@@ -2,13 +2,15 @@
 """
 Loop Agent <-> Tyr Assistant
 
-Runs a small LLM ("Loop Agent") as a grey-box tester of Tyr Assistant, in
-four phases:
-  1. Explore Tyr for a few turns to learn what's actually there.
+Runs a small LLM ("Loop Agent") as a functional QA tester of Tyr Assistant,
+in four phases:
+  1. Explore Tyr for a few turns to map its real capabilities -- connected
+     agents, device actions, file/image operations, web browsing, multi-agent
+     workflows, and channel behavior.
   2. Design its own test plan from what it learned (prompts.SEED_TEST_IDEAS
      is inspiration only, not a script).
   3. Execute that self-authored plan against Tyr, turn by turn.
-  4. Write a Markdown test report with emoji status markers.
+  4. Write a Markdown QA report with emoji status markers.
 
 The Loop Agent's own model calls go through OpenRouter's OpenAI-compatible
 API, so you can drive it with any Claude model your OpenRouter account can
@@ -74,7 +76,7 @@ MAX_TURNS = int(os.environ.get("TYR_LOOP_MAX_TURNS", "150"))
 # OpenRouter model slug for the Loop Agent's brain. Any Claude model your
 # OpenRouter account can reach works -- e.g. anthropic/claude-opus-4.8,
 # anthropic/claude-fable-5. See https://openrouter.ai/models for the full list.
-MODEL = os.environ.get("TYR_LOOP_MODEL", "anthropic/claude-sonnet-5")
+MODEL = os.environ.get("TYR_LOOP_MODEL", "anthropic/claude-opus-4-8")
 OPENROUTER_BASE_URL = os.environ.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
 
 # Safety: when False (default) the Loop Agent can only ask read-only questions

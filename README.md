@@ -1,21 +1,32 @@
 # Tyr Loop Agent
 
-A small test harness: an LLM ("Loop Agent") acts as a grey-box tester of Tyr
-Assistant over Tyr's MCP server. It isn't handed a fixed script -- it's told
-what kind of system Tyr Assistant is (multi-agent orchestrator, downstream
-agents/devices, file/attachment capabilities, privacy boundaries,
-multi-channel access, possible multi-tenancy -- see `prompts.SYSTEM_BRIEF`),
-explores it for a few turns, designs its own test plan, runs that plan, and
-writes a Markdown report with emoji status markers on what passed, what
-failed, and what needs attention.
+A functional QA harness: an LLM ("Loop Agent") acts as an intelligent tester
+of Tyr Assistant over Tyr's MCP server. It isn't handed a fixed script -- it
+explores the system to understand what's actually there, designs its own
+thorough test plan, executes that plan, and writes a Markdown QA report with
+emoji status markers on what passed, what failed, and what needs attention.
 
-Exploration explicitly covers, for any device-coupled agent: listing
-filenames, reading/extracting file content, creating/renaming/deleting
-files, sending documents back as chat attachments, and whether one agent
-can be made to browse or relay another agent's files -- plus, when a
-second agent sits on different hardware, what's possible on that hardware
-too. See `device-*` and `inter-agent-file-browse`/`send-attachment`/
-`cross-hardware-capability-probe` in `prompts.SEED_TEST_IDEAS`.
+The Loop Agent treats Tyr as a QA engineer would: it maps the full space of
+capabilities (agents connected, actions possible, device operations, web
+browsing, cross-agent workflows, multi-channel behavior), then verifies each
+claim end-to-end with real observed outcomes rather than self-reports.
+
+Capabilities it probes:
+- **Agent management** -- what agents are connected, their structure and
+  state; creating, deleting, and modifying agents; verifying lifecycle changes.
+- **Messaging** -- relaying messages to a single agent; sending instructions
+  to multiple agents simultaneously; verifying each responds correctly.
+- **Device/file operations** -- directory listing, file read, file create,
+  rename, delete; image creation and storage; sending files and images back
+  as chat attachments.
+- **Cross-agent sharing** -- Agent A creates a file or image, Agent B
+  receives and reads it; content verified independently across the hop.
+- **Web browsing** -- asking an agent to search or surf the internet and
+  return real content; verifying the results match the query.
+- **Multi-step workflows** -- chaining capabilities across several agents
+  (e.g. web search → file write → cross-agent relay → independent read-back).
+- **Multi-channel consistency** -- verifying state is coherent across MCP,
+  Telegram, and email.
 
 ## Files
 
@@ -42,26 +53,20 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-**2. Provide the two required secrets.** Copy the template to `.env`, fill in
-your real values, and `source` it. `.env` is gitignored, so your secrets never
-get committed, and `source .env` sets them in every new terminal without
-editing your shell config:
+**2. Set the two required secrets** as environment variables:
+
+```bash
+export TYR_MCP_TOKEN=<your token>
+export OPENROUTER_API_KEY=<your key>
+```
+
+Or persist them across sessions via `.env` (gitignored):
 
 ```bash
 cp .env.example .env
-# edit .env and paste in your real values, then:
+# paste your values into .env, then:
 source .env
 ```
-
-The two required values are:
-
-- `TYR_MCP_TOKEN` -- bearer token for your Tyr assistant (Tyr Web ->
-  account/developer settings, or DevTools Network tab -> `Authorization` header).
-- `OPENROUTER_API_KEY` -- your OpenRouter key ([openrouter.ai/keys](https://openrouter.ai/keys)).
-
-(If you prefer, you can skip `.env` and just `export TYR_MCP_TOKEN=...` and
-`export OPENROUTER_API_KEY=...` directly -- but those only last for that one
-terminal session.)
 
 ## Running
 
@@ -76,8 +81,8 @@ python3 agent_loop.py
 By default this runs **read-only**: the Loop Agent can only ask Tyr Assistant
 questions (`tyr_assistant_query`), never issue instructions with real side
 effects. Most test cases it ends up designing for itself (creating/deleting
-an agent, relaying a message to an agent, asking an agent to create a file,
-probing a security/privacy boundary) need actions enabled to actually run:
+an agent, asking an agent to create a file, running a cross-agent workflow)
+need actions enabled to actually run:
 
 ```bash
 export TYR_LOOP_ALLOW_ACTIONS=true
@@ -94,40 +99,74 @@ Other env vars:
 |---|---|---|
 | `TYR_LOOP_EXPLORE_TURNS` | `10` | Turns budgeted for phase 1 (exploration) |
 | `TYR_LOOP_MAX_TURNS` | `150` | Turns budgeted for phase 3 (test execution) |
-| `TYR_LOOP_MODEL` | `anthropic/claude-sonnet-5` | OpenRouter model slug for the Loop Agent's own decisions (e.g. `anthropic/claude-opus-4.8`, `anthropic/claude-fable-5` -- see [openrouter.ai/models](https://openrouter.ai/models)) |
+| `TYR_LOOP_MODEL` | `anthropic/claude-opus-4-8` | OpenRouter model slug for the Loop Agent's own decisions (e.g. `anthropic/claude-sonnet-5`, `anthropic/claude-fable-5` -- see [openrouter.ai/models](https://openrouter.ai/models)) |
 | `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | OpenRouter API base URL |
 | `TYR_MCP_URL` | `https://www.tyr.ai/tyrcli/mcp` | Tyr MCP endpoint (see `mcp_client.py`) |
 
 ## How it works
 
 1. **Explore** (`TYR_LOOP_EXPLORE_TURNS` turns) -- the Loop Agent asks Tyr
-   open-ended questions to learn what agents/devices actually exist, what
-   actions are possible, and anything about permissions, privacy, or
-   multi-channel/multi-user behavior. No mutating actions here.
+   open-ended questions to map what agents/devices exist, what actions are
+   possible (file ops, image creation, web browsing, cross-agent messaging,
+   multi-agent workflows), and anything about multi-channel access. No
+   mutating actions here.
 2. **Design** (one call, no Tyr interaction) -- given the exploration
    transcript, the model writes its own thorough test plan as JSON --
-   targeting around 50 cases (at least 40), spanning security
-   vulnerability-hunting (auth/permission bypass, injection, boundary
-   probing from multiple angles), functional correctness, permissions,
-   isolation, device/file capability, failure modes/features that don't
-   actually work, edge cases, reliability, and multi-channel consistency.
+   targeting around 50 cases (at least 30), covering agent management,
+   single- and multi-agent messaging, device/file capabilities, image
+   operations, cross-agent sharing, web browsing, multi-step workflows,
+   multi-channel consistency, error handling, and edge cases.
    `SEED_TEST_IDEAS` in `prompts.py` is passed in purely as inspiration for
-   the *kinds* of things worth checking -- the model is free to go beyond
-   or skip any of them in favor of what it actually found, and is expected
-   to generate many concrete cases per category rather than one each. If
-   the model's output isn't parseable JSON, the run falls back to the much
-   shorter `SEED_TEST_IDEAS`.
+   the *kinds* of things worth verifying -- the model is free to go beyond
+   or skip any of them in favor of what it actually found. If the model's
+   output isn't parseable JSON, the run falls back to `SEED_TEST_IDEAS`.
 3. **Execute** (`TYR_LOOP_MAX_TURNS` turns) -- runs the self-authored plan
-   against Tyr, one message per turn, tagging the first message of each case
-   with its id (e.g. `[create-agent] ...`).
+   against Tyr, one message per turn. Each message is a plain, natural
+   instruction -- exactly what a real Tyr user would type, with no test
+   labels or ID tags in the payload. Most cases take multiple turns:
+   the agent sends the real instruction, then follows up to independently
+   verify the outcome (re-reading a file, asking the receiving agent to
+   confirm, re-listing a directory) rather than trusting a single reply.
 4. **Report** -- one more model call summarizes the full transcript into
    `tyr_test_report_<timestamp>.md`.
 
-Security/isolation test cases are explicitly constrained: the goal is to
-check whether Tyr *refuses or contains* an out-of-bounds request (e.g.
-leaking one agent's data to another, or reaching across users), not to
-actually extract real sensitive data. Being blocked or refused on those
-cases is scored as a PASS, not a failure.
+## Example scenarios
+
+The test cases the Loop Agent designs for itself can range from simple
+single-step checks to complex multi-agent workflows. A few examples of
+the kinds of scenarios it generates:
+
+**Agent lifecycle**
+> Create an agent named `tyr-test-helper`, verify it shows up in the agent
+> list, send it a question to confirm it responds, then delete it and verify
+> it no longer appears.
+
+**Cross-agent file relay**
+> Ask Alice to create a file called `tyr-test-data.txt` with a known string.
+> Then ask Bob to read that file and return its exact contents. Verify the
+> contents Bob reports match what Alice wrote -- independently, not just
+> from Alice's claim.
+
+**Image creation and delivery**
+> Ask an agent to create a test image, store it on its device, then send it
+> back as a chat attachment. Verify the attachment arrives and is a valid image.
+
+**Web research → file → cross-agent handoff**
+> Ask Agent A to search the web for today's weather in London and write a
+> one-paragraph summary to `tyr-test-weather.txt`. Then ask Agent B to read
+> that file and tell you the weather. Verify Agent B's answer matches the file.
+
+**Multi-agent simultaneous dispatch**
+> Send the same question to all connected agents at once. Verify each agent
+> replies independently and the replies reflect their individual context
+> (not the same canned response).
+
+**Chained workflow**
+> Ask Agent A to surf the web for three recent news headlines and write them
+> to `tyr-test-headlines.txt`. Ask Agent B to read that file, pick the most
+> interesting headline, and create a short image (e.g. a title card) for it.
+> Ask Agent B to send that image back as a chat attachment. Verify the full
+> chain end-to-end.
 
 ## Output
 
@@ -139,20 +178,21 @@ Each run produces:
 - `tyr_test_report_<UTC timestamp>.md` -- one file per run. Starts with a
   legend (`✅ PASS · ❌ FAIL · ⚠️ PARTIAL · ⏭️ NOT ATTEMPTED`) and a status
   tally, then a subsection per test case (tagged with a category emoji --
-  🔧 functional, 🔑 permissions, 🔒 security, 👥 isolation, 💻 device,
-  🌐 channel, 🧯 reliability) with its result and supporting evidence, then
-  a "Failures needing attention" section (🚨 for security/privacy issues,
-  🐛 for functional/reliability bugs).
+  🔧 functional, 🤝 multi-agent, 💻 device, 🌐 channel, 🧯 reliability,
+  🔄 workflow, 🌍 web) with its result and supporting evidence, then an
+  "Issues needing attention" section (🐛 for functional bugs, ⚠️ for
+  partial/unverified outcomes).
 
 Both are gitignored (`.gitignore`) since they're run artifacts, not code.
 
 ## Notes
 
-- For security/isolation cases, a *refusal* from Tyr is the desired
-  outcome and scores as PASS; only compliance with an out-of-bounds request
-  scores as FAIL. The Loop Agent is instructed to stop and record the
-  failure rather than pursue further extraction if Tyr does comply with
-  something it should have refused.
+- PASS requires an independently verified outcome -- not just Tyr's claim
+  that something worked. The Loop Agent is instructed to follow up (re-read
+  a file, ask the other agent to confirm) before scoring.
 - If the Loop Agent can't complete a test case (e.g. a prerequisite
-  failed), it's instructed to note that and move on rather than get stuck,
-  so one broken case won't burn the whole turn budget.
+  failed), it notes that and moves on rather than getting stuck, so one
+  broken case won't burn the whole turn budget.
+- Device/file cases only create or modify files clearly prefixed `tyr-test-`,
+  never pre-existing files. Agent-lifecycle cases only create and delete
+  agents clearly labeled `tyr-test-*`.
