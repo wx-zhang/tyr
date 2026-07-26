@@ -28,18 +28,50 @@ too. See `device-*` and `inter-agent-file-browse`/`send-attachment`/
 
 ## Setup
 
+The Loop Agent's own model calls go through **OpenRouter** (OpenAI-compatible
+API), so you drive it with any Claude model your OpenRouter account can reach.
+Tyr Assistant itself is still reached over its own MCP server -- that's
+unchanged.
+
+**1. Install dependencies** into a project virtualenv (on macOS, Homebrew's
+Python is externally managed per PEP 668 and rejects global `pip install`):
+
 ```bash
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
-export TYR_OAUTH_TOKEN=...      # Tyr Web -> account/developer settings,
-                                 # or DevTools Network tab -> Authorization header
-export ANTHROPIC_API_KEY=...
 ```
 
+**2. Provide the two required secrets.** Copy the template to `.env`, fill in
+your real values, and `source` it. `.env` is gitignored, so your secrets never
+get committed, and `source .env` sets them in every new terminal without
+editing your shell config:
+
+```bash
+cp .env.example .env
+# edit .env and paste in your real values, then:
+source .env
+```
+
+The two required values are:
+
+- `TYR_MCP_TOKEN` -- bearer token for your Tyr assistant (Tyr Web ->
+  account/developer settings, or DevTools Network tab -> `Authorization` header).
+- `OPENROUTER_API_KEY` -- your OpenRouter key ([openrouter.ai/keys](https://openrouter.ai/keys)).
+
+(If you prefer, you can skip `.env` and just `export TYR_MCP_TOKEN=...` and
+`export OPENROUTER_API_KEY=...` directly -- but those only last for that one
+terminal session.)
+
 ## Running
+
+With the virtualenv activated:
 
 ```bash
 python3 agent_loop.py
 ```
+
+(or without activating: `.venv/bin/python agent_loop.py`)
 
 By default this runs **read-only**: the Loop Agent can only ask Tyr Assistant
 questions (`tyr_assistant_query`), never issue instructions with real side
@@ -62,7 +94,8 @@ Other env vars:
 |---|---|---|
 | `TYR_LOOP_EXPLORE_TURNS` | `10` | Turns budgeted for phase 1 (exploration) |
 | `TYR_LOOP_MAX_TURNS` | `150` | Turns budgeted for phase 3 (test execution) |
-| `TYR_LOOP_MODEL` | `claude-sonnet-5` | Model used for the Loop Agent's own decisions |
+| `TYR_LOOP_MODEL` | `anthropic/claude-sonnet-5` | OpenRouter model slug for the Loop Agent's own decisions (e.g. `anthropic/claude-opus-4.8`, `anthropic/claude-fable-5` -- see [openrouter.ai/models](https://openrouter.ai/models)) |
+| `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | OpenRouter API base URL |
 | `TYR_MCP_URL` | `https://www.tyr.ai/tyrcli/mcp` | Tyr MCP endpoint (see `mcp_client.py`) |
 
 ## How it works

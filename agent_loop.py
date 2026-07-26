@@ -10,22 +10,30 @@ four phases:
   3. Execute that self-authored plan against Tyr, turn by turn.
   4. Write a Markdown test report with emoji status markers.
 
+The Loop Agent's own model calls go through OpenRouter's OpenAI-compatible
+API, so you can drive it with any Claude model your OpenRouter account can
+reach (e.g. anthropic/claude-sonnet-5). Tyr Assistant itself is still reached
+over its own MCP server (see mcp_client.py) -- that connection is unchanged.
+
 Required env vars:
-  TYR_OAUTH_TOKEN     Tyr bearer token (see mcp_client.py for how to get one)
-  ANTHROPIC_API_KEY   Anthropic API key for the Loop Agent's own model calls
+  TYR_MCP_TOKEN       Tyr bearer token (see mcp_client.py for how to get one)
+  OPENROUTER_API_KEY  OpenRouter API key for the Loop Agent's own model calls
 
 Optional env vars:
   TYR_LOOP_ALLOW_ACTIONS   "true" to allow mutating tyr_assistant_request
                            calls (needed for most non-trivial test cases).
                            Default: read-only.
-  TYR_LOOP_EXPLORE_TURNS   Turns budgeted for phase 1. Default: 6.
-  TYR_LOOP_MAX_TURNS       Turns budgeted for phase 3. Default: 40.
-  TYR_LOOP_MODEL           Model for the Loop Agent's own calls.
+  TYR_LOOP_EXPLORE_TURNS   Turns budgeted for phase 1. Default: 10.
+  TYR_LOOP_MAX_TURNS       Turns budgeted for phase 3. Default: 150.
+  TYR_LOOP_MODEL           OpenRouter model slug for the Loop Agent's own
+                           calls. Default: anthropic/claude-sonnet-5.
+  OPENROUTER_BASE_URL      Override the OpenRouter API base URL.
 
 Usage:
+  python3 -m venv .venv && source .venv/bin/activate
   pip install -r requirements.txt
-  export TYR_OAUTH_TOKEN=...
-  export ANTHROPIC_API_KEY=...
+  export TYR_MCP_TOKEN=...
+  export OPENROUTER_API_KEY=...
   python3 agent_loop.py
 """
 
@@ -37,9 +45,12 @@ import sys
 from datetime import datetime, timezone
 
 try:
-    import anthropic
-except ImportError:
-    sys.exit("Run: pip install -r requirements.txt")
+    from openai import OpenAI
+except ImportError as e:
+    sys.exit(
+        f"Missing dependency ({e}). Install into THIS interpreter with:\n"
+        f"  {sys.executable} -m pip install -r requirements.txt"
+    )
 
 from mcp_client import TyrMCPClient, TyrMCPError
 from prompts import (
@@ -60,7 +71,11 @@ STOP_TOKEN = "<<DONE>>"
 # ~50 cases at a couple of turns each.
 EXPLORE_TURNS = int(os.environ.get("TYR_LOOP_EXPLORE_TURNS", "10"))
 MAX_TURNS = int(os.environ.get("TYR_LOOP_MAX_TURNS", "150"))
-MODEL = os.environ.get("TYR_LOOP_MODEL", "claude-sonnet-5")
+# OpenRouter model slug for the Loop Agent's brain. Any Claude model your
+# OpenRouter account can reach works -- e.g. anthropic/claude-opus-4.8,
+# anthropic/claude-fable-5. See https://openrouter.ai/models for the full list.
+MODEL = os.environ.get("TYR_LOOP_MODEL", "anthropic/claude-sonnet-5")
+OPENROUTER_BASE_URL = os.environ.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
 
 # Safety: when False (default) the Loop Agent can only ask read-only questions
 # (tyr_assistant_query). Most non-trivial test cases it designs for itself
@@ -92,6 +107,25 @@ def log(entry: dict) -> None:
 
 def divider() -> None:
     print("-" * 60)
+
+
+def call_model(
+    brain: "OpenAI",
+    messages: list[dict],
+    max_tokens: int,
+    system: str | None = None,
+) -> str:
+    """One Loop Agent model call via OpenRouter's OpenAI-compatible chat API.
+    Prepends `system` as a system message when given, and returns the reply
+    text (empty string if the model returned no content)."""
+    if system is not None:
+        messages = [{"role": "system", "content": system}, *messages]
+    completion = brain.chat.completions.create(
+        model=MODEL,
+        max_tokens=max_tokens,
+        messages=messages,
+    )
+    return (completion.choices[0].message.content or "").strip()
 
 
 def resolve_pending_approvals(tyr: TyrMCPClient, operation_id: str, approvals: list) -> None:
@@ -155,7 +189,7 @@ def confirm_actions_enabled() -> None:
 
 
 def converse(
-    brain: "anthropic.Anthropic",
+    brain: "OpenAI",
     tyr: TyrMCPClient,
     system_prompt: str,
     loop_messages: list[dict],
@@ -168,15 +202,7 @@ def converse(
     for turn in range(1, max_turns + 1):
         print(f"\n=== [{phase}] Turn {turn}/{max_turns} ===")
 
-        completion = brain.messages.create(
-            model=MODEL,
-            system=system_prompt,
-            max_tokens=1024,
-            messages=loop_messages,
-        )
-        next_message = "".join(
-            block.text for block in completion.content if block.type == "text"
-        ).strip()
+        next_message = call_model(brain, loop_messages, max_tokens=1024, system=system_prompt)
 
         if next_message == STOP_TOKEN or not next_message:
             print("Loop Agent signaled done.")
@@ -224,17 +250,16 @@ def render_transcript(loop_messages: list[dict]) -> str:
     return "\n\n".join(f"[{m['role'].upper()}] {m['content']}" for m in loop_messages[1:])
 
 
-def generate_test_plan(brain: "anthropic.Anthropic", loop_messages: list[dict]) -> list[dict]:
+def generate_test_plan(brain: "OpenAI", loop_messages: list[dict]) -> list[dict]:
     """One-shot call (no Tyr interaction): design a test plan from what
     exploration turned up. Falls back to SEED_TEST_IDEAS if the model
     doesn't return parseable JSON."""
     plan_prompt = render_plan_prompt(render_transcript(loop_messages))
-    completion = brain.messages.create(
-        model=MODEL,
+    raw = call_model(
+        brain,
+        [{"role": "user", "content": plan_prompt}],
         max_tokens=8192,  # ~50 test cases with instructions needs headroom
-        messages=[{"role": "user", "content": plan_prompt}],
     )
-    raw = "".join(block.text for block in completion.content if block.type == "text").strip()
     raw = raw.removeprefix("```json").removeprefix("```").removesuffix("```").strip()
 
     try:
@@ -249,16 +274,13 @@ def generate_test_plan(brain: "anthropic.Anthropic", loop_messages: list[dict]) 
     return test_plan
 
 
-def write_report(brain: "anthropic.Anthropic", test_plan: list[dict], loop_messages: list[dict]) -> str:
+def write_report(brain: "OpenAI", test_plan: list[dict], loop_messages: list[dict]) -> str:
     report_prompt = render_report_prompt(test_plan, render_transcript(loop_messages))
-    completion = brain.messages.create(
-        model=MODEL,
+    report = call_model(
+        brain,
+        [{"role": "user", "content": report_prompt}],
         max_tokens=16384,  # one subsection per test case, up to ~50 cases
-        messages=[{"role": "user", "content": report_prompt}],
     )
-    report = "".join(
-        block.text for block in completion.content if block.type == "text"
-    ).strip()
 
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     report_file = REPORT_FILE_TEMPLATE.format(timestamp=timestamp)
@@ -273,9 +295,11 @@ def write_report(brain: "anthropic.Anthropic", test_plan: list[dict], loop_messa
 
 
 def main() -> None:
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        sys.exit("Set ANTHROPIC_API_KEY before running.")
+    if not os.environ.get("OPENROUTER_API_KEY"):
+        sys.exit("Set OPENROUTER_API_KEY before running.")
 
+    print(f"Python: {sys.executable}")
+    print(f"Loop Agent model: {MODEL} (via OpenRouter: {OPENROUTER_BASE_URL})")
     print(f"Mode: {'ACTIONS ALLOWED (tyr_assistant_request)' if ALLOW_ACTIONS else 'READ-ONLY (tyr_assistant_query)'}")
     if ALLOW_ACTIONS:
         confirm_actions_enabled()
@@ -286,7 +310,11 @@ def main() -> None:
     except TyrMCPError as e:
         sys.exit(str(e))
 
-    brain = anthropic.Anthropic()
+    brain = OpenAI(
+        base_url=OPENROUTER_BASE_URL,
+        api_key=os.environ["OPENROUTER_API_KEY"],
+        default_headers={"X-Title": "Tyr Loop Agent"},  # optional OpenRouter attribution
+    )
     tyr_operation_id = None
 
     print("\n### Phase 1/4: Explore ###")

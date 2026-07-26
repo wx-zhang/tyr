@@ -21,7 +21,7 @@ MCP_URL = os.environ.get("TYR_MCP_URL", "https://www.tyr.ai/tyrcli/mcp")
 
 # Read from env, never hardcode. Get it from Tyr Web -> account/developer
 # settings, or browser DevTools (Network tab -> request to tyr.ai -> Authorization header).
-TOKEN_ENV_VAR = "TYR_OAUTH_TOKEN"
+TOKEN_ENV_VAR = "TYR_MCP_TOKEN"
 
 
 class TyrMCPError(RuntimeError):
