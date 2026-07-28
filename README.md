@@ -130,6 +130,103 @@ Other env vars:
 4. **Report** -- one more model call summarizes the full transcript into
    `tyr_test_report_<timestamp>.md`.
 
+## Tyr request lifecycle
+
+A Loop Agent turn is not always a single synchronous request and reply. Tyr
+may hand work to another Agent and return an acknowledgement before that
+Agent has produced its final result. The tester follows the operation until
+it settles or reaches its polling limit:
+
+1. The Loop Agent generates a natural-language message.
+2. `send_to_tyr()` sends it through `tyr_assistant_query` in read-only mode,
+   or `tyr_assistant_request` when actions are enabled.
+3. Tyr returns an `operationId`, its current `state`, and the latest
+   `response`.
+4. While the operation has not reached a state in `TERMINAL_STATES`,
+   `send_to_tyr()` calls `tyr_operation_status` with a 30-second long poll.
+   It makes at most 10 status checks by default.
+5. If Tyr returns pending approvals, the tester asks the human operator to
+   approve, reject, or leave each approval pending, then checks the same
+   operation again.
+6. When the operation settles, the tester records the final response. If the
+   polling limit is reached first, it records the latest response as
+   provisional and explicitly warns the Loop Agent not to treat it as final.
+
+Tyr's operation states have the following meanings:
+
+| State | Meaning |
+|---|---|
+| `input_required` | Tyr needs another message to collect or disambiguate input. |
+| `approval_required` | The operation is paused until an approval is resolved. |
+| `queued` | The execution is waiting for the runtime. |
+| `running` | The runtime is working, or Tyr is still publishing the user-visible return. |
+| `completed` | The operation completed successfully. For a handoff, this includes publishing the user-visible return. |
+| `partial` | The operation settled with a mix of successful and unsuccessful executions. |
+| `failed` | The operation failed. |
+| `cancelled` | The operation was cancelled or expired. |
+
+`send_to_tyr()` decides whether to stop polling by checking the value against
+`TERMINAL_STATES` in `agent_loop.py`. That constant is therefore part of the
+tester's behavior and should be kept aligned with Tyr's terminal operation
+states whenever either side changes. The tester also uses the local state
+`error` when an MCP call raises `TyrMCPError`; that is not a Tyr operation
+state.
+
+The important distinction is between a successful handoff and a completed
+operation:
+
+```text
+Tyr Assistant accepts the request
+             |
+             v
+Tyr delegates it to Alice and creates a runtime execution
+             |
+             v
+queued  ->  running  ->  completed / partial / failed / cancelled
+```
+
+A response such as “I asked Alice to solve X” confirms that the handoff
+succeeded. It is an intermediate acknowledgement, not Alice's final result.
+While Alice is waiting to start, the operation is normally `queued`; while
+she is working, it is `running`. If user input or approval is needed, Tyr may
+return `input_required` or `approval_required`.
+
+Alice's raw Agent-to-Agent final message remains internal. After her execution
+finishes, Tyr Assistant publishes a user-visible return to the original
+conversation; that published message becomes the operation's final
+`response`. The execution summary exposes `hasFinalResult` to show that an
+internal result exists, but it does not expose the raw `finalResult`. The
+outer operation may therefore remain `running` briefly after Alice's runtime
+execution finishes, until Tyr publishes that return.
+
+State is a snapshot. If Alice finishes before the tester's first status
+check, that check may already return `completed`.
+
+### Sending another request to a busy Agent
+
+Each Tyr Assistant handoff creates a separate runtime execution. If Alice is
+already running one execution when another request arrives, Tyr does not
+inject the new request into or replace her current work. The new execution is
+queued:
+
+```text
+Execution 1: running
+Execution 2: queued
+```
+
+After Execution 1 finishes normally, the daemon automatically starts the next
+queued execution:
+
+```text
+Execution 1: completed
+Execution 2: running
+```
+
+Queued executions are normally consumed in first-in, first-out order. A
+request remains queued while the active execution is waiting for approval.
+If the runtime enters an error state or the Agent is stopped, the queued work
+may require a restart or retry instead of starting automatically.
+
 ## Example scenarios
 
 The test cases the Loop Agent designs for itself can range from simple
