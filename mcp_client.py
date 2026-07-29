@@ -49,15 +49,18 @@ class TyrMCPClient:
         self._rpc_id += 1
         return self._rpc_id
 
-    def _post(self, method: str, params: dict | None = None) -> dict:
+    def _post(self, method: str, params: dict | None = None, timeout: int = 60) -> dict:
         payload = {"jsonrpc": "2.0", "id": self._next_id(), "method": method}
         if params:
             payload["params"] = params
         if self._session_id:
             self._http.headers["Mcp-Session-Id"] = self._session_id
 
-        resp = self._http.post(self.url, json=payload, timeout=60)
-        resp.raise_for_status()
+        try:
+            resp = self._http.post(self.url, json=payload, timeout=timeout)
+            resp.raise_for_status()
+        except requests.RequestException as e:
+            raise TyrMCPError(f"HTTP error calling Tyr ({method}): {e}") from e
 
         sid = resp.headers.get("Mcp-Session-Id")
         if sid:
@@ -106,9 +109,9 @@ class TyrMCPClient:
     def list_tools(self) -> list:
         return self._post("tools/list").get("tools", [])
 
-    def call_tool(self, name: str, arguments: dict) -> dict:
+    def call_tool(self, name: str, arguments: dict, timeout: int = 60) -> dict:
         """Call a tool and return its result as a dict (parsed from the text content block)."""
-        result = self._post("tools/call", {"name": name, "arguments": arguments})
+        result = self._post("tools/call", {"name": name, "arguments": arguments}, timeout=timeout)
         content = result.get("content", [])
         text_parts = [c["text"] for c in content if c.get("type") == "text" and "text" in c]
         raw = "\n".join(text_parts)
@@ -136,9 +139,13 @@ class TyrMCPClient:
         return self.call_tool("tyr_assistant_request", args)
 
     def operation_status(self, operation_id: str, wait_seconds: int = 0) -> dict:
+        # The server holds the connection open for up to wait_seconds on a
+        # long-poll; give the client comfortable headroom above that so a
+        # slightly slow response doesn't trip our own read timeout.
         return self.call_tool(
             "tyr_operation_status",
             {"operationId": operation_id, "waitSeconds": wait_seconds},
+            timeout=wait_seconds + 60,
         )
 
     def resolve_approval(

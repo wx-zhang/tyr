@@ -291,6 +291,12 @@ Rules:
   do X" or "is X possible". If a reply describes/predicts an outcome instead
   of actually doing the thing, push for the real attempt ("go ahead and
   actually do that now, then tell me exactly what happened") before moving on.
+- Treat every reply as feedback and adapt: if Tyr tells you your request was
+  invalid, unclear, or needs to be phrased differently (e.g. "use this tool",
+  "specify the agent name", "provide a file path"), incorporate that
+  information and retry with the corrected request -- do not give up on the
+  case just because the first attempt was rejected. Only move on after you
+  have either succeeded or exhausted reasonable reformulations.
 - Don't stop at the first reply: keep taking turns until you have a confirmed,
   observed outcome (actual data/file/error returned), not just a claim. Use
   an independent check where available (re-list the directory, have the
@@ -305,8 +311,12 @@ Rules:
 - Do not repeat a question already answered.
 - When every test case has been attempted, respond with exactly: {stop_token}
 
-Respond with ONLY the next message to send to Tyr Assistant (no preamble,
-no quotes) -- or with {stop_token} if you're done.
+OUTPUT FORMAT -- critical:
+Your entire response must be ONLY the bare message to send to Tyr Assistant.
+No "Now I'll test...", no "Let me ask...", no reasoning, no narration of your
+plan. Your output is piped directly into the chat -- anything you write
+becomes what Tyr reads. Keep all reasoning silent and start your response
+with the first word of the message itself.
 """.strip()
 
 
@@ -332,8 +342,7 @@ Test plan:
 Transcript:
 {transcript}
 
-Write a concise Markdown QA report. Keep it tight -- one line of evidence
-per case, no padding.
+Write a concise Markdown QA report.
 
 # Tyr Assistant QA Report
 
@@ -349,11 +358,19 @@ For every test case, one subsection using this format:
 
 Category emoji mapping: {category_legend}.
 
-Under each subsection, two lines only:
-- `**Result:** ✅ / ❌ / ⚠️ / ⏭️`
-- `**Evidence:** one sentence -- the concrete thing that happened (actual
-  output, file content, error message, or what was missing). If the outcome
-  is only a self-report with no independent verification, say so here.
+For ✅ PASS cases, two lines:
+- `**Result:** ✅ PASS`
+- `**Evidence:** one sentence -- the concrete thing that happened.`
+
+For ❌ FAIL and ⚠️ PARTIAL cases, four lines:
+- `**Result:** ❌ FAIL / ⚠️ PARTIAL`
+- `**Prompt sent:** the exact message (or last message if multi-turn) sent to Tyr that produced the failure.`
+- `**What happened:** one or two sentences -- what Tyr actually returned or did, and why that counts as a failure (e.g. wrong output, no response, error message, unverified self-report).`
+- `**Evidence:** the concrete observed outcome -- quote the response or state exactly what was missing or incorrect.`
+
+For ⏭️ NOT ATTEMPTED cases, two lines:
+- `**Result:** ⏭️ NOT ATTEMPTED`
+- `**Reason:** one sentence on why it was skipped (prerequisite failed, capability absent, etc.).`
 
 ## Issues needing attention
 
