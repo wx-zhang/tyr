@@ -1,7 +1,7 @@
 .venv/
 __pycache__/
 *.pyc
-tyr_loop_log.jsonl
-tyr_test_report_*.md
+tyr_*_log.jsonl
+qatestsearch_*.md
 .env
 .DS_Store

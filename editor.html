@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Tyr Test Case Editor</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg: #16161a; --panel: #1f1f24; --border: #333338; --text: #ececef;
+    --muted: #9a9aa2; --accent: #818cf8; --accent-text: #101014;
+    --danger: #f87171; --ok: #4ade80; --code-bg: #111114;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg); color: var(--text);
+  }
+  header {
+    position: sticky; top: 0; z-index: 10;
+    display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+    padding: 0.9rem 1.5rem; background: var(--panel); border-bottom: 1px solid var(--border);
+  }
+  header h1 { font-size: 1.05rem; margin: 0; margin-right: auto; }
+  input[type=text], textarea {
+    font-family: inherit; font-size: 0.9rem; color: var(--text); background: var(--code-bg);
+    border: 1px solid var(--border); border-radius: 6px; padding: 0.4rem 0.55rem;
+  }
+  textarea { width: 100%; resize: vertical; line-height: 1.4; }
+  button {
+    font-family: inherit; font-size: 0.85rem; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--panel); color: var(--text); padding: 0.4rem 0.75rem; cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; }
+  button.danger { color: var(--danger); border-color: var(--danger); }
+  button.subtle { border: none; background: none; padding: 0.2rem 0.4rem; color: var(--muted); }
+  button.subtle:hover { color: var(--text); }
+  button:disabled { opacity: 0.5; cursor: default; }
+  main { max-width: 920px; margin: 0 auto; padding: 1.5rem; }
+  #status { font-size: 0.85rem; color: var(--muted); min-width: 12rem; }
+  #status.error { color: var(--danger); }
+  #status.ok { color: var(--ok); }
+  .hint { font-size: 0.8rem; color: var(--muted); margin: 0 0 1rem; }
+  .hint code { background: var(--code-bg); padding: 0.05rem 0.3rem; border-radius: 4px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 1rem; margin-bottom: 1rem;
+  }
+  .card.disabled { opacity: 0.55; }
+  .card-row { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; }
+  .card-row label { font-size: 0.75rem; color: var(--muted); display: flex; flex-direction: column; gap: 0.2rem; }
+  .card-row input[type=text] { min-width: 10rem; }
+  .grow { flex: 1; }
+  .card-title { font-weight: 600; width: 100%; }
+  .step { display: flex; gap: 0.4rem; align-items: flex-start; margin-bottom: 0.4rem; }
+  .step .num { font-size: 0.75rem; color: var(--muted); padding-top: 0.5rem; width: 1.4rem; text-align: right; flex-shrink: 0; }
+  .step textarea { flex: 1; min-height: 3rem; }
+  .step-controls { display: flex; flex-direction: column; gap: 0.15rem; }
+  .steps-label { font-size: 0.75rem; color: var(--muted); margin: 0.6rem 0 0.3rem; }
+  #addCaseBtn { display: block; margin: 1rem auto 3rem; }
+  .empty { text-align: center; color: var(--muted); padding: 3rem 0; }
+  /* Read-only "view as text" mode: the whole case as plain prose, no inputs,
+     so it can be read end to end or copied out in one go. */
+  .text-cell-title { font-weight: 600; margin-bottom: 0.5rem; }
+  .text-cell {
+    background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px;
+    padding: 0.7rem 0.85rem; margin: 0; font-size: 0.85rem; line-height: 1.5;
+    white-space: pre-wrap; word-break: break-word; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Tyr QATestSearch test case editor</h1>
+  <span id="status"></span>
+  <button id="viewToggleBtn">View as text</button>
+  <button id="copyAllBtn">Copy all</button>
+  <button id="saveBtn" class="primary" disabled>Save changes</button>
+</header>
+
+<main>
+  <p class="hint">
+    Fixed test suite: cases run exactly as written, step by step, in order. Step text may use
+    <code>{store_url}</code> and <code>{fake_data_marker}</code> placeholders -- they're filled in from the
+    live STORE_URL / FAKE_DATA_MARKER at run time, so don't hardcode the URL here. Keep pass/fail wording
+    out of the steps and put it in each case's <b>pass bar</b> instead -- that's what the report grades
+    against. Uncheck "enabled" to keep a case on file without running it.
+  </p>
+  <div id="editorView">
+    <div id="cases"></div>
+    <button id="addCaseBtn">+ Add test case</button>
+  </div>
+  <div id="textView" style="display:none"></div>
+</main>
+
+<script>
+const state = { cases: [], dirty: false };
+
+const statusEl = document.getElementById("status");
+const saveBtn = document.getElementById("saveBtn");
+const casesEl = document.getElementById("cases");
+const addCaseBtn = document.getElementById("addCaseBtn");
+const viewToggleBtn = document.getElementById("viewToggleBtn");
+const copyAllBtn = document.getElementById("copyAllBtn");
+const editorViewEl = document.getElementById("editorView");
+const textViewEl = document.getElementById("textView");
+
+function setStatus(text, cls) {
+  statusEl.textContent = text;
+  statusEl.className = cls || "";
+}
+
+function setDirty(dirty) {
+  state.dirty = dirty;
+  saveBtn.disabled = !dirty;
+  if (dirty) setStatus("Unsaved changes", "");
+}
+
+// Normalize every case to a single "steps" array in place -- a legacy
+// single-line "instruction" becomes a one-item steps list; a case with
+// neither gets an empty steps list, ready for "+ Add step".
+function normalizeSteps(c) {
+  if (!Array.isArray(c.steps)) {
+    c.steps = typeof c.instruction === "string" && c.instruction ? [c.instruction] : [];
+  }
+  delete c.instruction;
+}
+
+async function loadCases() {
+  setStatus("Loading...");
+  const res = await fetch("/api/cases");
+  const data = await res.json();
+  state.cases = data.cases;
+  state.cases.forEach(normalizeSteps);
+  // A reload always lands back in the editable view.
+  editorViewEl.style.display = "";
+  textViewEl.style.display = "none";
+  viewToggleBtn.textContent = "View as text";
+  render();
+  setDirty(false);
+  setStatus("");
+}
+
+async function saveCases() {
+  setStatus("Saving...");
+  saveBtn.disabled = true;
+  const res = await fetch("/api/cases", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(state.cases),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    setStatus(`Error: ${data.error}`, "error");
+    saveBtn.disabled = false;
+    return;
+  }
+  setDirty(false);
+  setStatus(`Saved ${data.saved} case(s)`, "ok");
+}
+
+function render() {
+  if (!state.cases.length) {
+    casesEl.innerHTML = `<div class="empty">No test cases yet -- click "+ Add test case" below.</div>`;
+    return;
+  }
+  casesEl.innerHTML = "";
+  state.cases.forEach((c, i) => casesEl.appendChild(renderCard(c, i)));
+}
+
+function el(tag, props, children) {
+  const node = document.createElement(tag);
+  Object.assign(node, props || {});
+  (children || []).forEach(ch => ch && node.appendChild(ch));
+  return node;
+}
+
+// ── Plain-text view ──────────────────────────────────────────
+// One case as readable prose: what a reviewer wants to read end to end, and
+// what you paste into a ticket or a chat. Same text feeds the Copy buttons,
+// so what you read is exactly what lands on the clipboard.
+
+function formatCase(c, index) {
+  const lines = [
+    `${index != null ? `${index}. ` : ""}[${c.id || "(no id)"}] ${c.title || "(no title)"}` +
+      `${c.category ? ` (${c.category})` : ""}${c.enabled === false ? " [disabled]" : ""}`,
+  ];
+  (c.steps || []).forEach((s, i) => lines.push(`   Step ${i + 1}: ${s}`));
+  lines.push(`   PASS BAR: ${c.success && c.success.trim()
+    ? c.success.trim()
+    : "(default) the case's final action was carried out and reported done"}`);
+  return lines.join("\n");
+}
+
+function formatAllCases(cases) {
+  return cases.map((c, i) => formatCase(c, i + 1)).join("\n\n");
+}
+
+async function copyText(text, label) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    // clipboard API needs a secure context; the editor is served over plain
+    // http on localhost in some browsers, so keep the old execCommand path.
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    ta.remove();
+  }
+  setStatus(label || "Copied to clipboard", "ok");
+}
+
+function renderTextCard(c, index) {
+  const box = el("div", { className: "card" + (c.enabled === false ? " disabled" : "") });
+
+  const titleLine = el("div", {
+    className: "text-cell-title",
+    textContent: `${index}. [${c.id || "(no id)"}] ${c.title || "(no title)"}` +
+      `${c.category ? ` (${c.category})` : ""}${c.enabled === false ? " -- disabled" : ""}`,
+  });
+
+  const copyBtn = el("button", { textContent: "Copy" });
+  copyBtn.onclick = () => copyText(formatCase(c), `Copied "${c.id || c.title || "case"}"`);
+
+  const stepsText = (c.steps || []).map((s, i) => `${i + 1}. ${s}`).join("\n\n")
+    || "(no steps -- falls back to the title)";
+  const barText = "\n\nPASS BAR: " + (c.success && c.success.trim()
+    ? c.success.trim()
+    : "(default) the case's final action was carried out and reported done");
+
+  box.appendChild(el("div", { className: "card-row" }, [
+    el("div", { className: "grow" }, [titleLine]),
+    copyBtn,
+  ]));
+  box.appendChild(el("pre", { className: "text-cell", textContent: stepsText + barText }));
+  return box;
+}
+
+function refreshTextView() {
+  textViewEl.innerHTML = "";
+  if (!state.cases.length) {
+    textViewEl.innerHTML = `<div class="empty">No test cases.</div>`;
+    return;
+  }
+  state.cases.forEach((c, i) => textViewEl.appendChild(renderTextCard(c, i + 1)));
+}
+
+viewToggleBtn.onclick = () => {
+  const showingText = textViewEl.style.display !== "none";
+  if (showingText) {
+    textViewEl.style.display = "none";
+    editorViewEl.style.display = "";
+    viewToggleBtn.textContent = "View as text";
+  } else {
+    // Rebuilt on every switch so it always reflects unsaved edits.
+    refreshTextView();
+    editorViewEl.style.display = "none";
+    textViewEl.style.display = "";
+    viewToggleBtn.textContent = "Back to editor";
+  }
+};
+
+copyAllBtn.onclick = () => copyText(formatAllCases(state.cases), `Copied ${state.cases.length} case(s)`);
+
+function renderCard(c, index) {
+  const card = el("div", { className: "card" + (c.enabled === false ? " disabled" : "") });
+
+  // Row 1: enabled, id, category, move, delete
+  const enabledBox = el("input", { type: "checkbox", checked: c.enabled !== false, title: "Enabled (unchecked = kept on file but not run)" });
+  enabledBox.onchange = () => { c.enabled = enabledBox.checked; card.className = "card" + (c.enabled === false ? " disabled" : ""); setDirty(true); };
+
+  const idInput = el("input", { type: "text", value: c.id || "", placeholder: "kebab-case-id" });
+  idInput.oninput = () => { c.id = idInput.value; setDirty(true); };
+
+  const catInput = el("input", { type: "text", value: c.category || "", placeholder: "category" });
+  catInput.oninput = () => { c.category = catInput.value; setDirty(true); };
+
+  const upBtn = el("button", { className: "subtle", textContent: "↑", title: "Move up", disabled: index === 0 });
+  upBtn.onclick = () => { [state.cases[index - 1], state.cases[index]] = [state.cases[index], state.cases[index - 1]]; setDirty(true); render(); };
+  const downBtn = el("button", { className: "subtle", textContent: "↓", title: "Move down", disabled: index === state.cases.length - 1 });
+  downBtn.onclick = () => { [state.cases[index + 1], state.cases[index]] = [state.cases[index], state.cases[index + 1]]; setDirty(true); render(); };
+
+  const copyBtn = el("button", { textContent: "Copy", title: "Copy this whole case as plain text" });
+  copyBtn.onclick = () => copyText(formatCase(c), `Copied "${c.id || c.title || "case"}"`);
+
+  const delBtn = el("button", { className: "danger", textContent: "Delete" });
+  delBtn.onclick = () => {
+    if (!confirm(`Delete case "${c.id || "(untitled)"}"?`)) return;
+    state.cases.splice(index, 1); setDirty(true); render();
+  };
+
+  const row1 = el("div", { className: "card-row" }, [
+    el("label", {}, [document.createTextNode("Enabled"), enabledBox]),
+    el("label", { className: "grow" }, [document.createTextNode("ID"), idInput]),
+    el("label", {}, [document.createTextNode("Category"), catInput]),
+    el("div", { className: "step-controls" }, [upBtn, downBtn]),
+    copyBtn,
+    delBtn,
+  ]);
+
+  const titleInput = el("input", { type: "text", className: "card-title", value: c.title || "", placeholder: "Title" });
+  titleInput.oninput = () => { c.title = titleInput.value; setDirty(true); };
+
+  const stepsContainer = el("div", {});
+  c.steps.forEach((stepText, si) => {
+    const ta = el("textarea", { value: stepText, rows: 3, placeholder: "What to actually send / what counts as pass vs fail" });
+    ta.oninput = () => { c.steps[si] = ta.value; setDirty(true); };
+
+    const upS = el("button", { className: "subtle", textContent: "↑", title: "Move step up", disabled: si === 0 });
+    upS.onclick = () => { [c.steps[si - 1], c.steps[si]] = [c.steps[si], c.steps[si - 1]]; setDirty(true); render(); };
+    const downS = el("button", { className: "subtle", textContent: "↓", title: "Move step down", disabled: si === c.steps.length - 1 });
+    downS.onclick = () => { [c.steps[si + 1], c.steps[si]] = [c.steps[si], c.steps[si + 1]]; setDirty(true); render(); };
+    const rmS = el("button", { className: "subtle", textContent: "✕", title: "Remove step" });
+    rmS.onclick = () => { c.steps.splice(si, 1); setDirty(true); render(); };
+
+    stepsContainer.appendChild(el("div", { className: "step" }, [
+      el("div", { className: "num", textContent: `${si + 1}.` }),
+      ta,
+      el("div", { className: "step-controls" }, [upS, downS, rmS]),
+    ]));
+  });
+  const addStepBtn = el("button", { textContent: "+ Add step" });
+  addStepBtn.onclick = () => { c.steps.push(""); setDirty(true); render(); };
+
+  // The pass bar, kept out of the steps on purpose: steps say what to DO, this
+  // says which observed outcome counts as having done it. Left blank, the case
+  // is graded on whether its final action was carried out and reported done.
+  const successTa = el("textarea", {
+    value: c.success || "",
+    rows: 4,
+    placeholder: "Blank = PASS when the final action was carried out and reported done. Override here to state this case's own bar.",
+  });
+  successTa.oninput = () => { c.success = successTa.value; setDirty(true); };
+
+  card.appendChild(row1);
+  card.appendChild(titleInput);
+  card.appendChild(el("div", { className: "steps-label", textContent: "Steps" }));
+  card.appendChild(stepsContainer);
+  card.appendChild(addStepBtn);
+  card.appendChild(el("div", { className: "steps-label", textContent: "What counts as success (pass bar)" }));
+  card.appendChild(successTa);
+  return card;
+}
+
+saveBtn.onclick = saveCases;
+
+addCaseBtn.onclick = () => {
+  state.cases.push({ id: "", title: "", category: "", steps: [] });
+  setDirty(true);
+  render();
+  window.scrollTo(0, document.body.scrollHeight);
+};
+
+window.onbeforeunload = (e) => { if (state.dirty) { e.preventDefault(); e.returnValue = ""; } };
+
+loadCases();
+</script>
+</body>
+</html>

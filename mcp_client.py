@@ -2,11 +2,23 @@
 """
 Minimal JSON-RPC client for the Tyr Assistant MCP server (HTTP + SSE transport).
 
-Wraps the four tools Tyr exposes:
+Wraps the eight tools Tyr exposes:
   - tyr_assistant_query    (read-only: status/inventory/capabilities questions)
   - tyr_assistant_request  (can trigger real agent/computer actions -- gated, see agent_loop.py)
   - tyr_operation_status   (poll/long-poll an operation until it settles)
   - tyr_approval_resolve   (approve/reject a pending management or runtime approval)
+  - tyr_workspace_bridge_list / _send / _status / _history
+                           (reach a connected peer workspace -- see below)
+
+Note the split between the two assistant tools: `query` is server-enforced
+read-only and must NOT be used to hand work to an Agent, even when the Agent's
+downstream task only reads files. Every instruction or handoff goes through
+`request`.
+
+Cross-workspace access is mediated. A Bridge connects this workspace to a peer
+*Tyr Assistant*, never to a peer Agent -- peer Agents are not addressable from
+here. To act in another workspace you ask its Assistant to act for you, within
+the Bridge's declared permissions (e.g. chat, task_delegation, topology_read).
 """
 
 from __future__ import annotations
@@ -147,6 +159,52 @@ class TyrMCPClient:
             {"operationId": operation_id, "waitSeconds": wait_seconds},
             timeout=wait_seconds + 60,
         )
+
+    # -- Workspace Bridge tools ------------------------------------------
+    # A Bridge reaches the peer workspace's Tyr Assistant. It never reaches a
+    # peer Agent directly, and never exposes the peer's private chats.
+
+    def bridge_list(self) -> dict:
+        """Bridges authorized for this workspace: peer name, status
+        (active/revoked), direction, and declared permissions."""
+        return self.call_tool("tyr_workspace_bridge_list", {})
+
+    def bridge_send(
+        self,
+        bridge_id: str,
+        message: str,
+        conversation_id: str | None = None,
+        wait_seconds: int = 0,
+    ) -> dict:
+        """One request to the peer Tyr Assistant over an active Bridge. Reuse
+        conversation_id to continue the same isolated Bridge topic."""
+        args = {
+            "bridgeId": bridge_id,
+            "message": message,
+            "idempotencyKey": str(uuid.uuid4()),
+            "waitSeconds": wait_seconds,
+        }
+        if conversation_id:
+            args["conversationId"] = conversation_id
+        return self.call_tool("tyr_workspace_bridge_send", args, timeout=wait_seconds + 60)
+
+    def bridge_status(self, bridge_request_id: str, wait_seconds: int = 0) -> dict:
+        """State of one Bridge request. Peer approval blockers are reported but
+        cannot be resolved from this side."""
+        return self.call_tool(
+            "tyr_workspace_bridge_status",
+            {"bridgeRequestId": bridge_request_id, "waitSeconds": wait_seconds},
+            timeout=wait_seconds + 60,
+        )
+
+    def bridge_history(
+        self, bridge_id: str, conversation_id: str, limit: int = 30, before: str | None = None
+    ) -> dict:
+        """A bounded page from one isolated Bridge conversation."""
+        args = {"bridgeId": bridge_id, "conversationId": conversation_id, "limit": limit}
+        if before:
+            args["before"] = before
+        return self.call_tool("tyr_workspace_bridge_history", args)
 
     def resolve_approval(
         self,
