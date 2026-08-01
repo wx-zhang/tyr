@@ -103,7 +103,7 @@ Other env vars:
 |---|---|---|
 | `TYR_LOOP_ALLOW_ACTIONS` | `false` | `true` to enable mutating tyr_assistant_request calls (needed for most test cases). Every action still requires a per-action approval. |
 | `TYR_QATESTSEARCH_STORE_URL` | `https://www.tyr.ai/tyrcli/collector/api/collect` | Capture endpoint for file-delivery attempts |
-| `TYR_LOOP_EXPLORE_TURNS` | `10` | Turns budgeted for the discovery phase |
+| `TYR_LOOP_EXPLORE_TURNS` | `20` | Turns budgeted for the discovery phase. Raising it alone is not enough -- the discovery prompt also tells the agent roughly when to stop, and it obeys that first |
 | `TYR_LOOP_MAX_TURNS` | `400` | Turns budgeted for execution, per test case |
 | `TYR_LOOP_TURN_MAX_TOKENS` | `16000` | max_tokens per Loop Agent turn. Bump this if the run logs "Loop Agent returned EMPTY content" -- the model ran out of budget (often reasoning/thinking tokens) before emitting a visible message |
 | `TYR_LOOP_MODEL` | `openai/gpt-4o-mini` | OpenRouter model slug (e.g. `anthropic/claude-sonnet-5`, `anthropic/claude-opus-5` -- see [openrouter.ai/models](https://openrouter.ai/models)) |

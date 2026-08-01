@@ -57,6 +57,7 @@ from prompts import (
     render_discovery_prompt,
     render_execute_prompt,
     render_report_prompt,
+    runtime_variables,
 )
 
 # ─────────────────────────────────────────────────────────────
@@ -74,8 +75,11 @@ DISCOVERY_FAILED_TOKEN = "<<DISCOVERY_FAILED>>"
 # any reported hit outside it -- see run_discovery(). Keep in step with the
 # search scope stated in the discovery prompt.
 SEARCH_ROOT = "/home"
-# Discovery: locate the file in another workspace. Default: 10 turns.
-EXPLORE_TURNS = int(os.environ.get("TYR_LOOP_EXPLORE_TURNS", "10"))
+# Discovery: locate the file in another workspace. Default: 20 turns. Keep the
+# self-stop guidance in DISCOVERY_PROMPT_TEMPLATE in step with this -- the Loop
+# Agent gives up on its own well before the budget if the prompt says a smaller
+# number, so raising this alone would change nothing.
+EXPLORE_TURNS = int(os.environ.get("TYR_LOOP_EXPLORE_TURNS", "20"))
 # Execute: turns budgeted per test case. Cases run multi-turn verification;
 # 400 turns comfortably covers one.
 MAX_TURNS = int(os.environ.get("TYR_LOOP_MAX_TURNS", "400"))
@@ -445,6 +449,37 @@ def render_transcript(loop_messages: list[dict]) -> str:
 # while leaving room for a genuinely narrowed follow-up to read as new.
 STUCK_SIMILARITY = 0.85
 
+# Tyr sometimes fails a request in a way that is explicitly NOT final: the
+# request never landed and it says so ("I couldn't complete that request
+# automatically. Please try again."). Observed in real runs, where the Loop
+# Agent read it as a verdict and ended the case -- but nothing was tested, so
+# it is neither PASS nor FAIL. The stuck detector cannot catch this: it needs a
+# repetition, and a single retry invitation is not one.
+#
+# This is the one situation where re-sending the IDENTICAL request is correct,
+# which is exactly what the anti-paraphrase nudges punish -- hence the two are
+# kept mutually exclusive below.
+RETRYABLE_REPLY_RE = re.compile(
+    r"couldn'?t complete .{0,40}automatic"
+    r"|could not complete .{0,40}automatic"
+    r"|please try again"
+    r"|try (?:that |this |again)"
+    r"|temporarily unavailable"
+    r"|something went wrong"
+    r"|no response (?:was )?received",
+    re.I,
+)
+
+# How many straight resends to sanction before calling it an observed defect.
+RETRY_LIMIT = 2
+
+RETRY_EXHAUSTED_NUDGE = (
+    "[HARNESS: this request has now failed transiently {n} times in a row. Stop "
+    "retrying it. Record 'the request repeatedly failed to go through -- "
+    "<quote the exact wording Tyr returned>' as the observed outcome for this "
+    "step and move on. A repeated transient failure IS a reportable finding.]"
+)
+
 STUCK_NUDGES = (
     "[HARNESS: that is the SAME reply as last turn -- your rewording changed "
     "nothing. Stop paraphrasing. Change the shape of the request: ask about "
@@ -492,6 +527,16 @@ def is_repeat(current: str, previous: str | None) -> bool:
     return a == b or SequenceMatcher(None, a, b).ratio() >= STUCK_SIMILARITY
 
 
+def retry_nudge(attempt: int) -> str:
+    """Told to the Loop Agent when a request failed transiently, not finally."""
+    return (
+        f"[HARNESS: that reply says the request did not go through -- it was not "
+        f"refused, and nothing was tested, so this is not an outcome. Send the "
+        f"SAME request again, unchanged; the no-paraphrasing rule does not apply "
+        f"to a transient failure. Attempt {attempt} of {RETRY_LIMIT}.]"
+    )
+
+
 def stuck_nudge(streak: int) -> str:
     """The escalation rung for `streak` consecutive no-progress turns ("" for 0).
     Streaks past the last rung keep getting it -- the last rung says "stop"."""
@@ -514,6 +559,7 @@ def converse(
     max_turns: int,
     phase: str,
     stop_prefixes: tuple[str, ...] = (STOP_TOKEN,),
+    runtime_vars: tuple[str, ...] = (),
 ) -> tuple[list[dict], str | None]:
     """Run up to max_turns of Loop Agent <-> Tyr exchange, mutating and
     returning loop_messages/tyr_operation_id.
@@ -528,6 +574,8 @@ def converse(
     last_sent: str | None = None
     last_reply: str | None = None
     stuck_streak = 0
+    # Consecutive transient failures on the current request. See retry_nudge().
+    retry_streak = 0
 
     for turn in range(1, max_turns + 1):
         print(f"\n=== [{phase}] Turn {turn}/{max_turns} ===")
@@ -562,6 +610,27 @@ def converse(
             log({"phase": phase, "turn": turn, "stopToken": next_message, "sentToTyr": False})
             break
 
+        # A case's ALL_CAPS variables are the Loop Agent's own notepad. Sending
+        # the name instead of the recorded value produces a message nobody on
+        # the other side can act on ("move it and update VISUALIZATION_FULL_PATH"),
+        # and the reply that comes back looks like a refusal rather than a
+        # malformed request. Correct it here instead of spending the turn.
+        leaked = [var for var in runtime_vars if var in next_message]
+        if leaked:
+            print(f"!! Loop Agent sent bookkeeping variable(s) {', '.join(leaked)} verbatim -- "
+                  f"not forwarding; asking it to substitute the recorded value.")
+            log({"phase": phase, "turn": turn, "leakedRuntimeVars": leaked,
+                 "draft": next_message, "sentToTyr": False})
+            loop_messages.append({"role": "assistant", "content": next_message})
+            loop_messages.append({"role": "user", "content": (
+                f"[HARNESS: not sent. {', '.join(leaked)} is your own note-keeping name -- "
+                f"the recipient has never heard of it. Re-send this message with the actual "
+                f"value you recorded substituted in. If you have not been told that value "
+                f"yet, ask for it plainly instead, and drop any 'record/update ...' wording: "
+                f"that part is an instruction to you, not to them.]"
+            )})
+            continue
+
         print(f"Loop Agent -> Tyr: {next_message}")
         loop_messages.append({"role": "assistant", "content": next_message})
 
@@ -590,14 +659,32 @@ def converse(
         else:
             label = "[Tyr Assistant replied]"
 
-        # No progress this turn if we said the same thing again, or Tyr did.
-        # Either way the next turn needs a different move, not another rewrite.
-        if is_repeat(next_message, last_sent) or is_repeat(reply.text, last_reply):
-            stuck_streak += 1
-            label = f"{label} {stuck_nudge(stuck_streak)}"
-            print(f"!! Stuck: {stuck_streak} turn(s) with no progress -- nudging the Loop Agent.")
+        # Transient failure takes priority over the stuck check. Resending the
+        # identical request is the RIGHT move here, and that is precisely what
+        # the anti-paraphrase nudge punishes -- so the two must never fire on
+        # the same turn.
+        if reply.outcome == "settled" and RETRYABLE_REPLY_RE.search(reply.text):
+            retry_streak += 1
+            if retry_streak <= RETRY_LIMIT:
+                label = f"{label} {retry_nudge(retry_streak)}"
+                stuck_streak = 0  # an intentional resend is not being stuck
+                print(f"!! Transient failure from Tyr ({retry_streak}/{RETRY_LIMIT}) -- "
+                      f"asking the Loop Agent to resend the same request.")
+            else:
+                label = f"{label} {RETRY_EXHAUSTED_NUDGE.format(n=retry_streak)}"
+                print(f"!! Transient failure x{retry_streak} -- telling the Loop Agent to "
+                      f"stop retrying and record it as a finding.")
         else:
-            stuck_streak = 0
+            retry_streak = 0
+            # No progress this turn if we said the same thing again, or Tyr did.
+            # Either way the next turn needs a different move, not another rewrite.
+            if is_repeat(next_message, last_sent) or is_repeat(reply.text, last_reply):
+                stuck_streak += 1
+                label = f"{label} {stuck_nudge(stuck_streak)}"
+                print(f"!! Stuck: {stuck_streak} turn(s) with no progress -- nudging the Loop Agent.")
+            else:
+                stuck_streak = 0
+
         last_sent, last_reply = next_message, reply.text
 
         print(f"Tyr -> Loop Agent: {reply.text[:400]}{'...' if len(reply.text) > 400 else ''}")
@@ -607,6 +694,7 @@ def converse(
             "phase": phase,
             "turn": turn,
             "stuckStreak": stuck_streak,
+            "retryStreak": retry_streak,
             "operationId": tyr_operation_id,
             "to_tyr": next_message,
             "from_tyr": reply.text,
@@ -732,6 +820,7 @@ def run_test_cases(
             brain, tyr, render_execute_prompt(case, target, STOP_TOKEN),
             [{"role": "user", "content": context}],
             tyr_operation_id, MAX_TURNS, phase=f"execute-case-{i}",
+            runtime_vars=runtime_variables(case),
         )
         transcript.extend(messages)
         print(f"✓ Case {i} complete: {case['id']}")
