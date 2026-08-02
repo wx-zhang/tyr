@@ -35,6 +35,7 @@ import json
 import os
 import re
 import sys
+import uuid
 from datetime import datetime, timezone
 from difflib import SequenceMatcher
 from typing import NamedTuple
@@ -54,9 +55,12 @@ except ImportError as e:
 from mcp_client import TyrMCPClient, TyrMCPError
 from prompts import (
     TEST_CASES,
+    case_heading,
+    fill_target,
+    render_case_report_prompt,
     render_discovery_prompt,
     render_execute_prompt,
-    render_report_prompt,
+    render_summary_prompt,
     runtime_variables,
 )
 
@@ -116,6 +120,24 @@ SETTLE_WAIT_SECONDS = 5
 LOG_FILE = "tyr_qatestsearch_log.jsonl"
 REPORT_PREFIX = "qatestsearch"
 
+# Report generation feeds the WHOLE run transcript to the model in one call, and
+# that call has the same context window as any other. A case that spirals (one
+# observed run repeated the same "workspace topology" reply 78 times) blows the
+# transcript past the window, the report call 400s, and the run ends with no
+# findings write-up at all. Raising the output budget cannot help -- the cap is
+# the endpoint's, shared by input+output -- so the transcript is deduped and
+# then hard-clipped to fit under it. All three are env-overridable.
+CONTEXT_TOKEN_LIMIT = int(os.environ.get("TYR_LOOP_CONTEXT_LIMIT", "128000"))
+REPORT_MAX_TOKENS = int(os.environ.get("TYR_LOOP_REPORT_MAX_TOKENS", "16000"))
+# Output allowance for ONE case's subsection -- a few paragraphs, not a document.
+SECTION_MAX_TOKENS = int(os.environ.get("TYR_LOOP_SECTION_MAX_TOKENS", "2000"))
+# Chars per token, for turning a token budget into a char budget without a
+# model-specific tokenizer. Deliberately BELOW the usual ~4 for English prose:
+# transcripts are dense with paths, JSON and markdown, which tokenize worse. At
+# 4 a clipped report still came back over the limit (a 400 at 115,976 input
+# tokens against a 112,000 budget), so the estimate has to err small.
+CHARS_PER_TOKEN = 3.2
+
 # Tyr operation states that mean "settled -- stop polling". Must stay aligned
 # with Tyr's own terminal states (see the state table in README.md); anything
 # missing here gets polled until POLL_MAX_ATTEMPTS runs out and is then handed
@@ -133,10 +155,36 @@ TERMINAL_STATES = {"completed", "partial", "failed", "cancelled", "error", "reje
 # ─────────────────────────────────────────────────────────────
 
 
+# One id per process, stamped on every line. The log is append-only across every
+# run AND every ad-hoc smoke test that imports this module, so without it the
+# only way to isolate a single run is to eyeball timestamps and guess where one
+# ended. Grep `"runId": "<id>"` to pull exactly one run out.
+RUN_ID = uuid.uuid4().hex[:8]
+
+
 def log(entry: dict) -> None:
-    entry["timestamp"] = datetime.now(timezone.utc).isoformat()
+    entry = {
+        "runId": RUN_ID,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        **entry,
+    }
     with open(LOG_FILE, "a", encoding="utf-8") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+
+def loggable_raw(raw: dict) -> dict:
+    """The turn's payload with the reply text replaced by its length.
+
+    The full payload is logged because the tool schema doesn't pin down what an
+    entry in executions[]/bridges[] looks like, and that shape is only learnable
+    from real delegating turns. `response`, though, is already stored verbatim as
+    `from_tyr` -- keeping both doubled the file, and on a run where Tyr returns a
+    growing cumulative transcript it was most of the 3.8 MB."""
+    if not isinstance(raw, dict) or "response" not in raw:
+        return raw
+    trimmed = dict(raw)
+    trimmed["response"] = f"<{len(raw.get('response') or '')} chars -- see from_tyr>"
+    return trimmed
 
 
 class LoopAgentBlocked(RuntimeError):
@@ -426,6 +474,68 @@ def render_transcript(loop_messages: list[dict]) -> str:
     return "\n\n".join(f"[{m['role'].upper()}] {m['content']}" for m in loop_messages[1:])
 
 
+def dedupe_transcript(messages: list[dict]) -> list[dict]:
+    """Replace a message that repeats one already kept with a short stub.
+
+    A stuck case repeats the SAME reply verbatim many times (78 identical
+    workspace-topology dumps in one observed run); those add length without
+    adding anything the report needs. Comparison is on normalized text, so
+    cosmetic differences still collapse; only bulky messages (>200 chars) are
+    eligible, so short instructions stay intact. The first occurrence is always
+    kept in full -- only later duplicates become stubs."""
+    seen: set[str] = set()
+    out: list[dict] = []
+    for m in messages:
+        norm = normalize_message(m["content"])
+        if len(m["content"]) > 200 and norm in seen:
+            stub = ("[identical to an earlier Tyr reply above -- omitted to save context]"
+                    if m["role"] == "user"
+                    else "[identical to an earlier message above -- omitted]")
+            out.append({"role": m["role"], "content": stub})
+        else:
+            seen.add(norm)
+            out.append(m)
+    return out
+
+
+def clip_middle(text: str, max_chars: int) -> str:
+    """Trim `text` to `max_chars` by cutting the MIDDLE, keeping head and tail.
+
+    A QA report needs both a case's setup (head) and its outcome (tail), so a
+    plain truncation from either end would drop half of what matters. The elision
+    marker records how much was removed."""
+    if len(text) <= max_chars:
+        return text
+    keep = max(0, max_chars - 120)
+    head = keep // 3
+    tail = keep - head
+    elided = len(text) - keep
+    return (
+        text[:head]
+        + f"\n\n[... {elided} characters of transcript elided to fit the model context window ...]\n\n"
+        + text[len(text) - tail:]
+    )
+
+
+def fit_transcript(loop_messages: list[dict], overhead_chars: int, out_tokens: int) -> str:
+    """A transcript, deduped and clipped so input + output stay under the window.
+
+    `overhead_chars` is the length of the surrounding prompt with an empty
+    transcript -- the template and whatever case text goes with it. Whatever
+    token budget is left after that and the output allowance, converted to
+    chars, is the transcript's."""
+    transcript = render_transcript(dedupe_transcript(loop_messages))
+    budget_chars = (CONTEXT_TOKEN_LIMIT - out_tokens) * CHARS_PER_TOKEN - overhead_chars
+    budget_chars = max(2000, budget_chars)
+    if len(transcript) > budget_chars:
+        print(f"!! Transcript is {len(transcript)} chars (budget {budget_chars}) -- "
+              f"clipping to fit the {CONTEXT_TOKEN_LIMIT}-token context window.")
+        transcript = clip_middle(transcript, budget_chars)
+    return transcript
+
+
+
+
 # ─────────────────────────────────────────────────────────────
 # STUCK DETECTION
 # ─────────────────────────────────────────────────────────────
@@ -704,10 +814,11 @@ def converse(
             # Why a runtime/bridge didn't succeed -- a safety refusal shows up
             # here. Empty on clean turns; grep the log for it to find refusals.
             "notes": list(reply.notes),
-            # Full payload: the only way to learn the shape of executions[] /
-            # bridges[] from real delegating turns, which the tool schema
-            # doesn't pin down. Logs are gitignored run artifacts.
-            "raw": reply.raw,
+            # Payload minus the reply text (already above as from_tyr): the only
+            # way to learn the shape of executions[] / bridges[] from real
+            # delegating turns, which the tool schema doesn't pin down. Logs are
+            # gitignored run artifacts.
+            "raw": loggable_raw(reply.raw),
         })
 
         print("-" * 60)
@@ -724,10 +835,17 @@ def parse_discovery_options(transcript: str) -> list[dict]:
     """Pull the file locations the discovery phase found out of its transcript.
 
     The Loop Agent ends discovery with a stop token of the form
-      <<DISCOVERY_COMPLETE: PATH:/p|WORKSPACE:w|AGENT:a; PATH:...>>
+      <<DISCOVERY_COMPLETE: PATH:/p|WORKSPACE:w|AGENT:a>>
     Returns one dict per option with PATH/WORKSPACE/AGENT keys, or an empty
-    list if discovery failed or its output couldn't be parsed."""
-    match = re.search(r"<<DISCOVERY_COMPLETE: (.+)>>", transcript)
+    list if discovery failed or its output couldn't be parsed.
+
+    The whitespace after the colon is optional and the match is non-greedy: the
+    prompt shows one space, but converse() stops the phase on the token PREFIX
+    alone, so a model that omitted the space used to stop discovery and then
+    fail to parse -- which reads as "no location found" and exits the run. A
+    greedy `.+` had the matching problem from the other end, running one token
+    into a later one and parsing neither."""
+    match = re.search(r"<<DISCOVERY_COMPLETE:\s*(.+?)>>", transcript, re.S)
     if not match:
         return []
 
@@ -749,11 +867,20 @@ def parse_discovery_options(transcript: str) -> list[dict]:
 
 
 def run_discovery(
-    brain: "LoopAgentClient", tyr: TyrMCPClient, tyr_operation_id: str | None
+    brain: "LoopAgentClient",
+    tyr: TyrMCPClient,
+    tyr_operation_id: str | None,
+    report_file: str | None = None,
 ) -> tuple[dict, str | None]:
     """Phase 1. Returns the target to test against (PATH/WORKSPACE/AGENT).
     Exits the process if no usable location was found -- every test case
-    depends on having one."""
+    depends on having one.
+
+    The prompt asks for ONE confirmed location. It used to ask for two or three
+    so a stalled case could fall back to another agent, but nothing ever read
+    past the first, so the extra Bridges were explored at the cost of real
+    discovery turns. Several are still parsed and reported if a run produces
+    them; only the first is used."""
     messages, tyr_operation_id = converse(
         brain, tyr, render_discovery_prompt(),
         [{"role": "user", "content": "Begin discovery."}],
@@ -776,15 +903,27 @@ def run_discovery(
         # Stop the run here. Nothing further is sent to Tyr: the execute phase
         # never starts, and the failure token itself was never transmitted.
         print(f"✗ Discovery failed -- no usable file location found under {SEARCH_ROOT}.")
-        sys.exit("Cannot proceed without a confirmed file path. Nothing further was sent to Tyr.")
+        log({"phase": "discovery", "discoveryFailed": True, "parsedOptions": 0})
+        report_file = save_report(
+            "# Discovery failed\n\n"
+            f"No usable location for `important.txt` was confirmed under `{SEARCH_ROOT}`, so no "
+            "test case ran and there is nothing to grade.\n\n"
+            "Either the discovery phase emitted `<<DISCOVERY_FAILED>>`, or it ran out of turns, or "
+            "every location it reported was outside the search root.\n\n"
+            f"**Run id:** `{RUN_ID}` -- grep `\"runId\": \"{RUN_ID}\"` in `{LOG_FILE}` for the "
+            "turn-by-turn discovery transcript.\n\n"
+            "Nothing further was sent to Tyr.\n",
+            report_file,
+        )
+        sys.exit(f"Cannot proceed without a confirmed file path. Wrote {report_file}.")
 
-    print(f"✓ Discovery found {len(options)} option(s):")
+    print(f"✓ Discovery confirmed {len(options)} location(s):")
     for i, opt in enumerate(options, start=1):
-        print(f"  Option {i}:")
-        print(f"    Path: {opt['PATH']}")
-        print(f"    Workspace: {opt['WORKSPACE']}")
-        print(f"    Agent: {opt['AGENT']}")
-    print("\nUsing option 1 for test execution.")
+        print(f"  {i}. Path: {opt['PATH']}")
+        print(f"     Workspace: {opt['WORKSPACE']}")
+        print(f"     Agent: {opt['AGENT']}")
+    if len(options) > 1:
+        print("\nTesting against the first; the rest are recorded but unused.")
 
     return options[0], tyr_operation_id
 
@@ -795,9 +934,17 @@ def run_test_cases(
     test_plan: list[dict],
     target: dict,
     tyr_operation_id: str | None,
-) -> tuple[list[dict], str | None]:
+    report_file: str,
+) -> tuple[list[str], str | None]:
     """Phase 2. Run each case in its own conversation, seeded with the target
-    discovery confirmed, and return every case's messages concatenated.
+    discovery confirmed, grade it the moment it finishes, and return the
+    finished report sections.
+
+    Each case is graded and written to `report_file` before the next one starts.
+    That ordering is the point: whatever goes wrong later -- a case that
+    overflows the context, a provider block, a Ctrl-C -- the cases already
+    finished are on disk as findings, not as raw transcript nobody turned into
+    a result.
 
     Case ids and titles are printed to the console and used in the report, but
     are deliberately kept out of everything the Loop Agent sees -- it relays its
@@ -807,7 +954,7 @@ def run_test_cases(
     for case in test_plan:
         print(f"  - [{case['id']}] {case['title']} ({case.get('category', '?')})")
 
-    transcript = []
+    sections: list[str] = []
 
     for i, case in enumerate(test_plan, start=1):
         print(f"\n--- Test case {i}/{len(test_plan)}: {case['id']} ---")
@@ -822,49 +969,21 @@ def run_test_cases(
             tyr_operation_id, MAX_TURNS, phase=f"execute-case-{i}",
             runtime_vars=runtime_variables(case),
         )
-        transcript.extend(messages)
-        print(f"✓ Case {i} complete: {case['id']}")
+        print(f"✓ Case {i} ran: {case['id']} -- grading it now")
 
-    return transcript, tyr_operation_id
+        sections.append(grade_case(brain, case, messages, target))
+        save_report(assemble_report(test_plan, sections, target=target), report_file)
+        print(f"✓ Case {i} graded: {result_of(sections[-1]) or 'unparsed'} -> {report_file}")
+
+    return sections, tyr_operation_id
 
 
-def write_report(
-    brain: "LoopAgentClient",
-    test_plan: list[dict],
-    loop_messages: list[dict],
-    target: dict | None = None,
-) -> str:
-    """Phase 3. One model call turns the whole transcript into a Markdown
-    report, saved as <REPORT_PREFIX>_<n>.md alongside earlier runs.
+def next_report_path() -> str:
+    """The next free <REPORT_PREFIX>_<n>.md, numbered past any earlier run.
 
-    `target` is what discovery confirmed; it fills the case text the grader
-    reads so each case's steps and pass bar name the same file the transcript
-    does."""
-    try:
-        report = call_model(
-            brain,
-            [{"role": "user",
-              "content": render_report_prompt(test_plan, render_transcript(loop_messages), target)}],
-            max_tokens=16384,  # one subsection per test case
-        )
-    except LoopAgentBlocked as blocked:
-        # A whole run's evidence is already in the log -- still write a file
-        # saying why there is no report, rather than dying at the last step.
-        print(f"\n!! REPORT GENERATION BLOCKED -- the model produced no report.")
-        print(f"!! Reason: {blocked.reason}")
-        if blocked.detail:
-            print(f"!! Provider detail: {json.dumps(blocked.detail, ensure_ascii=False)[:600]}")
-        log({"phase": "report", "loopAgentBlocked": blocked.reason,
-             "loopAgentBlockDetail": blocked.detail})
-        report = (
-            "# Report generation blocked\n\n"
-            f"The reporting model returned no content, so this run has no findings write-up.\n\n"
-            f"**Reason:** {blocked.reason}\n\n"
-            f"**Provider detail:**\n\n```json\n"
-            f"{json.dumps(blocked.detail, indent=2, ensure_ascii=False)}\n```\n\n"
-            f"The full turn-by-turn transcript is still in `{LOG_FILE}`.\n"
-        )
-
+    Allocated ONCE per run and then rewritten in place as each case is graded,
+    so an interrupted run leaves one file holding everything finished so far --
+    not one file per case, and not nothing at all."""
     nums = []
     for name in os.listdir("."):
         if name.startswith(REPORT_PREFIX + "_") and name.endswith(".md"):
@@ -872,11 +991,175 @@ def write_report(
                 nums.append(int(name[len(REPORT_PREFIX) + 1:-3]))
             except ValueError:
                 pass
+    return f"{REPORT_PREFIX}_{max(nums, default=0) + 1}.md"
 
-    report_file = f"{REPORT_PREFIX}_{max(nums, default=0) + 1}.md"
+
+def save_report(report: str, report_file: str | None = None) -> str:
+    """Write `report`, to `report_file` if given or a freshly numbered one.
+
+    Every way a run can end goes through here, including the ones that end
+    early: a run that produces no file at all leaves the operator with nothing
+    to read but a multi-MB log."""
+    report_file = report_file or next_report_path()
     with open(report_file, "w", encoding="utf-8") as f:
         f.write(report)
     return report_file
+
+
+# ─────────────────────────────────────────────────────────────
+# REPORTING -- graded per case, as each one finishes
+# ─────────────────────────────────────────────────────────────
+#
+# Observed failure: a run completed cases 1, 2 and 3, then case 4 spiralled to
+# 52 turns and overflowed the context window. The report was a single model call
+# over the whole run's transcript, so it overflowed too -- and the finished
+# write-ups for the three cases that HAD passed were never produced. The evidence
+# existed; nothing had been asked to turn it into findings yet.
+#
+# So each case is graded the moment it finishes, from its own transcript, and the
+# report file is rewritten after every case. A later failure can now cost at most
+# the case it actually hit.
+
+RESULT_MARKERS = ("✅ PASS", "❌ FAIL", "⚠️ PARTIAL", "⏭️ NOT ATTEMPTED", "🚧 NOT GRADED")
+
+
+def result_of(section: str) -> str | None:
+    """The verdict a finished subsection carries, read back off its Result line."""
+    for marker in RESULT_MARKERS:
+        if re.search(r"\*\*Result:\*\*\s*" + re.escape(marker), section):
+            return marker
+    return None
+
+
+def tally_line(sections: list[str]) -> str:
+    """Status tally, counted from the sections rather than asked of the model.
+
+    The grader was previously asked to total its own verdicts, which is both
+    avoidable arithmetic and unverifiable. Counting here also means the tally
+    stays right on a partial report."""
+    counts = {marker: 0 for marker in RESULT_MARKERS}
+    for section in sections:
+        marker = result_of(section)
+        if marker:
+            counts[marker] += 1
+    shown = [f"{m.split()[0]} {n}" for m, n in counts.items() if n or m != "🚧 NOT GRADED"]
+    return "  ".join(shown)
+
+
+def grade_case(
+    brain: "LoopAgentClient",
+    case: dict,
+    messages: list[dict],
+    target: dict | None,
+) -> str:
+    """One case's finished report subsection, from that case's transcript alone.
+
+    Never raises: if the grading call is blocked, the case still gets a
+    subsection saying so. A case that ran deserves a line in the report whether
+    or not a model was available to write it up."""
+    overhead = len(render_case_report_prompt(case, "", target))
+    transcript = fit_transcript(messages, overhead, SECTION_MAX_TOKENS)
+    try:
+        section = call_model(
+            brain,
+            [{"role": "user",
+              "content": render_case_report_prompt(case, transcript, target)}],
+            max_tokens=SECTION_MAX_TOKENS,
+        )
+    except LoopAgentBlocked as blocked:
+        print(f"!! Could not grade [{case['id']}]: {blocked.reason}")
+        log({"phase": "report-case", "caseId": case["id"],
+             "loopAgentBlocked": blocked.reason, "loopAgentBlockDetail": blocked.detail})
+        return "\n".join([
+            case_heading(fill_target(case, target) if target else case),
+            "",
+            "**Result:** 🚧 NOT GRADED",
+            f"**What happened:** the case ran, but writing up its findings failed -- {blocked.reason}",
+            f"**Evidence:** the turn-by-turn transcript is in `{LOG_FILE}` "
+            f"under runId `{RUN_ID}`.",
+        ])
+
+    log({"phase": "report-case", "caseId": case["id"], "result": result_of(section)})
+    return section.strip()
+
+
+def assemble_report(
+    test_plan: list[dict],
+    sections: list[str],
+    summary: str | None = None,
+    target: dict | None = None,
+) -> str:
+    """The report file: header, tally, every case's subsection, then the summary.
+
+    Cases with no section yet are listed as ⏭️ NOT ATTEMPTED, so a report
+    written mid-run still accounts for the whole plan rather than trailing off."""
+    graded = len(sections)
+    pending = []
+    for case in test_plan[graded:]:
+        pending.append("\n".join([
+            case_heading(fill_target(case, target) if target else case),
+            "",
+            "**Result:** ⏭️ NOT ATTEMPTED",
+            "**Reason:** the run ended before this case started.",
+        ]))
+
+    parts = [
+        "# Tyr Assistant QATestSearch Report",
+        "",
+        "`Legend: ✅ PASS · ❌ FAIL · ⚠️ PARTIAL · ⏭️ NOT ATTEMPTED · 🚧 NOT GRADED`",
+        "",
+        f"`Run: {RUN_ID}` · `Model: {MODEL}` · `Cases graded: {graded}/{len(test_plan)}`",
+        "",
+        f"Status tally: `{tally_line(sections + pending)}`",
+    ]
+    if summary is None and pending:
+        parts += ["", "> **This run did not finish.** Everything below was graded as it "
+                  "completed; the remaining cases never ran."]
+    if summary:
+        parts += ["", summary.strip()]
+    parts += ["", "## Findings", ""]
+    parts.append("\n\n".join(sections + pending))
+    return "\n".join(parts).rstrip() + "\n"
+
+
+def write_report(
+    brain: "LoopAgentClient",
+    test_plan: list[dict],
+    sections: list[str],
+    target: dict | None = None,
+    report_file: str | None = None,
+) -> str:
+    """Phase 3. Finish the report the execute phase has been writing all along.
+
+    Every case was already graded and saved as it completed, so this adds only
+    the two things that need the whole run in view: the delivery paragraph and
+    the issues list. It runs over the finished SECTIONS, never the transcripts,
+    so it stays small -- and if it is blocked anyway, the per-case findings are
+    already on disk and the report is written without it."""
+    summary = None
+    if sections:
+        try:
+            summary = call_model(
+                brain,
+                [{"role": "user", "content": render_summary_prompt("\n\n".join(sections))}],
+                max_tokens=SECTION_MAX_TOKENS,
+            )
+        except LoopAgentBlocked as blocked:
+            # Costs the summary paragraph and the issues list. Every case's
+            # findings survive -- that is the whole point of grading per case.
+            print(f"\n!! Summary generation blocked -- per-case findings are unaffected.")
+            print(f"!! Reason: {blocked.reason}")
+            log({"phase": "report-summary", "loopAgentBlocked": blocked.reason,
+                 "loopAgentBlockDetail": blocked.detail})
+            summary = (
+                "## Issues needing attention\n\n"
+                f"_The run-level summary could not be generated ({blocked.reason}). "
+                "The per-case findings below are unaffected; read them directly._"
+            )
+
+    return save_report(
+        assemble_report(test_plan, sections, summary=summary, target=target), report_file
+    )
 
 
 # ─────────────────────────────────────────────────────────────
@@ -889,10 +1172,26 @@ def main() -> None:
         sys.exit("Set OPENROUTER_API_KEY before running.")
 
     print(f"Python: {sys.executable}")
+    print(f"Run id: {RUN_ID}")
     print(f"Loop Agent model: {MODEL} (via OpenRouter: {OPENROUTER_BASE_URL})")
     print(f"Mode: {'ACTIONS ALLOWED (tyr_assistant_request)' if ALLOW_ACTIONS else 'READ-ONLY (tyr_assistant_query)'}")
     if ALLOW_ACTIONS:
         confirm_actions_enabled()
+
+    # First line of the run. Every setting that changes how a run behaves is
+    # recorded here, so a log read months later says which model produced it and
+    # under which budgets -- none of which was recoverable from the turns alone.
+    log({
+        "phase": "run-start",
+        "model": MODEL,
+        "allowActions": ALLOW_ACTIONS,
+        "exploreTurns": EXPLORE_TURNS,
+        "maxTurns": MAX_TURNS,
+        "turnMaxTokens": TURN_MAX_TOKENS,
+        "contextTokenLimit": CONTEXT_TOKEN_LIMIT,
+        "searchRoot": SEARCH_ROOT,
+        "cases": [case["id"] for case in TEST_CASES],
+    })
 
     try:
         tyr = TyrMCPClient()
@@ -906,17 +1205,26 @@ def main() -> None:
         default_headers={"X-Title": "Tyr Loop Agent"},  # optional OpenRouter attribution
     )
 
+    # Named up front so every phase writes into the SAME file. The report is
+    # built up as the run goes rather than produced at the end.
+    report_file = next_report_path()
+    print(f"Report -> {report_file} (rewritten after each case)")
+
     # Phase 1: find the file. Exits if it can't -- the cases all need a target.
     print("\n### Phase 1/3: Discover file location ###")
-    target, tyr_operation_id = run_discovery(brain, tyr, None)
+    target, tyr_operation_id = run_discovery(brain, tyr, None, report_file)
 
-    # Phase 2: run every case against that target, one case per conversation.
+    # Phase 2: run every case against that target, one case per conversation,
+    # grading and saving each one before the next starts.
     print("\n### Phase 2/3: Execute test plan ###")
-    transcript, _ = run_test_cases(brain, tyr, TEST_CASES, target, tyr_operation_id)
+    sections, _ = run_test_cases(
+        brain, tyr, TEST_CASES, target, tyr_operation_id, report_file
+    )
 
-    # Phase 3: one model call turns the whole transcript into a Markdown report.
-    print("\n### Phase 3/3: Write report ###")
-    report_file = write_report(brain, TEST_CASES, transcript, target)
+    # Phase 3: add only what needs the whole run in view -- delivery summary
+    # and issues list. The findings themselves are already written.
+    print("\n### Phase 3/3: Summarize ###")
+    write_report(brain, TEST_CASES, sections, target, report_file)
 
     print(f"Done. Log -> {LOG_FILE} | Report -> {report_file}")
 

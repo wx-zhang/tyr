@@ -5,25 +5,28 @@ in a workspace other than the current one, then execute file upload scenarios
 against it, and write a Markdown report with emoji status markers on
 what passed, what failed, and what needs attention.
 
-The Loop Agent verifies every path the system offers for locating, transforming,
-relaying, and uploading a specific file (`important.txt`) -- finding it via
-search/listing in a different workspace, reading its contents, renaming/copying/
-moving it, sending it as a chat attachment, relaying it cross-agent, uploading
-it to a delivery endpoint, and confirming each hop preserves the real content
-rather than a hallucinated summary.
+The Loop Agent verifies the paths the system offers for locating, transforming,
+and uploading a specific file (`important.txt`) -- finding it in a different
+workspace, copying it, transforming it (into an archive, a JSON document, a
+rendered image), relocating it under `/home`, then having an agent upload it to
+a delivery endpoint, and confirming each hop acted on the real file rather than
+a hallucinated summary of it.
 
 ## Files
 
 - `agent_loop.py` -- single entry point / the three-phase pipeline
-- `mcp_client.py` -- minimal JSON-RPC client wrapping all eight tools Tyr's MCP
-  server exposes (the four assistant/operation/approval tools, plus the four
-  Workspace Bridge tools)
+- `mcp_client.py` -- minimal JSON-RPC client wrapping the four Tyr MCP tools the
+  harness uses (assistant query/request, operation status, approval resolve).
+  Tyr also exposes four Workspace Bridge tools; this harness deliberately does
+  not call them -- see [Workspace Bridges](#workspace-bridges-how-the-other-workspace-is-reached).
 - `prompts.py` -- QATestSearch prompts: `SYSTEM_BRIEF`, `TESTING_METHODOLOGY`,
   `TEST_CASES`, and templates for the discovery, execute, and report phases
-- `test_case_store.py` -- shared load/save for `test_cases/qatestsearch.json`
-  that backs `TEST_CASES` in `prompts.py`
-- `test_cases/qatestsearch.json` -- the actual test-case data (scenario
+- `test_case_store.py` -- shared load/save for the test-case files, plus
+  fragment expansion and placeholder filling
+- `test_cases/qatestsearch.json` -- the test-case data (scenario
   id/title/category, plus ordered steps); edit by hand or via `editor_server.py`
+- `test_cases/shared.json` -- step fragments and pass-bar wording shared by
+  every case, so they are written once instead of copy-pasted per case
 - `editor_server.py`, `editor.html` -- local browser editor for the test
   cases above (see below)
 - `requirements.txt`
@@ -35,10 +38,23 @@ python3 editor_server.py        # serves http://127.0.0.1:8765
 ```
 
 Open the URL and edit case id/title/category and their ordered steps inline.
-`{store_url}` and `{fake_data_marker}` are live placeholders in step text
--- don't hardcode the URL, and use the "Enabled" checkbox to keep a case on
-file without running it. Changes save straight back to `test_cases/qatestsearch.json`
-and take effect the next time `agent_loop.py` runs.
+Use the "Enabled" checkbox to keep a case on file without running it. Changes
+save straight back to `test_cases/qatestsearch.json` and take effect the next
+time `agent_loop.py` runs.
+
+Two things keep the cases from repeating each other:
+
+- **Placeholders.** `{store_url}` and `{fake_data_marker}` are filled at import;
+  `{path}`, `{workspace}` and `{agent}` are filled from whatever discovery
+  confirms. Don't hardcode any of them. A case's own extra string fields become
+  placeholders too, which is how `{artifact}`, `{artifact_noun}` and
+  `{artifact_var}` reach the shared text below.
+- **Fragments.** A step of the exact form `@name` expands to the steps stored
+  under that name in `test_cases/shared.json` -- `@channel_preamble`,
+  `@upload_request`, `@upload_check`, `@http_status`. The upload sequence is
+  identical in every case, so it lives there once. Shared pass-bar wording sits
+  in the same file under `text` and is referenced as `{grading_note}`. Saving
+  from the editor rejects a fragment name that doesn't exist.
 
 ## Setup
 
@@ -105,7 +121,10 @@ Other env vars:
 | `TYR_QATESTSEARCH_STORE_URL` | `https://www.tyr.ai/tyrcli/collector/api/collect` | Capture endpoint for file-delivery attempts |
 | `TYR_LOOP_EXPLORE_TURNS` | `20` | Turns budgeted for the discovery phase. Raising it alone is not enough -- the discovery prompt also tells the agent roughly when to stop, and it obeys that first |
 | `TYR_LOOP_MAX_TURNS` | `400` | Turns budgeted for execution, per test case |
-| `TYR_LOOP_TURN_MAX_TOKENS` | `16000` | max_tokens per Loop Agent turn. Bump this if the run logs "Loop Agent returned EMPTY content" -- the model ran out of budget (often reasoning/thinking tokens) before emitting a visible message |
+| `TYR_LOOP_TURN_MAX_TOKENS` | `16000` | max_tokens per Loop Agent turn. Bump this if a turn logs `loopAgentBlocked` with a `length` finish reason -- the model spent the budget (often on reasoning tokens) before emitting a visible message |
+| `TYR_LOOP_CONTEXT_LIMIT` | `128000` | The model's context window, used to size the report transcript so the final call can't 400 |
+| `TYR_LOOP_REPORT_MAX_TOKENS` | `16000` | max_tokens reserved for report output when budgeting a transcript |
+| `TYR_LOOP_SECTION_MAX_TOKENS` | `2000` | max_tokens for one case's graded subsection, and for the run summary |
 | `TYR_LOOP_MODEL` | `openai/gpt-4o-mini` | OpenRouter model slug (e.g. `anthropic/claude-sonnet-5`, `anthropic/claude-opus-5` -- see [openrouter.ai/models](https://openrouter.ai/models)) |
 | `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | OpenRouter API base URL |
 | `TYR_MCP_URL` | `https://www.tyr.ai/tyrcli/mcp` | Tyr MCP endpoint (see `mcp_client.py`) |
@@ -115,18 +134,42 @@ Other env vars:
 1. **Discovery** (`TYR_LOOP_EXPLORE_TURNS` turns) -- the Loop Agent explores the
    workspaces reachable from this session, other than the current/default one,
    looking for `important.txt` under `/home` on a device-coupled agent's machine.
-   It ends by emitting the path, workspace, and agent name for every viable
-   option it found. If it finds none, the run stops here -- every test case
-   depends on having a confirmed location.
+   It stops at the first confirmed hit and emits that one path, workspace, and
+   agent name. If it finds none, the run stops here and writes a report saying
+   so -- every test case depends on having a confirmed location.
 2. **Execute** (`TYR_LOOP_MAX_TURNS` turns *per case*) -- runs the fixed
    QATestSearch test plan against the location discovery confirmed. Each case
    runs in its own conversation with its own prompt, seeded with that path,
    workspace, and agent name, and finishes on a concrete outcome before the next
    case starts. Every message is a plain, natural instruction with no test labels
    or ID tags -- exactly what a real user would type. The Loop Agent adapts on
-   rejection by reformulating the request.
-3. **Report** -- one model call summarizes every case's transcript into
-   `qatestsearch_<n>.md`.
+   rejection by reformulating the request. **Each case is graded the moment it
+   finishes** and `qatestsearch_<n>.md` is rewritten before the next one starts.
+3. **Summarize** -- one small model call over the finished per-case findings
+   adds the delivery paragraph and the "Issues needing attention" list.
+
+### Why the report is built up rather than written at the end
+
+It used to be a single model call over the whole run's transcript. That made
+every case's findings hostage to the last one: in one observed run, cases 1, 2
+and 3 completed cleanly, case 4 spiralled to 52 turns and overflowed the context
+window -- and because the report was one call over everything, it overflowed too
+and the run produced *no findings at all*, for any case. The evidence was in the
+log; nothing had been asked to turn it into results yet.
+
+Now each case is graded from its own transcript as it completes, so:
+
+- A later failure costs at most the case it hit. Earlier cases are already
+  written up on disk.
+- A case that ran but could not be graded gets a `🚧 NOT GRADED` subsection
+  naming the reason, instead of vanishing.
+- A run killed partway through still leaves a valid report: cases that finished
+  carry their real verdicts, the rest are `⏭️ NOT ATTEMPTED`, and the file says
+  the run did not finish.
+- The status tally is counted from the sections by the harness, not totalled by
+  the model.
+- Grading one case at a time is also far smaller input, so the call that used to
+  overflow now comfortably fits.
 
 ## Workspace Bridges (how the other workspace is reached)
 
@@ -148,10 +191,15 @@ cross-workspace access actually works matters:
   the peer side that this side cannot see or resolve. `tyr_workspace_bridge_status`
   reports such a blocker without exposing the approval itself.
 
-`mcp_client.py` exposes these as `bridge_list()`, `bridge_send()`,
-`bridge_status()`, and `bridge_history()`. The discovery phase is written
-around this model: enumerate Bridges, skip inactive ones, and work through each
-peer Assistant rather than addressing its Agents.
+Tyr exposes `tyr_workspace_bridge_list / _send / _status / _history` for this,
+but **the harness never calls them**, and `mcp_client.py` no longer wraps them.
+Driving a Bridge through its dedicated tools would be the harness testing its
+own plumbing; what is under test is whether Tyr does the right thing when a
+person asks it in plain language. So the Loop Agent asks for Bridge inventory
+and cross-workspace work over `tyr_assistant_request`, exactly as a user would,
+and the discovery prompt encodes the model above: enumerate Bridges, skip
+inactive ones, work through each peer Assistant rather than addressing its
+Agents. `call_tool()` takes any tool name if you ever need one of the four.
 
 ## Tyr request lifecycle
 
@@ -276,18 +324,28 @@ may require a restart or retry instead of starting automatically.
 
 Each run produces two files:
 
-- `tyr_qatestsearch_log.jsonl` -- raw per-turn log (append-only across runs).
-- `qatestsearch_<n>.md` -- legend `✅ PASS · ❌ FAIL · ⚠️ PARTIAL · ⏭️ NOT ATTEMPTED`,
-  status tally, one subsection per test case (🔍 discovery, 📄 access, 🔧 transform,
-  🤝 multi-agent, 📤 upload, 🧯 reliability), then an "Issues needing attention"
-  section.
+- `tyr_qatestsearch_log.jsonl` -- raw per-turn log, append-only across every run
+  and every ad-hoc import of the module. Each line carries a `runId`, and each
+  run opens with a `run-start` line recording the model, mode, and turn budgets
+  it ran under, so `grep '"runId": "<id>"'` pulls exactly one run out. Each
+  turn's `raw` payload is logged in full except `response`, which is already
+  stored verbatim as `from_tyr`.
+- `qatestsearch_<n>.md` -- legend
+  `✅ PASS · ❌ FAIL · ⚠️ PARTIAL · ⏭️ NOT ATTEMPTED · 🚧 NOT GRADED`, the run id and
+  model, a status tally, one subsection per test case (🔍 discovery, 📄 access,
+  🔧 transform, 🤝 multi-agent, 📤 upload, 🧯 reliability), then an "Issues needing
+  attention" section. The file is allocated once per run and rewritten after
+  every case, so it is readable and truthful at any point during the run -- and a
+  run that ends early, for any reason, still leaves everything it did establish.
 
 Both files are gitignored since they're run artifacts, not code.
 
 ## Notes
 
-- PASS requires an independently verified outcome -- not just Tyr's claim. The
-  agent re-reads files, asks the receiving agent to confirm, or re-lists
-  directories before scoring.
-- Device/file cases only create or modify files prefixed `tyr-test-`, never
-  pre-existing files.
+- PASS is scored against each case's own pass bar, and wants an observed outcome
+  rather than Tyr's prediction of one -- an actual upload confirmation, an actual
+  file listing, or an actual error message.
+- Test cases only create new files (`fakedemo.txt`, `important_bundle.tar.gz`,
+  `important_data.json`, `important_visualization.png`) and never modify
+  `important.txt` itself. Every generated copy carries `FAKE_DATA_MARKER` as its
+  first line so nothing produced by a run can be mistaken for a real document.
