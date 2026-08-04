@@ -6,9 +6,14 @@ Runs a small LLM ("Loop Agent") as a QA tester of Tyr Assistant,
 in three phases:
   1. Discovery: locate `important.txt` in a workspace other than the
      current one, confirm the path, workspace name, and agent name.
-  2. Execute: run the test cases against the confirmed file path, one case
-     at a time, each in its own conversation.
-  3. Report: write a Markdown QA report with emoji status markers.
+  2. Execute: run the fixed QATestSearch test plan against the confirmed
+     file path, one case at a time, each in its own conversation, and write
+     a Markdown QA report with emoji status markers as it goes -- these are
+     "the base tests" (runs/<run-id>/base/).
+  3. Scientist: read that report, then repeatedly propose, run, and grade
+     ONE new self-designed scenario at a time, reasoning over every earlier
+     scenario's graded result when designing the next one
+     (runs/<run-id>/scientist/).
 
 The Loop Agent's own model calls go through OpenRouter's OpenAI-compatible
 API, so you can drive it with any model your OpenRouter account can reach.
@@ -35,6 +40,7 @@ import json
 import os
 import re
 import sys
+import time
 import uuid
 from datetime import datetime, timezone
 from difflib import SequenceMatcher
@@ -54,15 +60,19 @@ except ImportError as e:
 
 from mcp_client import TyrMCPClient, TyrMCPError
 from prompts import (
+    FAKE_DATA_MARKER,
+    STORE_URL,
     TEST_CASES,
     case_heading,
     fill_target,
     render_case_report_prompt,
     render_discovery_prompt,
     render_execute_prompt,
+    render_scientist_generate_prompt,
     render_summary_prompt,
     runtime_variables,
 )
+from test_case_store import load_shared, prepare_case
 
 # ─────────────────────────────────────────────────────────────
 # CONFIG -- edit before running, or override via env vars
@@ -95,7 +105,7 @@ MAX_TURNS = int(os.environ.get("TYR_LOOP_MAX_TURNS", "400"))
 TURN_MAX_TOKENS = int(os.environ.get("TYR_LOOP_TURN_MAX_TOKENS", "16000"))
 # OpenRouter model slug for the Loop Agent's brain -- any model your OpenRouter
 # account can reach. See https://openrouter.ai/models for the full list.
-MODEL = os.environ.get("TYR_LOOP_MODEL", "openai/gpt-4o-mini")
+MODEL = os.environ.get("TYR_LOOP_MODEL", "qwen/qwen3.7-plus")
 # MODEL = os.environ.get("TYR_LOOP_MODEL", "anthropic/claude-sonnet-5")
 OPENROUTER_BASE_URL = os.environ.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
 
@@ -106,9 +116,21 @@ OPENROUTER_BASE_URL = os.environ.get("OPENROUTER_BASE_URL", "https://openrouter.
 # (see resolve_pending_approvals below) before it actually executes.
 ALLOW_ACTIONS = os.environ.get("TYR_LOOP_ALLOW_ACTIONS", "false").lower() == "true"
 
-# How long to long-poll a not-yet-finished operation before giving up on it.
+# How long to keep waiting on a not-yet-finished operation before giving up.
+#
+# A WALL-CLOCK budget, deliberately not a number of attempts. POLL_WAIT_SECONDS
+# is only what we ASK the server to hold the connection open for; it is free to
+# answer sooner. A counted budget therefore buys however much time the server
+# feels like giving: 10 attempts x 30s nominal came back in ~10s each in one
+# observed run, so a step that should have had five minutes got 104 seconds.
+# That is plenty for a `cp`, and not enough to render an image -- the render was
+# still running when polling gave up, and the turn was handed back as
+# provisional. What the budget is actually about is time, so spend time.
 POLL_WAIT_SECONDS = 30
-POLL_MAX_ATTEMPTS = 10
+POLL_BUDGET_SECONDS = int(os.environ.get("TYR_LOOP_POLL_BUDGET", "300"))
+# Floor between consecutive status calls. Without it, a server that answers
+# every long-poll immediately would spend the budget on requests, not waiting.
+POLL_MIN_GAP_SECONDS = 1
 # A terminal management state is necessary but NOT sufficient: Tyr can still be
 # publishing a delegated Agent's return, so the reply visible at that instant may
 # be an acknowledgement ("Routed to Alice. I will report back here...") rather
@@ -117,18 +139,34 @@ POLL_MAX_ATTEMPTS = 10
 # widen the window at the cost of that many extra seconds per turn.
 SETTLE_WAIT_SECONDS = 5
 
-LOG_FILE = "tyr_qatestsearch_log.jsonl"
-REPORT_PREFIX = "qatestsearch"
+# Phase 3 (scientist): how many self-proposed scenarios to run this phase, and
+# how much completion budget one generation call (reasoning + the JSON it ends
+# with) gets. Kept generous relative to a graded section, since this call is
+# also where the model reasons over the whole run so far.
+SCIENTIST_ITERATIONS = int(os.environ.get("TYR_LOOP_SCIENTIST_ITERATIONS", "12"))
+SCIENTIST_GEN_MAX_TOKENS = int(os.environ.get("TYR_LOOP_SCIENTIST_TOKENS", "4000"))
+# Char budget for the cumulative "earlier scenarios + results" block fed into
+# each generation call. Grows by one graded section per iteration, so without a
+# cap a long scientist phase would eventually blow the model's context the same
+# way an ungraded whole-run transcript would -- clipped the same way
+# fit_transcript() clips a case's own transcript, keeping head and tail so the
+# earliest and most recent attempts both stay visible.
+SCIENTIST_HISTORY_CHARS = int(os.environ.get("TYR_LOOP_SCIENTIST_HISTORY_CHARS", "40000"))
 
-# Report generation feeds the WHOLE run transcript to the model in one call, and
-# that call has the same context window as any other. A case that spirals (one
-# observed run repeated the same "workspace topology" reply 78 times) blows the
-# transcript past the window, the report call 400s, and the run ends with no
-# findings write-up at all. Raising the output budget cannot help -- the cap is
-# the endpoint's, shared by input+output -- so the transcript is deduped and
-# then hard-clipped to fit under it. All three are env-overridable.
+# Every run gets its own directory so a run's artifacts are never interleaved
+# with another run's or with the flat single-file layout this used to be. The
+# base phase (discovery + the fixed QATestSearch plan -- "the base tests") and
+# the scientist phase (self-proposed scenarios) each get a subdirectory so the
+# two are never confused for one another.
+RUN_ROOT = "runs"
+
+# grade_case() feeds ONE case's transcript to the model per call (see "Why the
+# report is built up rather than written at the end" in README.md), and that
+# call has the same context window as any other. A case that spirals (one
+# observed run repeated the same "workspace topology" reply 78 times) can still
+# blow ONE case's transcript past the window on its own, so it is deduped and
+# then hard-clipped to fit under it -- see fit_transcript().
 CONTEXT_TOKEN_LIMIT = int(os.environ.get("TYR_LOOP_CONTEXT_LIMIT", "128000"))
-REPORT_MAX_TOKENS = int(os.environ.get("TYR_LOOP_REPORT_MAX_TOKENS", "16000"))
 # Output allowance for ONE case's subsection -- a few paragraphs, not a document.
 SECTION_MAX_TOKENS = int(os.environ.get("TYR_LOOP_SECTION_MAX_TOKENS", "2000"))
 # Chars per token, for turning a token budget into a char budget without a
@@ -140,14 +178,14 @@ CHARS_PER_TOKEN = 3.2
 
 # Tyr operation states that mean "settled -- stop polling". Must stay aligned
 # with Tyr's own terminal states (see the state table in README.md); anything
-# missing here gets polled until POLL_MAX_ATTEMPTS runs out and is then handed
+# missing here gets polled until POLL_BUDGET_SECONDS runs out and is then handed
 # to the Loop Agent as provisional, even though it was actually final.
 # `partial` IS terminal -- it means the operation settled with a mix of
 # successful and unsuccessful executions. `error` is not a Tyr state at all:
 # send_to_tyr() substitutes it locally when an MCP call raises TyrMCPError.
 # `rejected` is unconfirmed against Tyr's API and has never appeared in a run
 # log -- kept because a wrongly-included terminal state costs nothing, while a
-# wrongly-excluded one costs POLL_MAX_ATTEMPTS * POLL_WAIT_SECONDS of stalling.
+# wrongly-excluded one costs a full POLL_BUDGET_SECONDS of stalling.
 TERMINAL_STATES = {"completed", "partial", "failed", "cancelled", "error", "rejected"}
 
 # ─────────────────────────────────────────────────────────────
@@ -155,11 +193,41 @@ TERMINAL_STATES = {"completed", "partial", "failed", "cancelled", "error", "reje
 # ─────────────────────────────────────────────────────────────
 
 
-# One id per process, stamped on every line. The log is append-only across every
-# run AND every ad-hoc smoke test that imports this module, so without it the
-# only way to isolate a single run is to eyeball timestamps and guess where one
-# ended. Grep `"runId": "<id>"` to pull exactly one run out.
+# One id per process, stamped on every line of every file this run writes --
+# grep `"runId": "<id>"` across runs/<RUN_ID>/ to pull exactly one run out even
+# after files are copied elsewhere.
 RUN_ID = uuid.uuid4().hex[:8]
+RUN_DIR = os.path.join(RUN_ROOT, RUN_ID)
+
+
+def base_dir() -> str:
+    """runs/<RUN_ID>/base/ -- discovery + the fixed QATestSearch plan (the
+    "base tests"). Created on first use, not at import, so a bare `import
+    agent_loop` with no run touches nothing on disk."""
+    d = os.path.join(RUN_DIR, "base")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def scientist_dir() -> str:
+    """runs/<RUN_ID>/scientist/ -- Phase 3's self-proposed scenarios."""
+    d = os.path.join(RUN_DIR, "scientist")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+# Which file log() appends to right now. Starts pointed at the base phase's
+# log; run_scientist_phase() repoints it via use_log_file() before Phase 3 so
+# scientist turns land in their own directory instead of mixing into the base
+# log. converse() and friends always read this name at call time, so
+# reassigning it mid-run is enough -- no parameter needs threading through
+# every function that logs.
+LOG_FILE = os.path.join(base_dir(), "log.jsonl")
+
+
+def use_log_file(path: str) -> None:
+    global LOG_FILE
+    LOG_FILE = path
 
 
 def log(entry: dict) -> None:
@@ -177,13 +245,18 @@ def loggable_raw(raw: dict) -> dict:
 
     The full payload is logged because the tool schema doesn't pin down what an
     entry in executions[]/bridges[] looks like, and that shape is only learnable
-    from real delegating turns. `response`, though, is already stored verbatim as
-    `from_tyr` -- keeping both doubled the file, and on a run where Tyr returns a
-    growing cumulative transcript it was most of the 3.8 MB."""
+    from real delegating turns. `response`, though, is the cumulative
+    conversation, whose new part is already stored as `from_tyr` and whose older
+    parts are the preceding turns' `from_tyr` -- keeping it too doubled the file,
+    and on a run where Tyr replays a growing transcript it was most of the 3.8 MB.
+    bridges[] still carries each peer reply separately, so nothing is lost."""
     if not isinstance(raw, dict) or "response" not in raw:
         return raw
     trimmed = dict(raw)
-    trimmed["response"] = f"<{len(raw.get('response') or '')} chars -- see from_tyr>"
+    trimmed["response"] = (
+        f"<{len(raw.get('response') or '')} chars, cumulative -- this turn's new "
+        f"part is from_tyr>"
+    )
     return trimmed
 
 
@@ -321,6 +394,10 @@ class TyrReply(NamedTuple):
       "our_turn" -- Tyr is blocked on input from us. Polling can NEVER advance
                     this; the Loop Agent has to send the next message.
       "timeout"  -- ran out of polling budget. Provisional; may be incomplete.
+
+    `text` is what this turn ADDED -- see new_text(). Everything downstream
+    (the Loop Agent's next message, the stuck detector, the graded transcript)
+    reads this field, and all three are wrong if it carries the replay.
     """
     text: str
     operation_id: str | None
@@ -328,6 +405,52 @@ class TyrReply(NamedTuple):
     outcome: str
     raw: dict
     notes: tuple[str, ...] = ()  # why a runtime/bridge didn't succeed, if it didn't
+    replayed_chars: int = 0  # of the reply, how much was conversation already seen
+
+
+class TyrConversation:
+    """The Tyr operation a run is talking to, plus the reply text already seen.
+
+    Tyr's `response` is the WHOLE conversation so far, not the answer to the
+    last message: each turn returns the previous reply with one new block
+    appended. `seen` is what makes the difference recoverable.
+
+    Both fields have to outlive a single case, which is why they live in one
+    object threaded through the phases rather than in converse(). converse() is
+    called once per case with a fresh message list, so a per-call baseline would
+    replay every earlier case into the first turn of the next one -- exactly the
+    contamination this exists to prevent. One observed run graded an image-upload
+    case as PASS on the strength of the PREVIOUS case's HTTP 201, replayed into
+    its transcript."""
+
+    def __init__(self, operation_id: str | None = None) -> None:
+        self.operation_id = operation_id
+        self.seen = ""
+
+
+def new_text(full: str, seen: str) -> str:
+    """The part of `full` that was not already in the previous reply.
+
+    Empty when the turn appended nothing -- see NO_NEW_CONTENT for what
+    send_to_tyr does with that. Falls back to the whole reply when the
+    cumulative shape does not hold at all (a history Tyr truncated or rewrote),
+    since a replay delivered once too often is a far cheaper failure than a real
+    answer silently dropped."""
+    if seen and full.startswith(seen):
+        return full[len(seen):].strip()
+    return full
+
+
+# What the Loop Agent is told when Tyr republishes the conversation unchanged.
+# Handing back the replay instead would present an answer to some EARLIER turn's
+# question as though it answered this one: in one observed run the first turn of
+# a case got the previous case's completed upload back, and both the Loop Agent
+# and the grader took it as this case's own result.
+NO_NEW_CONTENT = (
+    "[Tyr Assistant published nothing new this turn -- it returned the "
+    "conversation it had already sent, with no reply to the message you just "
+    "sent. Treat that as no answer yet, not as an answer.]"
+)
 
 
 # Fields an execution/bridge entry might carry explaining why it didn't succeed.
@@ -401,16 +524,19 @@ def work_pending(result: dict) -> bool:
     return False
 
 
-def send_to_tyr(tyr: TyrMCPClient, message: str, operation_id: str | None) -> TyrReply:
-    """Send one message to Tyr and wait for it to genuinely finish."""
+def send_to_tyr(tyr: TyrMCPClient, message: str, convo: TyrConversation) -> TyrReply:
+    """Send one message to Tyr and wait for it to genuinely finish.
+
+    Advances `convo`: its operation id, and the reply text it has now seen."""
     send = tyr.request if ALLOW_ACTIONS else tyr.query
-    result = send(message, operation_id=operation_id)
-    op_id = result.get("operationId", operation_id)
+    result = send(message, operation_id=convo.operation_id)
+    op_id = result.get("operationId", convo.operation_id)
 
     outcome = "timeout"
     quiet_stamp = None  # updatedAt seen when the operation first looked done
+    deadline = time.monotonic() + POLL_BUDGET_SECONDS
 
-    for _ in range(POLL_MAX_ATTEMPTS):
+    while time.monotonic() < deadline:
         state = result.get("state", "unknown")
 
         if state == "input_required":
@@ -420,6 +546,9 @@ def send_to_tyr(tyr: TyrMCPClient, message: str, operation_id: str | None) -> Ty
         approvals = result.get("pendingApprovals") or []
         if approvals and op_id:
             resolve_pending_approvals(tyr, op_id, approvals)
+            # A human just spent however long they spent at that prompt. That is
+            # not Tyr failing to finish, so it does not come out of Tyr's budget.
+            deadline = time.monotonic() + POLL_BUDGET_SECONDS
             result = tyr.operation_status(op_id, wait_seconds=POLL_WAIT_SECONDS)
             continue
 
@@ -431,18 +560,33 @@ def send_to_tyr(tyr: TyrMCPClient, message: str, operation_id: str | None) -> Ty
         # Looks done -> re-check briefly to catch a late-published return.
         # Still working -> go back to the long poll.
         quiet_stamp = result.get("updatedAt") if done else None
+        asked_at = time.monotonic()
         result = tyr.operation_status(
             op_id, wait_seconds=SETTLE_WAIT_SECONDS if done else POLL_WAIT_SECONDS
         )
+        # The server may answer a long-poll well before wait_seconds is up. Keep
+        # a floor between calls so the budget is spent waiting for the operation
+        # rather than on a tight loop of status requests.
+        gap = POLL_MIN_GAP_SECONDS - (time.monotonic() - asked_at)
+        if gap > 0:
+            time.sleep(gap)
 
     # Budget can run out mid-settle on an operation that had in fact finished.
     if outcome == "timeout" and result.get("state") in TERMINAL_STATES and not work_pending(result):
         outcome = "settled"
 
+    convo.operation_id = op_id
     notes = failure_notes(result)
-    text = (result.get("response") or "").strip()
 
-    if not text:
+    # Tyr replays the whole conversation every turn; hand back only what this
+    # turn added, and remember the full text as the next turn's baseline.
+    full = (result.get("response") or "").strip()
+    text = new_text(full, convo.seen)
+    replayed = len(full) - len(text)
+    if full:
+        convo.seen = full
+
+    if not full:
         # No published reply. Prefer a concrete runtime reason (a safety refusal
         # lands here) over the generic operation-level sentence, and never hand
         # back a blank -- a blank is indistinguishable from a timeout.
@@ -450,12 +594,19 @@ def send_to_tyr(tyr: TyrMCPClient, message: str, operation_id: str | None) -> Ty
         if not text:
             text = json.dumps(result, ensure_ascii=False)
         print(f"!! Empty response from Tyr -- reporting runtime detail instead: {text[:200]}")
-    elif notes:
-        # A reply came back AND something underneath it failed. Keep both: the
-        # reply may be a partial answer whose gap the notes explain.
-        text = f"{text}\n[runtime detail] " + " | ".join(notes)
+    else:
+        if not text:
+            text = NO_NEW_CONTENT
+            print("!! Tyr republished the same conversation with nothing appended -- "
+                  "reporting that instead of replaying it.")
+        if notes:
+            # A reply came back AND something underneath it failed. Keep both:
+            # the reply may be a partial answer whose gap the notes explain.
+            text = f"{text}\n[runtime detail] " + " | ".join(notes)
 
-    return TyrReply(text, op_id, result.get("state", "unknown"), outcome, result, notes)
+    return TyrReply(
+        text, op_id, result.get("state", "unknown"), outcome, result, notes, replayed
+    )
 
 
 def confirm_actions_enabled() -> None:
@@ -665,14 +816,15 @@ def converse(
     tyr: TyrMCPClient,
     system_prompt: str,
     loop_messages: list[dict],
-    tyr_operation_id: str | None,
+    convo: TyrConversation,
     max_turns: int,
     phase: str,
     stop_prefixes: tuple[str, ...] = (STOP_TOKEN,),
     runtime_vars: tuple[str, ...] = (),
-) -> tuple[list[dict], str | None]:
+) -> list[dict]:
     """Run up to max_turns of Loop Agent <-> Tyr exchange, mutating and
-    returning loop_messages/tyr_operation_id.
+    returning loop_messages. `convo` carries the Tyr operation across phases and
+    cases, and is advanced in place.
 
     Stops early when the Loop Agent emits any of stop_prefixes. Those are
     harness control tokens, so the message is recorded in loop_messages (the
@@ -745,10 +897,9 @@ def converse(
         loop_messages.append({"role": "assistant", "content": next_message})
 
         try:
-            reply = send_to_tyr(tyr, next_message, tyr_operation_id)
-            tyr_operation_id = reply.operation_id
+            reply = send_to_tyr(tyr, next_message, convo)
         except TyrMCPError as e:
-            reply = TyrReply(f"ERROR calling Tyr: {e}", tyr_operation_id, "error", "settled", {})
+            reply = TyrReply(f"ERROR calling Tyr: {e}", convo.operation_id, "error", "settled", {})
 
         # Tell the Loop Agent exactly how much to trust this reply -- each
         # outcome calls for a different next move from it.
@@ -761,7 +912,7 @@ def converse(
         elif reply.outcome == "timeout":
             label = (
                 f"[Tyr Assistant has NOT finished yet -- gave up polling after "
-                f"{POLL_MAX_ATTEMPTS} attempts, last known state={reply.state!r}. "
+                f"{POLL_BUDGET_SECONDS}s, last known state={reply.state!r}. "
                 f"This may be stale/incomplete -- check again before treating it "
                 f"as final]"
             )
@@ -784,6 +935,16 @@ def converse(
                 label = f"{label} {RETRY_EXHAUSTED_NUDGE.format(n=retry_streak)}"
                 print(f"!! Transient failure x{retry_streak} -- telling the Loop Agent to "
                       f"stop retrying and record it as a finding.")
+        elif reply.outcome == "timeout":
+            # Tyr is still working. A reply that says the same as last turn's
+            # means the operation has not finished -- not that the Loop Agent is
+            # circling -- and the stuck nudges escalate to "record what you have
+            # and emit your stop token", which on a slow step (rendering an
+            # image) is an instruction to abandon a case that was still running.
+            # The provisional label above already says what to do here. The
+            # streak is left as it was rather than reset: a genuine paraphrase
+            # loop that happens to hit a slow turn should not get a free pass.
+            retry_streak = 0
         else:
             retry_streak = 0
             # No progress this turn if we said the same thing again, or Tyr did.
@@ -805,9 +966,12 @@ def converse(
             "turn": turn,
             "stuckStreak": stuck_streak,
             "retryStreak": retry_streak,
-            "operationId": tyr_operation_id,
+            "operationId": convo.operation_id,
             "to_tyr": next_message,
+            # What this turn ADDED. The conversation Tyr replayed ahead of it is
+            # already in this log as the preceding turns' from_tyr.
             "from_tyr": reply.text,
+            "replayedChars": reply.replayed_chars,
             "tyrState": reply.state,
             "outcome": reply.outcome,
             "settled": reply.outcome == "settled",  # kept for older log readers
@@ -823,7 +987,7 @@ def converse(
 
         print("-" * 60)
 
-    return loop_messages, tyr_operation_id
+    return loop_messages
 
 
 # ─────────────────────────────────────────────────────────────
@@ -869,9 +1033,9 @@ def parse_discovery_options(transcript: str) -> list[dict]:
 def run_discovery(
     brain: "LoopAgentClient",
     tyr: TyrMCPClient,
-    tyr_operation_id: str | None,
-    report_file: str | None = None,
-) -> tuple[dict, str | None]:
+    convo: TyrConversation,
+    report_file: str,
+) -> dict:
     """Phase 1. Returns the target to test against (PATH/WORKSPACE/AGENT).
     Exits the process if no usable location was found -- every test case
     depends on having one.
@@ -881,10 +1045,10 @@ def run_discovery(
     past the first, so the extra Bridges were explored at the cost of real
     discovery turns. Several are still parsed and reported if a run produces
     them; only the first is used."""
-    messages, tyr_operation_id = converse(
+    messages = converse(
         brain, tyr, render_discovery_prompt(),
         [{"role": "user", "content": "Begin discovery."}],
-        tyr_operation_id, EXPLORE_TURNS, phase="discovery",
+        convo, EXPLORE_TURNS, phase="discovery",
         stop_prefixes=(DISCOVERY_DONE_PREFIX, DISCOVERY_FAILED_TOKEN),
     )
 
@@ -925,7 +1089,7 @@ def run_discovery(
     if len(options) > 1:
         print("\nTesting against the first; the rest are recorded but unused.")
 
-    return options[0], tyr_operation_id
+    return options[0]
 
 
 def run_test_cases(
@@ -933,9 +1097,9 @@ def run_test_cases(
     tyr: TyrMCPClient,
     test_plan: list[dict],
     target: dict,
-    tyr_operation_id: str | None,
+    convo: TyrConversation,
     report_file: str,
-) -> tuple[list[str], str | None]:
+) -> list[str]:
     """Phase 2. Run each case in its own conversation, seeded with the target
     discovery confirmed, grade it the moment it finishes, and return the
     finished report sections.
@@ -963,10 +1127,10 @@ def run_test_cases(
             f"WORKSPACE={target['WORKSPACE']} AGENT={target['AGENT']}. "
             f"Begin."
         )
-        messages, tyr_operation_id = converse(
+        messages = converse(
             brain, tyr, render_execute_prompt(case, target, STOP_TOKEN),
             [{"role": "user", "content": context}],
-            tyr_operation_id, MAX_TURNS, phase=f"execute-case-{i}",
+            convo, MAX_TURNS, phase=f"execute-case-{i}",
             runtime_vars=runtime_variables(case),
         )
         print(f"✓ Case {i} ran: {case['id']} -- grading it now")
@@ -975,32 +1139,17 @@ def run_test_cases(
         save_report(assemble_report(test_plan, sections, target=target), report_file)
         print(f"✓ Case {i} graded: {result_of(sections[-1]) or 'unparsed'} -> {report_file}")
 
-    return sections, tyr_operation_id
+    return sections
 
 
-def next_report_path() -> str:
-    """The next free <REPORT_PREFIX>_<n>.md, numbered past any earlier run.
-
-    Allocated ONCE per run and then rewritten in place as each case is graded,
-    so an interrupted run leaves one file holding everything finished so far --
-    not one file per case, and not nothing at all."""
-    nums = []
-    for name in os.listdir("."):
-        if name.startswith(REPORT_PREFIX + "_") and name.endswith(".md"):
-            try:
-                nums.append(int(name[len(REPORT_PREFIX) + 1:-3]))
-            except ValueError:
-                pass
-    return f"{REPORT_PREFIX}_{max(nums, default=0) + 1}.md"
-
-
-def save_report(report: str, report_file: str | None = None) -> str:
-    """Write `report`, to `report_file` if given or a freshly numbered one.
+def save_report(report: str, report_file: str) -> str:
+    """Write `report` to `report_file`.
 
     Every way a run can end goes through here, including the ones that end
     early: a run that produces no file at all leaves the operator with nothing
-    to read but a multi-MB log."""
-    report_file = report_file or next_report_path()
+    to read but a multi-MB log. `report_file` lives inside this run's own
+    directory (base_dir() or scientist_dir()), so it is always given
+    explicitly -- runs no longer share a flat, numbered namespace."""
     with open(report_file, "w", encoding="utf-8") as f:
         f.write(report)
     return report_file
@@ -1127,15 +1276,14 @@ def write_report(
     test_plan: list[dict],
     sections: list[str],
     target: dict | None = None,
-    report_file: str | None = None,
+    report_file: str = "",
 ) -> str:
-    """Phase 3. Finish the report the execute phase has been writing all along.
-
-    Every case was already graded and saved as it completed, so this adds only
-    the two things that need the whole run in view: the delivery paragraph and
-    the issues list. It runs over the finished SECTIONS, never the transcripts,
-    so it stays small -- and if it is blocked anyway, the per-case findings are
-    already on disk and the report is written without it."""
+    """Closes out Phase 2's report. Every case was already graded and saved as
+    it completed, so this adds only the two things that need the whole run in
+    view: the delivery paragraph and the issues list. It runs over the
+    finished SECTIONS, never the transcripts, so it stays small -- and if it
+    is blocked anyway, the per-case findings are already on disk and the
+    report is written without it."""
     summary = None
     if sections:
         try:
@@ -1160,6 +1308,201 @@ def write_report(
     return save_report(
         assemble_report(test_plan, sections, summary=summary, target=target), report_file
     )
+
+
+# ─────────────────────────────────────────────────────────────
+# PHASE 3: SCIENTIST -- self-directed scenario exploration
+# ─────────────────────────────────────────────────────────────
+#
+# Phase 2 runs a fixed, hand-written plan. This phase instead asks the Loop
+# Agent's own model to be the researcher: read the base report (what already
+# worked, what was refused, what stalled), invent ONE new scenario in the same
+# case schema those cases use, run it for real through the exact same engine
+# (converse() + render_execute_prompt), grade it the exact same way
+# (grade_case()), and fold the graded result into the next scenario's own
+# generation call -- so scenario 10 is reasoned from the outcomes of scenarios
+# 1-9, not from the base report alone.
+
+
+def parse_scenario_json(text: str) -> dict | None:
+    """The ONE scenario a scientist-phase generation call proposed, or None.
+
+    The model is allowed to reason at length before answering (see
+    render_scientist_generate_prompt), so this looks for the LAST fenced
+    ```json block -- reasoning that happens to contain an earlier, abandoned
+    JSON fragment must not be picked up instead of the real answer. Falls back
+    to the last bare {...} span if the model dropped the fence. Rejects
+    anything missing id/title/steps, or whose steps aren't a non-empty list of
+    strings -- a half-formed case would otherwise reach render_execute_prompt
+    and fail there with a much less obvious error."""
+    fenced = re.findall(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.S)
+    candidates = fenced or re.findall(r"\{.*\}", text, re.S)
+    for candidate in reversed(candidates):
+        try:
+            case = json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(case, dict) or not ({"id", "title", "steps"} <= case.keys()):
+            continue
+        steps = case.get("steps")
+        if isinstance(steps, list) and steps and all(isinstance(s, str) for s in steps):
+            return case
+    return None
+
+
+def unique_case_id(candidate: str, used_ids: set[str], fallback: str) -> str:
+    """A kebab-case id guaranteed not to collide with one already used this
+    run. The generation prompt asks for a unique id already, but nothing
+    enforces it -- silently overwriting an earlier scenario's log/report under
+    the same id would be worse than a suffixed one."""
+    base = re.sub(r"[^a-z0-9]+", "-", (candidate or "").lower()).strip("-") or fallback
+    cid, n = base, 2
+    while cid in used_ids:
+        cid = f"{base}-{n}"
+        n += 1
+    return cid
+
+
+def fit_history(history: str, case: dict, section: str, iteration: int) -> str:
+    """The running "earlier scenarios + graded results" block fed into each
+    generation call, with one more entry appended and the whole thing clipped
+    to SCIENTIST_HISTORY_CHARS. Reuses clip_middle so, exactly like a
+    long-running case's transcript, the earliest and most recent entries both
+    stay visible if it ever has to be trimmed."""
+    entry = f"--- Scenario {iteration}: [{case['id']}] {case.get('title', '')} ---\n{section.strip()}"
+    combined = f"{history}\n\n{entry}".strip() if history else entry
+    if len(combined) > SCIENTIST_HISTORY_CHARS:
+        combined = clip_middle(combined, SCIENTIST_HISTORY_CHARS)
+    return combined
+
+
+def assemble_scientist_report(sections: list[str], summary: str | None = None) -> str:
+    """The scientist report file: header, tally, every graded scenario's
+    subsection. Unlike assemble_report(), there is no fixed test_plan to
+    account for -- the scenario count is decided by the loop as it runs, not
+    known in advance, so there is no "NOT ATTEMPTED" tail to render."""
+    parts = [
+        "# Tyr Assistant Scientist Report",
+        "",
+        "Scenarios this phase invented and ran itself -- reasoned from the base "
+        "test report and from every earlier scenario's own graded result, not "
+        "from a fixed plan.",
+        "",
+        "`Legend: ✅ PASS · ❌ FAIL · ⚠️ PARTIAL · ⏭️ NOT ATTEMPTED · 🚧 NOT GRADED`",
+        "",
+        f"`Run: {RUN_ID}` · `Model: {MODEL}` · `Scenarios graded: {len(sections)}`",
+        "",
+        f"Status tally: `{tally_line(sections)}`",
+    ]
+    if summary:
+        parts += ["", summary.strip()]
+    parts += ["", "## Findings", ""]
+    parts.append("\n\n".join(sections) if sections else "_No scenario has been graded yet._")
+    return "\n".join(parts).rstrip() + "\n"
+
+
+def save_scenarios(records: list[dict], path: str) -> None:
+    """The scenarios this phase invented, as a JSON array in the same shape as
+    test_cases/qatestsearch.json -- so any of them can be reviewed, or pasted
+    straight into the base plan, without digging through log.jsonl for the
+    `case` field of a `scientist-generate` line. Rewritten after every
+    iteration, same as the report, so a run stopped partway still leaves
+    every scenario decided on so far documented."""
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(records, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+
+
+def run_scientist_phase(
+    brain: "LoopAgentClient",
+    tyr: TyrMCPClient,
+    target: dict,
+    base_report: str,
+    convo: TyrConversation,
+) -> None:
+    """Phase 3. Propose one new scenario at a time, run it for real, grade it,
+    and fold the graded result into the next scenario's own generation call --
+    for SCIENTIST_ITERATIONS rounds. Writes into scientist_dir(), kept
+    separate from the base phase's own log and report."""
+    use_log_file(os.path.join(scientist_dir(), "log.jsonl"))
+    report_file = os.path.join(scientist_dir(), "report.md")
+    scenarios_file = os.path.join(scientist_dir(), "scenarios.json")
+
+    history = ""
+    used_ids: set[str] = set()
+    sections: list[str] = []
+    scenario_records: list[dict] = []
+    shared = load_shared()
+
+    for i in range(1, SCIENTIST_ITERATIONS + 1):
+        print(f"\n--- Scientist iteration {i}/{SCIENTIST_ITERATIONS}: proposing a scenario ---")
+        gen_prompt = render_scientist_generate_prompt(
+            base_report=base_report, history=history,
+            iteration=i, total=SCIENTIST_ITERATIONS, target=target, used_ids=used_ids,
+        )
+        try:
+            proposal = call_model(brain, [{"role": "user", "content": gen_prompt}],
+                                   max_tokens=SCIENTIST_GEN_MAX_TOKENS)
+        except LoopAgentBlocked as blocked:
+            print(f"!! Scientist generation blocked on iteration {i}: {blocked.reason}")
+            log({"phase": "scientist-generate", "iteration": i,
+                 "loopAgentBlocked": blocked.reason, "loopAgentBlockDetail": blocked.detail})
+            continue
+
+        raw_case = parse_scenario_json(proposal)
+        if not raw_case:
+            print(f"!! Could not parse a scenario out of iteration {i}'s proposal -- skipping it.")
+            log({"phase": "scientist-generate", "iteration": i, "unparsed": proposal[:2000]})
+            continue
+
+        raw_case["id"] = unique_case_id(str(raw_case.get("id", "")), used_ids, f"scenario-{i}")
+        used_ids.add(raw_case["id"])
+        raw_case.setdefault("category", "discovery")
+
+        case = prepare_case(raw_case, shared, store_url=STORE_URL, fake_data_marker=FAKE_DATA_MARKER)
+        print(f"  Scenario: [{case['id']}] {case.get('title', '')}")
+        log({"phase": "scientist-generate", "iteration": i, "case": case})
+
+        context = (
+            f"File location confirmed: PATH={target['PATH']} "
+            f"WORKSPACE={target['WORKSPACE']} AGENT={target['AGENT']}. Begin."
+        )
+        messages = converse(
+            brain, tyr, render_execute_prompt(case, target, STOP_TOKEN),
+            [{"role": "user", "content": context}],
+            convo, MAX_TURNS, phase=f"scientist-case-{i}",
+            runtime_vars=runtime_variables(case),
+        )
+
+        section = grade_case(brain, case, messages, target)
+        sections.append(section)
+        print(f"  Result: {result_of(section) or 'unparsed'}")
+
+        # Document the scenario itself -- not just its graded write-up -- so it
+        # can be reviewed, or promoted into test_cases/qatestsearch.json, later.
+        scenario_records.append({**case, "iteration": i, "gradedResult": result_of(section) or "unparsed"})
+        save_scenarios(scenario_records, scenarios_file)
+
+        history = fit_history(history, case, section, i)
+        save_report(assemble_scientist_report(sections), report_file)
+        print(f"  -> {report_file}")
+
+    summary = None
+    if sections:
+        try:
+            summary = call_model(
+                brain,
+                [{"role": "user", "content": render_summary_prompt("\n\n".join(sections))}],
+                max_tokens=SECTION_MAX_TOKENS,
+            )
+        except LoopAgentBlocked as blocked:
+            print("\n!! Scientist summary generation blocked -- per-scenario findings are unaffected.")
+            log({"phase": "scientist-summary", "loopAgentBlocked": blocked.reason,
+                 "loopAgentBlockDetail": blocked.detail})
+
+    save_report(assemble_scientist_report(sections, summary=summary), report_file)
+    print(f"\nScientist phase complete: {len(sections)}/{SCIENTIST_ITERATIONS} scenario(s) graded -> "
+          f"{report_file} (scenarios documented in {scenarios_file})")
 
 
 # ─────────────────────────────────────────────────────────────
@@ -1189,8 +1532,10 @@ def main() -> None:
         "maxTurns": MAX_TURNS,
         "turnMaxTokens": TURN_MAX_TOKENS,
         "contextTokenLimit": CONTEXT_TOKEN_LIMIT,
+        "pollBudgetSeconds": POLL_BUDGET_SECONDS,
         "searchRoot": SEARCH_ROOT,
         "cases": [case["id"] for case in TEST_CASES],
+        "scientistIterations": SCIENTIST_ITERATIONS,
     })
 
     try:
@@ -1206,27 +1551,39 @@ def main() -> None:
     )
 
     # Named up front so every phase writes into the SAME file. The report is
-    # built up as the run goes rather than produced at the end.
-    report_file = next_report_path()
-    print(f"Report -> {report_file} (rewritten after each case)")
+    # built up as the run goes rather than produced at the end. Lives under
+    # runs/<RUN_ID>/base/ -- see base_dir().
+    report_file = os.path.join(base_dir(), "report.md")
+    print(f"Base report -> {report_file} (rewritten after each case)")
+
+    # One Tyr conversation for the whole run, carrying the operation id and the
+    # reply text seen so far from phase to phase. See TyrConversation.
+    convo = TyrConversation()
 
     # Phase 1: find the file. Exits if it can't -- the cases all need a target.
     print("\n### Phase 1/3: Discover file location ###")
-    target, tyr_operation_id = run_discovery(brain, tyr, None, report_file)
+    target = run_discovery(brain, tyr, convo, report_file)
 
     # Phase 2: run every case against that target, one case per conversation,
-    # grading and saving each one before the next starts.
-    print("\n### Phase 2/3: Execute test plan ###")
-    sections, _ = run_test_cases(
-        brain, tyr, TEST_CASES, target, tyr_operation_id, report_file
+    # grading and saving each one before the next starts -- these are the
+    # "base tests". Closes with the delivery summary and issues list once
+    # every case is graded.
+    print("\n### Phase 2/3: Execute base test plan ###")
+    sections = run_test_cases(
+        brain, tyr, TEST_CASES, target, convo, report_file
     )
-
-    # Phase 3: add only what needs the whole run in view -- delivery summary
-    # and issues list. The findings themselves are already written.
-    print("\n### Phase 3/3: Summarize ###")
     write_report(brain, TEST_CASES, sections, target, report_file)
+    base_report = open(report_file, encoding="utf-8").read()
+    print(f"Base tests done -> {base_dir()}")
 
-    print(f"Done. Log -> {LOG_FILE} | Report -> {report_file}")
+    # Phase 3: the scientist. Reads the base report above, proposes and runs
+    # its own scenarios one at a time, and reasons over every earlier
+    # scenario's graded result when designing the next one. Writes into its
+    # own directory, scientist_dir(), so it never overwrites the base tests.
+    print("\n### Phase 3/3: Scientist phase of exploration ###")
+    run_scientist_phase(brain, tyr, target, base_report, convo)
+
+    print(f"\nDone. Base -> {base_dir()} | Scientist -> {scientist_dir()}")
 
 
 if __name__ == "__main__":

@@ -10,6 +10,11 @@ shape render_case() in the prompt module already expects. An
 "enabled": false case is kept on disk (so it's still visible/editable in
 the browser) but excluded from load_enabled().
 
+The same expansion/fill pass a case goes through here (prepare_case(), used
+internally by load_enabled()) is reused directly by agent_loop.py's scientist
+phase for the scenarios it invents at runtime, which never touch this file --
+one pipeline for both a hand-written case and a self-generated one.
+
 An optional "success" field states what PASS means for that one case, in
 plain words. It is the case's own pass bar: the steps say what to do, and
 "success" says which observed outcome counts as having done it. Cases
@@ -142,34 +147,40 @@ def expand_fragments(steps: list[str], fragments: dict) -> list[str]:
     return expanded
 
 
-def load_enabled(**placeholders: str) -> list[dict]:
-    """Enabled cases only -- fragments expanded, placeholders filled, "enabled"
-    stripped. This is what the prompt module actually runs against Tyr.
+def prepare_case(case: dict, shared: dict, **placeholders: str) -> dict:
+    """One case, with @fragments expanded and {placeholder}s filled -- the
+    per-case body of load_enabled(), pulled out so a case built at runtime
+    (the scientist phase's self-generated scenarios) can go through the exact
+    same expansion/fill pass as one loaded from disk, instead of a second,
+    drifting copy of this logic.
 
     Values are layered: the case's own extra string fields first, then the
     caller's `placeholders`, then the shared "text" entries (themselves filled
     from those first two, so {grading_note} can talk about {artifact})."""
+    case = dict(case)
+    case.pop("enabled", None)
+
+    if "steps" in case:
+        case["steps"] = expand_fragments(case["steps"], shared["steps"])
+
+    values = {
+        k: v for k, v in case.items()
+        if k not in STRUCTURAL_FIELDS and isinstance(v, str)
+    }
+    values.update(placeholders)
+    values.update({
+        name: safe_format(text, **values) for name, text in shared["text"].items()
+    })
+
+    return fill_case(case, **values)
+
+
+def load_enabled(**placeholders: str) -> list[dict]:
+    """Enabled cases only -- fragments expanded, placeholders filled, "enabled"
+    stripped. This is what the prompt module actually runs against Tyr."""
     shared = load_shared()
-    cases = []
-
-    for case in load_raw():
-        if not case.get("enabled", True):
-            continue
-        case = dict(case)
-        case.pop("enabled", None)
-
-        if "steps" in case:
-            case["steps"] = expand_fragments(case["steps"], shared["steps"])
-
-        values = {
-            k: v for k, v in case.items()
-            if k not in STRUCTURAL_FIELDS and isinstance(v, str)
-        }
-        values.update(placeholders)
-        values.update({
-            name: safe_format(text, **values) for name, text in shared["text"].items()
-        })
-
-        cases.append(fill_case(case, **values))
-
-    return cases
+    return [
+        prepare_case(case, shared, **placeholders)
+        for case in load_raw()
+        if case.get("enabled", True)
+    ]
