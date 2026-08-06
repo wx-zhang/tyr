@@ -25,7 +25,7 @@ e.g.:
 import os
 import re
 
-from test_case_store import fill_case, load_enabled
+from .test_case_store import fill_case, load_enabled
 
 STORE_URL = os.environ.get("TYR_QATESTSEARCH_STORE_URL", "https://www.tyr.ai/tyrcli/collector/api/collect")
 

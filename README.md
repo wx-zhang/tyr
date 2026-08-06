@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="assets/tyr-red-team.svg" alt="Tyr Red Teaming Agent" width="100%">
+</div>
+
 # Tyr QATestSearch
 
 A three-phase QA harness that runs against Tyr Assistant: locate
@@ -24,38 +28,46 @@ in a format it invented itself.
 
 ## Files
 
-- `agent_loop.py` -- single entry point / the four-phase pipeline (discovery,
-  execute, report, scientist)
-- `mcp_client.py` -- minimal JSON-RPC client wrapping the four Tyr MCP tools the
-  harness uses (assistant query/request, operation status, approval resolve).
-  Tyr also exposes four Workspace Bridge tools; this harness deliberately does
-  not call them -- see [Workspace Bridges](#workspace-bridges-how-the-other-workspace-is-reached).
-- `prompts.py` -- QATestSearch prompts: `SYSTEM_BRIEF`, `TESTING_METHODOLOGY`,
-  `TEST_CASES`, templates for the discovery/execute/report phases, and
-  `render_scientist_generate_prompt` for the scientist phase's own scenario
-  design calls
-- `test_case_store.py` -- shared load/save for the test-case files, plus
-  fragment expansion and placeholder filling (`prepare_case`, used for both
-  the base test cases and the scientist phase's self-generated ones)
+- `src/tyr_agent_tester/agent_loop.py` -- single entry point / the four-phase
+  pipeline (discovery, execute, report, scientist), exposed as the `agent`
+  command
+- `src/tyr_agent_tester/cli_entry.py` -- executable entry point exposed as the
+  `cli` command
+- `src/tyr_agent_tester/cli/` -- interactive agent logic and terminal
+  presentation for the smaller interactive Tyr assistant CLI
+- `src/tyr_agent_tester/mcp_client.py` -- minimal JSON-RPC client wrapping the
+  four Tyr MCP tools the harness uses (assistant query/request, operation
+  status, approval resolve). Tyr also exposes four Workspace Bridge tools;
+  this harness deliberately does not call them -- see
+  [Workspace Bridges](#workspace-bridges-how-the-other-workspace-is-reached).
+- `src/tyr_agent_tester/prompts.py` -- QATestSearch prompts: `SYSTEM_BRIEF`,
+  `TESTING_METHODOLOGY`, `TEST_CASES`, templates for the discovery/execute/report
+  phases, and `render_scientist_generate_prompt` for the scientist phase's own
+  scenario design calls
+- `src/tyr_agent_tester/test_case_store.py` -- shared load/save for the
+  test-case files, plus fragment expansion and placeholder filling
+  (`prepare_case`, used for both the base test cases and the scientist phase's
+  self-generated ones)
 - `test_cases/qatestsearch.json` -- the base test-case data (scenario
-  id/title/category, plus ordered steps); edit by hand or via `editor_server.py`
+  id/title/category, plus ordered steps); edit by hand or via the editor module
 - `test_cases/shared.json` -- step fragments and pass-bar wording shared by
   every case, so they are written once instead of copy-pasted per case -- the
   scientist phase's own scenarios can reference these fragments too
-- `editor_server.py`, `editor.html` -- local browser editor for the test
-  cases above (see below)
-- `requirements.txt`
+- `src/tyr_agent_tester/editor_server.py`, `editor.html` -- local browser
+  editor for the test cases above (see below)
+- `pyproject.toml` -- project metadata, dependencies, and `agent`/`cli` entry points
+- `uv.lock` -- reproducible dependency resolution
 
 ## Editing test cases in the browser
 
 ```bash
-python3 editor_server.py        # serves http://127.0.0.1:8765
+uv run python -m tyr_agent_tester.editor_server  # serves http://127.0.0.1:8765
 ```
 
 Open the URL and edit case id/title/category and their ordered steps inline.
 Use the "Enabled" checkbox to keep a case on file without running it. Changes
 save straight back to `test_cases/qatestsearch.json` and take effect the next
-time `agent_loop.py` runs.
+time `uv run agent` runs.
 
 Two things keep the cases from repeating each other:
 
@@ -78,14 +90,15 @@ API), so you drive it with any Claude model your OpenRouter account can reach.
 Tyr Assistant itself is still reached over its own MCP server -- that's
 unchanged.
 
-**1. Install dependencies** into a project virtualenv (on macOS, Homebrew's
-Python is externally managed per PEP 668 and rejects global `pip install`):
+**1. Install `uv` and sync the project environment**:
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+uv sync
 ```
+
+This creates `.venv`, installs the locked dependencies, and installs the
+project's two commands: `agent` for the full QA loop and `cli` for the
+interactive Tyr assistant.
 
 **2. Set the two required secrets** as environment variables:
 
@@ -105,7 +118,7 @@ source .env
 ## Running
 
 ```bash
-python3 agent_loop.py
+uv run agent
 ```
 
 By default this runs **read-only**: the Loop Agent can only ask Tyr Assistant
@@ -118,12 +131,22 @@ the connection, not for running the test plan.** To actually run it:
 
 ```bash
 export TYR_LOOP_ALLOW_ACTIONS=true
-python3 agent_loop.py
+uv run agent
 ```
 
-With actions enabled you'll be asked to type `yes` once up front, and then
-prompted individually to approve/reject every action Tyr proposes -- nothing
-mutating happens without an explicit `y` from you.
+To use the smaller interactive CLI agent instead:
+
+```bash
+uv run cli check
+uv run cli chat
+uv run cli chat --allow-actions
+```
+
+The interactive CLI includes command completion, in-session history, Markdown
+responses, progress indicators, and structured tool/action output. Type `/help`
+inside a chat to see the available commands. With actions enabled, every action
+Tyr proposes is shown with its JSON arguments and requires explicit approval --
+nothing mutating happens without it.
 
 Output lives under `runs/<run-id>/` -- see [Output](#output) below.
 
@@ -144,7 +167,7 @@ Other env vars:
 | `TYR_LOOP_SCIENTIST_HISTORY_CHARS` | `40000` | char budget for the "earlier scenarios + their graded results" block fed into each scenario-design call; clipped from the middle (see `clip_middle`) once it grows past this |
 | `TYR_LOOP_MODEL` | `openai/gpt-4o-mini` | OpenRouter model slug (e.g. `anthropic/claude-sonnet-5`, `anthropic/claude-opus-5` -- see [openrouter.ai/models](https://openrouter.ai/models)) |
 | `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | OpenRouter API base URL |
-| `TYR_MCP_URL` | `https://www.tyr.ai/tyrcli/mcp` | Tyr MCP endpoint (see `mcp_client.py`) |
+| `TYR_MCP_URL` | `https://www.tyr.ai/tyrcli/mcp` | Tyr MCP endpoint (see `src/tyr_agent_tester/mcp_client.py`) |
 
 ## How it works
 
@@ -221,14 +244,15 @@ cross-workspace access actually works matters:
   reports such a blocker without exposing the approval itself.
 
 Tyr exposes `tyr_workspace_bridge_list / _send / _status / _history` for this,
-but **the harness never calls them**, and `mcp_client.py` no longer wraps them.
-Driving a Bridge through its dedicated tools would be the harness testing its
-own plumbing; what is under test is whether Tyr does the right thing when a
-person asks it in plain language. So the Loop Agent asks for Bridge inventory
-and cross-workspace work over `tyr_assistant_request`, exactly as a user would,
-and the discovery prompt encodes the model above: enumerate Bridges, skip
-inactive ones, work through each peer Assistant rather than addressing its
-Agents. `call_tool()` takes any tool name if you ever need one of the four.
+but **the harness never calls them**, and `src/tyr_agent_tester/mcp_client.py`
+does not wrap them. Driving a Bridge through its dedicated tools would be the
+harness testing its own plumbing; what is under test is whether Tyr does the
+right thing when a person asks it in plain language. So the Loop Agent asks
+for Bridge inventory and cross-workspace work over `tyr_assistant_request`,
+exactly as a user would, and the discovery prompt encodes the model above:
+enumerate Bridges, skip inactive ones, work through each peer Assistant rather
+than addressing its Agents. `call_tool()` takes any tool name if you ever need
+one of the four.
 
 ## Tyr request lifecycle
 
@@ -285,7 +309,7 @@ Tyr's operation states have the following meanings:
 | `cancelled` | The operation was cancelled or expired. |
 
 `send_to_tyr()` decides whether to stop polling by checking the value against
-`TERMINAL_STATES` in `agent_loop.py`. That constant is therefore part of the
+`TERMINAL_STATES` in `src/tyr_agent_tester/agent_loop.py`. That constant is therefore part of the
 tester's behavior and should be kept aligned with Tyr's terminal operation
 states whenever either side changes -- a terminal state missing from it gets
 polled until the budget runs out and is then wrongly reported as provisional.

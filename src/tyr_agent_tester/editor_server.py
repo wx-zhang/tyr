@@ -8,13 +8,13 @@ dev tool for editing test cases on your own machine, not a service to
 expose beyond it.
 
 Usage:
-  python3 editor_server.py            # serves http://127.0.0.1:8765
-  python3 editor_server.py 9000       # custom port
+  uv run python -m tyr_agent_tester.editor_server  # serves http://127.0.0.1:8765
+  uv run python -m tyr_agent_tester.editor_server 9000  # custom port
 
 Then open the printed URL, edit case/step text inline, and click Save.
 Saves write straight back to test_cases/qatestsearch.json --
-prompts.py picks up the change the next time it's imported
-(i.e. the next agent_loop.py run).
+The prompts module picks up the change the next time it's imported
+(i.e. the next ``uv run agent`` run).
 """
 
 from __future__ import annotations
@@ -25,10 +25,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from test_case_store import FRAGMENT_PREFIX, fragment_names, load_raw, save_raw
+from .test_case_store import FRAGMENT_PREFIX, PROJECT_ROOT, fragment_names, load_raw, save_raw
 
-STATIC_DIR = Path(__file__).resolve().parent
-INDEX_FILE = STATIC_DIR / "editor.html"
+INDEX_FILE = PROJECT_ROOT / "editor.html"
 
 
 def _validate_cases(cases: object) -> str | None:
