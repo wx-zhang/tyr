@@ -22,11 +22,10 @@ Required env vars:
 Optional env vars are documented alongside the constants in CONFIG below.
 
 Usage:
-  python3 -m venv .venv && source .venv/bin/activate
-  pip install -r requirements.txt
+  uv sync
   export TYR_MCP_TOKEN=...
   export OPENROUTER_API_KEY=...
-  python3 agent_loop.py
+  uv run agent
 """
 
 from __future__ import annotations
@@ -48,11 +47,11 @@ try:
 except ImportError as e:
     sys.exit(
         f"Missing dependency ({e}). Install into THIS interpreter with:\n"
-        f"  {sys.executable} -m pip install -r requirements.txt"
+        f"  uv sync"
     )
 
-from mcp_client import TyrMCPClient, TyrMCPError
-from prompts import (
+from .mcp_client import TyrMCPClient, TyrMCPError
+from .prompts import (
     TEST_CASES,
     render_discovery_prompt,
     render_execute_prompt,

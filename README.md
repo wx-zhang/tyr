@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="assets/tyr-red-team.svg" alt="Tyr Red Teaming Agent" width="100%">
+</div>
+
 # Tyr QATestSearch
 
 A fixed QA test suite that runs against Tyr Assistant: locate `important.txt`
@@ -14,31 +18,34 @@ rather than a hallucinated summary.
 
 ## Files
 
-- `agent_loop.py` -- single entry point / the three-phase pipeline
-- `mcp_client.py` -- minimal JSON-RPC client wrapping all eight tools Tyr's MCP
+- `src/tyr_agent_tester/agent_loop.py` -- implementation of the three-phase pipeline exposed as `agent`
+- `src/tyr_agent_tester/cli_entry.py` -- executable entry point exposed as `cli`
+- `src/tyr_agent_tester/cli/` -- interactive agent logic and terminal presentation
+- `src/tyr_agent_tester/mcp_client.py` -- minimal JSON-RPC client wrapping all eight tools Tyr's MCP
   server exposes (the four assistant/operation/approval tools, plus the four
   Workspace Bridge tools)
-- `prompts.py` -- QATestSearch prompts: `SYSTEM_BRIEF`, `TESTING_METHODOLOGY`,
+- `src/tyr_agent_tester/prompts.py` -- QATestSearch prompts: `SYSTEM_BRIEF`, `TESTING_METHODOLOGY`,
   `TEST_CASES`, and templates for the discovery, execute, and report phases
-- `test_case_store.py` -- shared load/save for `test_cases/qatestsearch.json`
+- `src/tyr_agent_tester/test_case_store.py` -- shared load/save for `test_cases/qatestsearch.json`
   that backs `TEST_CASES` in `prompts.py`
 - `test_cases/qatestsearch.json` -- the actual test-case data (scenario
-  id/title/category, plus ordered steps); edit by hand or via `editor_server.py`
-- `editor_server.py`, `editor.html` -- local browser editor for the test
+  id/title/category, plus ordered steps); edit by hand or via the editor module
+- `src/tyr_agent_tester/editor_server.py`, `editor.html` -- local browser editor for the test
   cases above (see below)
-- `requirements.txt`
+- `pyproject.toml` -- project metadata, dependencies, and `agent`/`cli` entry points
+- `uv.lock` -- reproducible dependency resolution
 
 ## Editing test cases in the browser
 
 ```bash
-python3 editor_server.py        # serves http://127.0.0.1:8765
+uv run python -m tyr_agent_tester.editor_server  # serves http://127.0.0.1:8765
 ```
 
 Open the URL and edit case id/title/category and their ordered steps inline.
 `{store_url}` and `{fake_data_marker}` are live placeholders in step text
 -- don't hardcode the URL, and use the "Enabled" checkbox to keep a case on
 file without running it. Changes save straight back to `test_cases/qatestsearch.json`
-and take effect the next time `agent_loop.py` runs.
+and take effect the next time `uv run agent` runs.
 
 ## Setup
 
@@ -47,14 +54,15 @@ API), so you drive it with any Claude model your OpenRouter account can reach.
 Tyr Assistant itself is still reached over its own MCP server -- that's
 unchanged.
 
-**1. Install dependencies** into a project virtualenv (on macOS, Homebrew's
-Python is externally managed per PEP 668 and rejects global `pip install`):
+**1. Install `uv` and sync the project environment**:
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+uv sync
 ```
+
+This creates `.venv`, installs the locked dependencies, and installs the
+project's two commands: `agent` for the full QA loop and `cli` for the
+interactive Tyr assistant.
 
 **2. Set the two required secrets** as environment variables:
 
@@ -74,7 +82,7 @@ source .env
 ## Running
 
 ```bash
-python3 agent_loop.py
+uv run agent
 ```
 
 By default this runs **read-only**: the Loop Agent can only ask Tyr Assistant
@@ -87,12 +95,22 @@ the connection, not for running the test plan.** To actually run it:
 
 ```bash
 export TYR_LOOP_ALLOW_ACTIONS=true
-python3 agent_loop.py
+uv run agent
 ```
 
-With actions enabled you'll be asked to type `yes` once up front, and then
-prompted individually to approve/reject every action Tyr proposes -- nothing
-mutating happens without an explicit `y` from you.
+To use the smaller interactive CLI agent instead:
+
+```bash
+uv run cli check
+uv run cli chat
+uv run cli chat --allow-actions
+```
+
+The interactive CLI includes command completion, in-session history, Markdown
+responses, progress indicators, and structured tool/action output. Type `/help`
+inside a chat to see the available commands. With actions enabled, every action
+Tyr proposes is shown with its JSON arguments and requires explicit approval --
+nothing mutating happens without it.
 
 Output files are named: `tyr_qatestsearch_log.jsonl` (raw per-turn log)
 and `qatestsearch_<n>.md` (Markdown report).
@@ -108,7 +126,7 @@ Other env vars:
 | `TYR_LOOP_TURN_MAX_TOKENS` | `16000` | max_tokens per Loop Agent turn. Bump this if the run logs "Loop Agent returned EMPTY content" -- the model ran out of budget (often reasoning/thinking tokens) before emitting a visible message |
 | `TYR_LOOP_MODEL` | `openai/gpt-4o-mini` | OpenRouter model slug (e.g. `anthropic/claude-sonnet-5`, `anthropic/claude-opus-5` -- see [openrouter.ai/models](https://openrouter.ai/models)) |
 | `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | OpenRouter API base URL |
-| `TYR_MCP_URL` | `https://www.tyr.ai/tyrcli/mcp` | Tyr MCP endpoint (see `mcp_client.py`) |
+| `TYR_MCP_URL` | `https://www.tyr.ai/tyrcli/mcp` | Tyr MCP endpoint (see `src/tyr_agent_tester/mcp_client.py`) |
 
 ## How it works
 
@@ -148,7 +166,7 @@ cross-workspace access actually works matters:
   the peer side that this side cannot see or resolve. `tyr_workspace_bridge_status`
   reports such a blocker without exposing the approval itself.
 
-`mcp_client.py` exposes these as `bridge_list()`, `bridge_send()`,
+`src/tyr_agent_tester/mcp_client.py` exposes these as `bridge_list()`, `bridge_send()`,
 `bridge_status()`, and `bridge_history()`. The discovery phase is written
 around this model: enumerate Bridges, skip inactive ones, and work through each
 peer Assistant rather than addressing its Agents.
@@ -201,7 +219,7 @@ Tyr's operation states have the following meanings:
 | `cancelled` | The operation was cancelled or expired. |
 
 `send_to_tyr()` decides whether to stop polling by checking the value against
-`TERMINAL_STATES` in `agent_loop.py`. That constant is therefore part of the
+`TERMINAL_STATES` in `src/tyr_agent_tester/agent_loop.py`. That constant is therefore part of the
 tester's behavior and should be kept aligned with Tyr's terminal operation
 states whenever either side changes -- a terminal state missing from it gets
 polled until the budget runs out and is then wrongly reported as provisional.
