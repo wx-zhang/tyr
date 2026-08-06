@@ -2,6 +2,7 @@
 *.egg-info/
 __pycache__/
 *.pyc
+runs/
 tyr_*_log.jsonl
 qatestsearch_*.md
 .env

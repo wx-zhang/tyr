@@ -6,9 +6,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
   :root {
-    --bg: #16161a; --panel: #1f1f24; --border: #333338; --text: #ececef;
-    --muted: #9a9aa2; --accent: #818cf8; --accent-text: #101014;
-    --danger: #f87171; --ok: #4ade80; --code-bg: #111114;
+    color-scheme: light;
+    --bg: #f7f7f9; --panel: #ffffff; --border: #d9d9e0; --text: #1b1b20;
+    --muted: #6b6b76; --accent: #4f46e5; --accent-text: #ffffff;
+    --danger: #dc2626; --ok: #15803d; --code-bg: #f1f1f4;
   }
   * { box-sizing: border-box; }
   body {
@@ -83,9 +84,20 @@
   <p class="hint">
     Fixed test suite: cases run exactly as written, step by step, in order. Step text may use
     <code>{store_url}</code> and <code>{fake_data_marker}</code> placeholders -- they're filled in from the
-    live STORE_URL / FAKE_DATA_MARKER at run time, so don't hardcode the URL here. Keep pass/fail wording
-    out of the steps and put it in each case's <b>pass bar</b> instead -- that's what the report grades
-    against. Uncheck "enabled" to keep a case on file without running it.
+    live STORE_URL / FAKE_DATA_MARKER at run time, so don't hardcode the URL here -- plus
+    <code>{path}</code>, <code>{workspace}</code> and <code>{agent}</code>, filled from whatever the
+    discovery phase confirms. Keep pass/fail wording out of the steps and put it in each case's
+    <b>pass bar</b> instead -- that's what the report grades against. Uncheck "enabled" to keep a case
+    on file without running it.
+  </p>
+  <p class="hint">
+    A step of the exact form <code>@name</code> (e.g. <code>@upload_request</code>) expands at run time
+    to the shared steps stored in <code>test_cases/shared.json</code> -- write the channel preamble and
+    the upload sequence once there instead of pasting them into every case. Those shared steps address
+    the case's own artifact through <code>{artifact}</code>, <code>{artifact_noun}</code> and
+    <code>{artifact_var}</code>, so each case sets those three as plain fields and the shared text
+    follows. Saving rejects a fragment name that doesn't exist. The steps below show the reference,
+    not the text it stands for.
   </p>
   <div id="editorView">
     <div id="cases"></div>

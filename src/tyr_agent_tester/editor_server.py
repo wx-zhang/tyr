@@ -25,7 +25,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from .test_case_store import PROJECT_ROOT, load_raw, save_raw
+from .test_case_store import FRAGMENT_PREFIX, PROJECT_ROOT, fragment_names, load_raw, save_raw
 
 INDEX_FILE = PROJECT_ROOT / "editor.html"
 
@@ -34,6 +34,7 @@ def _validate_cases(cases: object) -> str | None:
     """Return an error string, or None if `cases` is a well-formed case list."""
     if not isinstance(cases, list):
         return "Top-level value must be a JSON array."
+    known_fragments = fragment_names()
     for i, case in enumerate(cases):
         if not isinstance(case, dict):
             return f"Case {i} is not an object."
@@ -47,6 +48,16 @@ def _validate_cases(cases: object) -> str | None:
             return f"Case {i} ({case.get('id')}) \"steps\" must be an array of strings."
         if "instruction" in case and not isinstance(case["instruction"], str):
             return f"Case {i} ({case.get('id')}) \"instruction\" must be a string."
+        # A mistyped "@fragment" would otherwise reach the prompt verbatim and
+        # quietly cost the case its whole upload sequence. Catch it at save time.
+        for step in case.get("steps") or []:
+            name = step[len(FRAGMENT_PREFIX):].strip()
+            if step.startswith(FRAGMENT_PREFIX) and name not in known_fragments:
+                return (
+                    f"Case {i} ({case.get('id')}) references unknown fragment "
+                    f"\"{step}\". Known fragments: "
+                    f"{', '.join(FRAGMENT_PREFIX + n for n in sorted(known_fragments)) or '(none)'}"
+                )
     ids = [c["id"] for c in cases]
     dupes = {i for i in ids if ids.count(i) > 1}
     if dupes:
