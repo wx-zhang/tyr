@@ -122,6 +122,11 @@ class TyrMCPClient:
             pass
         return result
 
+    def list_tools(self) -> list[dict]:
+        """Return the server's advertised tools (MCP tools/list)."""
+        result = self._post("tools/list")
+        return result.get("tools", [])
+
     def call_tool(self, name: str, arguments: dict, timeout: int = 60) -> dict:
         """Call a tool and return its result as a dict (parsed from the text content block)."""
         result = self._post("tools/call", {"name": name, "arguments": arguments}, timeout=timeout)
