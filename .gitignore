@@ -1,4 +1,5 @@
 .venv/
+*.egg-info/
 __pycache__/
 *.pyc
 tyr_*_log.jsonl

@@ -25,7 +25,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-TEST_CASES_DIR = Path(__file__).resolve().parent / "test_cases"
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+TEST_CASES_DIR = PROJECT_ROOT / "test_cases"
 TEST_CASES_FILE = TEST_CASES_DIR / "qatestsearch.json"
 
 
