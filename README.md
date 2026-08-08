@@ -146,7 +146,12 @@ The interactive CLI includes command completion, in-session history, Markdown
 responses, progress indicators, and structured tool/action output. Type `/help`
 inside a chat to see the available commands. Its default session exposes only
 tools classified as read-only, prioritizing MCP `annotations.readOnlyHint` and
-failing closed for unknown unannotated tools. If a query is rejected with the
+failing closed for unknown unannotated tools. Non-read-only tools (currently
+`tyr_assistant_request` and `tyr_workspace_bridge_send`) are filtered out
+before the model ever sees them, so asking the agent to list its tools in the
+default session will not show them -- this is not a bug, and the model cannot
+choose to call a tool it was never given. Run `uv run cli chat --allow-actions`
+to expose them. If a query is rejected with the
 exact `actionModeRequired=true`, `newOperationRequired=true`, and
 `requiredTool=tyr_assistant_request` contract, the CLI asks for one explicit
 Action confirmation. Approval creates a fresh request operation with the same
