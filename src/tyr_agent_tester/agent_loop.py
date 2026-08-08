@@ -45,6 +45,10 @@ from datetime import datetime, timezone
 from difflib import SequenceMatcher
 from typing import NamedTuple
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 try:
     # The `openai` package is just the OpenAI-compatible HTTP client OpenRouter
     # speaks; it says nothing about which model you run. Aliased so nothing in

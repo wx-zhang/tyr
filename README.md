@@ -115,6 +115,12 @@ cp .env.example .env
 source .env
 ```
 
+Both `agent` and `cli` also load `.env` automatically on startup (via
+`python-dotenv`), so once it's filled in you don't need to `source` it in
+every new shell -- `export TYR_LOOP_ALLOW_ACTIONS=true` in `.env` is picked up
+without any extra step. `source .env` is still useful if you want those values
+in your shell's own environment too (e.g. to inspect them with `echo`).
+
 ## Running
 
 ```bash
