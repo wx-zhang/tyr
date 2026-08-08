@@ -1,8 +1,8 @@
 """Command flow for the interactive Tyr CLI.
 
-The default chat mode exposes read-only Tyr MCP tools to the model. Tools that
-can send instructions, resolve approvals, or reach another workspace are only
-enabled with ``--allow-actions`` and still require terminal confirmation.
+The default chat mode exposes read-only Tyr MCP tools to the model. A structured
+Read-only rejection can be upgraded once after terminal confirmation; other
+Action tools require ``--allow-actions`` and still require confirmation.
 """
 
 from __future__ import annotations
@@ -59,7 +59,7 @@ def run_chat(
     with ui.status("Starting secure session…"):
         client = make_openrouter_client(base_url)
         tyr, advertised_tools, server_info = connect_tyr()
-    tool_specs, tool_names = tool_definitions(advertised_tools, allow_actions)
+    tool_specs, tool_names, read_only_by_name = tool_definitions(advertised_tools, allow_actions)
 
     server_name = server_info.get("serverInfo", {}).get("name") or "Tyr MCP"
     ui.connection_summary(server_name, len(tool_specs), model, base_url, allow_actions)
@@ -97,6 +97,7 @@ def run_chat(
                 messages,
                 tool_specs,
                 tool_names,
+                read_only_by_name,
                 allow_actions,
                 ui,
             )
@@ -114,7 +115,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--allow-actions",
         action="store_true",
-        help="Expose mutating/remote MCP tools; every call still needs confirmation",
+        help="Expose non-read-only MCP tools; every call still needs confirmation",
     )
     return parser.parse_args()
 

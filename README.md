@@ -121,7 +121,7 @@ source .env
 uv run agent
 ```
 
-By default this runs **read-only**: the Loop Agent can only ask Tyr Assistant
+By default the full Loop Agent runs **read-only**: it can only ask Tyr Assistant
 questions (`tyr_assistant_query`), never issue instructions with real side
 effects. That tool is *server-enforced* read-only and, per its own contract,
 must not be used to hand work to an Agent "even when the Agent's downstream task
@@ -144,9 +144,15 @@ uv run cli chat --allow-actions
 
 The interactive CLI includes command completion, in-session history, Markdown
 responses, progress indicators, and structured tool/action output. Type `/help`
-inside a chat to see the available commands. With actions enabled, every action
-Tyr proposes is shown with its JSON arguments and requires explicit approval --
-nothing mutating happens without it.
+inside a chat to see the available commands. Its default session exposes only
+tools classified as read-only, prioritizing MCP `annotations.readOnlyHint` and
+failing closed for unknown unannotated tools. If a query is rejected with the
+exact `actionModeRequired=true`, `newOperationRequired=true`, and
+`requiredTool=tyr_assistant_request` contract, the CLI asks for one explicit
+Action confirmation. Approval creates a fresh request operation with the same
+message and new idempotency key; rejection creates no Action. This does not
+enable Action mode for later calls. With `--allow-actions`, non-read-only tools
+are exposed up front and every call still requires explicit approval.
 
 Output lives under `runs/<run-id>/` -- see [Output](#output) below.
 

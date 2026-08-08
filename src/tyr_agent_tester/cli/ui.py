@@ -127,6 +127,22 @@ class TerminalUI:
         except (EOFError, KeyboardInterrupt):
             return False
 
+    def confirm_action_upgrade(self, name: str, arguments: dict[str, Any]) -> bool:
+        body = Group(
+            Text("The Read-only request was not executed.", style="bold warning"),
+            Text(
+                "Create one new Action operation with the same request? The blocked query operation ID will not be reused.",
+                style="muted",
+            ),
+            Text(name, style="bold warning"),
+            JSON.from_data(arguments),
+        )
+        self.console.print(Panel(body, title="One-time Action approval", border_style="yellow"))
+        try:
+            return Confirm.ask("Create this one Action operation?", console=self.console, default=False)
+        except (EOFError, KeyboardInterrupt):
+            return False
+
     def check_result(self, service: str, detail: str, success: bool) -> None:
         symbol = "✓" if success else "✗"
         style = "success" if success else "error"

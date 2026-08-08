@@ -30,10 +30,12 @@ DEFAULT_MODEL = os.environ.get("TYR_AGENT_MODEL", os.environ.get("TYR_LOOP_MODEL
 DEFAULT_BASE_URL = os.environ.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
 MAX_TOOL_ROUNDS = int(os.environ.get("TYR_AGENT_MAX_TOOL_ROUNDS", "8"))
 
-ACTION_TOOLS = {
-    "tyr_assistant_request",
-    "tyr_approval_resolve",
-    "tyr_workspace_bridge_send",
+LEGACY_READ_ONLY_TOOLS = {
+    "tyr_assistant_query",
+    "tyr_operation_status",
+    "tyr_workspace_bridge_list",
+    "tyr_workspace_bridge_status",
+    "tyr_workspace_bridge_history",
 }
 
 SYSTEM_PROMPT = """You are a small command-line assistant connected to Tyr through MCP.
@@ -44,7 +46,9 @@ operations, workspaces, or bridges. Do not claim that a tool succeeded unless
 its result says so. Keep responses concise and mention useful next steps when
 Tyr is waiting for input or approval. When a Tyr tool returns an operationId
 for work that is not finished, use tyr_operation_status before reporting the
-final outcome.
+final outcome. A Read-only rejection does not mean the action ran. The CLI may
+ask the operator to approve one new Action operation; rely only on the result
+of that new operation.
 """
 
 
@@ -108,15 +112,18 @@ def check_openrouter(client: Any, model: str) -> str:
 
 def tool_definitions(
     advertised_tools: list[dict[str, Any]], allow_actions: bool
-) -> tuple[list[dict[str, Any]], set[str]]:
+) -> tuple[list[dict[str, Any]], set[str], dict[str, bool]]:
     """Convert MCP's tools/list shape to OpenAI chat-completions tool shape."""
     definitions: list[dict[str, Any]] = []
     names: set[str] = set()
+    read_only_by_name: dict[str, bool] = {}
     for tool in advertised_tools:
         name = tool.get("name")
         if not isinstance(name, str) or not name:
             continue
-        if not allow_actions and name in ACTION_TOOLS:
+        read_only = tool_is_read_only(tool)
+        read_only_by_name[name] = read_only
+        if not allow_actions and not read_only:
             continue
         schema = tool.get("inputSchema") or {"type": "object", "properties": {}}
         definitions.append({
@@ -128,7 +135,18 @@ def tool_definitions(
             },
         })
         names.add(name)
-    return definitions, names
+    return definitions, names, read_only_by_name
+
+
+def tool_is_read_only(tool: dict[str, Any]) -> bool:
+    """Prefer MCP annotations and fail closed for unknown legacy tools."""
+    annotations = tool.get("annotations")
+    if isinstance(annotations, dict):
+        read_only_hint = annotations.get("readOnlyHint")
+        if isinstance(read_only_hint, bool):
+            return read_only_hint
+    name = tool.get("name")
+    return isinstance(name, str) and name in LEGACY_READ_ONLY_TOOLS
 
 
 def json_for_message(value: Any) -> str:
@@ -162,6 +180,35 @@ def confirm_tool_call(name: str, arguments: dict[str, Any], ui: TerminalUI | Non
     return answer in {"y", "yes"}
 
 
+def confirm_action_upgrade(message: str, ui: TerminalUI | None = None) -> bool:
+    arguments = {"message": message}
+    if ui is not None:
+        return ui.confirm_action_upgrade("tyr_assistant_request", arguments)
+    print("\n!! Read-only request was not executed.")
+    print("Create one new tyr_assistant_request Action operation with the same request?")
+    print(json_for_message(arguments))
+    try:
+        answer = input("Run this one Action? [y/N]: ").strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        return False
+    return answer in {"y", "yes"}
+
+
+def required_action_upgrade(result: Any) -> str | None:
+    if not isinstance(result, dict):
+        return None
+    error = result.get("error")
+    if not isinstance(error, dict):
+        return None
+    if (
+        error.get("actionModeRequired") is True
+        and error.get("newOperationRequired") is True
+        and error.get("requiredTool") == "tyr_assistant_request"
+    ):
+        return "tyr_assistant_request"
+    return None
+
+
 def call_model(
     client: Any,
     model: str,
@@ -189,10 +236,12 @@ def run_turn(
     messages: list[dict[str, Any]],
     tool_specs: list[dict[str, Any]],
     tool_names: set[str],
+    read_only_by_name: dict[str, bool],
     allow_actions: bool,
     ui: TerminalUI | None = None,
 ) -> str:
     """Run one user turn, servicing model-requested MCP calls until a reply."""
+    action_upgrade_decided = False
     for _ in range(MAX_TOOL_ROUNDS):
         if ui is None:
             response = call_model(client, model, messages, tool_specs)
@@ -223,11 +272,12 @@ def run_turn(
             except (json.JSONDecodeError, ValueError) as exc:
                 result: Any = {"error": f"Invalid tool arguments: {exc}"}
             else:
+                read_only = read_only_by_name.get(name)
                 if name not in tool_names:
                     result = {"error": f"Tool {name!r} is not enabled in this session."}
-                elif name in ACTION_TOOLS and not allow_actions:
+                elif read_only is not True and not allow_actions:
                     result = {"error": "Action tools are disabled. Restart with --allow-actions if needed."}
-                elif name in ACTION_TOOLS and not confirm_tool_call(name, arguments, ui):
+                elif read_only is not True and not confirm_tool_call(name, arguments, ui):
                     result = {"error": "Operator declined this tool call."}
                 else:
                     if ui is None:
@@ -238,6 +288,33 @@ def run_turn(
                         result = tyr.call_tool(name, arguments)
                     except TyrMCPError as exc:
                         result = {"error": str(exc)}
+
+                    required_tool = required_action_upgrade(result)
+                    original_message = arguments.get("message")
+                    can_upgrade = (
+                        required_tool is not None
+                        and read_only is True
+                        and read_only_by_name.get(required_tool) is False
+                        and isinstance(original_message, str)
+                        and bool(original_message.strip())
+                    )
+                    if can_upgrade and not action_upgrade_decided:
+                        action_upgrade_decided = True
+                        if confirm_action_upgrade(original_message, ui):
+                            if ui is None:
+                                print(f"[MCP] {required_tool}")
+                            else:
+                                ui.tool_call(required_tool)
+                            try:
+                                # request() creates a new key and omits the query operationId.
+                                result = tyr.request(original_message)
+                            except TyrMCPError as exc:
+                                result = {"error": str(exc)}
+                        else:
+                            result = {
+                                "error": "Operator declined the one-time Action upgrade. No Action operation was created.",
+                                "blockedQuery": result,
+                            }
 
             messages.append({
                 "role": "tool",
