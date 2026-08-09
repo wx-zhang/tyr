@@ -183,6 +183,7 @@ Other env vars:
 | `TYR_LOOP_SCIENTIST_TOKENS` | `4000` | max_tokens for one scenario-design call -- larger than a graded section's, since the model reasons over the whole run so far before answering |
 | `TYR_LOOP_SCIENTIST_HISTORY_CHARS` | `40000` | char budget for the "earlier scenarios + their graded results" block fed into each scenario-design call; clipped from the middle (see `clip_middle`) once it grows past this |
 | `TYR_LOOP_MODEL` | `openai/gpt-4o-mini` | OpenRouter model slug (e.g. `anthropic/claude-sonnet-5`, `anthropic/claude-opus-5` -- see [openrouter.ai/models](https://openrouter.ai/models)) |
+| `TYR_LOOP_DISCOVERY_MODEL` | `anthropic/claude-opus-5` | OpenRouter model slug used only for the discovery phase, overriding `TYR_LOOP_MODEL` for those turns. A wrong or hallucinated file location here poisons every downstream test case, so discovery defaults to a stronger model than the rest of the run. |
 | `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | OpenRouter API base URL |
 | `TYR_MCP_URL` | `https://www.tyr.ai/tyrcli/mcp` | Tyr MCP endpoint (see `src/tyr_agent_tester/mcp_client.py`) |
 

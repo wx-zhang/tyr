@@ -111,6 +111,10 @@ TURN_MAX_TOKENS = int(os.environ.get("TYR_LOOP_TURN_MAX_TOKENS", "16000"))
 MODEL = os.environ.get("TYR_LOOP_MODEL", "qwen/qwen3.7-plus")
 # MODEL = os.environ.get("TYR_LOOP_MODEL", "anthropic/claude-sonnet-5")
 OPENROUTER_BASE_URL = os.environ.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+# Discovery only: a stronger model for the phase where a wrong or hallucinated
+# file location poisons every downstream test case. Falls back to MODEL for
+# everything else (execute, report, scientist).
+DISCOVERY_MODEL = os.environ.get("TYR_LOOP_DISCOVERY_MODEL", "anthropic/claude-opus-4.8")
 
 # Safety: when False (default) the Loop Agent can only ask read-only questions
 # (tyr_assistant_query). Most non-trivial test cases need this True to run at all
@@ -338,9 +342,11 @@ def call_model(
     messages: list[dict],
     max_tokens: int,
     system: str | None = None,
+    model: str | None = None,
 ) -> str:
     """One Loop Agent model call via OpenRouter's OpenAI-compatible chat API.
-    Prepends `system` as a system message when given.
+    Prepends `system` as a system message when given. `model` overrides the
+    default MODEL for this call only -- see DISCOVERY_MODEL.
 
     Raises LoopAgentBlocked, carrying the provider's stated reason, rather than
     returning an empty string -- a bare "" is indistinguishable between a safety
@@ -350,7 +356,7 @@ def call_model(
 
     try:
         completion = brain.chat.completions.create(
-            model=MODEL,
+            model=model or MODEL,
             max_tokens=max_tokens,
             messages=messages,
         )
@@ -824,10 +830,12 @@ def converse(
     phase: str,
     stop_prefixes: tuple[str, ...] = (STOP_TOKEN,),
     runtime_vars: tuple[str, ...] = (),
+    model: str | None = None,
 ) -> list[dict]:
     """Run up to max_turns of Loop Agent <-> Tyr exchange, mutating and
     returning loop_messages. `convo` carries the Tyr operation across phases and
-    cases, and is advanced in place.
+    cases, and is advanced in place. `model` overrides MODEL for every turn in
+    this call only.
 
     Stops early when the Loop Agent emits any of stop_prefixes. Those are
     harness control tokens, so the message is recorded in loop_messages (the
@@ -846,7 +854,9 @@ def converse(
         print(f"\n=== [{phase}] Turn {turn}/{max_turns} ===")
 
         try:
-            next_message = call_model(brain, loop_messages, max_tokens=TURN_MAX_TOKENS, system=system_prompt)
+            next_message = call_model(
+                brain, loop_messages, max_tokens=TURN_MAX_TOKENS, system=system_prompt, model=model
+            )
         except LoopAgentBlocked as blocked:
             # The QA tester itself was stopped, so this turn never reached Tyr.
             # Never let it pass as a normal end-of-phase: report the provider's
@@ -1053,6 +1063,7 @@ def run_discovery(
         [{"role": "user", "content": "Begin discovery."}],
         convo, EXPLORE_TURNS, phase="discovery",
         stop_prefixes=(DISCOVERY_DONE_PREFIX, DISCOVERY_FAILED_TOKEN),
+        model=DISCOVERY_MODEL,
     )
 
     options = parse_discovery_options(render_transcript(messages))
@@ -1520,6 +1531,7 @@ def main() -> None:
     print(f"Python: {sys.executable}")
     print(f"Run id: {RUN_ID}")
     print(f"Loop Agent model: {MODEL} (via OpenRouter: {OPENROUTER_BASE_URL})")
+    print(f"Discovery model: {DISCOVERY_MODEL}")
     print(f"Mode: {'ACTIONS ALLOWED (tyr_assistant_request)' if ALLOW_ACTIONS else 'READ-ONLY (tyr_assistant_query)'}")
     if ALLOW_ACTIONS:
         confirm_actions_enabled()
@@ -1530,6 +1542,7 @@ def main() -> None:
     log({
         "phase": "run-start",
         "model": MODEL,
+        "discoveryModel": DISCOVERY_MODEL,
         "allowActions": ALLOW_ACTIONS,
         "exploreTurns": EXPLORE_TURNS,
         "maxTurns": MAX_TURNS,
