@@ -45,6 +45,10 @@ def render_progress(console: Console, event: ProgressEvent) -> None:
         console.print(
             f"[red]✗[/] Scientist failed [dim]({escape(event.detail or '')})[/]"
         )
+    elif event.event_type == "scientist.skipped":
+        console.print(
+            f"[yellow]⊘[/] Scientist skipped [dim]· {escape(event.detail or '')}[/]"
+        )
     elif event.event_type == "scientist.completed":
         console.print(
             f"[green]✓[/] Scientist complete [dim]· {escape(event.detail or '')}[/]"
@@ -73,7 +77,16 @@ def render_progress(console: Console, event: ProgressEvent) -> None:
     elif event.event_type == "assessment.started":
         console.print(f"[yellow]◌[/] [dim]{context}[/] Assessing evidence…")
     elif event.event_type == "assessment.completed":
-        console.print(f"[green]✓[/] [dim]{context}[/] Assessment ready")
+        console.print(
+            f"[green]✓[/] [dim]{context}[/] Assessment ready"
+            + (f" [dim]· {escape(event.detail)}[/]" if event.detail else "")
+        )
+        if event.fields:
+            for name, value in event.fields:
+                if name == "summary":
+                    _print_message(console, value, style="yellow")
+                else:
+                    console.print(f"  [cyan]{escape(name)}[/]  {escape(value)}")
     elif event.event_type == "case.completed":
         console.print(
             f"[green]✓[/] Case [cyan]{escape(event.case_id or '')}[/] "

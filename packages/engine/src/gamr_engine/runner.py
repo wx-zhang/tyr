@@ -296,19 +296,41 @@ class ExperimentRunner:
             if case_error:
                 errors.append(case_error)
         if config.scientist_iterations:
-            scientist_records, scientist_errors = await self._run_scientist(
-                dataset,
-                target_candidate,
-                config,
-                target,
-                model,
-                identifier,
-                artifacts,
-                conversation,
-                case_records,
-            )
-            case_records.extend(scientist_records)
-            errors.extend(scientist_errors)
+            if self._base_cases_ready_for_scientist(case_records):
+                scientist_records, scientist_errors = await self._run_scientist(
+                    dataset,
+                    target_candidate,
+                    config,
+                    target,
+                    model,
+                    identifier,
+                    artifacts,
+                    conversation,
+                    case_records,
+                )
+                case_records.extend(scientist_records)
+                errors.extend(scientist_errors)
+            else:
+                incomplete = [
+                    (
+                        f"{record.case.scenario_id}:"
+                        f"{record.case.outcome.value}/"
+                        f"{record.case.objective_status.value}"
+                    )
+                    for record in case_records
+                    if not self._case_succeeded_for_scientist(record.case)
+                ]
+                detail = (
+                    "scientist skipped: base cases did not succeed"
+                    + (f" ({', '.join(incomplete)})" if incomplete else "")
+                )
+                self._emit(
+                    "scientist.skipped",
+                    identifier,
+                    phase="scientist",
+                    detail=detail,
+                )
+                errors.append(detail)
         case_results = [record.case for record in case_records]
         return self._result(identifier, started_at, dataset, config, case_results, errors=errors)
 
@@ -719,6 +741,7 @@ class ExperimentRunner:
                 summary=f"Missing runtime dataset variable: {exc.args[0]}",
                 turn_ids=[],
             )
+            self._write_case_result(artifacts, run_id, case, stage=phase)
             self._emit(
                 "case.completed",
                 run_id,
@@ -771,6 +794,7 @@ class ExperimentRunner:
                 summary=result.error,
                 turn_ids=turn_ids,
             )
+            self._write_case_result(artifacts, run_id, case, stage=phase)
             self._emit(
                 "case.completed",
                 run_id,
@@ -790,7 +814,6 @@ class ExperimentRunner:
             return record, result.error
         self._emit("assessment.started", run_id, phase="assessment", case_id=case_id)
         assessment = await self._assess(dataset, scenario, result.transcript, model)
-        self._emit("assessment.completed", run_id, phase="assessment", case_id=case_id)
         if assessment is not None:
             valid_evidence = [
                 turn_id for turn_id in assessment.evidence_turn_ids if turn_id in turn_ids
@@ -814,6 +837,21 @@ class ExperimentRunner:
                 ),
                 evidenceTurnIds=turn_ids or [new_id()],
             )
+        self._emit(
+            "assessment.completed",
+            run_id,
+            phase="assessment",
+            case_id=case_id,
+            detail=(
+                f"{assessment.verdict.value} · {assessment.objective_status.value} · "
+                f"{assessment.summary}"
+            ),
+            fields=(
+                ("verdict", assessment.verdict.value),
+                ("objective", assessment.objective_status.value),
+                ("summary", assessment.summary),
+            ),
+        )
         case = self._case_result(
             scenario,
             outcome=ExecutionOutcome.COMPLETED,
@@ -822,12 +860,13 @@ class ExperimentRunner:
             summary=assessment.summary,
             turn_ids=assessment.evidence_turn_ids,
         )
+        self._write_case_result(artifacts, run_id, case, stage=phase)
         self._emit(
             "case.completed",
             run_id,
             phase=phase,
             case_id=case_id,
-            detail="completed",
+            detail=f"completed · {assessment.verdict.value}",
         )
         record = CaseRecord(
             scenario=scenario,
@@ -1255,12 +1294,17 @@ class ExperimentRunner:
         text = ExperimentRunner._strip_code_fence(content)
         if text.startswith("<<"):
             raise ValueError("harness control tokens are not accepted")
+        stripped = text.strip()
+        if not stripped:
+            return None
         try:
-            payload = json.loads(text)
+            payload, end = json.JSONDecoder().raw_decode(stripped)
         except json.JSONDecodeError:
-            if strict:
+            if strict or stripped.startswith("{"):
                 return None
             return NextTurnDecision(kind="send", message=content)
+        if stripped[end:].strip():
+            return None
         if not isinstance(payload, dict):
             if strict:
                 return None
@@ -1443,7 +1487,7 @@ class ExperimentRunner:
         if event_type.startswith(("discovery.", "scientist.")):
             return (
                 ActivityType.ERROR
-                if event_type.endswith(".failed")
+                if event_type.endswith((".failed", ".skipped"))
                 else ActivityType.PHASE
             )
         if event_type.startswith("case."):
@@ -1576,6 +1620,36 @@ class ExperimentRunner:
                 "occurredAt": occurred_at,
             }
         artifacts.write_json(f"runs/{run_id}/discovery-result.json", payload)
+
+    @staticmethod
+    def _write_case_result(
+        artifacts: ArtifactStore | None,
+        run_id: str,
+        case: CaseResult,
+        *,
+        stage: str,
+    ) -> None:
+        if artifacts is None:
+            return
+        safe_id = _UNSAFE_ID_CHAR.sub("-", case.scenario_id)[:128] or "case"
+        payload = case.model_dump(by_alias=True, exclude_none=True, mode="json")
+        payload["stage"] = "scientist" if stage == "scientist" else "case"
+        payload["occurredAt"] = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+        artifacts.write_json(f"runs/{run_id}/case-results/{safe_id}.json", payload)
+
+    @staticmethod
+    def _case_succeeded_for_scientist(case: CaseResult) -> bool:
+        return (
+            case.outcome is ExecutionOutcome.COMPLETED
+            and case.objective_status is ObjectiveStatus.ACHIEVED
+        )
+
+    @staticmethod
+    def _base_cases_ready_for_scientist(records: list[CaseRecord]) -> bool:
+        return bool(records) and all(
+            ExperimentRunner._case_succeeded_for_scientist(record.case)
+            for record in records
+        )
 
     @staticmethod
     def _case_result(

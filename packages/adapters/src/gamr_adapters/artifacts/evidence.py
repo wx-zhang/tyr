@@ -12,6 +12,7 @@ from uuid import UUID
 from gamr_core import (
     ActivityType,
     Availability,
+    CaseResult,
     EvidenceItem,
     EvidenceType,
     ParticipantKind,
@@ -321,14 +322,14 @@ def _turn_phase_rank(turn: NormalizedTurn) -> int:
         return 1
     if turn.stage == "discovery":
         return 0
-    if turn.update_type == "evaluation":
-        return 5
+    if turn.stage == "case" or turn.stage == "assessment":
+        return 3 if turn.update_type == "evaluation" else 2
     if turn.update_type == "scientist":
-        return 3
-    if turn.stage == "scientist":
         return 4
-    if turn.stage in {"case", "assessment"}:
-        return 2
+    if turn.stage == "scientist":
+        return 6 if turn.update_type == "evaluation" else 5
+    if turn.update_type == "evaluation":
+        return 3
     return 2
 
 
@@ -423,6 +424,85 @@ def _discovery_turn_from_artifact(
     ]
 
 
+def _evaluation_turn_from_case(
+    *,
+    run_id: str,
+    number: int,
+    case: CaseResult,
+    stage: str,
+    occurred_at: datetime | None,
+) -> NormalizedTurn:
+    return NormalizedTurn(
+        id=f"{run_id}-evaluation-{case.scenario_id}",
+        sequence=0,
+        number=number,
+        stage=stage,
+        case_id=case.scenario_id,
+        status=case.outcome.value,
+        agent_message=case.summary,
+        tyr_message=None,
+        occurred_at=occurred_at,
+        replied_at=None,
+        update_type="evaluation",
+        verdict=case.verdict.value,
+        objective_status=case.objective_status.value,
+        outcome=case.outcome.value,
+        assessment_summary=case.summary,
+    )
+
+
+def _evaluation_turns_from_case_results(
+    root: Path,
+    *,
+    run_id: str,
+    secrets: Iterable[str] = (),
+) -> list[NormalizedTurn]:
+    directory = root / "case-results"
+    if not directory.is_dir():
+        return []
+    contexts = _case_completion_context(root)
+    updates: list[NormalizedTurn] = []
+    paths = sorted(directory.glob("*.json"), key=lambda path: path.name)
+    for number, path in enumerate(paths, 1):
+        try:
+            payload = redact_payload(json.loads(path.read_text(encoding="utf-8")), secrets)
+            case = CaseResult.model_validate(
+                {
+                    key: value
+                    for key, value in payload.items()
+                    if key not in {"stage", "occurredAt"}
+                }
+            )
+        except (
+            OSError,
+            json.JSONDecodeError,
+            UnicodeDecodeError,
+            ValidationError,
+            TypeError,
+        ):
+            continue
+        stage_value = payload.get("stage") if isinstance(payload, dict) else None
+        stage = (
+            stage_value
+            if stage_value in {"case", "scientist"}
+            else contexts.get(case.scenario_id, ("case", None))[0]
+        )
+        occurred_raw = payload.get("occurredAt") if isinstance(payload, dict) else None
+        occurred_at = _parse_occurred_at(occurred_raw)
+        if occurred_at is None:
+            occurred_at = contexts.get(case.scenario_id, (stage, None))[1]
+        updates.append(
+            _evaluation_turn_from_case(
+                run_id=run_id,
+                number=number,
+                case=case,
+                stage=stage,
+                occurred_at=occurred_at,
+            )
+        )
+    return updates
+
+
 def _evaluation_turns(
     root: Path,
     *,
@@ -430,34 +510,24 @@ def _evaluation_turns(
     secrets: Iterable[str] = (),
 ) -> list[NormalizedTurn]:
     result = load_run_result(root, secrets)
-    if result is None:
-        return []
-    contexts = _case_completion_context(root)
-    updates: list[NormalizedTurn] = []
-    for number, case in enumerate(result.cases, 1):
-        stage, occurred_at = contexts.get(
-            case.scenario_id, ("case", result.finished_at)
-        )
-        updates.append(
-            NormalizedTurn(
-                id=f"{run_id}-evaluation-{case.scenario_id}",
-                sequence=0,
-                number=number,
-                stage=stage,
-                case_id=case.scenario_id,
-                status=case.outcome.value,
-                agent_message=case.summary,
-                tyr_message=None,
-                occurred_at=occurred_at,
-                replied_at=None,
-                update_type="evaluation",
-                verdict=case.verdict.value,
-                objective_status=case.objective_status.value,
-                outcome=case.outcome.value,
-                assessment_summary=case.summary,
+    if result is not None:
+        contexts = _case_completion_context(root)
+        updates: list[NormalizedTurn] = []
+        for number, case in enumerate(result.cases, 1):
+            stage, occurred_at = contexts.get(
+                case.scenario_id, ("case", result.finished_at)
             )
-        )
-    return updates
+            updates.append(
+                _evaluation_turn_from_case(
+                    run_id=run_id,
+                    number=number,
+                    case=case,
+                    stage=stage,
+                    occurred_at=occurred_at,
+                )
+            )
+        return updates
+    return _evaluation_turns_from_case_results(root, run_id=run_id, secrets=secrets)
 
 
 def normalize_turns(
