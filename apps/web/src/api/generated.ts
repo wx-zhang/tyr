@@ -513,6 +513,24 @@ export interface components {
             /** Latestsequence */
             latestSequence?: number | null;
         };
+        /** DiscoveryField */
+        DiscoveryField: {
+            /** Name */
+            name: string;
+            /** Value */
+            value: string;
+        };
+        /** DiscoveryResult */
+        DiscoveryResult: {
+            /** Status */
+            status: string;
+            /** Candidatecount */
+            candidateCount: number;
+            /** Fields */
+            fields: components["schemas"]["DiscoveryField"][];
+            /** Reason */
+            reason?: string | null;
+        };
         /** EvidenceContentResponse */
         EvidenceContentResponse: {
             /** Id */
@@ -724,6 +742,7 @@ export interface components {
             /** Latestsequence */
             latestSequence: number;
             latestActivity?: components["schemas"]["ActivityPreview"] | null;
+            discoveryResult?: components["schemas"]["DiscoveryResult"] | null;
         };
         /** RunVisualizationSummary */
         RunVisualizationSummary: {

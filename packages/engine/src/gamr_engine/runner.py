@@ -185,6 +185,7 @@ class ProgressEvent:
     case_id: str | None = None
     turn: int | None = None
     detail: str | None = None
+    fields: tuple[tuple[str, str], ...] | None = None
 
 
 ProgressCallback = Callable[[ProgressEvent], None]
@@ -668,11 +669,16 @@ class ExperimentRunner:
             artifacts=artifacts,
             phase="discovery",
         )
+        fields = (
+            self._discovery_fields(result.candidates[0]) if result.candidates else None
+        )
+        self._write_discovery_result(artifacts, run_id, result)
         self._emit(
             "discovery.completed",
             run_id,
             phase="discovery",
             detail=f"{len(result.candidates)} candidate(s)" if result.candidates else "blocked",
+            fields=fields,
         )
         return result
 
@@ -1372,6 +1378,7 @@ class ExperimentRunner:
         turn: int | None = None,
         turn_id: str | None = None,
         detail: str | None = None,
+        fields: tuple[tuple[str, str], ...] | None = None,
     ) -> None:
         sink = self._activity_sink
         if sink is not None:
@@ -1425,6 +1432,7 @@ class ExperimentRunner:
                     case_id=case_id,
                     turn=turn,
                     detail=detail,
+                    fields=fields,
                 )
             )
 
@@ -1529,6 +1537,45 @@ class ExperimentRunner:
                 if isinstance(value, str):
                     values[name] = value
         return values
+
+    @staticmethod
+    def _discovery_fields(candidate: DiscoveryCandidate) -> tuple[tuple[str, str], ...]:
+        return (
+            ("path", candidate.path),
+            ("workspace", candidate.workspace),
+            ("agent", candidate.agent),
+            ("bridgeId", candidate.bridge_id),
+        )
+
+    @staticmethod
+    def _write_discovery_result(
+        artifacts: ArtifactStore | None,
+        run_id: str,
+        result: PhaseResult,
+    ) -> None:
+        if artifacts is None:
+            return
+        occurred_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+        if result.candidates:
+            fields = [
+                {"name": name, "value": value}
+                for name, value in ExperimentRunner._discovery_fields(result.candidates[0])
+            ]
+            payload: dict[str, object] = {
+                "status": "found",
+                "candidateCount": len(result.candidates),
+                "fields": fields,
+                "occurredAt": occurred_at,
+            }
+        else:
+            payload = {
+                "status": "blocked",
+                "candidateCount": 0,
+                "fields": [],
+                "reason": result.error or "blocked",
+                "occurredAt": occurred_at,
+            }
+        artifacts.write_json(f"runs/{run_id}/discovery-result.json", payload)
 
     @staticmethod
     def _case_result(

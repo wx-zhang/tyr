@@ -100,6 +100,22 @@ class ActivityPreview(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class DiscoveryField(BaseModel):
+    name: str
+    value: str
+
+    model_config = {"populate_by_name": True}
+
+
+class DiscoveryResult(BaseModel):
+    status: str
+    candidate_count: int = Field(alias="candidateCount")
+    fields: list[DiscoveryField]
+    reason: str | None = None
+
+    model_config = {"populate_by_name": True}
+
+
 class RunVisualization(BaseModel):
     run: RunVisualizationSummary
     phases: list[ProgressItem]
@@ -108,6 +124,7 @@ class RunVisualization(BaseModel):
     counts: RunCounts
     latest_sequence: int = Field(alias="latestSequence")
     latest_activity: ActivityPreview | None = Field(default=None, alias="latestActivity")
+    discovery_result: DiscoveryResult | None = Field(default=None, alias="discoveryResult")
 
     model_config = {"populate_by_name": True}
 

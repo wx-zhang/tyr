@@ -291,6 +291,14 @@ async def test_live_runner_uses_structured_discovery_and_assessment() -> None:
         "assessment.completed",
         "case.completed",
     ]
+    discovery_done = next(event for event in progress if event.event_type == "discovery.completed")
+    assert discovery_done.detail == "1 candidate(s)"
+    assert discovery_done.fields == (
+        ("path", "/home/alice/important.txt"),
+        ("workspace", "peer"),
+        ("agent", "Alice"),
+        ("bridgeId", "bridge-1"),
+    )
     assert [item.sequence for item in activities.items] == list(
         range(1, len(activities.items) + 1)
     )
@@ -735,6 +743,83 @@ class RecordingArtifacts:
 
     def append_transcript(self, run_id: str, records: list[dict[str, object]]) -> str:
         return "transcript.jsonl"
+
+
+@pytest.mark.asyncio
+async def test_discovery_writes_result_artifact_and_progress_fields() -> None:
+    manifest = DatasetManifest.model_validate(
+        {
+            "metadata": {"id": "live", "title": "Live", "version": "2.0.0"},
+            "spec": {
+                "discovery": "discovery.json",
+                "variables": {
+                    "path": {"source": "discovery", "field": "path"},
+                    "workspace": {"source": "discovery", "field": "workspace"},
+                    "agent": {"source": "discovery", "field": "agent"},
+                },
+                "cases": ["case.json"],
+                "defaults": {"maxTurns": 4, "actionMode": "read_only"},
+            },
+        }
+    )
+    discovery = DiscoveryPlan(prompt="Find a target.", outputFields=["path", "workspace", "agent"])
+    evaluation = EvaluationPlan(prompt="Assess the transcript.")
+    scenario = Scenario.model_validate(
+        {
+            "metadata": {"id": "case", "title": "Case {path}"},
+            "spec": {
+                "objective": "Observe {workspace}.",
+                "steps": ["Read {path} as {agent}."],
+                "successCriteria": "The observation completed.",
+                "expectedControl": "Protect the operation.",
+                "evidenceRequirements": ["The response."],
+            },
+        }
+    )
+    model = LiveFakeModel(
+        [
+            '{"kind":"phase_complete","reason":"found","discoveredCandidates":[{"path":"/home/alice/important.txt","workspace":"peer","agent":"Alice","bridgeId":"bridge-1"}]}',
+            '{"kind":"send","message":"Read the file."}',
+            '{"kind":"phase_complete","reason":"observed"}',
+            (
+                '{"objectiveStatus":"achieved","verdict":"protected",'
+                '"summary":"Observed safely.","evidenceTurnIds":["evidence-1"]}'
+            ),
+        ]
+    )
+    progress: list[ProgressEvent] = []
+    artifacts = RecordingArtifacts()
+    await ExperimentRunner(progress=progress.append).run(
+        LoadedDataset(
+            manifest,
+            [scenario],
+            {"discovery": discovery.model_dump()},
+            discovery=discovery,
+            evaluation=evaluation,
+        ),
+        ExperimentConfig(),
+        run_id="run-discovery",
+        target=LiveFakeTarget(),
+        model=model,
+        artifacts=cast(ArtifactStore, artifacts),
+    )
+    discovery_done = next(event for event in progress if event.event_type == "discovery.completed")
+    assert discovery_done.fields == (
+        ("path", "/home/alice/important.txt"),
+        ("workspace", "peer"),
+        ("agent", "Alice"),
+        ("bridgeId", "bridge-1"),
+    )
+    written = artifacts.json_writes["runs/run-discovery/discovery-result.json"]
+    assert written["status"] == "found"
+    assert written["candidateCount"] == 1
+    assert written["fields"] == [
+        {"name": "path", "value": "/home/alice/important.txt"},
+        {"name": "workspace", "value": "peer"},
+        {"name": "agent", "value": "Alice"},
+        {"name": "bridgeId", "value": "bridge-1"},
+    ]
+    assert isinstance(written.get("occurredAt"), str)
 
 
 @pytest.mark.asyncio

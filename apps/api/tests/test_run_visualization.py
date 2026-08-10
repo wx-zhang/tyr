@@ -238,6 +238,123 @@ def test_visualization_marks_scientist_skipped_when_disabled() -> None:
         app.dependency_overrides.clear()
 
 
+def test_visualization_includes_discovery_result_with_peer_paths(tmp_path: Path) -> None:
+    artifact_root = tmp_path / "artifacts"
+    bundle = artifact_root / "runs" / "run-discovery"
+    bundle.mkdir(parents=True)
+    (bundle / "run.json").write_text(
+        json.dumps(
+            {
+                "id": "run-discovery",
+                "state": "running",
+                "dataset": "datasets/first-plan",
+                "actionMode": "read_only",
+                "startedAt": "2026-08-08T10:00:00Z",
+                "updatedAt": "2026-08-08T10:02:00Z",
+            }
+        ),
+        encoding="utf-8",
+    )
+    (bundle / "discovery-result.json").write_text(
+        json.dumps(
+            {
+                "status": "found",
+                "candidateCount": 1,
+                "fields": [
+                    {"name": "path", "value": "/home/alice/important.txt"},
+                    {"name": "workspace", "value": "peer"},
+                    {"name": "agent", "value": "Alice"},
+                    {"name": "bridgeId", "value": "bridge-1"},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (bundle / "activity.jsonl").write_text("", encoding="utf-8")
+    registry = InMemoryRegistry(
+        runs={
+            "run-discovery": RunRecord(
+                "run-discovery", None, "datasets/first-plan", RunState.RUNNING
+            )
+        }
+    )
+    app.dependency_overrides[get_registry] = lambda: registry
+    app.dependency_overrides[get_settings] = lambda: Settings(
+        artifact_root=str(artifact_root), model_api_key="top-secret"
+    )
+    try:
+        response = TestClient(app).get("/api/v1/runs/run-discovery/visualization")
+        assert response.status_code == 200
+        discovery = response.json()["discoveryResult"]
+        assert discovery["status"] == "found"
+        assert discovery["candidateCount"] == 1
+        assert discovery["fields"] == [
+            {"name": "path", "value": "/home/alice/important.txt"},
+            {"name": "workspace", "value": "peer"},
+            {"name": "agent", "value": "Alice"},
+            {"name": "bridgeId", "value": "bridge-1"},
+        ]
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_visualization_redacts_secrets_in_discovery_result(tmp_path: Path) -> None:
+    artifact_root = tmp_path / "artifacts"
+    bundle = artifact_root / "runs" / "run-discovery-secret"
+    bundle.mkdir(parents=True)
+    (bundle / "run.json").write_text(
+        json.dumps(
+            {
+                "id": "run-discovery-secret",
+                "state": "running",
+                "dataset": "datasets/first-plan",
+                "actionMode": "read_only",
+                "startedAt": "2026-08-08T10:00:00Z",
+                "updatedAt": "2026-08-08T10:02:00Z",
+            }
+        ),
+        encoding="utf-8",
+    )
+    (bundle / "discovery-result.json").write_text(
+        json.dumps(
+            {
+                "status": "found",
+                "candidateCount": 1,
+                "fields": [
+                    {"name": "path", "value": "/home/alice/top-secret.txt"},
+                    {"name": "workspace", "value": "peer"},
+                    {"name": "agent", "value": "Alice"},
+                    {"name": "bridgeId", "value": "bridge-1"},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (bundle / "activity.jsonl").write_text("", encoding="utf-8")
+    registry = InMemoryRegistry(
+        runs={
+            "run-discovery-secret": RunRecord(
+                "run-discovery-secret", None, "datasets/first-plan", RunState.RUNNING
+            )
+        }
+    )
+    app.dependency_overrides[get_registry] = lambda: registry
+    app.dependency_overrides[get_settings] = lambda: Settings(
+        artifact_root=str(artifact_root), model_api_key="top-secret"
+    )
+    try:
+        response = TestClient(app).get("/api/v1/runs/run-discovery-secret/visualization")
+        assert response.status_code == 200
+        fields = {
+            item["name"]: item["value"]
+            for item in response.json()["discoveryResult"]["fields"]
+        }
+        assert fields["path"] == "/home/alice/[REDACTED].txt"
+        assert fields["workspace"] == "peer"
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_historical_visualization_merges_canonical_case_results(tmp_path: Path) -> None:
     artifact_root = tmp_path / "artifacts"
     source = Path("tests/fixtures/run_evidence/completed")

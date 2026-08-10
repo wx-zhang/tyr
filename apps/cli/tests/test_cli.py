@@ -173,6 +173,47 @@ def test_progress_renderer_renders_markdown_preview(monkeypatch: pytest.MonkeyPa
     assert "•" in rendered or "-" in rendered
 
 
+def test_progress_renderer_shows_discovery_fields(monkeypatch: pytest.MonkeyPatch) -> None:
+    output = StringIO()
+    monkeypatch.setattr(cli, "console", Console(file=output, force_terminal=False))
+
+    cli._render_progress(
+        ProgressEvent(
+            "discovery.completed",
+            "run-1",
+            phase="discovery",
+            detail="1 candidate(s)",
+            fields=(
+                ("path", "/home/alice/important.txt"),
+                ("workspace", "peer"),
+                ("agent", "Alice"),
+                ("bridgeId", "bridge-1"),
+            ),
+        )
+    )
+    cli._render_progress(
+        ProgressEvent(
+            "discovery.completed",
+            "run-2",
+            phase="discovery",
+            detail="blocked",
+        )
+    )
+
+    rendered = output.getvalue()
+    assert "Discovery complete" in rendered
+    assert "1 candidate(s)" in rendered
+    assert "path" in rendered
+    assert "/home/alice/important.txt" in rendered
+    assert "workspace" in rendered
+    assert "peer" in rendered
+    assert "agent" in rendered
+    assert "Alice" in rendered
+    assert "bridgeId" in rendered
+    assert "bridge-1" in rendered
+    assert "blocked" in rendered
+
+
 def test_progress_renderer_shows_scientist_events(monkeypatch: pytest.MonkeyPatch) -> None:
     output = StringIO()
     monkeypatch.setattr(cli, "console", Console(file=output, force_terminal=False))

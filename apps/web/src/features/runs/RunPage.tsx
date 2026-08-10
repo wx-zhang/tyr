@@ -110,6 +110,24 @@ function isEvaluation(turn: RunTurn): boolean {
   return turn.updateType === "evaluation";
 }
 
+function isDiscoveryResult(turn: RunTurn): boolean {
+  return turn.updateType === "discovery";
+}
+
+function discoveryFields(message: string): Array<{ name: string; value: string }> {
+  return message
+    .split("\n")
+    .map((line) => {
+      const separator = line.indexOf(":");
+      if (separator <= 0) return null;
+      const name = line.slice(0, separator).trim();
+      const value = line.slice(separator + 1).trim();
+      if (!name || !value) return null;
+      return { name, value };
+    })
+    .filter((item): item is { name: string; value: string } => item !== null);
+}
+
 function connectionLabel(state: RunConnectionState): string {
   return {
     connecting: "Connecting",
@@ -598,13 +616,19 @@ function Turn({
   const waiting = turn.status === "waiting_for_tyr" && !turn.tyrMessage;
   const scientistGeneration = isScientistGeneration(turn);
   const evaluation = isEvaluation(turn);
+  const discoveryResult = isDiscoveryResult(turn);
   const waitMs = turnWaitMs(turn, now);
   const heading = evaluation
     ? `${turn.stage === "scientist" ? "Scientist evaluation" : "Evaluation result"} - ${turn.caseId ?? `Case ${turn.number}`}`
-    : scientistGeneration
-      ? `Scientist - Iteration ${turn.number}`
-      : `${label(turn.stage)} - Turn ${turn.number}`;
+    : discoveryResult
+      ? turn.status === "blocked"
+        ? "Discovery blocked"
+        : "Discovery complete"
+      : scientistGeneration
+        ? `Scientist - Iteration ${turn.number}`
+        : `${label(turn.stage)} - Turn ${turn.number}`;
   const status = evaluation ? turn.verdict ?? turn.status : turn.status;
+  const discovered = discoveryResult ? discoveryFields(turn.agentMessage) : [];
   return (
     <li
       className={[
@@ -614,7 +638,8 @@ function Turn({
         scientistGeneration ? "turn-scientist" : "",
         evaluation ? "turn-evaluation" : "",
         evaluation ? `verdict-${turn.verdict ?? "unknown"}` : "",
-        turn.status === "failed" ? "turn-failed" : "",
+        discoveryResult ? "turn-discovery" : "",
+        turn.status === "failed" || turn.status === "blocked" ? "turn-failed" : "",
         flash ? "turn-flash" : "",
       ].filter(Boolean).join(" ")}
       data-turn-id={turn.id}
@@ -672,6 +697,24 @@ function Turn({
               </div>
             </dl>
             <MarkdownMessage content={turn.assessmentSummary ?? turn.agentMessage} />
+          </article>
+        </div>
+      ) : discoveryResult ? (
+        <div className="turn-messages turn-messages-single">
+          <article className={`turn-message discovery-message status-${turn.status}`}>
+            <p className="turn-speaker"><span aria-hidden="true">D</span>Discovery</p>
+            {discovered.length ? (
+              <dl className="discovery-variable-list" aria-label="Discovered variables">
+                {discovered.map((field) => (
+                  <div key={field.name} className="discovery-variable-row">
+                    <dt className="mono">{field.name}</dt>
+                    <dd className="mono">{field.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            ) : (
+              <MarkdownMessage content={turn.agentMessage} />
+            )}
           </article>
         </div>
       ) : scientistGeneration ? (

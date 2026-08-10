@@ -198,6 +198,65 @@ function renderPageWithCachedTurns() {
   );
 }
 
+it("shows discovered variables in Updates after discovery completes", async () => {
+  vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url.includes("/visualization")) {
+      return Promise.resolve({ ok: true, json: async () => visualization } as Response);
+    }
+    if (url.includes("/turns")) {
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          ...turns,
+          items: [
+            {
+              id: "run-1-discovery-result",
+              sequence: 3,
+              number: 1,
+              stage: "discovery",
+              caseId: null,
+              status: "completed",
+              agentMessage:
+                "path: /home/alice/important.txt\nworkspace: peer\nagent: Alice\nbridgeId: bridge-1",
+              tyrMessage: null,
+              occurredAt: "2026-08-08T10:01:45Z",
+              repliedAt: null,
+              updateType: "discovery",
+            },
+            ...turns.items,
+          ],
+          latestSequence: 3,
+        }),
+      } as Response);
+    }
+    return Promise.resolve({ ok: true, json: async () => ({ items: [] }) } as Response);
+  });
+
+  renderPage();
+
+  expect(await screen.findByRole("heading", { name: "Discovery complete" })).toBeInTheDocument();
+  const list = screen.getByLabelText("Discovered variables");
+  expect(list).toHaveTextContent("path");
+  expect(list).toHaveTextContent("/home/alice/important.txt");
+  expect(list).toHaveTextContent("workspace");
+  expect(list).toHaveTextContent("peer");
+  expect(list).toHaveTextContent("agent");
+  expect(list).toHaveTextContent("Alice");
+  expect(list).toHaveTextContent("bridgeId");
+  expect(list).toHaveTextContent("bridge-1");
+  const stages = screen.getByRole("list", { name: "Run stages" });
+  expect(stages).not.toHaveTextContent("Discovered variables");
+});
+
+it("hides discovered variables until discovery has a result", async () => {
+  renderPage();
+
+  expect(await screen.findByRole("list", { name: "Run updates" })).toBeInTheDocument();
+  expect(screen.queryByLabelText("Discovered variables")).not.toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "Discovery complete" })).not.toBeInTheDocument();
+});
+
 it("shows scientist stage as Off when the timeline marks it skipped", async () => {
   vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
     const url = String(input);

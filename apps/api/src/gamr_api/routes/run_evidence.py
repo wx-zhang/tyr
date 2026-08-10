@@ -14,6 +14,7 @@ from gamr_adapters.artifacts.evidence import (
 )
 from gamr_adapters.artifacts.filesystem import (
     FilesystemArtifactStore,
+    redact_payload,
 )
 from gamr_adapters.artifacts.query import (
     ActivityMemoryRepository,
@@ -312,6 +313,46 @@ def _read_run_json(root: Path) -> dict[str, object]:
         return {}
 
 
+def _load_discovery_result(
+    root: Path, secrets: tuple[str, ...] = ()
+) -> dict[str, object] | None:
+    path = root / "discovery-result.json"
+    if not path.is_file():
+        return None
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(value, dict):
+        return None
+    status = value.get("status")
+    if status not in {"found", "blocked"}:
+        return None
+    raw_fields = value.get("fields")
+    fields: list[dict[str, str]] = []
+    if isinstance(raw_fields, list):
+        for item in raw_fields:
+            if not isinstance(item, dict):
+                continue
+            name = item.get("name")
+            field_value = item.get("value")
+            if isinstance(name, str) and isinstance(field_value, str):
+                fields.append({"name": name, "value": field_value})
+    candidate_count = value.get("candidateCount", len(fields))
+    if not isinstance(candidate_count, int):
+        candidate_count = len(fields)
+    payload: dict[str, object] = {
+        "status": status,
+        "candidateCount": candidate_count,
+        "fields": fields,
+    }
+    reason = value.get("reason")
+    if isinstance(reason, str) and reason:
+        payload["reason"] = reason
+    redacted = redact_payload(payload, secrets)
+    return redacted if isinstance(redacted, dict) else payload
+
+
 def _map_activity_stage(phase: str | None) -> str | None:
     if not phase:
         return None
@@ -540,7 +581,7 @@ def visualization(
         for item in cases.values()
         if item["state"] in {"active", "blocked", "running"}
     ]
-    return cast(
+    payload = cast(
         dict[str, object],
         browser_safe_value(
             {
@@ -575,6 +616,10 @@ def visualization(
             secrets,
         ),
     )
+    discovery_result = _load_discovery_result(root, secrets)
+    if discovery_result is not None:
+        payload["discoveryResult"] = discovery_result
+    return payload
 
 
 @router.get("/{run_id}/turns", response_model=RunTurnPageResponse)

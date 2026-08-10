@@ -316,6 +316,113 @@ def _case_completion_context(root: Path) -> dict[str, tuple[str, datetime | None
     return contexts
 
 
+def _turn_phase_rank(turn: NormalizedTurn) -> int:
+    if turn.update_type == "discovery":
+        return 1
+    if turn.stage == "discovery":
+        return 0
+    if turn.update_type == "evaluation":
+        return 5
+    if turn.update_type == "scientist":
+        return 3
+    if turn.stage == "scientist":
+        return 4
+    if turn.stage in {"case", "assessment"}:
+        return 2
+    return 2
+
+
+def _stamp_discovery_after_chatter(
+    discovery: list[NormalizedTurn],
+    conversation: list[NormalizedTurn],
+) -> list[NormalizedTurn]:
+    if not discovery:
+        return discovery
+    stamped: list[NormalizedTurn] = []
+    for turn in discovery:
+        if turn.occurred_at is not None:
+            stamped.append(turn)
+            continue
+        moments = [
+            item.replied_at or item.occurred_at
+            for item in conversation
+            if item.stage == "discovery" and (item.replied_at or item.occurred_at)
+        ]
+        moments = [moment for moment in moments if moment is not None]
+        stamped.append(
+            replace(turn, occurred_at=max(moments)) if moments else turn
+        )
+    return stamped
+
+
+def _discovery_turn_from_artifact(
+    root: Path,
+    *,
+    run_id: str,
+    secrets: Iterable[str] = (),
+) -> list[NormalizedTurn]:
+    path = root / "discovery-result.json"
+    if not path.is_file():
+        return []
+    try:
+        raw = redact_payload(json.loads(path.read_text(encoding="utf-8")), secrets)
+    except (OSError, json.JSONDecodeError):
+        return []
+    if not isinstance(raw, dict):
+        return []
+    status = raw.get("status")
+    if status not in {"found", "blocked"}:
+        return []
+    occurred_at = _parse_occurred_at(raw.get("occurredAt"))
+    if status == "blocked":
+        reason = raw.get("reason")
+        message = (
+            str(reason).strip()
+            if isinstance(reason, str) and reason.strip()
+            else "No usable discovery target."
+        )
+        return [
+            NormalizedTurn(
+                id=f"{run_id}-discovery-result",
+                sequence=0,
+                number=1,
+                stage="discovery",
+                case_id=None,
+                status="blocked",
+                agent_message=message,
+                tyr_message=None,
+                occurred_at=occurred_at,
+                update_type="discovery",
+            )
+        ]
+    raw_fields = raw.get("fields")
+    lines: list[str] = []
+    if isinstance(raw_fields, list):
+        for item in raw_fields:
+            if not isinstance(item, dict):
+                continue
+            name = item.get("name")
+            value = item.get("value")
+            if isinstance(name, str) and isinstance(value, str):
+                lines.append(f"{name}: {value}")
+    if not lines:
+        return []
+    return [
+        NormalizedTurn(
+            id=f"{run_id}-discovery-result",
+            sequence=0,
+            number=1,
+            stage="discovery",
+            case_id=None,
+            status="completed",
+            agent_message="\n".join(lines),
+            tyr_message=None,
+            occurred_at=occurred_at,
+            update_type="discovery",
+        )
+    ]
+
+
 def _evaluation_turns(
     root: Path,
     *,
@@ -457,6 +564,7 @@ def normalize_turns(
     scientist = _scientist_turns_from_activity(root, run_id=run_id, secrets=secrets)
     scientist = [replace(turn, update_type="scientist") for turn in scientist]
     evaluations = _evaluation_turns(root, run_id=run_id, secrets=secrets)
+    discovery = _discovery_turn_from_artifact(root, run_id=run_id, secrets=secrets)
     executed_scientist_cases = {
         turn.case_id for turn in conversation if turn.stage == "scientist" and turn.case_id
     }
@@ -468,11 +576,17 @@ def normalize_turns(
         for turn in scientist
         if turn.status != "ready" or turn.case_id not in executed_scientist_cases
     ]
-    combined = [*conversation, *scientist, *evaluations]
+    discovery = _stamp_discovery_after_chatter(discovery, conversation)
+    combined = [*conversation, *scientist, *evaluations, *discovery]
     minimum = datetime.min.replace(tzinfo=UTC)
 
-    def sort_key(turn: NormalizedTurn) -> tuple[datetime, int, str]:
-        return (turn.occurred_at or minimum, turn.number, turn.id)
+    def sort_key(turn: NormalizedTurn) -> tuple[int, datetime, int, str]:
+        return (
+            _turn_phase_rank(turn),
+            turn.occurred_at or minimum,
+            turn.number,
+            turn.id,
+        )
 
     ordered = sorted(combined, key=sort_key)
     return [

@@ -26,6 +26,11 @@ def render_progress(console: Console, event: ProgressEvent) -> None:
         console.print("[bold blue]▸[/] Discovery")
     elif event.event_type == "discovery.completed":
         console.print(f"[green]✓[/] Discovery complete [dim]· {escape(event.detail or '')}[/]")
+        if event.fields:
+            width = max(len(name) for name, _ in event.fields)
+            for name, value in event.fields:
+                label = f"{name:<{width}}"
+                console.print(f"  [cyan]{escape(label)}[/]  {escape(value)}")
     elif event.event_type == "scientist.started":
         console.print(
             f"[bold blue]▸[/] Scientist [dim]· {escape(event.detail or '')}[/]"
@@ -100,6 +105,7 @@ class ConsoleActivitySink:
                 case_id=activity.case_id,
                 turn=metadata_turn if isinstance(metadata_turn, int) else None,
                 detail=activity.summary,
+                fields=None,
             ),
         )
         return activity

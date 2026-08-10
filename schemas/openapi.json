@@ -1728,6 +1728,61 @@
         ],
         "title": "CaseProgress"
       },
+      "DiscoveryField": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "value"
+        ],
+        "title": "DiscoveryField"
+      },
+      "DiscoveryResult": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "candidateCount": {
+            "type": "integer",
+            "title": "Candidatecount"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/DiscoveryField"
+            },
+            "type": "array",
+            "title": "Fields"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "candidateCount",
+          "fields"
+        ],
+        "title": "DiscoveryResult"
+      },
       "EvidenceContentResponse": {
         "properties": {
           "id": {
@@ -2332,6 +2387,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/ActivityPreview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "discoveryResult": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DiscoveryResult"
               },
               {
                 "type": "null"
