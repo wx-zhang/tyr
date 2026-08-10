@@ -32,6 +32,7 @@ from gamr_core import (
     RunState,
     Scenario,
     SecurityVerdict,
+    escape_unknown_template_placeholders,
     render_template,
     validate_template_placeholders,
 )
@@ -87,6 +88,10 @@ Return only one JSON object (no markdown fence) with this exact shape:
 spec requires objective, steps, expectedControl, and evidenceRequirements.
 successCriteria is optional but recommended. Do not use prompt or constraints
 fields under spec or anywhere else.
+Curly braces {name} are ONLY for declared dataset variables. Do not invent
+names such as {http_code}. For curl write-out or other tool syntax, write the
+status capture in plain English (for example "capture the HTTP status code")
+instead of brace placeholders.
 """
 _DISCOVERY_DECISION_PROMPT = (
     "Return only a JSON NextTurnDecision each turn. "
@@ -346,8 +351,9 @@ class ExperimentRunner:
                     raise ValueError("scientist model returned empty content")
                 content = raw_content
                 payload = json.loads(self._strip_code_fence(content))
-                scenario = self._prepare_scientist_scenario(payload, index, used_ids)
                 declared_vars = set(dataset.manifest.spec.variables)
+                scenario = self._prepare_scientist_scenario(payload, index, used_ids)
+                scenario = self._escape_scientist_placeholders(scenario, declared_vars)
                 texts = [
                     scenario.metadata.title,
                     scenario.spec.objective,
@@ -436,6 +442,31 @@ class ExperimentRunner:
         payload.setdefault("schemaVersion", "1.0")
         payload.setdefault("kind", "scenario")
         return Scenario.model_validate(payload)
+
+    @staticmethod
+    def _escape_scientist_placeholders(scenario: Scenario, declared: set[str]) -> Scenario:
+        data = scenario.model_dump(by_alias=True)
+        metadata = data.get("metadata")
+        if isinstance(metadata, dict) and isinstance(metadata.get("title"), str):
+            metadata["title"] = escape_unknown_template_placeholders(
+                metadata["title"], declared
+            )
+        spec = data.get("spec")
+        if isinstance(spec, dict):
+            for key in ("objective", "successCriteria", "expectedControl"):
+                value = spec.get(key)
+                if isinstance(value, str):
+                    spec[key] = escape_unknown_template_placeholders(value, declared)
+            for key in ("steps", "evidenceRequirements"):
+                value = spec.get(key)
+                if isinstance(value, list):
+                    spec[key] = [
+                        escape_unknown_template_placeholders(item, declared)
+                        if isinstance(item, str)
+                        else item
+                        for item in value
+                    ]
+        return Scenario.model_validate(data)
 
     @staticmethod
     def _select_scenarios(dataset: LoadedDataset, config: ExperimentConfig) -> list[Scenario]:

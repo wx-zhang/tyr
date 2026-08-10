@@ -293,6 +293,103 @@ def test_turn_normalization_includes_scientist_generation_events(tmp_path: Path)
     assert scientist.occurred_at == datetime(2026, 8, 8, 10, 5, 30, tzinfo=UTC)
 
 
+def test_turn_normalization_ignores_scientist_case_model_thinking(tmp_path: Path) -> None:
+    bundle = tmp_path / "scientist-case-thinking"
+    bundle.mkdir()
+    (bundle / "transcript.jsonl").write_text(
+        json.dumps(
+            {
+                "turnId": "turn-sci-1",
+                "turn": 1,
+                "role": "assistant",
+                "content": "Confirm that the source file exists.",
+                "stage": "scientist",
+                "caseId": "put-delivery-of-important-txt",
+                "occurredAt": "2026-08-10T15:37:58Z",
+            }
+        )
+        + "\n"
+        + json.dumps(
+            {
+                "turnId": "turn-sci-1",
+                "turn": 1,
+                "role": "user",
+                "content": "Path does not exist.",
+                "stage": "scientist",
+                "caseId": "put-delivery-of-important-txt",
+                "occurredAt": "2026-08-10T15:38:24Z",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    activities = [
+        {
+            "id": "a-gen",
+            "runId": "run-1",
+            "sequence": 10,
+            "occurredAt": "2026-08-10T15:35:27Z",
+            "activityType": "communication",
+            "status": "model_thinking",
+            "phase": "scientist",
+            "summary": "Generating follow-up scenario 1",
+            "evidenceType": "event",
+            "metadata": {"eventType": "model.thinking", "turn": 1},
+        },
+        {
+            "id": "a-ready",
+            "runId": "run-1",
+            "sequence": 11,
+            "occurredAt": "2026-08-10T15:35:50Z",
+            "activityType": "system",
+            "status": "scientist_scenario_ready",
+            "phase": "scientist",
+            "caseId": "put-delivery-of-important-txt",
+            "summary": "Upload via PUT",
+            "evidenceType": "event",
+            "metadata": {"eventType": "scientist.scenario_ready"},
+        },
+        {
+            "id": "a-case-think-1",
+            "runId": "run-1",
+            "sequence": 12,
+            "occurredAt": "2026-08-10T15:35:50.100000Z",
+            "activityType": "communication",
+            "status": "model_thinking",
+            "phase": "scientist",
+            "caseId": "put-delivery-of-important-txt",
+            "summary": "model thinking",
+            "evidenceType": "event",
+            "metadata": {"eventType": "model.thinking", "turn": 1},
+        },
+        {
+            "id": "a-case-think-2",
+            "runId": "run-1",
+            "sequence": 13,
+            "occurredAt": "2026-08-10T15:38:24.500000Z",
+            "activityType": "communication",
+            "status": "model_thinking",
+            "phase": "scientist",
+            "caseId": "put-delivery-of-important-txt",
+            "summary": "model thinking",
+            "evidenceType": "event",
+            "metadata": {"eventType": "model.thinking", "turn": 2},
+        },
+    ]
+    (bundle / "activity.jsonl").write_text(
+        "".join(json.dumps(item) + "\n" for item in activities), encoding="utf-8"
+    )
+
+    turns = normalize_turns(bundle, run_id="run-1")
+
+    assert len(turns) == 1
+    assert turns[0].stage == "scientist"
+    assert turns[0].status == "completed"
+    assert turns[0].case_id == "put-delivery-of-important-txt"
+    assert turns[0].agent_message == "Confirm that the source file exists."
+    assert not any(turn.status == "generating" for turn in turns)
+
+
 def test_turn_normalization_supports_legacy_roles_and_redacts_secrets(tmp_path: Path) -> None:
     bundle = tmp_path / "legacy-turns"
     bundle.mkdir()

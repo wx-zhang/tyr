@@ -168,7 +168,13 @@ def _scientist_turns_from_activity(
             occurred_at = _parse_occurred_at(value.get("occurredAt"))
             summary = value.get("summary")
             message = str(summary).strip() if isinstance(summary, str) and summary.strip() else ""
+            case_value = value.get("caseId")
+            activity_case_id = (
+                str(case_value) if isinstance(case_value, str) and case_value else None
+            )
             if status == "model_thinking" or event_type == "model.thinking":
+                if activity_case_id is not None:
+                    continue
                 index = turn_meta or next_index
                 open_iteration = index
                 next_index = max(next_index, index + 1)
@@ -204,14 +210,12 @@ def _scientist_turns_from_activity(
                 index = turn_meta or open_iteration or next_index
                 open_iteration = None
                 next_index = max(next_index, index + 1)
-                case_value = value.get("caseId")
-                case_id = str(case_value) if isinstance(case_value, str) and case_value else None
                 iterations[index] = {
                     "id": str(value.get("id") or f"{run_id}-scientist-{index}"),
                     "number": index,
                     "status": "ready",
                     "agent_message": message or f"Scientist scenario {index} ready",
-                    "case_id": case_id,
+                    "case_id": activity_case_id,
                     "occurred_at": occurred_at,
                 }
                 continue
