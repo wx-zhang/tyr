@@ -94,6 +94,27 @@ class FilesystemArtifactStore:
             raise ValueError("evidence is malformed JSON") from error
         return redact_payload(payload, self.secrets)
 
+    def read_json(self, run_id: str, relative_path: str) -> dict[str, Any]:
+        payload = self.read_evidence(run_id, relative_path)
+        if not isinstance(payload, dict):
+            raise ValueError(f"{relative_path} is not a JSON object")
+        return payload
+
+    def read_transcript(self, run_id: str) -> list[dict[str, Any]]:
+        run_root = self._run_root(run_id, create=False)
+        path = run_root / "transcript.jsonl"
+        if not path.is_file():
+            return []
+        records: list[dict[str, Any]] = []
+        with path.open(encoding="utf-8") as handle:
+            for line in handle:
+                if not line.strip():
+                    continue
+                value = redact_payload(json.loads(line), self.secrets)
+                if isinstance(value, dict):
+                    records.append(value)
+        return records
+
     def read_evidence_bytes(self, run_id: str, relative_path: str) -> bytes:
         return json.dumps(
             self.read_evidence(run_id, relative_path),

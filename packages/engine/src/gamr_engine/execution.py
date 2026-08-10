@@ -61,6 +61,41 @@ class ExperimentExecutionService:
             self._emit_terminal_activity(activity_sink, result)
         return ExecutionOutput(result, result_path)
 
+    async def resume_scientist(
+        self,
+        dataset: LoadedDataset,
+        configuration: ExperimentConfig,
+        *,
+        source_run_id: str,
+        target: TargetGateway,
+        model: ModelGateway,
+        artifacts: ArtifactStore,
+        run_id: str | None = None,
+        activity_sink: ActivitySink | None = None,
+        progress: ProgressCallback | None = None,
+    ) -> ExecutionOutput:
+        result = await ExperimentRunner(
+            progress=progress,
+            activity_sink=activity_sink,
+        ).resume_scientist(
+            dataset,
+            configuration,
+            source_run_id=source_run_id,
+            run_id=run_id,
+            target=target,
+            model=model,
+            artifacts=artifacts,
+        )
+        result_path = artifacts.write_result(
+            result.run_id,
+            result,
+            dataset_snapshot=dataset.raw,
+        )
+        artifacts.write_report(result.run_id, render_markdown(result))
+        if activity_sink is not None:
+            self._emit_terminal_activity(activity_sink, result)
+        return ExecutionOutput(result, result_path)
+
     @staticmethod
     def _terminal_run_state(outcome: ExecutionOutcome) -> RunState:
         if outcome is ExecutionOutcome.CANCELLED:
