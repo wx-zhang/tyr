@@ -18,10 +18,10 @@ def build_run_executor(settings: Settings, registry: JsonRegistry) -> RunExecuto
         if run is None:
             raise ValueError("run does not exist")
         if not settings.tyr_mcp_token or not settings.model_api_key:
-            raise ValueError("GAMR_TYR_MCP_TOKEN and GAMR_MODEL_API_KEY are required")
+            raise ValueError("TYR_MCP_TOKEN and OPENROUTER_API_KEY are required")
         selected_model = run.configuration.model or settings.model_name
         if not selected_model:
-            raise ValueError("GAMR_MODEL_NAME is required")
+            raise ValueError("TYR_LOOP_MODEL is required")
         run.configuration = run.configuration.model_copy(update={"model": selected_model})
         registry.save_run(run)
         dataset_path = resolve_dataset_directory(settings.dataset_root, run.dataset)

@@ -23,7 +23,7 @@ uv run gamr result validate .gamr/runs/<run-id>/result.json
 uv run gamr chat
 ```
 
-Live commands require `GAMR_TYR_MCP_TOKEN`, `GAMR_MODEL_API_KEY`, and `GAMR_MODEL_NAME`.
+Live commands require `TYR_MCP_TOKEN`, `OPENROUTER_API_KEY`, and `TYR_LOOP_MODEL`.
 Experiments may run read-only or with Actions Allowed (`approval_required`). Action-enabled runs require explicit
 confirmation; GAMR never approves actions automatically.
 
@@ -39,7 +39,7 @@ Or run the production-style containers (API + static web):
 
 ```bash
 cp .env.example .env
-# set GAMR_TYR_MCP_TOKEN, GAMR_MODEL_API_KEY, and GAMR_MODEL_NAME for live runs
+# set TYR_MCP_TOKEN, OPENROUTER_API_KEY, and TYR_LOOP_MODEL for live runs
 docker compose up -d --build
 ```
 

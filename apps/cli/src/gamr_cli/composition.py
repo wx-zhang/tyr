@@ -15,12 +15,12 @@ def build_chat_session(
     base_url: str | None = None,
 ) -> tuple[ChatSession, TyrMcpClient]:
     if not settings.tyr_mcp_token:
-        raise ValueError("GAMR_TYR_MCP_TOKEN is required for live chat")
+        raise ValueError("TYR_MCP_TOKEN is required for live chat")
     if not settings.model_api_key:
-        raise ValueError("GAMR_MODEL_API_KEY is required for live chat")
+        raise ValueError("OPENROUTER_API_KEY is required for live chat")
     selected_model = model_name or settings.model_name
     if not selected_model:
-        raise ValueError("GAMR_MODEL_NAME is required for live chat")
+        raise ValueError("TYR_LOOP_MODEL is required for live chat")
     target = TyrMcpClient(settings.tyr_mcp_url, settings.tyr_mcp_token)
     model = OpenAICompatibleModel(
         base_url=base_url or settings.model_base_url,

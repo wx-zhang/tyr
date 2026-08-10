@@ -36,7 +36,7 @@ def test_experiment_run_requires_provider_configuration(
     result = CliRunner().invoke(cli.app, ["experiment", "run", "datasets/first-plan"])
 
     assert result.exit_code == 2
-    assert "GAMR_TYR_MCP_TOKEN is required" in result.output
+    assert "TYR_MCP_TOKEN is required" in result.output
 
 
 def test_experiment_run_ctrl_c_cancels_run(monkeypatch: pytest.MonkeyPatch) -> None:

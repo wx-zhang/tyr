@@ -91,7 +91,7 @@ def validate_dataset(directory: Path) -> None:
 def run_experiment(
     directory: Path,
     action_mode: str = typer.Option("read_only", "--action-mode"),
-    model: str = typer.Option("", "--model", help="Override GAMR_MODEL_NAME."),
+    model: str = typer.Option("", "--model", help="Override TYR_LOOP_MODEL."),
     allow_actions: bool = typer.Option(
         False,
         "--allow-actions",
@@ -143,11 +143,11 @@ def run_experiment(
     settings = Settings()
     selected_model = model or settings.model_name
     if not settings.tyr_mcp_token:
-        raise typer.BadParameter("GAMR_TYR_MCP_TOKEN is required")
+        raise typer.BadParameter("TYR_MCP_TOKEN is required")
     if not settings.model_api_key:
-        raise typer.BadParameter("GAMR_MODEL_API_KEY is required")
+        raise typer.BadParameter("OPENROUTER_API_KEY is required")
     if not selected_model:
-        raise typer.BadParameter("GAMR_MODEL_NAME is required")
+        raise typer.BadParameter("TYR_LOOP_MODEL is required")
     artifact_store = FilesystemArtifactStore(
         settings.artifact_root,
         secrets=(settings.tyr_mcp_token, settings.model_api_key),
@@ -292,8 +292,8 @@ def chat(
         "--confirm-actions",
         help="Confirm action-capable chat without an interactive prompt.",
     ),
-    model: str = typer.Option("", "--model", help="Override GAMR_MODEL_NAME."),
-    base_url: str = typer.Option("", "--base-url", help="Override GAMR_MODEL_BASE_URL."),
+    model: str = typer.Option("", "--model", help="Override TYR_LOOP_MODEL."),
+    base_url: str = typer.Option("", "--base-url", help="Override OPENROUTER_BASE_URL."),
 ) -> None:
     """Connect to Tyr through a read-only interactive chat session."""
 
