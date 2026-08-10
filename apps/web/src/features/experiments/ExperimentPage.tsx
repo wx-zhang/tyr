@@ -37,7 +37,11 @@ export function ExperimentPage() {
   const [datasetId, setDatasetId] = useState("");
   const [selectedCaseIds, setSelectedCaseIds] = useState<string[]>([]);
   const [allowActions, setAllowActions] = useState(true);
-  const [scientistIterations, setScientistIterations] = useState(0);
+  const [scientistIterationsInput, setScientistIterationsInput] = useState("0");
+  const scientistIterations = useMemo(() => {
+    const parsed = Number(scientistIterationsInput);
+    return Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)) : 0;
+  }, [scientistIterationsInput]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [casesOpen, setCasesOpen] = useState(true);
@@ -90,23 +94,22 @@ export function ExperimentPage() {
       setError("Select a dataset.");
       return;
     }
-    if (selectedCaseIds.length === 0) {
-      setError("Select at least one case.");
+    if (selectedCaseIds.length === 0 && scientistIterations === 0) {
+      setError(
+        "Select at least one case, or set scientist iterations above 0 to skip seed cases.",
+      );
       return;
     }
     const datasetTitle = selectedDataset?.metadata.title ?? datasetId;
     const experimentName = name.trim() || defaultExperimentName(datasetTitle);
     setSubmitting(true);
     try {
-      const iterations = Number.isFinite(scientistIterations)
-        ? Math.max(0, Math.floor(scientistIterations))
-        : 0;
       const experiment = await createExperiment({
         name: experimentName,
         dataset: datasetId,
         actionMode: allowActions ? "approval_required" : "read_only",
         caseIds: selectedCaseIds,
-        scientistIterations: iterations,
+        scientistIterations,
       });
       if (!experiment.id) throw new Error("Experiment was not created");
       navigate(`/experiments/${experiment.id}`);
@@ -122,7 +125,7 @@ export function ExperimentPage() {
   const caseList = (cases.data ?? []).map(scenarioToCase);
   const canSubmit =
     Boolean(datasetId) &&
-    selectedCaseIds.length > 0 &&
+    (selectedCaseIds.length > 0 || scientistIterations > 0) &&
     !submitting &&
     !cases.isLoading;
 
@@ -257,7 +260,8 @@ export function ExperimentPage() {
                   After selected cases finish, the scientist stage asks the model
                   to invent new follow-up scenarios and runs each one. The number
                   is how many generate-and-run cycles to allow. Zero skips the
-                  scientist stage.
+                  scientist stage. Clear all seed cases below to skip straight
+                  from discovery to the scientist stage.
                 </span>
               </button>
             </div>
@@ -268,20 +272,20 @@ export function ExperimentPage() {
               min={0}
               step={1}
               inputMode="numeric"
-              value={scientistIterations}
+              value={scientistIterationsInput}
               onChange={(event) => {
-                const next = Number(event.target.value);
-                if (!Number.isFinite(next)) {
-                  setScientistIterations(0);
-                  return;
-                }
-                setScientistIterations(Math.max(0, Math.floor(next)));
+                setScientistIterationsInput(event.target.value);
+              }}
+              onBlur={() => {
+                setScientistIterationsInput(String(scientistIterations));
               }}
             />
             <p className="field-help">
-              {scientistIterations > 0
-                ? `After selected cases finish, generate and run up to ${scientistIterations} follow-up scenario${scientistIterations === 1 ? "" : "s"}.`
-                : "Off. Selected cases run only."}
+              {scientistIterations === 0
+                ? "Off. Selected cases run only."
+                : selectedCaseIds.length > 0
+                  ? `After selected cases finish, generate and run up to ${scientistIterations} follow-up scenario${scientistIterations === 1 ? "" : "s"}.`
+                  : `No seed cases selected — jumps straight from discovery to generate and run up to ${scientistIterations} follow-up scenario${scientistIterations === 1 ? "" : "s"}.`}
             </p>
           </div>
 

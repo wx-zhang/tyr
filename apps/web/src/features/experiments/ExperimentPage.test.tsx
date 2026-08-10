@@ -211,6 +211,35 @@ it("disables continue when no cases are selected", async () => {
   expect(navigate).not.toHaveBeenCalled();
 });
 
+it("allows skipping seed cases to jump straight to the scientist stage", async () => {
+  const createBodies: Record<string, unknown>[] = [];
+  installFetch((body) => {
+    createBodies.push(body);
+  });
+
+  renderPage();
+
+  expect(await screen.findByLabelText(/Case Alpha/)).toBeChecked();
+  fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+  expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
+
+  fireEvent.change(screen.getByLabelText("Scientist iterations"), {
+    target: { value: "3" },
+  });
+
+  expect(screen.getByRole("button", { name: "Continue" })).not.toBeDisabled();
+  fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+  await waitFor(() => {
+    expect(navigate).toHaveBeenCalledWith("/experiments/exp-1");
+  });
+
+  expect(createBodies[0]).toMatchObject({
+    caseIds: [],
+    scientistIterations: 3,
+  });
+});
+
 it("hides and shows the test case explorer", async () => {
   renderPage();
 
