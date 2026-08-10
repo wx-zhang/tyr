@@ -159,6 +159,8 @@ export function layoutNetwork(
     pairTotals.set(key, (pairTotals.get(key) ?? 0) + 1);
   }
 
+  let maxBowBottom = 0;
+
   const edges: LayoutEdge[] = relationships
     .filter(
       (edge) => nodeById.has(edge.sourceParticipantId) && nodeById.has(edge.targetParticipantId),
@@ -184,20 +186,46 @@ export function layoutNetwork(
       const y1 = from.y + from.height / 2 + stackOffset;
       const y2 = to.y + to.height / 2 + stackOffset;
       const midX = (x1 + x2) / 2;
-      const path = forward
-        ? Math.abs(y1 - y2) < 2
-          ? `M ${x1} ${y1} L ${x2} ${y2}`
-          : `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`
-        : Math.abs(y1 - y2) < 2
-          ? `M ${x2} ${y2} L ${x1} ${y1}`
-          : `M ${x2} ${y2} C ${midX} ${y2}, ${midX} ${y1}, ${x1} ${y1}`;
+
+      const fromColumn = laneToColumn.get(from.lane) ?? 0;
+      const toColumn = laneToColumn.get(to.lane) ?? 0;
+      const intermediateNodes = nodes.filter((node) => {
+        const column = laneToColumn.get(node.lane) ?? 0;
+        return column > fromColumn && column < toColumn;
+      });
+
+      let path: string;
+      if (intermediateNodes.length > 0) {
+        // Edge skips over one or more lanes: dip below the intermediate
+        // nodes instead of drawing a straight line through them.
+        const bowY =
+          Math.max(...intermediateNodes.map((node) => node.y + node.height), y1, y2) +
+          24 +
+          Math.abs(stackOffset);
+        maxBowBottom = Math.max(maxBowBottom, bowY);
+        const c1x = x1 + (x2 - x1) * 0.2;
+        const c2x = x1 + (x2 - x1) * 0.8;
+        path = forward
+          ? `M ${x1} ${y1} C ${c1x} ${bowY}, ${c2x} ${bowY}, ${x2} ${y2}`
+          : `M ${x2} ${y2} C ${c2x} ${bowY}, ${c1x} ${bowY}, ${x1} ${y1}`;
+      } else {
+        path = forward
+          ? Math.abs(y1 - y2) < 2
+            ? `M ${x1} ${y1} L ${x2} ${y2}`
+            : `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`
+          : Math.abs(y1 - y2) < 2
+            ? `M ${x2} ${y2} L ${x1} ${y1}`
+            : `M ${x2} ${y2} C ${midX} ${y2}, ${midX} ${y1}, ${x1} ${y1}`;
+      }
+
+      const labelY = intermediateNodes.length > 0 ? maxBowBottom - 8 : Math.min(y1, y2) - 12;
 
       const type = primaryType(edge.relationshipTypes);
       return {
         ...edge,
         path,
         labelX: midX,
-        labelY: Math.min(y1, y2) - 12,
+        labelY,
         labelText: `${SHORT_TYPE[type] ?? type} · ${edge.activityCount}`,
         primaryType: type,
         strokeWidth: strokeForCount(edge.activityCount),
@@ -205,7 +233,8 @@ export function layoutNetwork(
     });
 
   const width = PAD_X * 2 + Math.max(usedLanes.length, 1) * LANE_GAP - (LANE_GAP - NODE_W);
-  const height = PAD_Y * 2 + Math.max(maxRows - 1, 0) * ROW_GAP + NODE_H + EDGE_STACK * 2;
+  const baseHeight = PAD_Y * 2 + Math.max(maxRows - 1, 0) * ROW_GAP + NODE_H + EDGE_STACK * 2;
+  const height = Math.max(baseHeight, maxBowBottom + 24);
   const laneLabels = usedLanes.map((lane) => ({
     lane,
     label: LANE_LABELS[LANE_ORDER[lane] ?? "unknown"] ?? "Other",
