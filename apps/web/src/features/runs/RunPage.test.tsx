@@ -26,9 +26,24 @@ const visualization = {
     { id: "evaluating", label: "Evaluating", state: "pending", latestSequence: null },
     { id: "reporting", label: "Reporting", state: "pending", latestSequence: null },
   ],
-  cases: [],
+  cases: [
+    {
+      caseId: "case-alpha",
+      order: 1,
+      state: "active",
+      verdict: null,
+      latestSequence: 5,
+    },
+    {
+      caseId: "case-beta",
+      order: 2,
+      state: "pending",
+      verdict: null,
+      latestSequence: null,
+    },
+  ],
   attention: { pendingApprovalCount: 0, blockers: [], unsettledTyrWork: false },
-  counts: { totalKnown: true, totalCases: 1, completedCases: 0 },
+  counts: { totalKnown: true, totalCases: 2, completedCases: 0 },
   latestSequence: 5,
   latestActivity: null,
 };
@@ -131,8 +146,17 @@ it("shows the run lifecycle and grouped Agent to Tyr turns newest first", async 
   expect(screen.getAllByText("Waiting for Tyr").length).toBeGreaterThan(0);
   expect(screen.getByRole("heading", { name: "Discovery - Turn 1" })).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "Executing evaluation - Turn 1" })).toBeInTheDocument();
-  expect(screen.getByText("case-alpha")).toBeInTheDocument();
+  expect(screen.getAllByText("case-alpha").length).toBeGreaterThan(0);
   expect(screen.getByText(/Evaluation name/)).toBeInTheDocument();
+  const caseDetails = screen.getByText("Test cases").closest("details");
+  expect(caseDetails).not.toBeNull();
+  expect(caseDetails).not.toHaveAttribute("open");
+  expect(screen.getByText("0/2")).toBeInTheDocument();
+  fireEvent.click(screen.getByText("Test cases"));
+  expect(caseDetails).toHaveAttribute("open");
+  expect(screen.getByRole("list", { name: "Test cases" })).toBeInTheDocument();
+  expect(screen.getByText("case-beta")).toBeInTheDocument();
+  expect(screen.getByText("Pending")).toBeInTheDocument();
   expect(screen.getByText("Inspect")).toHaveProperty("tagName", "STRONG");
   expect(screen.getByText("Alice").closest("li")).toBeInTheDocument();
   expect(screen.queryByText("Agent request sent · Tyr reply pending")).not.toBeInTheDocument();

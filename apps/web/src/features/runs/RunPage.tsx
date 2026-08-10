@@ -4,6 +4,7 @@ import { useParams } from "react-router-dom";
 import {
   fetchRunTurns,
   fetchRunVisualization,
+  type CaseProgress,
   type RunTurn,
 } from "../../api/client";
 import { useRunEvents, type RunConnectionState } from "../../api/useRunEvents";
@@ -49,12 +50,36 @@ function label(value: string | null | undefined): string {
 }
 
 function tone(state: string | undefined): "info" | "success" | "warning" | "danger" | "neutral" {
-  if (state === "completed" || state === "ready") return "success";
-  if (state === "failed") return "danger";
-  if (state === "waiting_for_approval" || state === "generating") return "warning";
+  if (state === "completed" || state === "ready" || state === "protected" || state === "pass" || state === "passed") {
+    return "success";
+  }
+  if (state === "failed" || state === "vulnerable" || state === "fail") return "danger";
+  if (
+    state === "waiting_for_approval"
+    || state === "generating"
+    || state === "inconclusive"
+    || state === "partial"
+  ) {
+    return "warning";
+  }
   if (state === "waiting_for_tyr") return "info";
-  if (state === "cancelled" || state === "interrupted" || state === "incomplete") return "neutral";
+  if (
+    state === "cancelled"
+    || state === "interrupted"
+    || state === "incomplete"
+    || state === "pending"
+    || state === "not_applicable"
+    || state === "not_attempted"
+    || state === "unknown"
+  ) {
+    return "neutral";
+  }
   return "info";
+}
+
+function caseStatus(item: CaseProgress): { label: string; tone: ReturnType<typeof tone> } {
+  if (item.verdict) return { label: label(item.verdict), tone: tone(item.verdict) };
+  return { label: label(item.state), tone: tone(item.state) };
 }
 
 function currentPhaseLabel(
@@ -426,6 +451,11 @@ export function RunPage() {
             );
           })}
         </ol>
+        <CaseList
+          cases={visualization.data?.cases ?? []}
+          completedCount={visualization.data?.counts?.completedCases}
+          totalCount={visualization.data?.counts?.totalCases}
+        />
       </section>
 
       <section ref={turnsSection} className="turns-section" aria-labelledby="turns-title">
@@ -596,6 +626,42 @@ function WaitingTyr() {
         </span>
       </p>
     </div>
+  );
+}
+
+function CaseList({
+  cases,
+  completedCount,
+  totalCount,
+}: {
+  cases: CaseProgress[];
+  completedCount?: number;
+  totalCount?: number | null;
+}) {
+  if (!cases.length) return null;
+  const ordered = [...cases].sort((left, right) => left.order - right.order);
+  const done = completedCount ?? ordered.filter((item) => item.state === "completed").length;
+  const total = totalCount ?? ordered.length;
+  return (
+    <details className="case-list">
+      <summary className="case-list-summary">
+        <span>Test cases</span>
+        <span className="case-list-count mono">
+          {done}/{total}
+        </span>
+      </summary>
+      <ul className="case-list-items" aria-label="Test cases">
+        {ordered.map((item) => {
+          const status = caseStatus(item);
+          return (
+            <li key={item.caseId} className="case-list-item">
+              <span className="case-list-id mono" title={item.caseId}>{item.caseId}</span>
+              <StatusBadge label={status.label} tone={status.tone} pulse={item.state === "active"} />
+            </li>
+          );
+        })}
+      </ul>
+    </details>
   );
 }
 
