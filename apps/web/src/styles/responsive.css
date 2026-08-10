@@ -3,8 +3,7 @@
   .execute-layout,
   .run-grid,
   .progress-grid,
-  .dataset-case-layout,
-  .product-overview-grid {
+  .dataset-case-layout {
     grid-template-columns: 1fr;
   }
 

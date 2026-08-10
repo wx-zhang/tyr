@@ -107,31 +107,17 @@ export function DashboardPage() {
 
   return (
     <section className="section-stack">
-      <section className="product-overview" aria-label="About GAMR and Tyr">
-        <div className="product-overview-grid">
-          <article className="product-overview-item">
-            <h2 className="product-overview-name">Tyr</h2>
-            <p>
-              Firewall for AI agents. Every tool call and action goes through
-              Tyr first; policy decides what is allowed.
-            </p>
-            <a
-              className="product-overview-link"
-              href="https://tyr.ai/"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              tyr.ai
-            </a>
-          </article>
-          <article className="product-overview-item">
-            <h2 className="product-overview-name">GAMR</h2>
-            <p>
-              Red team for Tyr. Runs attack scenarios against it and saves
-              the evidence so you can see what held and what failed.
-            </p>
-          </article>
-        </div>
+      <section className="product-overview" aria-label="About GAMR">
+        <h2 className="product-overview-name">
+          GAMR{" "}
+          <span className="product-overview-acronym">
+            Generative Adversarial Risk Mapper
+          </span>
+        </h2>
+        <p>
+          Red team for Tyr. Runs attack scenarios against it and saves the
+          evidence so you can see what held and what failed.
+        </p>
       </section>
 
       <PageHeader
