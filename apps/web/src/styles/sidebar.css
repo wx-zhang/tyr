@@ -13,13 +13,20 @@
   margin: 0;
 }
 
-.sidebar-collapsed .brand > span:not(.brand-mark),
+.sidebar-collapsed .brand-text,
 .sidebar-collapsed .sidebar-health > span:not(.status-dot),
 .sidebar-collapsed .sidebar-label,
 .sidebar-collapsed .sidebar-context,
+.sidebar-collapsed .tyr-link-text,
 .sidebar-collapsed .theme-toggle > span:not(:first-child),
 .sidebar-collapsed .nav-label {
   display: none;
+}
+
+.sidebar-collapsed .tyr-link {
+  justify-content: center;
+  margin-inline: 0;
+  padding: var(--space-2) 0;
 }
 
 .sidebar-collapsed .sidebar-toggle {

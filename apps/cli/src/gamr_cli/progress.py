@@ -12,7 +12,8 @@ def render_progress(console: Console, event: ProgressEvent) -> None:
     context = _context(event)
     if event.event_type == "run.started":
         console.print(
-            f"[bold cyan]GAMR[/] [dim]·[/] {escape(event.detail or 'starting')} "
+            f"[bold cyan]GAMR[/] [dim]· Tyr's final opponent ·[/] "
+            f"{escape(event.detail or 'starting')} "
             f"[dim](run {escape(event.run_id)})[/]"
         )
     elif event.event_type == "tyr.connecting":

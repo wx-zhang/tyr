@@ -45,7 +45,12 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
 
 def create_app() -> FastAPI:
     settings = get_settings()
-    application = FastAPI(title="GAMR API", version="0.1.0", lifespan=lifespan)
+    application = FastAPI(
+        title="GAMR",
+        description="Tyr's final opponent. Red-team experiment API for Tyr (https://tyr.ai/).",
+        version="0.1.0",
+        lifespan=lifespan,
+    )
     application.add_middleware(
         CORSMiddleware,
         allow_origins=_web_origins(settings.web_origin),

@@ -11,7 +11,7 @@ export function DatasetPage() {
       <PageHeader
         eyebrow="Authoring sources"
         title="Datasets"
-        description="Versioned scenarios used to create reproducible experiment snapshots."
+        description="Versioned Tyr red-team scenarios used to create reproducible experiment snapshots."
         actions={
           <Link className="button button-primary" to="/experiments/new">
             Execute

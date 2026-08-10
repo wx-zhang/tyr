@@ -30,7 +30,9 @@ def _commands(watch: bool) -> Sequence[Sequence[str]]:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Start the local GAMR API and web app.")
+    parser = argparse.ArgumentParser(
+        description="Start the local GAMR for Tyr API and web app."
+    )
     parser.add_argument("--watch", action="store_true", help="Reload the API on Python changes.")
     args = parser.parse_args()
     processes: list[subprocess.Popen[bytes]] = []

@@ -1,7 +1,7 @@
 [project]
 name = "gamr-workspace"
 version = "0.1.0"
-description = "GAMR workspace for Tyr red-team experiments"
+description = "GAMR for Tyr — red-team experiment workspace"
 requires-python = ">=3.14,<3.15"
 dependencies = []
 

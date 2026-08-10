@@ -131,7 +131,7 @@ export function ExperimentPage() {
       <PageHeader
         eyebrow="Experiment execution"
         title="Execute experiment"
-        description="Choose a dataset and cases, then start a live run."
+        description="Choose a dataset and cases, then start a live red-team run against Tyr."
         actions={
           <Link className="button button-secondary" to="/datasets">
             Browse datasets

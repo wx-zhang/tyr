@@ -5,7 +5,7 @@ build-backend = "uv_build"
 [project]
 name = "gamr-cli"
 version = "0.1.0"
-description = "GAMR command line interface"
+description = "GAMR for Tyr command line interface"
 requires-python = ">=3.14,<3.15"
 dependencies = ["gamr-adapters", "gamr-engine", "rich>=14,<15", "typer>=0.16,<1"]
 

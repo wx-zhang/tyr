@@ -3,6 +3,30 @@ import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { getSidebarCollapsed, persistSidebarCollapsed } from "../sidebar";
 import { applyTheme, getPreferredTheme, type Theme } from "../theme";
 
+function TyrMark() {
+  return (
+    <svg
+      className="tyr-mark-svg"
+      viewBox="0 0 32 32"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <circle
+        cx="16"
+        cy="16"
+        r="13"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.25"
+      />
+      <path
+        fill="currentColor"
+        d="M16 6.5 22.75 17h-3.4v8.5h-6.7V17h-3.4L16 6.5Z"
+      />
+    </svg>
+  );
+}
+
 export function App() {
   const [theme, setTheme] = useState<Theme>(() => getPreferredTheme());
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() =>
@@ -38,12 +62,15 @@ export function App() {
       <a className="skip-link" href="#main-content">
         Skip to content
       </a>
-      <aside className="sidebar" aria-label="GAMR application navigation">
+      <aside className="sidebar" aria-label="GAMR for Tyr application navigation">
         <div className="sidebar-inner">
           <div className="sidebar-top">
             <Link to="/" className="brand" aria-label="GAMR home">
               <img className="brand-mark" src="/favicon.svg" alt="" />
-              <span>GAMR</span>
+              <span className="brand-text">
+                <span className="brand-name">GAMR</span>
+                <span className="brand-tagline">Tyr&apos;s final opponent</span>
+              </span>
             </Link>
             <button
               className="sidebar-toggle"
@@ -100,14 +127,30 @@ export function App() {
           <div className="sidebar-footer">
             <p className="sidebar-label">Current context</p>
             <p className="sidebar-context">{context}</p>
+            <a
+              className="tyr-link"
+              href="https://tyr.ai/"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Tyr website (opens in a new tab)"
+            >
+              <span className="tyr-mark" aria-hidden="true">
+                <TyrMark />
+              </span>
+              <span className="tyr-link-text">
+                <span className="tyr-link-label">Red team for Tyr</span>
+                <span className="tyr-link-url">tyr.ai</span>
+              </span>
+            </a>
             <button
               className="button button-ghost theme-toggle"
               type="button"
               onClick={toggleTheme}
               aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
+              title={theme === "dark" ? "Light theme" : "Dark theme"}
             >
               <span aria-hidden="true">{theme === "dark" ? "☼" : "◐"}</span>
-              <span>Use {theme === "dark" ? "light" : "dark"} theme</span>
+              <span>{theme === "dark" ? "Light" : "Dark"}</span>
             </button>
           </div>
         </div>
@@ -116,10 +159,9 @@ export function App() {
         <header className="app-header">
           <div className="header-inner">
             <div className="header-context">
-              <p className="eyebrow">GAMR control room</p>
+              <p className="eyebrow">Red team for Tyr</p>
               <span>{context}</span>
             </div>
-            <span className="header-hint mono">no auto-approval</span>
           </div>
         </header>
         <main id="main-content" className="app-main">

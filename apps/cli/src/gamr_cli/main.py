@@ -32,7 +32,10 @@ from .composition import build_chat_session
 from .progress import render_progress
 
 console = Console()
-app = typer.Typer(help="GAMR red-team experiment tools", no_args_is_help=True)
+app = typer.Typer(
+    help="GAMR — Tyr's final opponent. Red-team experiment tools for Tyr (https://tyr.ai/).",
+    no_args_is_help=True,
+)
 dataset_app = typer.Typer(help="Inspect and validate JSON datasets")
 experiment_app = typer.Typer(help="Create and inspect experiment runs")
 result_app = typer.Typer(help="Validate canonical run results")

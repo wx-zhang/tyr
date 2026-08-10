@@ -1,8 +1,13 @@
 # GAMR
 
-![GAMR — Generative Adversarial Risk Mapper](docs/assets/gamr-hero.svg)
+**Tyr's final opponent**
 
-GAMR runs and reviews red-team experiments against Tyr. The CLI is the primary interface. The
+![GAMR — Tyr's final opponent](docs/assets/gamr-hero.svg)
+
+**GAMR** (Generative Adversarial Risk Mapper) is the red-team experiment runner for
+[Tyr](https://tyr.ai/) — the security and governance layer for AI agents.
+
+GAMR runs and reviews adversarial experiments against Tyr. The CLI is the primary interface. The
 optional API and web app use the same engine to start read-only runs and visualize every run stored
 under the shared `.gamr` root, including CLI runs.
 

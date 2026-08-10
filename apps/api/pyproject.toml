@@ -5,7 +5,7 @@ build-backend = "uv_build"
 [project]
 name = "gamr-api"
 version = "0.1.0"
-description = "GAMR FastAPI service"
+description = "GAMR for Tyr FastAPI service"
 requires-python = ">=3.14,<3.15"
 dependencies = ["fastapi>=0.116,<1", "gamr-adapters", "gamr-engine", "uvicorn[standard]>=0.35,<1"]
 

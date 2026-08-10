@@ -3,7 +3,8 @@
   .execute-layout,
   .run-grid,
   .progress-grid,
-  .dataset-case-layout {
+  .dataset-case-layout,
+  .product-overview-grid {
     grid-template-columns: 1fr;
   }
 
@@ -83,9 +84,10 @@
   .sidebar-footer {
     display: flex;
     grid-column: 1 / -1;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: var(--space-3);
+    gap: var(--space-2) var(--space-3);
     border-top: 0;
     padding: var(--space-2) 0 var(--space-3);
   }
@@ -94,15 +96,31 @@
     margin: 0 auto 0 0;
   }
 
+  .tyr-link {
+    margin: 0;
+    padding: var(--space-1) var(--space-2);
+  }
+
+  .tyr-link-label {
+    display: none;
+  }
+
   .sidebar-collapsed .sidebar-toggle {
     display: none;
   }
 
-  .sidebar-collapsed .brand > span:not(.brand-mark),
+  .sidebar-collapsed .brand-text,
   .sidebar-collapsed .sidebar-health > span:not(.status-dot),
   .sidebar-collapsed .sidebar-context,
+  .sidebar-collapsed .tyr-link-text,
   .sidebar-collapsed .nav-label {
-    display: inline;
+    display: revert;
+  }
+
+  .sidebar-collapsed .tyr-link {
+    justify-content: flex-start;
+    margin: 0;
+    padding: var(--space-2);
   }
 
   .sidebar-collapsed .sidebar-top {
@@ -138,10 +156,6 @@
 
   .header-inner {
     width: min(100% - var(--space-4), var(--content-max));
-  }
-
-  .header-hint {
-    display: none;
   }
 
   .app-main {

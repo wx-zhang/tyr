@@ -2,6 +2,8 @@
 
 This document is the visual and interaction contract for GAMR's optional web interface: datasets, experiment execution starts, run visualization, case transcripts, findings, and evidence artifacts.
 
+GAMR is the red-team product **for Tyr** ([tyr.ai](https://tyr.ai/)). Branding should always make that relationship clear: the product name is **GAMR**, the logo tagline is **Tyr's final opponent**, and the shell links out to Tyr. Reuse the Tyr spear monogram as a co-brand mark, not as a replacement for the GAMR identity.
+
 The intended character is a **calm evidence console**: precise enough for operators, readable enough for reviewers, and restrained enough that live state, risk, and approval requests receive attention when they matter.
 
 ## 1. Authority and scope
@@ -38,7 +40,7 @@ The shell supports the routes defined by the scaffold:
 - Case transcript and evidence
 - Artifacts and reports
 
-Use a persistent left navigation rail for product identity, workspace routes, local API health, current context, and theme control. The expanded rail is 192px; its hide control collapses it to a 56px icon rail and persists that choice in `localStorage`. On narrow screens it becomes a compact top rail with horizontally scrollable navigation. The contextual header belongs to the content frame and should stay quiet. A run page may add local tabs for Overview, Cases, and Artifacts. Approval observations from CLI runs remain visible in the activity view.
+Use a persistent left navigation rail for product identity, workspace routes, local API health, current context, Tyr attribution, and theme control. Product identity is **GAMR** with the secondary line **Tyr's final opponent**; the rail footer links to [tyr.ai](https://tyr.ai/) with the Tyr monogram. The expanded rail is 192px; its hide control collapses it to a 56px icon rail and persists that choice in `localStorage`. On narrow screens it becomes a compact top rail with horizontally scrollable navigation. The contextual header belongs to the content frame, stays quiet, and may use “Red team for Tyr” as the eyebrow. A run page may add local tabs for Overview, Cases, and Artifacts. Approval observations from CLI runs remain visible in the activity view.
 
 ### Width and density
 

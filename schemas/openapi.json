@@ -1,7 +1,8 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "GAMR API",
+    "title": "GAMR",
+    "description": "Tyr's final opponent. Red-team experiment API for Tyr (https://tyr.ai/).",
     "version": "0.1.0"
   },
   "paths": {
