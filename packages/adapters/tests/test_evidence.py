@@ -275,7 +275,7 @@ def test_turn_normalization_includes_scientist_generation_events(tmp_path: Path)
             "phase": "scientist",
             "summary": "scientist scenario 1 invalid: missing objective",
             "evidenceType": "event",
-            "metadata": {"eventType": "scientist.failed"},
+            "metadata": {"eventType": "scientist.failed", "turn": 1},
         },
     ]
     (bundle / "activity.jsonl").write_text(
@@ -291,6 +291,34 @@ def test_turn_normalization_includes_scientist_generation_events(tmp_path: Path)
     assert "missing objective" in scientist.agent_message
     assert scientist.tyr_message is None
     assert scientist.occurred_at == datetime(2026, 8, 8, 10, 5, 30, tzinfo=UTC)
+    assert not any(turn.status == "generating" for turn in turns)
+
+
+def test_turn_normalization_ignores_scientist_model_thinking(tmp_path: Path) -> None:
+    bundle = tmp_path / "scientist-thinking-only"
+    bundle.mkdir()
+    (bundle / "activity.jsonl").write_text(
+        json.dumps(
+            {
+                "id": "a-1",
+                "runId": "run-1",
+                "sequence": 10,
+                "occurredAt": "2026-08-08T10:05:00Z",
+                "activityType": "communication",
+                "status": "model_thinking",
+                "phase": "scientist",
+                "summary": "Generating follow-up scenario 2",
+                "evidenceType": "event",
+                "metadata": {"eventType": "model.thinking", "turn": 2},
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    turns = normalize_turns(bundle, run_id="run-1")
+
+    assert turns == []
 
 
 def test_turn_normalization_ignores_scientist_case_model_thinking(tmp_path: Path) -> None:

@@ -698,6 +698,15 @@ async def test_scientist_iteration_uses_the_same_case_engine() -> None:
     ready = next(event for event in progress if event.event_type == "scientist.scenario_ready")
     assert ready.case_id == "new-delivery"
     assert ready.phase == "scientist"
+    assert ready.turn == 1
+    scientist_thinking = [
+        event
+        for event in progress
+        if event.event_type == "model.thinking"
+        and event.phase == "scientist"
+        and event.case_id is None
+    ]
+    assert scientist_thinking == []
     scientist_case_events = [
         event
         for event in progress

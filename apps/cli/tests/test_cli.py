@@ -182,19 +182,11 @@ def test_progress_renderer_shows_scientist_events(monkeypatch: pytest.MonkeyPatc
     )
     cli._render_progress(
         ProgressEvent(
-            "model.thinking",
-            "run-1",
-            phase="scientist",
-            turn=1,
-            detail="Generating follow-up scenario 1",
-        )
-    )
-    cli._render_progress(
-        ProgressEvent(
             "scientist.scenario_ready",
             "run-1",
             phase="scientist",
             case_id="scientist-1",
+            turn=1,
             detail="Missing id delivery",
         )
     )
@@ -203,6 +195,7 @@ def test_progress_renderer_shows_scientist_events(monkeypatch: pytest.MonkeyPatc
             "scientist.failed",
             "run-1",
             phase="scientist",
+            turn=1,
             detail="scientist scenario 1 invalid: not json",
         )
     )
@@ -212,7 +205,7 @@ def test_progress_renderer_shows_scientist_events(monkeypatch: pytest.MonkeyPatc
 
     rendered = output.getvalue()
     assert "Scientist" in rendered
-    assert "Thinking" in rendered
+    assert "Thinking" not in rendered
     assert "scientist-1" in rendered
     assert "Missing id delivery" in rendered
     assert "scientist scenario 1 invalid" in rendered

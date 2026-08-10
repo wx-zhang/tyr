@@ -179,25 +179,9 @@ def _scientist_turns_from_activity(
                 str(case_value) if isinstance(case_value, str) and case_value else None
             )
             if status == "model_thinking" or event_type == "model.thinking":
-                if activity_case_id is not None:
-                    continue
-                index = turn_meta or next_index
-                open_iteration = index
-                next_index = max(next_index, index + 1)
-                item = iterations.setdefault(
-                    index,
-                    {
-                        "id": f"{run_id}-scientist-{index}",
-                        "number": index,
-                        "status": "generating",
-                        "agent_message": message or f"Generating follow-up scenario {index}",
-                        "case_id": None,
-                        "occurred_at": occurred_at,
-                    },
-                )
-                if item.get("status") == "generating":
-                    item["agent_message"] = message or item["agent_message"]
-                    item["occurred_at"] = occurred_at or item.get("occurred_at")
+                if activity_case_id is None and turn_meta is not None:
+                    open_iteration = turn_meta
+                    next_index = max(next_index, turn_meta + 1)
                 continue
             if status == "scientist_failed" or event_type == "scientist.failed":
                 index = turn_meta or open_iteration or next_index

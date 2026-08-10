@@ -498,13 +498,6 @@ class ExperimentRunner:
                 f"strings.\n\n{_SCIENTIST_SCENARIO_SHAPE}\n"
                 f"Earlier attempts (scenario, steps, transcript, assessment):\n{history}"
             )
-            self._emit(
-                "model.thinking",
-                run_id,
-                phase="scientist",
-                turn=index,
-                detail=f"Generating follow-up scenario {index}",
-            )
             content: str | None = None
             try:
                 completion = await model.complete(prompt)
@@ -533,6 +526,7 @@ class ExperimentRunner:
                     "scientist.failed",
                     run_id,
                     phase="scientist",
+                    turn=index,
                     detail=error,
                 )
                 self._write_raw(
@@ -552,6 +546,7 @@ class ExperimentRunner:
                 run_id,
                 phase="scientist",
                 case_id=scenario.metadata.id,
+                turn=index,
                 detail=scenario.metadata.title,
             )
             record, case_error = await self._run_case(
