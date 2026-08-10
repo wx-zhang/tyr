@@ -254,8 +254,146 @@ it("removes the previous evidence navigation and controls", async () => {
 
   expect(screen.queryByRole("link", { name: "Cases" })).not.toBeInTheDocument();
   expect(screen.queryByRole("link", { name: "Artifacts" })).not.toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: "Cancel run" })).not.toBeInTheDocument();
   expect(screen.queryByText("Relationship graph")).not.toBeInTheDocument();
+});
+
+it("shows Cancel run while the run is live", async () => {
+  renderPage();
+  expect(await screen.findByRole("button", { name: "Cancel run" })).toBeInTheDocument();
+});
+
+it("hides Cancel run after the run ends", async () => {
+  vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url.includes("/visualization")) {
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          ...visualization,
+          run: {
+            ...visualization.run,
+            state: "completed",
+            currentPhase: null,
+            finishedAt: "2026-08-08T10:10:00Z",
+            outcome: "completed",
+          },
+          phases: visualization.phases.map((phase) => ({ ...phase, state: "completed" })),
+        }),
+      } as Response);
+    }
+    if (url.includes("/turns")) {
+      return Promise.resolve({ ok: true, json: async () => turns } as Response);
+    }
+    return Promise.resolve({ ok: true, json: async () => ({ items: [] }) } as Response);
+  });
+
+  renderPage();
+  await screen.findByRole("heading", { name: "Run run-1" });
+  expect(screen.queryByRole("button", { name: "Cancel run" })).not.toBeInTheDocument();
+});
+
+it("cancels a live run after confirmation", async () => {
+  const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+  let cancelled = false;
+  vi.mocked(fetch).mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url.includes("/cancel") && init?.method === "POST") {
+      cancelled = true;
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          id: "run-1",
+          state: "cancelled",
+          source: "service",
+          experimentId: null,
+          dataset: "first-plan",
+          configuration: {
+            actionMode: "read_only",
+            model: "test",
+            maxTurns: 10,
+            discoveryTurns: 1,
+            scientistIterations: 0,
+          },
+        }),
+      } as Response);
+    }
+    if (url.includes("/visualization")) {
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          ...visualization,
+          run: {
+            ...visualization.run,
+            state: cancelled ? "cancelled" : "running",
+            finishedAt: cancelled ? "2026-08-08T10:05:00Z" : null,
+            outcome: cancelled ? "cancelled" : null,
+            currentPhase: cancelled ? null : "running",
+          },
+          phases: visualization.phases.map((phase) => ({
+            ...phase,
+            state: cancelled
+              ? phase.id === "running"
+                ? "cancelled"
+                : phase.state === "active"
+                  ? "cancelled"
+                  : phase.state
+              : phase.state,
+          })),
+        }),
+      } as Response);
+    }
+    if (url.includes("/turns")) {
+      return Promise.resolve({ ok: true, json: async () => turns } as Response);
+    }
+    return Promise.resolve({ ok: true, json: async () => ({ items: [] }) } as Response);
+  });
+
+  renderPage();
+  fireEvent.click(await screen.findByRole("button", { name: "Cancel run" }));
+  expect(confirm).toHaveBeenCalled();
+  await waitFor(() => {
+    expect(screen.queryByRole("button", { name: "Cancel run" })).not.toBeInTheDocument();
+  });
+  expect(screen.getAllByText("Cancelled").length).toBeGreaterThan(0);
+  confirm.mockRestore();
+});
+
+it("does not cancel when the operator dismisses confirmation", async () => {
+  const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+  renderPage();
+  fireEvent.click(await screen.findByRole("button", { name: "Cancel run" }));
+  expect(confirm).toHaveBeenCalled();
+  await waitFor(() => {
+    const cancelCalls = vi.mocked(fetch).mock.calls.filter(([input, init]) => {
+      return String(input).includes("/cancel") && (init as RequestInit | undefined)?.method === "POST";
+    });
+    expect(cancelCalls).toHaveLength(0);
+  });
+  expect(screen.getByRole("button", { name: "Cancel run" })).toBeInTheDocument();
+  confirm.mockRestore();
+});
+
+it("shows an error when cancel fails", async () => {
+  const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+  vi.mocked(fetch).mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url.includes("/cancel") && init?.method === "POST") {
+      return Promise.resolve({ ok: false, status: 500, json: async () => ({}) } as Response);
+    }
+    if (url.includes("/visualization")) {
+      return Promise.resolve({ ok: true, json: async () => visualization } as Response);
+    }
+    if (url.includes("/turns")) {
+      return Promise.resolve({ ok: true, json: async () => turns } as Response);
+    }
+    return Promise.resolve({ ok: true, json: async () => ({ items: [] }) } as Response);
+  });
+
+  renderPage();
+  fireEvent.click(await screen.findByRole("button", { name: "Cancel run" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("Request failed: 500");
+  expect(screen.getByRole("button", { name: "Cancel run" })).toBeEnabled();
+  confirm.mockRestore();
 });
 
 it("does not render raw HTML from conversation markdown", async () => {

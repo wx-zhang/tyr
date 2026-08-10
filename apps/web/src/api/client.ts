@@ -169,6 +169,15 @@ export function fetchRun(runId: string): Promise<Run> {
   return get<Run>(`/api/v1/runs/${encodeURIComponent(runId)}`);
 }
 
+export async function cancelRun(runId: string): Promise<Run> {
+  const response = await fetch(
+    `${apiOrigin}/api/v1/runs/${encodeURIComponent(runId)}/cancel`,
+    { method: "POST" },
+  );
+  if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+  return response.json() as Promise<Run>;
+}
+
 export function fetchRunVisualization(runId: string): Promise<RunVisualization> {
   return get<RunVisualization>(
     `/api/v1/runs/${encodeURIComponent(runId)}/visualization`,

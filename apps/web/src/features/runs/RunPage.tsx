@@ -1,7 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
+  cancelRun,
   fetchRunTurns,
   fetchRunVisualization,
   type CaseProgress,
@@ -209,6 +210,7 @@ function stageStatusLabel(
 export function RunPage() {
   const { id } = useParams();
   const runId = id ?? "unknown";
+  const queryClient = useQueryClient();
   const [refreshMs, setRefreshMs] = useState<RefreshRateMs>(() => readStoredRefreshMs());
   const visualization = useQuery({
     queryKey: ["run-visualization", runId],
@@ -233,6 +235,8 @@ export function RunPage() {
   const [visibleLatestTurns, setVisibleLatestTurns] = useState<RunTurn[]>([]);
   const [followingLatest, setFollowingLatest] = useState(true);
   const [loadingOlder, setLoadingOlder] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [flashIds, setFlashIds] = useState<Set<string>>(() => new Set());
   const turnsSection = useRef<HTMLElement>(null);
@@ -254,11 +258,32 @@ export function RunPage() {
     }
   };
 
+  const requestCancel = async () => {
+    if (cancelling || !isLive) return;
+    const confirmed = window.confirm(
+      `Cancel run ${runId}? The run will stop. Existing evidence remains reviewable.`,
+    );
+    if (!confirmed) return;
+    setCancelling(true);
+    setCancelError(null);
+    try {
+      await cancelRun(runId);
+      await queryClient.invalidateQueries({ queryKey: ["run-visualization", runId] });
+      await queryClient.invalidateQueries({ queryKey: ["run-turns", runId] });
+    } catch (error) {
+      setCancelError(error instanceof Error ? error.message : "Could not cancel run");
+    } finally {
+      setCancelling(false);
+    }
+  };
+
   useEffect(() => {
     setOlderTurns([]);
     setVisibleLatestTurns([]);
     setFollowingLatest(true);
     setFlashIds(new Set());
+    setCancelling(false);
+    setCancelError(null);
     previousVisible.current = new Map();
   }, [runId]);
 
@@ -387,18 +412,33 @@ export function RunPage() {
               </button>
             ))}
           </div>
-          <p
-            className={`run-connection connection-${events.connectionState}`}
-            role="status"
-            aria-live="polite"
-            title={connectionDetail(events.connectionState)}
-          >
-            <span className="connection-dot" aria-hidden="true" />
-            <span className="connection-label">{connectionLabel(events.connectionState)}</span>
-          </p>
+          <div className="run-header-meta">
+            <p
+              className={`run-connection connection-${events.connectionState}`}
+              role="status"
+              aria-live="polite"
+              title={connectionDetail(events.connectionState)}
+            >
+              <span className="connection-dot" aria-hidden="true" />
+              <span className="connection-label">{connectionLabel(events.connectionState)}</span>
+            </p>
+            {isLive ? (
+              <button
+                type="button"
+                className="run-cancel"
+                disabled={cancelling}
+                onClick={() => void requestCancel()}
+              >
+                {cancelling ? "Cancelling…" : "Cancel run"}
+              </button>
+            ) : null}
+          </div>
         </div>
       </header>
 
+      {cancelError ? (
+        <p className="callout callout-warning" role="alert">{cancelError}</p>
+      ) : null}
       {visualization.error ? (
         <p className="callout callout-warning" role="alert">{visualization.error.message}</p>
       ) : null}
