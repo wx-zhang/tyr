@@ -32,7 +32,9 @@ class TargetGateway(Protocol):
         self, operation_id: str, *, wait_seconds: int = 0
     ) -> dict[str, object]: ...
 
-    async def settle(self, result: dict[str, object]) -> dict[str, object]: ...
+    async def settle(
+        self, result: dict[str, object], *, operation_id: str | None = None
+    ) -> dict[str, object]: ...
 
 
 class ApprovalGateway(Protocol):

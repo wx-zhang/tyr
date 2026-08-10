@@ -842,7 +842,7 @@ class ExperimentRunner:
                 new_operation_id = result.get("operationId")
                 if isinstance(new_operation_id, str):
                     conversation.operation_id = new_operation_id
-                result = await target.settle(result)
+                result = await target.settle(result, operation_id=conversation.operation_id)
             except Exception as exc:
                 self._emit(
                     "target.failed",

@@ -128,7 +128,9 @@ class LiveFakeTarget:
     ) -> dict[str, object]:
         return await self.query(prompt, operation_id=operation_id, idempotency_key=idempotency_key)
 
-    async def settle(self, result: dict[str, object]) -> dict[str, object]:
+    async def settle(
+        self, result: dict[str, object], *, operation_id: str | None = None
+    ) -> dict[str, object]:
         return result
 
 
