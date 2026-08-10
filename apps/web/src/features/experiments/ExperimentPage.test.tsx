@@ -109,6 +109,7 @@ it("creates the experiment via the API then redirects to details", async () => {
     dataset: "first-plan",
     actionMode: "approval_required",
     caseIds: ["case-a"],
+    scientistIterations: 0,
   });
 
   expect(
@@ -118,6 +119,40 @@ it("creates the experiment via the API then redirects to details", async () => {
         (init as RequestInit | undefined)?.method === "POST",
     ),
   ).toBe(true);
+});
+
+it("sends scientist iterations when the operator sets them", async () => {
+  const createBodies: Record<string, unknown>[] = [];
+  installFetch((body) => {
+    createBodies.push(body);
+  });
+
+  renderPage();
+
+  expect(await screen.findByLabelText(/Case Alpha/)).toBeChecked();
+  expect(screen.getByLabelText("Scientist iterations")).toHaveValue(0);
+  expect(
+    screen.getByRole("button", { name: "What scientist iterations mean" }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole("tooltip", {
+      name: /scientist stage asks the model to invent new follow-up scenarios/i,
+    }),
+  ).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("Scientist iterations"), {
+    target: { value: "2" },
+  });
+  expect(screen.getByLabelText("Scientist iterations")).toHaveValue(2);
+  fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+  await waitFor(() => {
+    expect(navigate).toHaveBeenCalledWith("/experiments/exp-1");
+  });
+
+  expect(createBodies[0]).toMatchObject({
+    scientistIterations: 2,
+    caseIds: ["case-a"],
+  });
 });
 
 it("does not redirect when the API fails to create the experiment", async () => {

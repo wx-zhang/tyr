@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
   cancelRun,
+  fetchRun,
   fetchRunTurns,
   fetchRunVisualization,
   type CaseProgress,
@@ -221,6 +222,10 @@ export function RunPage() {
       return refreshMs;
     },
   });
+  const runRecord = useQuery({
+    queryKey: ["run", runId],
+    queryFn: () => fetchRun(runId),
+  });
   const turns = useQuery({
     queryKey: ["run-turns", runId],
     queryFn: () => fetchRunTurns(runId),
@@ -242,6 +247,7 @@ export function RunPage() {
   const turnsSection = useRef<HTMLElement>(null);
   const previousVisible = useRef<Map<string, RunTurn>>(new Map());
   const run = visualization.data?.run;
+  const scientistIterations = runRecord.data?.configuration?.scientistIterations ?? 0;
   const latestTurns = turns.data?.items;
   const isLive = Boolean(run && !terminalStates.has(run.state));
   const waitingForTyr = Boolean(
@@ -390,6 +396,12 @@ export function RunPage() {
                 {isLive ? formatRelative(run?.latestUpdateAt, now) : formatTimestamp(run?.latestUpdateAt)}
               </dd>
             </div>
+            {scientistIterations > 0 ? (
+              <div>
+                <dt>Scientist iterations</dt>
+                <dd className="mono tabular">{scientistIterations}</dd>
+              </div>
+            ) : null}
           </dl>
         </div>
         <div className="run-header-tools">

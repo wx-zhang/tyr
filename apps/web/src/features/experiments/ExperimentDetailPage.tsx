@@ -25,6 +25,7 @@ export function ExperimentDetailPage() {
   const config = experiment.data?.configuration;
   const actionMode = config?.actionMode ?? "read_only";
   const caseIds = config?.caseIds ?? [];
+  const scientistIterations = config?.scientistIterations ?? 0;
 
   return (
     <section className="section-stack">
@@ -78,6 +79,12 @@ export function ExperimentDetailPage() {
                   {caseIds.length > 0 ? caseIds.join(", ") : "Dataset defaults"}
                 </dd>
               </div>
+              <div className="detail-row">
+                <dt>Scientist iterations</dt>
+                <dd className="mono tabular">
+                  {scientistIterations > 0 ? scientistIterations : "0 (off)"}
+                </dd>
+              </div>
             </dl>
           )}
         </article>
@@ -92,8 +99,8 @@ export function ExperimentDetailPage() {
             <div>
               <h3>Queue a run</h3>
               <p>
-                Starts with the stored dataset, cases, and action mode. Live
-                progress opens on the run page.
+                Starts with the stored dataset, cases, action mode, and scientist
+                iterations. Live progress opens on the run page.
               </p>
               <button
                 className="button button-primary"

@@ -36,6 +36,7 @@ export function ExperimentPage() {
   const [datasetId, setDatasetId] = useState("");
   const [selectedCaseIds, setSelectedCaseIds] = useState<string[]>([]);
   const [allowActions, setAllowActions] = useState(true);
+  const [scientistIterations, setScientistIterations] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -95,11 +96,15 @@ export function ExperimentPage() {
     const experimentName = name.trim() || defaultExperimentName(datasetTitle);
     setSubmitting(true);
     try {
+      const iterations = Number.isFinite(scientistIterations)
+        ? Math.max(0, Math.floor(scientistIterations))
+        : 0;
       const experiment = await createExperiment({
         name: experimentName,
         dataset: datasetId,
         actionMode: allowActions ? "approval_required" : "read_only",
         caseIds: selectedCaseIds,
+        scientistIterations: iterations,
       });
       if (!experiment.id) throw new Error("Experiment was not created");
       navigate(`/experiments/${experiment.id}`);
@@ -245,6 +250,52 @@ export function ExperimentPage() {
             </div>
           )}
 
+          <div className="field-group">
+            <div className="field-label-row">
+              <label htmlFor="scientist-iterations">Scientist iterations</label>
+              <button
+                type="button"
+                className="info-tip"
+                aria-label="What scientist iterations mean"
+                aria-describedby="scientist-iterations-tip"
+              >
+                <span aria-hidden="true">i</span>
+                <span
+                  id="scientist-iterations-tip"
+                  role="tooltip"
+                  className="info-tip-bubble"
+                >
+                  After selected cases finish, the scientist stage asks the model
+                  to invent new follow-up scenarios and runs each one. The number
+                  is how many generate-and-run cycles to allow. Zero skips the
+                  scientist stage.
+                </span>
+              </button>
+            </div>
+            <input
+              id="scientist-iterations"
+              name="scientistIterations"
+              type="number"
+              min={0}
+              step={1}
+              inputMode="numeric"
+              value={scientistIterations}
+              onChange={(event) => {
+                const next = Number(event.target.value);
+                if (!Number.isFinite(next)) {
+                  setScientistIterations(0);
+                  return;
+                }
+                setScientistIterations(Math.max(0, Math.floor(next)));
+              }}
+            />
+            <p className="field-help">
+              {scientistIterations > 0
+                ? `After selected cases finish, generate and run up to ${scientistIterations} follow-up scenario${scientistIterations === 1 ? "" : "s"}.`
+                : "Off. Selected cases run only."}
+            </p>
+          </div>
+
           <div className="form-actions">
             {error ? (
               <p className="form-status form-status-error" role="alert">
@@ -286,6 +337,12 @@ export function ExperimentPage() {
             <div className="detail-row">
               <dt>Selected cases</dt>
               <dd className="mono tabular">{selectedCaseIds.length}</dd>
+            </div>
+            <div className="detail-row">
+              <dt>Scientist iterations</dt>
+              <dd className="mono tabular">
+                {scientistIterations > 0 ? scientistIterations : "0 (off)"}
+              </dd>
             </div>
             <div className="detail-row">
               <dt>Evidence</dt>

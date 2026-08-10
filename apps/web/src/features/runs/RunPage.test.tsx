@@ -248,6 +248,88 @@ it("shows scientist generation failures on completed runs without Unknown stage"
   expect(screen.getAllByText("Scientist").length).toBeGreaterThan(0);
 });
 
+it("shows ready scientist generation turns as iteration cards", async () => {
+  vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url.includes("/visualization")) {
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          ...visualization,
+          run: {
+            ...visualization.run,
+            currentPhase: "scientist",
+          },
+          phases: visualization.phases.map((phase) => ({
+            ...phase,
+            state:
+              phase.id === "scientist"
+                ? "active"
+                : phase.id === "evaluating" || phase.id === "reporting"
+                  ? "pending"
+                  : "completed",
+          })),
+        }),
+      } as Response);
+    }
+    if (url.includes("/turns")) {
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          items: [
+            {
+              id: "sci-ready",
+              sequence: 4,
+              number: 2,
+              stage: "scientist",
+              caseId: "scientist-2",
+              status: "ready",
+              agentMessage: "New delivery path scenario ready",
+              tyrMessage: null,
+              occurredAt: "2026-08-08T10:06:00Z",
+              repliedAt: null,
+            },
+            ...turns.items,
+          ],
+          omittedBefore: 0,
+          nextCursor: null,
+          latestSequence: 4,
+        }),
+      } as Response);
+    }
+    if (url.match(/\/api\/v1\/runs\/run-1$/) || url.endsWith("/runs/run-1")) {
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          id: "run-1",
+          experimentId: "exp-1",
+          source: "service",
+          state: "running",
+          dataset: "first-plan",
+          configuration: {
+            actionMode: "read_only",
+            model: "test",
+            maxTurns: 10,
+            discoveryTurns: 1,
+            scientistIterations: 2,
+          },
+        }),
+      } as Response);
+    }
+    return Promise.resolve({ ok: true, json: async () => ({ items: [] }) } as Response);
+  });
+
+  const { container } = renderPage();
+
+  expect(await screen.findByRole("heading", { name: "Scientist - Iteration 2" })).toBeInTheDocument();
+  expect(screen.getByText("New delivery path scenario ready")).toBeInTheDocument();
+  expect(screen.getByText("Ready")).toBeInTheDocument();
+  expect(container.querySelector(".turn-scientist")).not.toBeNull();
+  expect(container.querySelector(".turn-messages-single")).not.toBeNull();
+  expect(await screen.findByText("Scientist iterations")).toBeInTheDocument();
+  expect(screen.getByText("2")).toBeInTheDocument();
+});
+
 it("removes the previous evidence navigation and controls", async () => {
   renderPage();
   await screen.findByRole("heading", { name: "Turns" });
