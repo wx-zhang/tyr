@@ -1127,28 +1127,34 @@ class ExperimentRunner:
                 sequence += 1
             self._activity_sequences[run_id] = sequence
             try:
+                activity_type = self._activity_type(event_type)
+                source, target, participant_meta = self._activity_participants(event_type)
+                metadata: dict[str, object] = (
+                    {"eventType": event_type, "turn": turn}
+                    if turn is not None
+                    else {"eventType": event_type}
+                )
+                metadata.update(participant_meta)
                 sink.append(
                     RunActivity(
                         id=new_id(),
                         runId=run_id,
                         sequence=sequence,
                         occurredAt=datetime.now(UTC),
-                        activityType=self._activity_type(event_type),
+                        activityType=activity_type,
                         status=self._activity_status(event_type),
                         phase=phase,
                         caseId=case_id,
                         turnId=turn_id,
+                        sourceParticipantId=source,
+                        targetParticipantId=target,
                         evidenceType=(
                             EvidenceType.FINDING
                             if event_type.startswith("assessment.")
                             else EvidenceType.EVENT
                         ),
                         summary=self._activity_summary(event_type, detail),
-                        metadata=(
-                            {"eventType": event_type, "turn": turn}
-                            if turn is not None
-                            else {"eventType": event_type}
-                        ),
+                        metadata=metadata,
                     )
                 )
             except ValueError:
@@ -1193,6 +1199,37 @@ class ExperimentRunner:
         if event_type.endswith(".failed") or event_type.endswith(".error"):
             return ActivityType.ERROR
         return ActivityType.SYSTEM
+
+    @staticmethod
+    def _activity_participants(
+        event_type: str,
+    ) -> tuple[str | None, str | None, dict[str, object]]:
+        if event_type.startswith("target.completed") or event_type in {
+            "tyr.reply",
+            "target.replied",
+        }:
+            return (
+                "tyr",
+                "gamr",
+                {
+                    "_sourceParticipantKind": "tyr_agent",
+                    "_sourceParticipantLabel": "Tyr",
+                    "_targetParticipantKind": "gamr",
+                    "_targetParticipantLabel": "GAMR",
+                },
+            )
+        if event_type.startswith(("target.", "tyr.", "model.")):
+            return (
+                "gamr",
+                "tyr",
+                {
+                    "_sourceParticipantKind": "gamr",
+                    "_sourceParticipantLabel": "GAMR",
+                    "_targetParticipantKind": "tyr_agent",
+                    "_targetParticipantLabel": "Tyr",
+                },
+            )
+        return None, None, {}
 
     @staticmethod
     def _activity_status(event_type: str) -> str:

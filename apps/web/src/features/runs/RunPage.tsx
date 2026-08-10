@@ -12,6 +12,7 @@ import {
 import { useRunEvents, type RunConnectionState } from "../../api/useRunEvents";
 import { StatusBadge } from "../../components/StatusBadge";
 import { MarkdownMessage } from "./MarkdownMessage";
+import { TyrNetworkMap } from "./TyrNetworkMap";
 
 const terminalStates = new Set(["completed", "failed", "cancelled", "interrupted"]);
 const REFRESH_RATES_MS = [1000, 5000, 10_000, 30_000] as const;
@@ -515,6 +516,8 @@ export function RunPage() {
           totalCount={visualization.data?.counts?.totalCases}
         />
       </section>
+
+      <TyrNetworkMap runId={runId} isLive={isLive} refreshMs={refreshMs} />
 
       <section ref={turnsSection} className="turns-section" aria-labelledby="turns-title">
         <div className="section-heading">

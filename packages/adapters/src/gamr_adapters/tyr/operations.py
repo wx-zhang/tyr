@@ -68,33 +68,72 @@ def normalize_operation_result(
         for index, entry in enumerate(entries):
             if not isinstance(entry, dict):
                 continue
-            status = str(entry.get("state") or entry.get("status") or "observed").lower()
-            if not _SAFE_STATUS.fullmatch(status):
-                status = "observed"
-            source = _observed_participant(entry, "source")
-            target = _observed_participant(entry, "target")
-            item_key = str(entry.get("id") or entry.get(f"{key[:-1]}Id") or index)
-            item_id = sha256(f"{run_id}:{operation_id}:{key}:{item_key}".encode()).hexdigest()[:32]
-            activities.append(
-                RunActivity(
-                    id=f"operation-{item_id}",
-                    runId=run_id,
-                    sequence=starting_sequence + len(activities),
-                    occurredAt=occurred_at,
-                    activityType=activity_type,
-                    status=status,
-                    operationId=operation_id,
-                    sourceParticipantId=source,
-                    targetParticipantId=target,
-                    evidenceType=EvidenceType.EVENT,
-                    summary=f"Observed Tyr {label}",
-                    metadata={"_operationSource": key},
-                )
+            activity = _activity_from_child(
+                entry,
+                run_id=run_id,
+                operation_id=operation_id,
+                group=key,
+                activity_type=activity_type,
+                label=label,
+                index=index,
+                sequence=starting_sequence + len(activities),
+                occurred_at=occurred_at,
             )
+            activities.append(activity)
     return activities
 
 
 normalize_tyr_operation = normalize_operation_result
+
+
+def child_item_key(entry: dict[str, object], group: str, index: int = 0) -> str:
+    for key in (
+        "executionId",
+        "bridgeRequestId",
+        "delegationId",
+        "toolCallId",
+        "approvalId",
+        "id",
+        f"{group[:-1]}Id" if group.endswith("s") else f"{group}Id",
+    ):
+        value = entry.get(key)
+        if isinstance(value, str) and value.strip() and not _UNSAFE_IDENTIFIER.search(value):
+            return value.strip()
+    return str(index)
+
+
+def _activity_from_child(
+    entry: dict[str, object],
+    *,
+    run_id: str,
+    operation_id: str,
+    group: str,
+    activity_type: ActivityType,
+    label: str,
+    index: int,
+    sequence: int,
+    occurred_at: datetime,
+) -> RunActivity:
+    status = str(entry.get("state") or entry.get("status") or "observed").lower()
+    if not _SAFE_STATUS.fullmatch(status):
+        status = "observed"
+    source, target, metadata = _endpoints_for_child(entry, group)
+    item_key = child_item_key(entry, group, index)
+    item_id = sha256(f"{run_id}:{operation_id}:{group}:{item_key}".encode()).hexdigest()[:32]
+    return RunActivity(
+        id=f"operation-{item_id}",
+        runId=run_id,
+        sequence=sequence,
+        occurredAt=occurred_at,
+        activityType=activity_type,
+        status=status,
+        operationId=operation_id,
+        sourceParticipantId=source,
+        targetParticipantId=target,
+        evidenceType=EvidenceType.EVENT,
+        summary=f"Observed Tyr {label}",
+        metadata={"_operationSource": group, **metadata},
+    )
 
 
 def _operation_time(value: object) -> datetime:
@@ -108,12 +147,174 @@ def _operation_time(value: object) -> datetime:
     return datetime(1970, 1, 1, tzinfo=UTC)
 
 
+def _safe_id(value: object) -> str | None:
+    if isinstance(value, str) and value.strip() and not _UNSAFE_IDENTIFIER.search(value):
+        return value.strip()
+    return None
+
+
 def _observed_participant(entry: dict[str, object], side: str) -> str | None:
     for key in (f"{side}ParticipantId", f"{side}Id"):
-        value = entry.get(key)
-        if isinstance(value, str) and value.strip() and not _UNSAFE_IDENTIFIER.search(value):
-            return value.strip()
+        value = _safe_id(entry.get(key))
+        if value is not None:
+            return value
     return None
+
+
+def _endpoints_for_child(
+    entry: dict[str, object], group: str
+) -> tuple[str | None, str | None, dict[str, object]]:
+    source = _observed_participant(entry, "source")
+    target = _observed_participant(entry, "target")
+    metadata: dict[str, object] = {}
+    if source is None and target is None:
+        source, target, metadata = _inferred_endpoints(entry, group)
+    elif source is None and target is not None:
+        source = "tyr"
+        metadata = {
+            "_sourceParticipantKind": "tyr_agent",
+            "_sourceParticipantLabel": "Tyr",
+            **_target_metadata_from_id(target, entry, group),
+        }
+    elif source is not None and target is None:
+        metadata = {
+            "_sourceParticipantKind": "unknown",
+            "_sourceParticipantLabel": source,
+        }
+    else:
+        metadata = {
+            "_sourceParticipantKind": "unknown",
+            "_sourceParticipantLabel": source or "Unknown actor",
+            "_targetParticipantKind": "unknown",
+            "_targetParticipantLabel": target or "Unknown actor",
+        }
+    return source, target, metadata
+
+
+def _inferred_endpoints(
+    entry: dict[str, object], group: str
+) -> tuple[str | None, str | None, dict[str, object]]:
+    if group == "executions":
+        agent_id = _safe_id(entry.get("agentId"))
+        if agent_id is None:
+            return None, None, {}
+        label = _safe_id(entry.get("agentName")) or agent_id
+        return (
+            "tyr",
+            f"agent:{agent_id}",
+            {
+                "_sourceParticipantKind": "tyr_agent",
+                "_sourceParticipantLabel": "Tyr",
+                "_targetParticipantKind": "delegated_agent",
+                "_targetParticipantLabel": label,
+            },
+        )
+    if group == "bridges":
+        bridge_id = _safe_id(entry.get("bridgeId")) or _safe_id(entry.get("id"))
+        peer = _safe_id(entry.get("peerWorkspaceName"))
+        if bridge_id is not None:
+            target = f"bridge:{bridge_id}"
+            label = peer or bridge_id
+        elif peer is not None:
+            target = f"workspace:{peer}"
+            label = peer
+        else:
+            return None, None, {}
+        return (
+            "tyr",
+            target,
+            {
+                "_sourceParticipantKind": "tyr_agent",
+                "_sourceParticipantLabel": "Tyr",
+                "_targetParticipantKind": "bridge",
+                "_targetParticipantLabel": label,
+            },
+        )
+    if group == "delegations":
+        agent_id = _safe_id(entry.get("agentId")) or _safe_id(entry.get("targetAgentId"))
+        if agent_id is None:
+            return None, None, {}
+        label = _safe_id(entry.get("agentName")) or agent_id
+        return (
+            "tyr",
+            f"agent:{agent_id}",
+            {
+                "_sourceParticipantKind": "tyr_agent",
+                "_sourceParticipantLabel": "Tyr",
+                "_targetParticipantKind": "delegated_agent",
+                "_targetParticipantLabel": label,
+            },
+        )
+    if group == "toolCalls":
+        tool_id = (
+            _safe_id(entry.get("toolId"))
+            or _safe_id(entry.get("id"))
+            or _safe_id(entry.get("toolName"))
+        )
+        if tool_id is None:
+            return None, None, {}
+        label = _safe_id(entry.get("toolName")) or tool_id
+        return (
+            "tyr",
+            f"tool:{tool_id}",
+            {
+                "_sourceParticipantKind": "tyr_agent",
+                "_sourceParticipantLabel": "Tyr",
+                "_targetParticipantKind": "tool",
+                "_targetParticipantLabel": label,
+            },
+        )
+    if group == "pendingApprovals":
+        actor = (
+            _safe_id(entry.get("actorId"))
+            or _safe_id(entry.get("approverId"))
+            or _safe_id(entry.get("id"))
+        )
+        if actor is None:
+            return None, None, {}
+        return (
+            "tyr",
+            f"human:{actor}",
+            {
+                "_sourceParticipantKind": "tyr_agent",
+                "_sourceParticipantLabel": "Tyr",
+                "_targetParticipantKind": "human",
+                "_targetParticipantLabel": "Approver",
+            },
+        )
+    return None, None, {}
+
+
+def _target_metadata_from_id(
+    target: str, entry: dict[str, object], group: str
+) -> dict[str, object]:
+    if target.startswith("agent:") or group == "executions":
+        label = _safe_id(entry.get("agentName")) or target.removeprefix("agent:")
+        return {
+            "_targetParticipantKind": "delegated_agent",
+            "_targetParticipantLabel": label,
+        }
+    if target.startswith("bridge:") or target.startswith("workspace:") or group == "bridges":
+        label = _safe_id(entry.get("peerWorkspaceName")) or target.split(":", 1)[-1]
+        return {
+            "_targetParticipantKind": "bridge",
+            "_targetParticipantLabel": label,
+        }
+    if target.startswith("tool:") or group == "toolCalls":
+        label = _safe_id(entry.get("toolName")) or target.removeprefix("tool:")
+        return {
+            "_targetParticipantKind": "tool",
+            "_targetParticipantLabel": label,
+        }
+    if target.startswith("human:") or group == "pendingApprovals":
+        return {
+            "_targetParticipantKind": "human",
+            "_targetParticipantLabel": "Approver",
+        }
+    return {
+        "_targetParticipantKind": "unknown",
+        "_targetParticipantLabel": target,
+    }
 
 
 def work_pending(result: dict[str, object]) -> bool:

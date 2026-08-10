@@ -251,6 +251,26 @@ export function fetchRunTurns(runId: string, cursor?: string): Promise<RunTurnPa
   );
 }
 
+export type RelationshipParticipant = components["schemas"]["ParticipantResponse"];
+export type RelationshipEdge = components["schemas"]["RelationshipResponse"];
+export type RelationshipProjection = components["schemas"]["RelationshipProjectionResponse"];
+
+export function fetchRunRelationships(
+  runId: string,
+  filters: Pick<EvidenceFilters, "caseId" | "participantId" | "activityType"> = {},
+): Promise<RelationshipProjection> {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (value !== undefined && value !== "") {
+      params.set(key, String(value));
+    }
+  }
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  return get<RelationshipProjection>(
+    `/api/v1/runs/${encodeURIComponent(runId)}/relationships${suffix}`,
+  );
+}
+
 export function fetchActivity(runId: string, filters: EvidenceFilters = {}): Promise<ActivityPage> {
   const params = new URLSearchParams();
   params.set("limit", String(Math.min(filters.limit ?? 200, 200)));

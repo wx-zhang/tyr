@@ -21,6 +21,11 @@ from gamr_core import (
 )
 from pydantic import ValidationError
 
+from gamr_adapters.tyr.operations import (
+    child_item_key,
+    normalize_operation_result,
+)
+
 from .filesystem import FilesystemArtifactStore, redact_payload
 from .query import CursorCodec
 
@@ -418,6 +423,8 @@ class BundleNormalizer:
         activities = self._activities_from_source(source, resolved_run_id) if source else []
         if not activities:
             activities = self._from_transcript(root, resolved_run_id)
+        activities = self._enrich_communication_participants(activities)
+        activities = self._merge_raw_network_activities(root, resolved_run_id, activities)
         activities = self._with_terminal_run_state(root, resolved_run_id, activities)
         return NormalizedBundle(activities, self._evidence(root, resolved_run_id, activities))
 
@@ -944,6 +951,139 @@ class BundleNormalizer:
             detailAvailability=Availability.AVAILABLE,
         )
         return [*activities, synthetic]
+
+    def _enrich_communication_participants(
+        self, activities: list[RunActivity]
+    ) -> list[RunActivity]:
+        enriched: list[RunActivity] = []
+        for activity in activities:
+            if activity.source_participant_id or activity.target_participant_id:
+                enriched.append(activity)
+                continue
+            event_type = activity.metadata.get("eventType")
+            if not isinstance(event_type, str):
+                enriched.append(activity)
+                continue
+            direction = self._communication_direction(event_type, activity.activity_type)
+            if direction is None:
+                enriched.append(activity)
+                continue
+            source, target = direction
+            metadata = {
+                **activity.metadata,
+                "_sourceParticipantKind": "gamr" if source == "gamr" else "tyr_agent",
+                "_sourceParticipantLabel": "GAMR" if source == "gamr" else "Tyr",
+                "_targetParticipantKind": "tyr_agent" if target == "tyr" else "gamr",
+                "_targetParticipantLabel": "Tyr" if target == "tyr" else "GAMR",
+            }
+            enriched.append(
+                activity.model_copy(
+                    update={
+                        "source_participant_id": source,
+                        "target_participant_id": target,
+                        "metadata": metadata,
+                    }
+                )
+            )
+        return enriched
+
+    @staticmethod
+    def _communication_direction(
+        event_type: str, activity_type: ActivityType
+    ) -> tuple[str, str] | None:
+        if event_type.startswith("target.completed") or event_type in {
+            "tyr.reply",
+            "target.replied",
+        }:
+            return "tyr", "gamr"
+        if event_type.startswith(("target.", "tyr.", "model.")):
+            return "gamr", "tyr"
+        if activity_type in {ActivityType.COMMUNICATION, ActivityType.TYR_OPERATION}:
+            if event_type.endswith(".completed") or event_type.endswith(".reply"):
+                return "tyr", "gamr"
+        return None
+
+    def _merge_raw_network_activities(
+        self, root: Path, run_id: str, activities: list[RunActivity]
+    ) -> list[RunActivity]:
+        projected = self._project_raw_network_activities(root, run_id)
+        if not projected:
+            return activities
+        existing_ids = {item.id for item in activities}
+        maximum = max((item.sequence for item in activities), default=0)
+        merged = list(activities)
+        for item in projected:
+            if item.id in existing_ids:
+                continue
+            maximum += 1
+            merged.append(item.model_copy(update={"sequence": maximum}))
+            existing_ids.add(item.id)
+        return merged
+
+    def _project_raw_network_activities(
+        self, root: Path, run_id: str
+    ) -> list[RunActivity]:
+        raw_dir = root / "raw"
+        if not raw_dir.is_dir():
+            return []
+        groups = (
+            ("executions", ActivityType.EXECUTION, "execution"),
+            ("delegations", ActivityType.DELEGATION, "delegation"),
+            ("bridges", ActivityType.BRIDGE, "bridge"),
+            ("toolCalls", ActivityType.TOOL_CALL, "tool call"),
+            ("pendingApprovals", ActivityType.APPROVAL, "approval"),
+        )
+        observed: dict[tuple[str, str, str], dict[str, object]] = {}
+        for path in sorted(raw_dir.glob("*.json")):
+            try:
+                payload = redact_payload(json.loads(path.read_text(encoding="utf-8")), self.secrets)
+            except (OSError, json.JSONDecodeError, TypeError, ValueError):
+                continue
+            if not isinstance(payload, dict):
+                continue
+            result = payload.get("targetResponse")
+            if not isinstance(result, dict):
+                result = payload
+            if not isinstance(result, dict):
+                continue
+            operation_id = str(
+                result.get("operationId")
+                or payload.get("operationId")
+                or result.get("id")
+                or path.stem
+            )
+            for group, _activity_type, _label in groups:
+                entries = result.get(group)
+                if not isinstance(entries, list):
+                    continue
+                for index, entry in enumerate(entries):
+                    if not isinstance(entry, dict):
+                        continue
+                    item_key = child_item_key(entry, group, index)
+                    observed[(operation_id, group, item_key)] = {
+                        "operationId": operation_id,
+                        "updatedAt": result.get("updatedAt") or payload.get("updatedAt"),
+                        "entry": entry,
+                        "group": group,
+                    }
+        if not observed:
+            return []
+        activities: list[RunActivity] = []
+        sequence = 1
+        for (operation_id, group, _item_key), record in sorted(observed.items()):
+            entry = record["entry"]
+            assert isinstance(entry, dict)
+            partial = {
+                "operationId": operation_id,
+                "updatedAt": record.get("updatedAt"),
+                group: [entry],
+            }
+            for item in normalize_operation_result(
+                partial, run_id=run_id, starting_sequence=sequence
+            ):
+                activities.append(item)
+                sequence += 1
+        return activities
 
     @staticmethod
     def _activity_type(event_type: str) -> ActivityType:

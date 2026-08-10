@@ -80,6 +80,67 @@ const turns = {
   latestSequence: 2,
 };
 
+const relationshipProjection = {
+  participants: [
+    {
+      id: "gamr",
+      kind: "gamr",
+      displayLabel: "GAMR",
+      firstObservedSequence: 1,
+    },
+    {
+      id: "tyr",
+      kind: "tyr_agent",
+      displayLabel: "Tyr",
+      firstObservedSequence: 2,
+    },
+    {
+      id: "bridge:bridge-1",
+      kind: "bridge",
+      displayLabel: "Joe workspace",
+      firstObservedSequence: 3,
+    },
+    {
+      id: "agent:agent-1",
+      kind: "delegated_agent",
+      displayLabel: "Alice",
+      firstObservedSequence: 4,
+    },
+  ],
+  relationships: [
+    {
+      id: "rel-gamr-tyr",
+      sourceParticipantId: "gamr",
+      targetParticipantId: "tyr",
+      relationshipTypes: ["communication", "operation"],
+      activityCount: 12,
+      statusCounts: { target_requesting: 6, model_thinking: 6 },
+      firstSequence: 1,
+      lastSequence: 20,
+    },
+    {
+      id: "rel-tyr-bridge",
+      sourceParticipantId: "tyr",
+      targetParticipantId: "bridge:bridge-1",
+      relationshipTypes: ["bridge"],
+      activityCount: 11,
+      statusCounts: { completed: 11 },
+      firstSequence: 5,
+      lastSequence: 18,
+    },
+    {
+      id: "rel-tyr-alice",
+      sourceParticipantId: "tyr",
+      targetParticipantId: "agent:agent-1",
+      relationshipTypes: ["execution"],
+      activityCount: 2,
+      statusCounts: { failed: 2 },
+      firstSequence: 10,
+      lastSequence: 16,
+    },
+  ],
+};
+
 class EventSourceStub {
   addEventListener = vi.fn();
   removeEventListener = vi.fn();
@@ -94,6 +155,9 @@ beforeEach(() => {
       const url = String(input);
       if (url.includes("/visualization")) {
         return Promise.resolve({ ok: true, json: async () => visualization });
+      }
+      if (url.includes("/relationships")) {
+        return Promise.resolve({ ok: true, json: async () => relationshipProjection });
       }
       if (url.includes("/turns")) {
         return Promise.resolve({ ok: true, json: async () => turns });
@@ -158,7 +222,9 @@ it("shows the run lifecycle and grouped Agent to Tyr turns newest first", async 
   expect(screen.getByText("case-beta")).toBeInTheDocument();
   expect(screen.getByText("Pending")).toBeInTheDocument();
   expect(screen.getByText("Inspect")).toHaveProperty("tagName", "STRONG");
-  expect(screen.getByText("Alice").closest("li")).toBeInTheDocument();
+  expect(
+    screen.getByRole("list", { name: "Run conversation turns" }).textContent,
+  ).toContain("Alice");
   expect(screen.queryByText("Agent request sent · Tyr reply pending")).not.toBeInTheDocument();
   expect(container.querySelector(".stage-active")).not.toBeNull();
   expect(container.querySelector(".stage-waiting")).not.toBeNull();
@@ -336,7 +402,45 @@ it("removes the previous evidence navigation and controls", async () => {
 
   expect(screen.queryByRole("link", { name: "Cases" })).not.toBeInTheDocument();
   expect(screen.queryByRole("link", { name: "Artifacts" })).not.toBeInTheDocument();
-  expect(screen.queryByText("Relationship graph")).not.toBeInTheDocument();
+});
+
+it("shows the Tyr network map with observed participants and connections", async () => {
+  window.localStorage.setItem("gamr-tyr-network-open", "1");
+  renderPage();
+
+  expect(await screen.findByRole("heading", { name: "Tyr network" })).toBeInTheDocument();
+  expect(await screen.findByText("Joe workspace")).toBeInTheDocument();
+  expect(screen.getAllByText("Alice").length).toBeGreaterThan(0);
+  expect(screen.getByLabelText("Relationship list")).toBeInTheDocument();
+  expect(screen.getAllByText(/bridge · 11/i).length).toBeGreaterThan(0);
+
+  fireEvent.click(screen.getByRole("button", { name: /Tyr → Alice/i }));
+  expect(screen.getByRole("button", { name: /Tyr → Alice/i })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+});
+
+it("keeps the Tyr network panel closed by default and expands on demand", async () => {
+  window.localStorage.removeItem("gamr-tyr-network-open");
+  const { container } = renderPage();
+
+  expect(await screen.findByRole("heading", { name: "Tyr network" })).toBeInTheDocument();
+  const panel = container.querySelector("details.network-panel");
+  expect(panel).not.toBeNull();
+  expect(panel).not.toHaveAttribute("open");
+  expect(screen.queryByText("Joe workspace")).not.toBeInTheDocument();
+
+  const summary = panel!.querySelector("summary");
+  expect(summary).not.toBeNull();
+  fireEvent.click(summary!);
+  expect(panel).toHaveAttribute("open");
+  expect(await screen.findByText("Joe workspace")).toBeInTheDocument();
+  expect(window.localStorage.getItem("gamr-tyr-network-open")).toBe("1");
+
+  fireEvent.click(summary!);
+  expect(panel).not.toHaveAttribute("open");
+  expect(window.localStorage.getItem("gamr-tyr-network-open")).toBe("0");
 });
 
 it("shows Cancel run while the run is live", async () => {

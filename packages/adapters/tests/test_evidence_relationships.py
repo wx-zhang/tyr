@@ -174,7 +174,7 @@ def test_normalizer_preserves_explicit_identity_direction_and_relationship_kinds
     ).target_participant_id == "agent-a"
 
 
-def test_operation_normalization_is_deterministic_and_only_uses_observed_endpoints() -> None:
+def test_operation_normalization_maps_tyr_agent_bridge_tool_and_approval_endpoints() -> None:
     from gamr_adapters.tyr.operations import normalize_operation_result
 
     result = normalize_operation_result(
@@ -183,13 +183,20 @@ def test_operation_normalization_is_deterministic_and_only_uses_observed_endpoin
             "updatedAt": "2026-08-08T10:00:00Z",
             "executions": [
                 {
-                    "id": "execution-1",
+                    "executionId": "execution-1",
                     "agentId": "agent-1",
                     "agentName": "Worker",
                     "state": "running",
                 }
             ],
-            "bridges": [{"id": "bridge-1", "bridgeId": "bridge-1", "state": "pending"}],
+            "bridges": [
+                {
+                    "bridgeRequestId": "xmsg-1",
+                    "bridgeId": "bridge-1",
+                    "peerWorkspaceName": "Joe workspace",
+                    "state": "pending",
+                }
+            ],
             "toolCalls": [{"id": "tool-1", "toolName": "read", "state": "requested"}],
             "pendingApprovals": [{"id": "approval-1", "actorId": "human-1", "state": "pending"}],
         },
@@ -198,11 +205,209 @@ def test_operation_normalization_is_deterministic_and_only_uses_observed_endpoin
     )
 
     assert [item.sequence for item in result] == [1, 2, 3, 4]
-    assert {item.activity_type.value for item in result} == {
-        "execution",
-        "bridge",
-        "tool_call",
-        "approval",
-    }
+    by_type = {item.activity_type.value: item for item in result}
+    assert set(by_type) == {"execution", "bridge", "tool_call", "approval"}
     assert all(item.run_id == "run-relations" for item in result)
+    assert all(item.source_participant_id == "tyr" for item in result)
+    assert by_type["execution"].target_participant_id == "agent:agent-1"
+    assert by_type["execution"].metadata["_targetParticipantLabel"] == "Worker"
+    assert by_type["execution"].metadata["_targetParticipantKind"] == "delegated_agent"
+    assert by_type["bridge"].target_participant_id == "bridge:bridge-1"
+    assert by_type["bridge"].metadata["_targetParticipantLabel"] == "Joe workspace"
+    assert by_type["tool_call"].target_participant_id == "tool:tool-1"
+    assert by_type["approval"].target_participant_id == "human:human-1"
+
+
+def test_operation_normalization_does_not_invent_endpoints_from_labels_alone() -> None:
+    from gamr_adapters.tyr.operations import normalize_operation_result
+
+    result = normalize_operation_result(
+        {
+            "operationId": "operation-2",
+            "updatedAt": "2026-08-08T10:00:00Z",
+            "executions": [{"state": "running", "agentName": "Nameless"}],
+            "bridges": [{"state": "pending"}],
+        },
+        run_id="run-relations",
+        starting_sequence=1,
+    )
+    assert len(result) == 2
     assert all(item.source_participant_id is None for item in result)
+    assert all(item.target_participant_id is None for item in result)
+
+
+def test_raw_network_projection_dedupes_child_objects_across_poll_snapshots(
+    tmp_path: Path,
+) -> None:
+    bundle = tmp_path / "network-run"
+    (bundle / "raw").mkdir(parents=True)
+    (bundle / "activity.jsonl").write_text(
+        json.dumps(
+            {
+                "id": "activity-1",
+                "runId": "network-run",
+                "sequence": 1,
+                "occurredAt": "2026-08-08T10:00:00Z",
+                "activityType": "run_state",
+                "status": "running",
+                "evidenceType": "event",
+                "summary": "Run state is running",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    snapshots = [
+        {
+            "targetResponse": {
+                "operationId": "op-1",
+                "state": "completed",
+                "updatedAt": "2026-08-08T10:01:00Z",
+                "bridges": [
+                    {
+                        "bridgeRequestId": "xmsg-1",
+                        "bridgeId": "bridge-1",
+                        "peerWorkspaceName": "Joe workspace",
+                        "state": "completed",
+                    }
+                ],
+                "executions": [],
+            }
+        },
+        {
+            "targetResponse": {
+                "operationId": "op-1",
+                "state": "completed",
+                "updatedAt": "2026-08-08T10:02:00Z",
+                "bridges": [
+                    {
+                        "bridgeRequestId": "xmsg-1",
+                        "bridgeId": "bridge-1",
+                        "peerWorkspaceName": "Joe workspace",
+                        "state": "completed",
+                    },
+                    {
+                        "bridgeRequestId": "xmsg-2",
+                        "bridgeId": "bridge-1",
+                        "peerWorkspaceName": "Joe workspace",
+                        "state": "completed",
+                    },
+                ],
+                "executions": [
+                    {
+                        "executionId": "exec-1",
+                        "agentId": "agent-1",
+                        "agentName": "Alice",
+                        "status": "failed",
+                    }
+                ],
+            }
+        },
+        {
+            "targetResponse": {
+                "operationId": "op-1",
+                "state": "completed",
+                "updatedAt": "2026-08-08T10:03:00Z",
+                "bridges": [
+                    {
+                        "bridgeRequestId": "xmsg-1",
+                        "bridgeId": "bridge-1",
+                        "peerWorkspaceName": "Joe workspace",
+                        "state": "completed",
+                    },
+                    {
+                        "bridgeRequestId": "xmsg-2",
+                        "bridgeId": "bridge-1",
+                        "peerWorkspaceName": "Joe workspace",
+                        "state": "completed",
+                    },
+                ],
+                "executions": [
+                    {
+                        "executionId": "exec-1",
+                        "agentId": "agent-1",
+                        "agentName": "Alice",
+                        "status": "completed",
+                    }
+                ],
+            }
+        },
+    ]
+    for index, snapshot in enumerate(snapshots, 1):
+        (bundle / "raw" / f"{index:02d}.json").write_text(
+            json.dumps(snapshot), encoding="utf-8"
+        )
+
+    activities = BundleNormalizer().normalize(bundle, run_id="network-run")
+    projected = [
+        item
+        for item in activities
+        if item.activity_type.value in {"bridge", "execution"}
+    ]
+    assert len(projected) == 3
+    bridges = [item for item in projected if item.activity_type.value == "bridge"]
+    executions = [item for item in projected if item.activity_type.value == "execution"]
+    assert len(bridges) == 2
+    assert len(executions) == 1
+    assert executions[0].target_participant_id == "agent:agent-1"
+    assert executions[0].status == "completed"
+    assert all(item.source_participant_id == "tyr" for item in projected)
+    assert all(
+        item.target_participant_id == "bridge:bridge-1" for item in bridges
+    )
+
+    relationships = BundleNormalizer().normalize_with_relationships(
+        bundle, run_id="network-run"
+    )
+    pairs = {
+        (item.source_participant_id, item.target_participant_id, item.activity_count)
+        for item in relationships.relationships
+    }
+    assert ("tyr", "bridge:bridge-1", 2) in pairs
+    assert ("tyr", "agent:agent-1", 1) in pairs
+
+
+def test_raw_network_projection_ignores_free_text_topology_mentions(tmp_path: Path) -> None:
+    bundle = tmp_path / "text-only"
+    (bundle / "raw").mkdir(parents=True)
+    (bundle / "raw" / "note.json").write_text(
+        json.dumps(
+            {
+                "targetResponse": {
+                    "operationId": "op-text",
+                    "state": "completed",
+                    "message": "Active bridges: Joe workspace and mike server",
+                    "executions": [],
+                    "bridges": [],
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    (bundle / "activity.jsonl").write_text(
+        json.dumps(
+            {
+                "id": "activity-1",
+                "runId": "text-only",
+                "sequence": 1,
+                "occurredAt": "2026-08-08T10:00:00Z",
+                "activityType": "tyr_operation",
+                "status": "target_completed",
+                "evidenceType": "event",
+                "summary": "mike server is active",
+                "metadata": {"eventType": "target.completed"},
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    relationships = BundleNormalizer().normalize_with_relationships(
+        bundle, run_id="text-only"
+    )
+    assert not any(
+        "mike" in participant.display_label.casefold()
+        for participant in relationships.participants
+    )
+    assert not any(
+        item.activity_type.value == "bridge" for item in relationships.activities
+    )
