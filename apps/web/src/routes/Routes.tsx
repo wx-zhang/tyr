@@ -1,5 +1,6 @@
 import { createBrowserRouter } from "react-router-dom";
 import { App } from "../app/App";
+import { DatasetDetailPage } from "../features/datasets/DatasetDetailPage";
 import { DatasetPage } from "../features/datasets/DatasetPage";
 import { ExperimentDetailPage } from "../features/experiments/ExperimentDetailPage";
 import { DashboardPage } from "../features/runs/DashboardPage";
@@ -13,6 +14,11 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <DashboardPage /> },
       { path: "datasets", element: <DatasetPage /> },
+      { path: "datasets/:datasetId", element: <DatasetDetailPage /> },
+      {
+        path: "datasets/:datasetId/cases/:caseId",
+        element: <DatasetDetailPage />,
+      },
       { path: "experiments/new", element: <ExperimentPage /> },
       { path: "experiments/:id", element: <ExperimentDetailPage /> },
       { path: "runs/:id", element: <RunPage /> },

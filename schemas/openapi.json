@@ -128,6 +128,104 @@
         }
       }
     },
+    "/api/v1/datasets/{dataset_id}/cases": {
+      "get": {
+        "tags": [
+          "datasets"
+        ],
+        "summary": "List Dataset Cases",
+        "operationId": "list_dataset_cases_api_v1_datasets__dataset_id__cases_get",
+        "parameters": [
+          {
+            "name": "dataset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Dataset Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response List Dataset Cases Api V1 Datasets  Dataset Id  Cases Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/datasets/{dataset_id}/plans": {
+      "get": {
+        "tags": [
+          "datasets"
+        ],
+        "summary": "Get Dataset Plans",
+        "operationId": "get_dataset_plans_api_v1_datasets__dataset_id__plans_get",
+        "parameters": [
+          {
+            "name": "dataset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Dataset Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "anyOf": [
+                      {},
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "title": "Response Get Dataset Plans Api V1 Datasets  Dataset Id  Plans Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/datasets/{dataset_id}": {
       "get": {
         "tags": [
@@ -1688,11 +1786,11 @@
           "dataset": {
             "type": "string",
             "title": "Dataset",
-            "default": "datasets/first-plan"
+            "default": "first-plan"
           },
           "actionMode": {
             "type": "string",
-            "pattern": "^read_only$",
+            "pattern": "^(read_only|approval_required)$",
             "title": "Actionmode",
             "default": "read_only"
           },

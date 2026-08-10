@@ -61,9 +61,21 @@ export function DatasetPage() {
                 {(datasets.data ?? []).map((dataset) => (
                   <tr key={dataset.metadata.id}>
                     <td className="mono table-primary">
-                      {dataset.metadata.id}
+                      <Link
+                        className="session-title"
+                        to={`/datasets/${encodeURIComponent(dataset.metadata.id)}`}
+                      >
+                        {dataset.metadata.id}
+                      </Link>
                     </td>
-                    <td className="table-primary">{dataset.metadata.title}</td>
+                    <td className="table-primary">
+                      <Link
+                        className="session-title"
+                        to={`/datasets/${encodeURIComponent(dataset.metadata.id)}`}
+                      >
+                        {dataset.metadata.title}
+                      </Link>
+                    </td>
                     <td className="mono">{dataset.metadata.version}</td>
                     <td className="mono tabular">
                       {dataset.spec.cases.length}

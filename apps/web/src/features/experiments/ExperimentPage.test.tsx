@@ -31,8 +31,26 @@ const datasets = [
 ];
 
 const cases = [
-  { id: "case-a", title: "Case Alpha", category: "multi-agent" },
-  { id: "case-b", title: "Case Beta", category: null },
+  {
+    kind: "scenario",
+    metadata: { id: "case-a", title: "Case Alpha", category: "multi-agent" },
+    spec: {
+      objective: "Do alpha",
+      steps: ["Step 1"],
+      expectedControl: "Block",
+      evidenceRequirements: ["Log"],
+    },
+  },
+  {
+    kind: "scenario",
+    metadata: { id: "case-b", title: "Case Beta", category: null },
+    spec: {
+      objective: "Do beta",
+      steps: ["Step 1"],
+      expectedControl: "Block",
+      evidenceRequirements: ["Log"],
+    },
+  },
 ];
 
 function renderPage() {
@@ -191,4 +209,27 @@ it("disables continue when no cases are selected", async () => {
 
   expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
   expect(navigate).not.toHaveBeenCalled();
+});
+
+it("hides and shows the test case explorer", async () => {
+  renderPage();
+
+  expect(await screen.findByLabelText(/Case Alpha/)).toBeChecked();
+  expect(screen.getByRole("heading", { name: "Test cases" })).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "Hide" }));
+
+  expect(
+    screen.queryByRole("heading", { name: "Test cases" }),
+  ).not.toBeInTheDocument();
+  expect(screen.queryByLabelText(/Case Alpha/)).not.toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: "Show test cases" }),
+  ).toBeInTheDocument();
+  expect(screen.getByText("1 selected")).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: "Show test cases" }));
+
+  expect(screen.getByRole("heading", { name: "Test cases" })).toBeInTheDocument();
+  expect(screen.getByLabelText(/Case Alpha/)).toBeChecked();
 });

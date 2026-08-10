@@ -5,6 +5,7 @@ import {
   createExperiment,
   fetchDatasetCases,
   fetchDatasets,
+  scenarioToCase,
   type Dataset,
 } from "../../api/client";
 import { PageHeader } from "../../components/PageHeader";
@@ -39,6 +40,7 @@ export function ExperimentPage() {
   const [scientistIterations, setScientistIterations] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [casesOpen, setCasesOpen] = useState(true);
 
   const datasets = useQuery({
     queryKey: ["datasets"],
@@ -68,7 +70,7 @@ export function ExperimentPage() {
     setSelectedCaseIds(
       defaultCaseSelection(
         selectedDataset,
-        cases.data.map((item) => item.id),
+        cases.data.map((item) => item.metadata.id),
       ),
     );
   }, [cases.data, selectedDataset]);
@@ -117,7 +119,7 @@ export function ExperimentPage() {
     }
   };
 
-  const caseList = cases.data ?? [];
+  const caseList = (cases.data ?? []).map(scenarioToCase);
   const canSubmit =
     Boolean(datasetId) &&
     selectedCaseIds.length > 0 &&
@@ -137,7 +139,9 @@ export function ExperimentPage() {
         }
       />
 
-      <div className="form-layout">
+      <div
+        className={`execute-layout${casesOpen ? "" : " execute-layout-collapsed"}`}
+      >
         <form className="card form-card" onSubmit={submit}>
           <div className="field-group">
             <label htmlFor="experiment-name">Name</label>
@@ -182,40 +186,25 @@ export function ExperimentPage() {
             ) : null}
           </div>
 
-          <fieldset className="fieldset">
-            <legend>Test cases</legend>
-            {!datasetId ? (
-              <p className="field-help">Select a dataset to load cases.</p>
-            ) : cases.isLoading ? (
-              <p className="field-help" role="status">
-                Loading cases…
-              </p>
-            ) : cases.isError ? (
-              <p className="field-help" role="alert">
-                Could not load cases for this dataset.
-              </p>
-            ) : caseList.length === 0 ? (
-              <p className="field-help">No cases in this dataset.</p>
-            ) : (
-              <CaseChecklist
-                cases={caseList}
-                selectedCaseIds={selectedCaseIds}
-                onToggle={toggleCase}
-                onSelectDefaults={() =>
-                  setSelectedCaseIds(
-                    defaultCaseSelection(
-                      selectedDataset,
-                      caseList.map((item) => item.id),
-                    ),
-                  )
-                }
-                onSelectAll={() =>
-                  setSelectedCaseIds(caseList.map((item) => item.id))
-                }
-                onClear={() => setSelectedCaseIds([])}
-              />
-            )}
-          </fieldset>
+          {!casesOpen ? (
+            <div className="field-group">
+              <span className="field-label">Test cases</span>
+              <div className="case-explorer-actions">
+                <button
+                  type="button"
+                  className="button button-secondary"
+                  onClick={() => setCasesOpen(true)}
+                  aria-expanded={false}
+                  aria-controls="test-cases-panel"
+                >
+                  Show test cases
+                </button>
+                <span className="field-help mono tabular">
+                  {selectedCaseIds.length} selected
+                </span>
+              </div>
+            </div>
+          ) : null}
 
           <label className="choice-card case-choice">
             <input
@@ -312,44 +301,67 @@ export function ExperimentPage() {
           </div>
         </form>
 
-        <aside className="card" aria-labelledby="run-safety-title">
-          <div className="card-header">
-            <div>
-              <p className="eyebrow">Safety boundary</p>
-              <h2 id="run-safety-title">Before you execute</h2>
+        {casesOpen ? (
+          <aside
+            id="test-cases-panel"
+            className="card form-card"
+            aria-labelledby="test-cases-title"
+          >
+            <div className="card-header">
+              <div>
+                <p className="eyebrow">Dataset cases</p>
+                <h2 id="test-cases-title">Test cases</h2>
+              </div>
+              <div className="case-explorer-actions">
+                {datasetId && selectedCaseIds.length > 0 ? (
+                  <span className="secondary mono tabular">
+                    {selectedCaseIds.length} selected
+                  </span>
+                ) : null}
+                <button
+                  type="button"
+                  className="button button-ghost"
+                  onClick={() => setCasesOpen(false)}
+                  aria-expanded={true}
+                  aria-controls="test-cases-panel"
+                >
+                  Hide
+                </button>
+              </div>
             </div>
-          </div>
-          <div className="callout">
-            <p>
-              Credentials stay on the API server. The browser never receives Tyr
-              or model secrets.
-            </p>
-          </div>
-          <dl className="detail-list spaced">
-            <div className="detail-row">
-              <dt>Dataset snapshot</dt>
-              <dd>At run creation</dd>
-            </div>
-            <div className="detail-row">
-              <dt>Action mode</dt>
-              <dd>{allowActions ? "Actions Allowed" : "Read-only"}</dd>
-            </div>
-            <div className="detail-row">
-              <dt>Selected cases</dt>
-              <dd className="mono tabular">{selectedCaseIds.length}</dd>
-            </div>
-            <div className="detail-row">
-              <dt>Scientist iterations</dt>
-              <dd className="mono tabular">
-                {scientistIterations > 0 ? scientistIterations : "0 (off)"}
-              </dd>
-            </div>
-            <div className="detail-row">
-              <dt>Evidence</dt>
-              <dd className="mono">JSON bundle</dd>
-            </div>
-          </dl>
-        </aside>
+            {!datasetId ? (
+              <p className="field-help">Select a dataset to load cases.</p>
+            ) : cases.isLoading ? (
+              <p className="field-help" role="status">
+                Loading cases…
+              </p>
+            ) : cases.isError ? (
+              <p className="field-help" role="alert">
+                Could not load cases for this dataset.
+              </p>
+            ) : caseList.length === 0 ? (
+              <p className="field-help">No cases in this dataset.</p>
+            ) : (
+              <CaseChecklist
+                cases={caseList}
+                selectedCaseIds={selectedCaseIds}
+                onToggle={toggleCase}
+                onSelectDefaults={() =>
+                  setSelectedCaseIds(
+                    defaultCaseSelection(
+                      selectedDataset,
+                      caseList.map((item) => item.id),
+                    ),
+                  )
+                }
+                onSelectAll={() =>
+                  setSelectedCaseIds(caseList.map((item) => item.id))
+                }
+                onClear={() => setSelectedCaseIds([])}
+              />
+            )}
+          </aside>
+        ) : null}
       </div>
     </section>
   );

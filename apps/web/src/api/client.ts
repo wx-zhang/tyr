@@ -1,9 +1,13 @@
 import type { components } from "./generated";
 
 export type Dataset = {
+  kind?: "dataset";
   metadata: { id: string; title: string; version: string };
   spec: {
     cases: string[];
+    discovery?: string | null;
+    methodology?: string | null;
+    evaluation?: string | null;
     defaults: {
       maxTurns: number;
       actionMode: string;
@@ -16,11 +20,56 @@ export type Dataset = {
   };
 };
 
+export type DatasetScenario = {
+  schemaVersion?: string;
+  kind?: "scenario";
+  metadata: {
+    id: string;
+    title: string;
+    category?: string | null;
+    tags?: string[];
+  };
+  spec: {
+    objective: string;
+    steps: string[];
+    successCriteria?: string | null;
+    expectedControl: string;
+    evidenceRequirements: string[];
+  };
+};
+
+/** Summary fields used by the experiment case checklist. */
 export type DatasetCase = {
   id: string;
   title: string;
   category?: string | null;
 };
+
+export type DatasetPlans = {
+  discovery: {
+    kind?: string;
+    prompt: string;
+    outputFields?: string[];
+  } | null;
+  methodology: {
+    kind?: string;
+    systemBrief: string;
+    unstickingGuidance: string;
+    testingMethodology: string;
+  } | null;
+  evaluation: {
+    kind?: string;
+    prompt: string;
+  } | null;
+};
+
+export function scenarioToCase(scenario: DatasetScenario): DatasetCase {
+  return {
+    id: scenario.metadata.id,
+    title: scenario.metadata.title,
+    category: scenario.metadata.category,
+  };
+}
 export type RunVisualization = components["schemas"]["RunVisualization"];
 export type RunTurn = components["schemas"]["RunTurnResponse"];
 export type RunTurnPage = components["schemas"]["RunTurnPageResponse"];
@@ -93,9 +142,19 @@ export async function fetchDatasets(): Promise<Dataset[]> {
   return response.json() as Promise<Dataset[]>;
 }
 
-export function fetchDatasetCases(datasetId: string): Promise<DatasetCase[]> {
-  return get<DatasetCase[]>(
+export function fetchDataset(datasetId: string): Promise<Dataset> {
+  return get<Dataset>(`/api/v1/datasets/${encodeURIComponent(datasetId)}`);
+}
+
+export function fetchDatasetCases(datasetId: string): Promise<DatasetScenario[]> {
+  return get<DatasetScenario[]>(
     `/api/v1/datasets/${encodeURIComponent(datasetId)}/cases`,
+  );
+}
+
+export function fetchDatasetPlans(datasetId: string): Promise<DatasetPlans> {
+  return get<DatasetPlans>(
+    `/api/v1/datasets/${encodeURIComponent(datasetId)}/plans`,
   );
 }
 

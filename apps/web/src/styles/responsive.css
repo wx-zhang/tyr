@@ -1,7 +1,9 @@
 @media (max-width: 900px) {
   .form-layout,
+  .execute-layout,
   .run-grid,
-  .progress-grid {
+  .progress-grid,
+  .dataset-case-layout {
     grid-template-columns: 1fr;
   }
 
@@ -11,6 +13,13 @@
 
   .run-grid .run-panel:last-child {
     order: -1;
+  }
+
+  .case-panel {
+    border-left: 0;
+    border-top: var(--border-w) solid var(--border);
+    padding-left: 0;
+    padding-top: var(--space-4);
   }
 }
 
