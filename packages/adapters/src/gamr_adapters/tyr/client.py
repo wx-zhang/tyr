@@ -210,14 +210,18 @@ class TyrMcpClient:
             timeout=wait_seconds + 60,
         )
 
-    async def settle(self, result: dict[str, object]) -> dict[str, object]:
+    async def settle(
+        self, result: dict[str, object], *, operation_id: str | None = None
+    ) -> dict[str, object]:
         from .operations import settle_operation
 
-        operation_id = result.get("operationId")
-        if not isinstance(operation_id, str):
+        op_id = result.get("operationId")
+        if not isinstance(op_id, str):
+            op_id = operation_id
+        if not isinstance(op_id, str):
             return result
         settled = await settle_operation(
-            lambda wait: self.operation_status(operation_id, wait_seconds=wait),
+            lambda wait: self.operation_status(op_id, wait_seconds=wait),
             initial=result,
         )
         payload = dict(settled.payload)

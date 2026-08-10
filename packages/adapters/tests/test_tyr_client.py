@@ -123,3 +123,60 @@ async def test_request_adds_idempotency_key_and_operation_id() -> None:
     arguments = cast(dict[str, object], params["arguments"])
     assert params["name"] == "tyr_assistant_request"
     assert arguments == {"message": "do it", "operationId": "op-1", "idempotencyKey": "key-1"}
+
+
+@pytest.mark.asyncio
+async def test_settle_falls_back_to_prior_operation_id_when_reply_omits_it() -> None:
+    calls: list[dict[str, object]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content)
+        calls.append(payload)
+        assert payload["method"] == "tools/call"
+        arguments = cast(dict[str, object], payload["params"]["arguments"])
+        assert arguments["operationId"] == "op-prev"
+        body = json.dumps({"operationId": "op-prev", "state": "completed", "response": "settled"})
+        return httpx.Response(
+            200,
+            json={
+                "jsonrpc": "2.0",
+                "id": payload["id"],
+                "result": {"content": [{"type": "text", "text": body}]},
+            },
+        )
+
+    client = TyrMcpClient(
+        "https://tyr.invalid/mcp",
+        "secret-token",
+        http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+    )
+    try:
+        # A bridge-routed reply that doesn't echo an operationId of its own --
+        # settle() must fall back to the in-flight operation instead of
+        # treating the reply as already settled.
+        reply = {"state": "unknown", "response": "sent this across the bridge"}
+        settled = await client.settle(reply, operation_id="op-prev")
+    finally:
+        await client.aclose()
+
+    assert settled["gamrSettlement"] == {"state": "settled", "notes": []}
+    assert len(calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_settle_returns_reply_unchanged_without_any_operation_id() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise AssertionError("settle() must not call Tyr without an operation id")
+
+    client = TyrMcpClient(
+        "https://tyr.invalid/mcp",
+        "secret-token",
+        http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+    )
+    try:
+        reply = {"state": "unknown", "response": "no operation yet"}
+        settled = await client.settle(reply)
+    finally:
+        await client.aclose()
+
+    assert settled == reply

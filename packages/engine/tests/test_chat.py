@@ -64,7 +64,9 @@ class FakeTarget:
     ) -> dict[str, object]:
         return {"state": "completed", "operationId": operation_id}
 
-    async def settle(self, result: dict[str, object]) -> dict[str, object]:
+    async def settle(
+        self, result: dict[str, object], *, operation_id: str | None = None
+    ) -> dict[str, object]:
         return result
 
 
