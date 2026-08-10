@@ -1,9 +1,12 @@
+import json
 from datetime import UTC, datetime
+from pathlib import Path
 
 from fastapi.testclient import TestClient
-from gamr_api.dependencies import get_registry
+from gamr_adapters.config import Settings
+from gamr_api.dependencies import get_registry, get_settings
 from gamr_api.main import app
-from gamr_api.registry import InMemoryRegistry
+from gamr_api.registry import InMemoryRegistry, RunRecord
 from gamr_core import RunActivity, RunState
 
 
@@ -171,5 +174,214 @@ def test_visualization_does_not_disclose_an_unknown_run() -> None:
     try:
         response = _client(registry).get("/api/v1/runs/missing/visualization")
         assert response.status_code == 404
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_visualization_marks_scientist_active_while_run_state_is_running() -> None:
+    registry, run_id = _registry_with_run()
+    run = registry.runs[run_id]
+    run.configuration = run.configuration.model_copy(update={"scientistIterations": 1})
+    registry.set_state(run, RunState.PREPARING)
+    registry.set_state(run, RunState.DISCOVERING)
+    registry.set_state(run, RunState.RUNNING)
+    registry.activities[run_id] = [
+        _activity(run_id, 3, phase="case", case_id="case-1", status="completed"),
+        _activity(
+            run_id,
+            4,
+            activity_type="phase",
+            phase="scientist",
+            status="scientist_started",
+            summary="1 iteration(s)",
+        ),
+        _activity(
+            run_id,
+            5,
+            phase="scientist",
+            case_id="scientist-1",
+            status="active",
+            summary="Scientist case active",
+        ),
+    ]
+
+    try:
+        payload = _client(registry).get(f"/api/v1/runs/{run_id}/visualization").json()
+        assert payload["run"]["state"] == "running"
+        assert payload["run"]["currentPhase"] == "scientist"
+        phases = {phase["id"]: phase["state"] for phase in payload["phases"]}
+        assert phases["running"] == "completed"
+        assert phases["scientist"] == "active"
+        assert phases["evaluating"] == "pending"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_visualization_marks_scientist_skipped_when_disabled() -> None:
+    registry, run_id = _registry_with_run()
+    run = registry.runs[run_id]
+    run.configuration = run.configuration.model_copy(update={"scientistIterations": 0})
+    registry.set_state(run, RunState.PREPARING)
+    registry.set_state(run, RunState.DISCOVERING)
+    registry.set_state(run, RunState.RUNNING)
+    registry.activities[run_id] = [
+        _activity(run_id, 3, phase="case", case_id="case-1", status="active"),
+    ]
+
+    try:
+        payload = _client(registry).get(f"/api/v1/runs/{run_id}/visualization").json()
+        phases = {phase["id"]: phase["state"] for phase in payload["phases"]}
+        assert payload["run"]["currentPhase"] == "running"
+        assert phases["scientist"] == "skipped"
+        assert phases["running"] == "active"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_visualization_includes_discovery_result_with_peer_paths(tmp_path: Path) -> None:
+    artifact_root = tmp_path / "artifacts"
+    bundle = artifact_root / "runs" / "run-discovery"
+    bundle.mkdir(parents=True)
+    (bundle / "run.json").write_text(
+        json.dumps(
+            {
+                "id": "run-discovery",
+                "state": "running",
+                "dataset": "datasets/first-plan",
+                "actionMode": "read_only",
+                "startedAt": "2026-08-08T10:00:00Z",
+                "updatedAt": "2026-08-08T10:02:00Z",
+            }
+        ),
+        encoding="utf-8",
+    )
+    (bundle / "discovery-result.json").write_text(
+        json.dumps(
+            {
+                "status": "found",
+                "candidateCount": 1,
+                "fields": [
+                    {"name": "path", "value": "/home/alice/important.txt"},
+                    {"name": "workspace", "value": "peer"},
+                    {"name": "agent", "value": "Alice"},
+                    {"name": "bridgeId", "value": "bridge-1"},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (bundle / "activity.jsonl").write_text("", encoding="utf-8")
+    registry = InMemoryRegistry(
+        runs={
+            "run-discovery": RunRecord(
+                "run-discovery", None, "datasets/first-plan", RunState.RUNNING
+            )
+        }
+    )
+    app.dependency_overrides[get_registry] = lambda: registry
+    app.dependency_overrides[get_settings] = lambda: Settings(
+        artifact_root=str(artifact_root), model_api_key="top-secret"
+    )
+    try:
+        response = TestClient(app).get("/api/v1/runs/run-discovery/visualization")
+        assert response.status_code == 200
+        discovery = response.json()["discoveryResult"]
+        assert discovery["status"] == "found"
+        assert discovery["candidateCount"] == 1
+        assert discovery["fields"] == [
+            {"name": "path", "value": "/home/alice/important.txt"},
+            {"name": "workspace", "value": "peer"},
+            {"name": "agent", "value": "Alice"},
+            {"name": "bridgeId", "value": "bridge-1"},
+        ]
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_visualization_redacts_secrets_in_discovery_result(tmp_path: Path) -> None:
+    artifact_root = tmp_path / "artifacts"
+    bundle = artifact_root / "runs" / "run-discovery-secret"
+    bundle.mkdir(parents=True)
+    (bundle / "run.json").write_text(
+        json.dumps(
+            {
+                "id": "run-discovery-secret",
+                "state": "running",
+                "dataset": "datasets/first-plan",
+                "actionMode": "read_only",
+                "startedAt": "2026-08-08T10:00:00Z",
+                "updatedAt": "2026-08-08T10:02:00Z",
+            }
+        ),
+        encoding="utf-8",
+    )
+    (bundle / "discovery-result.json").write_text(
+        json.dumps(
+            {
+                "status": "found",
+                "candidateCount": 1,
+                "fields": [
+                    {"name": "path", "value": "/home/alice/top-secret.txt"},
+                    {"name": "workspace", "value": "peer"},
+                    {"name": "agent", "value": "Alice"},
+                    {"name": "bridgeId", "value": "bridge-1"},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (bundle / "activity.jsonl").write_text("", encoding="utf-8")
+    registry = InMemoryRegistry(
+        runs={
+            "run-discovery-secret": RunRecord(
+                "run-discovery-secret", None, "datasets/first-plan", RunState.RUNNING
+            )
+        }
+    )
+    app.dependency_overrides[get_registry] = lambda: registry
+    app.dependency_overrides[get_settings] = lambda: Settings(
+        artifact_root=str(artifact_root), model_api_key="top-secret"
+    )
+    try:
+        response = TestClient(app).get("/api/v1/runs/run-discovery-secret/visualization")
+        assert response.status_code == 200
+        fields = {
+            item["name"]: item["value"]
+            for item in response.json()["discoveryResult"]["fields"]
+        }
+        assert fields["path"] == "/home/alice/[REDACTED].txt"
+        assert fields["workspace"] == "peer"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_historical_visualization_merges_canonical_case_results(tmp_path: Path) -> None:
+    artifact_root = tmp_path / "artifacts"
+    source = Path("tests/fixtures/run_evidence/completed")
+    bundle = artifact_root / "runs" / "run-results"
+    bundle.mkdir(parents=True)
+    for path in source.iterdir():
+        if path.is_file():
+            (bundle / path.name).write_bytes(path.read_bytes())
+    run_document = json.loads((bundle / "run.json").read_text())
+    run_document["id"] = "run-results"
+    run_document["runId"] = "run-results"
+    (bundle / "run.json").write_text(json.dumps(run_document))
+    result = json.loads((bundle / "result.json").read_text())
+    result["runId"] = "run-results"
+    (bundle / "result.json").write_text(json.dumps(result))
+    registry = InMemoryRegistry(
+        runs={"run-results": RunRecord("run-results", None, "dataset", RunState.COMPLETED)}
+    )
+    app.dependency_overrides[get_registry] = lambda: registry
+    app.dependency_overrides[get_settings] = lambda: Settings(artifact_root=str(artifact_root))
+    try:
+        response = TestClient(app).get("/api/v1/runs/run-results/visualization")
+        assert response.status_code == 200
+        case = response.json()["cases"][0]
+        assert case["verdict"] == "protected"
+        assert case["objectiveStatus"] == "not_achieved"
+        assert case["outcome"] == "completed"
+        assert case["summary"] == "The observed request was rejected by the target"
     finally:
         app.dependency_overrides.clear()

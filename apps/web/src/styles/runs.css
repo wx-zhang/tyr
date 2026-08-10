@@ -248,6 +248,37 @@
   margin-bottom: var(--space-2);
 }
 
+.turn-discovery .discovery-message {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.discovery-variable-list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.discovery-variable-row {
+  display: grid;
+  grid-template-columns: minmax(7rem, 10rem) minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: baseline;
+}
+
+.discovery-variable-row dt {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.discovery-variable-row dd {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
 .lifecycle-live {
   border-color: var(--border-strong);
 }
@@ -425,6 +456,28 @@
   font-weight: 400;
 }
 
+.stage-skipped {
+  border-top-color: var(--border);
+  border-top-style: dashed;
+}
+
+.stage-skipped .stage-marker {
+  border-color: var(--border);
+  background: var(--surface);
+  opacity: 0.7;
+}
+
+.stage-skipped strong {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.stage-skipped .stage-state {
+  color: var(--text-muted);
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
 @keyframes stage-arrow-slide {
   0% {
     left: 8%;
@@ -559,33 +612,6 @@
   scroll-margin-top: var(--space-6);
 }
 
-.new-turns-action {
-  position: sticky;
-  top: var(--space-3);
-  z-index: 2;
-  display: flex;
-  justify-content: center;
-  pointer-events: none;
-}
-
-.new-turns-action .button {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  pointer-events: auto;
-  border-color: var(--accent);
-  border-radius: var(--radius-full);
-  box-shadow: var(--shadow-md);
-}
-
-.new-turns-pulse {
-  width: 7px;
-  height: 7px;
-  border-radius: var(--radius-full);
-  background: currentColor;
-  animation: status-pulse 1.2s var(--ease-in-out) infinite;
-}
-
 .turn-count {
   border: var(--border-w) solid var(--border);
   border-radius: var(--radius-full);
@@ -626,6 +652,18 @@
 
 .turn-scientist {
   border-left: 3px solid var(--warning);
+}
+
+.turn-evaluation {
+  border-left: 3px solid var(--border-strong);
+}
+
+.turn-evaluation.verdict-protected {
+  border-left-color: var(--success);
+}
+
+.turn-evaluation.verdict-vulnerable {
+  border-left-color: var(--danger);
 }
 
 .turn-failed {
@@ -717,6 +755,47 @@
 .scientist-message.status-failed {
   border-top-color: var(--danger);
   background: var(--danger-tint);
+}
+
+.evaluation-message {
+  border-top: 2px solid var(--border-strong);
+}
+
+.evaluation-message.verdict-protected {
+  border-top-color: var(--success);
+  background: var(--success-tint);
+}
+
+.evaluation-message.verdict-vulnerable {
+  border-top-color: var(--danger);
+  background: var(--danger-tint);
+}
+
+.evaluation-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-6);
+  margin: 0 0 var(--space-4);
+}
+
+.evaluation-facts div {
+  display: grid;
+  gap: 2px;
+}
+
+.evaluation-facts dt {
+  color: var(--text-muted);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.evaluation-facts dd {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--text-sm);
+  font-weight: 500;
 }
 
 .scientist-message .turn-speaker span {

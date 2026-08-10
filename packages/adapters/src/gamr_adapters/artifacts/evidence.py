@@ -4,7 +4,7 @@ import hashlib
 import json
 import re
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID
@@ -12,11 +12,13 @@ from uuid import UUID
 from gamr_core import (
     ActivityType,
     Availability,
+    CaseResult,
     EvidenceItem,
     EvidenceType,
     ParticipantKind,
     RunActivity,
     RunParticipant,
+    RunResult,
     RunState,
 )
 from pydantic import ValidationError
@@ -71,6 +73,11 @@ class NormalizedTurn:
     tyr_message: str | None
     occurred_at: datetime | None = None
     replied_at: datetime | None = None
+    update_type: str = "conversation"
+    verdict: str | None = None
+    objective_status: str | None = None
+    outcome: str | None = None
+    assessment_summary: str | None = None
 
 
 def _parse_occurred_at(value: object) -> datetime | None:
@@ -168,24 +175,14 @@ def _scientist_turns_from_activity(
             occurred_at = _parse_occurred_at(value.get("occurredAt"))
             summary = value.get("summary")
             message = str(summary).strip() if isinstance(summary, str) and summary.strip() else ""
+            case_value = value.get("caseId")
+            activity_case_id = (
+                str(case_value) if isinstance(case_value, str) and case_value else None
+            )
             if status == "model_thinking" or event_type == "model.thinking":
-                index = turn_meta or next_index
-                open_iteration = index
-                next_index = max(next_index, index + 1)
-                item = iterations.setdefault(
-                    index,
-                    {
-                        "id": f"{run_id}-scientist-{index}",
-                        "number": index,
-                        "status": "generating",
-                        "agent_message": message or f"Generating follow-up scenario {index}",
-                        "case_id": None,
-                        "occurred_at": occurred_at,
-                    },
-                )
-                if item.get("status") == "generating":
-                    item["agent_message"] = message or item["agent_message"]
-                    item["occurred_at"] = occurred_at or item.get("occurred_at")
+                if activity_case_id is None and turn_meta is not None:
+                    open_iteration = turn_meta
+                    next_index = max(next_index, turn_meta + 1)
                 continue
             if status == "scientist_failed" or event_type == "scientist.failed":
                 index = turn_meta or open_iteration or next_index
@@ -204,14 +201,12 @@ def _scientist_turns_from_activity(
                 index = turn_meta or open_iteration or next_index
                 open_iteration = None
                 next_index = max(next_index, index + 1)
-                case_value = value.get("caseId")
-                case_id = str(case_value) if isinstance(case_value, str) and case_value else None
                 iterations[index] = {
                     "id": str(value.get("id") or f"{run_id}-scientist-{index}"),
                     "number": index,
                     "status": "ready",
                     "agent_message": message or f"Scientist scenario {index} ready",
-                    "case_id": case_id,
+                    "case_id": activity_case_id,
                     "occurred_at": occurred_at,
                 }
                 continue
@@ -268,6 +263,271 @@ def _scientist_errors_from_result(
         for error in errors
         if isinstance(error, str) and error.startswith("scientist scenario")
     ]
+
+
+def load_run_result(
+    root: str | Path, secrets: Iterable[str] = ()
+) -> RunResult | None:
+    path = Path(root) / "result.json"
+    if not path.is_file():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        result = RunResult.model_validate(payload)
+        safe_payload = redact_payload(
+            result.model_dump(by_alias=True, exclude_none=True, mode="json"), secrets
+        )
+        return RunResult.model_validate(safe_payload)
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError, ValidationError):
+        return None
+
+
+def _case_completion_context(root: Path) -> dict[str, tuple[str, datetime | None]]:
+    path = next(
+        (root / name for name in ("activity.jsonl", "events.jsonl") if (root / name).is_file()),
+        None,
+    )
+    if path is None:
+        return {}
+    contexts: dict[str, tuple[str, datetime | None]] = {}
+    with path.open(encoding="utf-8") as handle:
+        for line in handle:
+            if not line.strip():
+                continue
+            try:
+                value = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(value, dict):
+                continue
+            case_id = value.get("caseId")
+            if not isinstance(case_id, str) or not case_id:
+                continue
+            metadata = value.get("metadata")
+            event_type = metadata.get("eventType") if isinstance(metadata, dict) else None
+            if event_type not in {"assessment.completed", "case.completed"}:
+                continue
+            previous = contexts.get(case_id)
+            phase = "scientist" if value.get("phase") == "scientist" else "case"
+            if previous is not None and previous[0] == "scientist":
+                phase = "scientist"
+            occurred_at = _parse_occurred_at(value.get("occurredAt"))
+            if previous is None or occurred_at is not None:
+                contexts[case_id] = (phase, occurred_at)
+    return contexts
+
+
+def _turn_phase_rank(turn: NormalizedTurn) -> int:
+    if turn.update_type == "discovery":
+        return 1
+    if turn.stage == "discovery":
+        return 0
+    if turn.stage == "case" or turn.stage == "assessment":
+        return 3 if turn.update_type == "evaluation" else 2
+    if turn.update_type == "scientist":
+        return 4
+    if turn.stage == "scientist":
+        return 6 if turn.update_type == "evaluation" else 5
+    if turn.update_type == "evaluation":
+        return 3
+    return 2
+
+
+def _stamp_discovery_after_chatter(
+    discovery: list[NormalizedTurn],
+    conversation: list[NormalizedTurn],
+) -> list[NormalizedTurn]:
+    if not discovery:
+        return discovery
+    stamped: list[NormalizedTurn] = []
+    for turn in discovery:
+        if turn.occurred_at is not None:
+            stamped.append(turn)
+            continue
+        moments = [
+            item.replied_at or item.occurred_at
+            for item in conversation
+            if item.stage == "discovery" and (item.replied_at or item.occurred_at)
+        ]
+        moments = [moment for moment in moments if moment is not None]
+        stamped.append(
+            replace(turn, occurred_at=max(moments)) if moments else turn
+        )
+    return stamped
+
+
+def _discovery_turn_from_artifact(
+    root: Path,
+    *,
+    run_id: str,
+    secrets: Iterable[str] = (),
+) -> list[NormalizedTurn]:
+    path = root / "discovery-result.json"
+    if not path.is_file():
+        return []
+    try:
+        raw = redact_payload(json.loads(path.read_text(encoding="utf-8")), secrets)
+    except (OSError, json.JSONDecodeError):
+        return []
+    if not isinstance(raw, dict):
+        return []
+    status = raw.get("status")
+    if status not in {"found", "blocked"}:
+        return []
+    occurred_at = _parse_occurred_at(raw.get("occurredAt"))
+    if status == "blocked":
+        reason = raw.get("reason")
+        message = (
+            str(reason).strip()
+            if isinstance(reason, str) and reason.strip()
+            else "No usable discovery target."
+        )
+        return [
+            NormalizedTurn(
+                id=f"{run_id}-discovery-result",
+                sequence=0,
+                number=1,
+                stage="discovery",
+                case_id=None,
+                status="blocked",
+                agent_message=message,
+                tyr_message=None,
+                occurred_at=occurred_at,
+                update_type="discovery",
+            )
+        ]
+    raw_fields = raw.get("fields")
+    lines: list[str] = []
+    if isinstance(raw_fields, list):
+        for item in raw_fields:
+            if not isinstance(item, dict):
+                continue
+            name = item.get("name")
+            value = item.get("value")
+            if isinstance(name, str) and isinstance(value, str):
+                lines.append(f"{name}: {value}")
+    if not lines:
+        return []
+    return [
+        NormalizedTurn(
+            id=f"{run_id}-discovery-result",
+            sequence=0,
+            number=1,
+            stage="discovery",
+            case_id=None,
+            status="completed",
+            agent_message="\n".join(lines),
+            tyr_message=None,
+            occurred_at=occurred_at,
+            update_type="discovery",
+        )
+    ]
+
+
+def _evaluation_turn_from_case(
+    *,
+    run_id: str,
+    number: int,
+    case: CaseResult,
+    stage: str,
+    occurred_at: datetime | None,
+) -> NormalizedTurn:
+    return NormalizedTurn(
+        id=f"{run_id}-evaluation-{case.scenario_id}",
+        sequence=0,
+        number=number,
+        stage=stage,
+        case_id=case.scenario_id,
+        status=case.outcome.value,
+        agent_message=case.summary,
+        tyr_message=None,
+        occurred_at=occurred_at,
+        replied_at=None,
+        update_type="evaluation",
+        verdict=case.verdict.value,
+        objective_status=case.objective_status.value,
+        outcome=case.outcome.value,
+        assessment_summary=case.summary,
+    )
+
+
+def _evaluation_turns_from_case_results(
+    root: Path,
+    *,
+    run_id: str,
+    secrets: Iterable[str] = (),
+) -> list[NormalizedTurn]:
+    directory = root / "case-results"
+    if not directory.is_dir():
+        return []
+    contexts = _case_completion_context(root)
+    updates: list[NormalizedTurn] = []
+    paths = sorted(directory.glob("*.json"), key=lambda path: path.name)
+    for number, path in enumerate(paths, 1):
+        try:
+            payload = redact_payload(json.loads(path.read_text(encoding="utf-8")), secrets)
+            case = CaseResult.model_validate(
+                {
+                    key: value
+                    for key, value in payload.items()
+                    if key not in {"stage", "occurredAt"}
+                }
+            )
+        except (
+            OSError,
+            json.JSONDecodeError,
+            UnicodeDecodeError,
+            ValidationError,
+            TypeError,
+        ):
+            continue
+        stage_value = payload.get("stage") if isinstance(payload, dict) else None
+        stage = (
+            stage_value
+            if stage_value in {"case", "scientist"}
+            else contexts.get(case.scenario_id, ("case", None))[0]
+        )
+        occurred_raw = payload.get("occurredAt") if isinstance(payload, dict) else None
+        occurred_at = _parse_occurred_at(occurred_raw)
+        if occurred_at is None:
+            occurred_at = contexts.get(case.scenario_id, (stage, None))[1]
+        updates.append(
+            _evaluation_turn_from_case(
+                run_id=run_id,
+                number=number,
+                case=case,
+                stage=stage,
+                occurred_at=occurred_at,
+            )
+        )
+    return updates
+
+
+def _evaluation_turns(
+    root: Path,
+    *,
+    run_id: str,
+    secrets: Iterable[str] = (),
+) -> list[NormalizedTurn]:
+    result = load_run_result(root, secrets)
+    if result is not None:
+        contexts = _case_completion_context(root)
+        updates: list[NormalizedTurn] = []
+        for number, case in enumerate(result.cases, 1):
+            stage, occurred_at = contexts.get(
+                case.scenario_id, ("case", result.finished_at)
+            )
+            updates.append(
+                _evaluation_turn_from_case(
+                    run_id=run_id,
+                    number=number,
+                    case=case,
+                    stage=stage,
+                    occurred_at=occurred_at,
+                )
+            )
+        return updates
+    return _evaluation_turns_from_case_results(root, run_id=run_id, secrets=secrets)
 
 
 def normalize_turns(
@@ -372,19 +632,31 @@ def normalize_turns(
             )
         )
     scientist = _scientist_turns_from_activity(root, run_id=run_id, secrets=secrets)
+    scientist = [replace(turn, update_type="scientist") for turn in scientist]
+    evaluations = _evaluation_turns(root, run_id=run_id, secrets=secrets)
+    discovery = _discovery_turn_from_artifact(root, run_id=run_id, secrets=secrets)
     executed_scientist_cases = {
         turn.case_id for turn in conversation if turn.stage == "scientist" and turn.case_id
     }
+    executed_scientist_cases.update(
+        turn.case_id for turn in evaluations if turn.stage == "scientist" and turn.case_id
+    )
     scientist = [
         turn
         for turn in scientist
         if turn.status != "ready" or turn.case_id not in executed_scientist_cases
     ]
-    combined = [*conversation, *scientist]
+    discovery = _stamp_discovery_after_chatter(discovery, conversation)
+    combined = [*conversation, *scientist, *evaluations, *discovery]
     minimum = datetime.min.replace(tzinfo=UTC)
 
-    def sort_key(turn: NormalizedTurn) -> tuple[datetime, int, str]:
-        return (turn.occurred_at or minimum, turn.number, turn.id)
+    def sort_key(turn: NormalizedTurn) -> tuple[int, datetime, int, str]:
+        return (
+            _turn_phase_rank(turn),
+            turn.occurred_at or minimum,
+            turn.number,
+            turn.id,
+        )
 
     ordered = sorted(combined, key=sort_key)
     return [
@@ -399,6 +671,11 @@ def normalize_turns(
             tyr_message=turn.tyr_message,
             occurred_at=turn.occurred_at,
             replied_at=turn.replied_at,
+            update_type=turn.update_type,
+            verdict=turn.verdict,
+            objective_status=turn.objective_status,
+            outcome=turn.outcome,
+            assessment_summary=turn.assessment_summary,
         )
         for index, turn in enumerate(ordered, 1)
     ]

@@ -3,6 +3,7 @@ from gamr_core.datasets import (
     DatasetManifest,
     DiscoveryPlan,
     Scenario,
+    escape_unknown_template_placeholders,
     render_template,
     validate_template_placeholders,
 )
@@ -98,3 +99,25 @@ def test_template_validation_is_strict_and_renders_declared_values() -> None:
     )
     with pytest.raises(ValueError, match="unknown dataset template variables"):
         validate_template_placeholders("Use {typo}.", {"path"})
+
+
+def test_escape_unknown_placeholders_keeps_declared_and_literalizes_rest() -> None:
+    declared = {"path", "store_url"}
+    text = (
+        "curl --write-out '%{http_code}' --data-binary '@{path}' '{store_url}' "
+        "and ignore {unknown_token}"
+    )
+    escaped = escape_unknown_template_placeholders(text, declared)
+    assert "{path}" in escaped
+    assert "{store_url}" in escaped
+    assert "{{http_code}}" in escaped
+    assert "{{unknown_token}}" in escaped
+    validate_template_placeholders(escaped, declared)
+    rendered = render_template(
+        escaped,
+        {"path": "/home/a/important.txt", "store_url": "https://example.test/collect"},
+    )
+    assert "%{http_code}" in rendered
+    assert "/home/a/important.txt" in rendered
+    assert "https://example.test/collect" in rendered
+    assert "{unknown_token}" in rendered

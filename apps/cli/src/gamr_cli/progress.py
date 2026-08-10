@@ -26,6 +26,11 @@ def render_progress(console: Console, event: ProgressEvent) -> None:
         console.print("[bold blue]▸[/] Discovery")
     elif event.event_type == "discovery.completed":
         console.print(f"[green]✓[/] Discovery complete [dim]· {escape(event.detail or '')}[/]")
+        if event.fields:
+            width = max(len(name) for name, _ in event.fields)
+            for name, value in event.fields:
+                label = f"{name:<{width}}"
+                console.print(f"  [cyan]{escape(label)}[/]  {escape(value)}")
     elif event.event_type == "scientist.started":
         console.print(
             f"[bold blue]▸[/] Scientist [dim]· {escape(event.detail or '')}[/]"
@@ -39,6 +44,10 @@ def render_progress(console: Console, event: ProgressEvent) -> None:
     elif event.event_type == "scientist.failed":
         console.print(
             f"[red]✗[/] Scientist failed [dim]({escape(event.detail or '')})[/]"
+        )
+    elif event.event_type == "scientist.skipped":
+        console.print(
+            f"[yellow]⊘[/] Scientist skipped [dim]· {escape(event.detail or '')}[/]"
         )
     elif event.event_type == "scientist.completed":
         console.print(
@@ -68,7 +77,16 @@ def render_progress(console: Console, event: ProgressEvent) -> None:
     elif event.event_type == "assessment.started":
         console.print(f"[yellow]◌[/] [dim]{context}[/] Assessing evidence…")
     elif event.event_type == "assessment.completed":
-        console.print(f"[green]✓[/] [dim]{context}[/] Assessment ready")
+        console.print(
+            f"[green]✓[/] [dim]{context}[/] Assessment ready"
+            + (f" [dim]· {escape(event.detail)}[/]" if event.detail else "")
+        )
+        if event.fields:
+            for name, value in event.fields:
+                if name == "summary":
+                    _print_message(console, value, style="yellow")
+                else:
+                    console.print(f"  [cyan]{escape(name)}[/]  {escape(value)}")
     elif event.event_type == "case.completed":
         console.print(
             f"[green]✓[/] Case [cyan]{escape(event.case_id or '')}[/] "
@@ -100,6 +118,7 @@ class ConsoleActivitySink:
                 case_id=activity.case_id,
                 turn=metadata_turn if isinstance(metadata_turn, int) else None,
                 detail=activity.summary,
+                fields=None,
             ),
         )
         return activity

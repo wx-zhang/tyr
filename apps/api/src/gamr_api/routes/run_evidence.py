@@ -6,9 +6,15 @@ from pathlib import Path
 from typing import Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from gamr_adapters.artifacts.evidence import BundleNormalizer, NormalizedBundle, normalize_turns
+from gamr_adapters.artifacts.evidence import (
+    BundleNormalizer,
+    NormalizedBundle,
+    load_run_result,
+    normalize_turns,
+)
 from gamr_adapters.artifacts.filesystem import (
     FilesystemArtifactStore,
+    redact_payload,
 )
 from gamr_adapters.artifacts.query import (
     ActivityMemoryRepository,
@@ -56,8 +62,8 @@ _ACTIVITY_STAGE = {
     "case": "running",
     "execution": "running",
     "scientist": "scientist",
-    "assessment": "evaluating",
 }
+_COARSE_RUN_STATES = frozenset({"running", "waiting_for_approval"})
 _CASE_STATE = {
     "case_started": "active",
     "case_completed": "completed",
@@ -158,6 +164,11 @@ class RunTurnResponse(BaseModel):
     tyr_message: str | None = Field(default=None, alias="tyrMessage")
     occurred_at: datetime | None = Field(default=None, alias="occurredAt")
     replied_at: datetime | None = Field(default=None, alias="repliedAt")
+    update_type: str = Field(default="conversation", alias="updateType")
+    verdict: str | None = None
+    objective_status: str | None = Field(default=None, alias="objectiveStatus")
+    outcome: str | None = None
+    assessment_summary: str | None = Field(default=None, alias="assessmentSummary")
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -302,6 +313,46 @@ def _read_run_json(root: Path) -> dict[str, object]:
         return {}
 
 
+def _load_discovery_result(
+    root: Path, secrets: tuple[str, ...] = ()
+) -> dict[str, object] | None:
+    path = root / "discovery-result.json"
+    if not path.is_file():
+        return None
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(value, dict):
+        return None
+    status = value.get("status")
+    if status not in {"found", "blocked"}:
+        return None
+    raw_fields = value.get("fields")
+    fields: list[dict[str, str]] = []
+    if isinstance(raw_fields, list):
+        for item in raw_fields:
+            if not isinstance(item, dict):
+                continue
+            name = item.get("name")
+            field_value = item.get("value")
+            if isinstance(name, str) and isinstance(field_value, str):
+                fields.append({"name": name, "value": field_value})
+    candidate_count = value.get("candidateCount", len(fields))
+    if not isinstance(candidate_count, int):
+        candidate_count = len(fields)
+    payload: dict[str, object] = {
+        "status": status,
+        "candidateCount": candidate_count,
+        "fields": fields,
+    }
+    reason = value.get("reason")
+    if isinstance(reason, str) and reason:
+        payload["reason"] = reason
+    redacted = redact_payload(payload, secrets)
+    return redacted if isinstance(redacted, dict) else payload
+
+
 def _map_activity_stage(phase: str | None) -> str | None:
     if not phase:
         return None
@@ -337,17 +388,26 @@ def _activity_case_state(activities: list[RunActivity]) -> dict[str, dict[str, o
     return cases
 
 
+def _activity_current_phase(activities: list[RunActivity]) -> str | None:
+    for activity in reversed(activities):
+        mapped = _map_activity_stage(activity.phase)
+        if mapped is not None:
+            return mapped
+    return None
+
+
 def _current_phase(
     state: str,
     metadata: dict[str, object],
     activities: list[RunActivity],
 ) -> str | None:
+    activity_phase = _activity_current_phase(activities)
+    if state in _COARSE_RUN_STATES:
+        return activity_phase or "running"
     if state in _LIFECYCLE_STAGES:
         return state
-    for activity in reversed(activities):
-        mapped = _map_activity_stage(activity.phase)
-        if mapped is not None:
-            return mapped
+    if activity_phase is not None:
+        return activity_phase
     raw_phase = metadata.get("phase")
     if raw_phase:
         mapped = _map_activity_stage(str(raw_phase))
@@ -360,17 +420,52 @@ def _current_phase(
     return None
 
 
+def _scientist_stage_state(
+    *,
+    scientist_seen: bool,
+    scientist_enabled: bool,
+    current_index: int,
+    scientist_index: int,
+    terminal: bool,
+    state: str,
+) -> str:
+    if scientist_seen:
+        if current_index == scientist_index:
+            return state if terminal else "active"
+        if state == "completed" or current_index > scientist_index:
+            return "completed"
+        return "pending"
+    if scientist_enabled and not terminal and current_index < scientist_index:
+        return "pending"
+    return "skipped"
+
+
 def _lifecycle_progress(
     state: str,
     metadata: dict[str, object],
     activities: list[RunActivity],
+    *,
+    scientist_enabled: bool = False,
 ) -> tuple[list[dict[str, object]], str | None]:
     current = _current_phase(state, metadata, activities)
     current_index = _LIFECYCLE_STAGES.index(current) if current in _LIFECYCLE_STAGES else -1
     terminal = state in {"completed", "failed", "cancelled", "interrupted"}
+    scientist_index = _LIFECYCLE_STAGES.index("scientist")
+    scientist_seen = any(
+        _map_activity_stage(activity.phase) == "scientist" for activity in activities
+    )
     result: list[dict[str, object]] = []
     for index, stage in enumerate(_LIFECYCLE_STAGES):
-        if state == "completed" or index < current_index:
+        if stage == "scientist":
+            stage_state = _scientist_stage_state(
+                scientist_seen=scientist_seen,
+                scientist_enabled=scientist_enabled or scientist_seen,
+                current_index=current_index,
+                scientist_index=scientist_index,
+                terminal=terminal,
+                state=state,
+            )
+        elif state == "completed" or index < current_index:
             stage_state = "completed"
         elif index == current_index:
             stage_state = state if terminal else "active"
@@ -416,6 +511,26 @@ def visualization(
     if state == "blocked":
         state = RunState.COMPLETED.value
     cases = _activity_case_state(bundle.activities)
+    result = load_run_result(root, secrets)
+    if result is not None:
+        for case in result.cases:
+            item = cases.setdefault(
+                case.scenario_id,
+                {
+                    "caseId": case.scenario_id,
+                    "order": len(cases),
+                    "latestSequence": None,
+                },
+            )
+            item.update(
+                {
+                    "state": case.outcome.value,
+                    "verdict": case.verdict.value,
+                    "objectiveStatus": case.objective_status.value,
+                    "outcome": case.outcome.value,
+                    "summary": case.summary,
+                }
+            )
     known_cases = metadata.get("caseIds") or run.configuration.case_ids or list(cases)
     for order, case_id in enumerate(known_cases if isinstance(known_cases, list) else [], 0):
         cases.setdefault(
@@ -428,7 +543,18 @@ def visualization(
                 "latestSequence": None,
             },
         )
-    phases, current_phase = _lifecycle_progress(state, metadata, bundle.activities)
+    scientist_enabled = run.configuration.scientist_iterations > 0
+    config_meta = metadata.get("configuration")
+    if isinstance(config_meta, dict):
+        iterations = config_meta.get("scientistIterations", config_meta.get("scientist_iterations"))
+        if isinstance(iterations, int):
+            scientist_enabled = iterations > 0
+    phases, current_phase = _lifecycle_progress(
+        state,
+        metadata,
+        bundle.activities,
+        scientist_enabled=scientist_enabled,
+    )
     pending_approvals = sum(
         activity.activity_type is ActivityType.APPROVAL and activity.status == "pending"
         for activity in bundle.activities
@@ -455,7 +581,7 @@ def visualization(
         for item in cases.values()
         if item["state"] in {"active", "blocked", "running"}
     ]
-    return cast(
+    payload = cast(
         dict[str, object],
         browser_safe_value(
             {
@@ -490,6 +616,10 @@ def visualization(
             secrets,
         ),
     )
+    discovery_result = _load_discovery_result(root, secrets)
+    if discovery_result is not None:
+        payload["discoveryResult"] = discovery_result
+    return payload
 
 
 @router.get("/{run_id}/turns", response_model=RunTurnPageResponse)
@@ -528,6 +658,11 @@ def turns(
             tyrMessage=item.tyr_message,
             occurredAt=item.occurred_at,
             repliedAt=item.replied_at,
+            updateType=item.update_type,
+            verdict=item.verdict,
+            objectiveStatus=item.objective_status,
+            outcome=item.outcome,
+            assessmentSummary=item.assessment_summary,
         )
         for item in page
     ]

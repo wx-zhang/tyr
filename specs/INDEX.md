@@ -6,4 +6,6 @@
 
 The Run Evidence Visualization implementation uses JSON-derived views and passed checks for
 dependency direction, bundle immutability, approval safety, redaction, generated-contract drift,
-accessibility, and deterministic validation.
+accessibility, and deterministic validation. The run history is presented as Updates and includes
+canonical security verdicts and assessment summaries for configured and scientist-generated
+cases.

@@ -1,6 +1,7 @@
 import json
 from collections.abc import Iterator
 from contextlib import contextmanager
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 from gamr_adapters.config import Settings
@@ -61,7 +62,7 @@ def test_event_stream_includes_fifteen_second_heartbeat_and_reconnects_in_sequen
         ]
 
 
-def test_json_bundle_event_stream_survives_unsafe_transcript_summary(tmp_path) -> None:
+def test_json_bundle_event_stream_survives_unsafe_transcript_summary(tmp_path: Path) -> None:
     artifact_root = tmp_path / ".gamr"
     registry = JsonRegistry(artifact_root)
     run = registry.create_run(None, "fixture-evidence")

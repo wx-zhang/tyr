@@ -6,8 +6,8 @@ The selected run route presents four synchronized views:
 
 1. Progress overview with exact run/action state, phase and case progress, timestamps, blockers,
    unsettled Tyr work, and pending approval count.
-2. Cursor-bounded chronological timeline with authoritative sequence retained separately from the
-   rendered or filtered order.
+2. Cursor-bounded chronological Updates timeline with authoritative sequence retained separately
+   from the rendered or filtered order.
 3. Native SVG observed-relationship graph plus a complete semantic relationship list.
 4. Summary-first evidence inspector with an explicit control to request permitted redacted content.
 
@@ -27,6 +27,11 @@ stable IDs. Overall run state and approval attention remain visible regardless o
 
 ## Timeline and follow behavior
 
+- Label the workspace “Updates.” Conversation entries retain their numbered turn titles, while
+  evaluation entries use result titles and do not masquerade as agent/Tyr messages.
+- Show canonical case and scientist evaluations with Protected, Vulnerable, Inconclusive, or Not
+  applicable as the primary result. Show objective status, execution outcome, and the redacted
+  assessment summary as supporting information.
 - Render a semantic ordered list with type, source/destination when observed, timestamp, status,
   phase/case, summary, and evidence availability.
 - Load at most the contract page size and expose explicit older/newer navigation plus omitted counts.

@@ -6,10 +6,19 @@ from gamr_adapters.config import Settings
 from gamr_adapters.datasets.filesystem import load_dataset, resolve_dataset_directory
 from gamr_adapters.models.openai_compatible import OpenAICompatibleModel
 from gamr_adapters.tyr.client import TyrMcpClient
-from gamr_engine import ExperimentExecutionService
+from gamr_core import RunState
+from gamr_engine import ExperimentExecutionService, ProgressEvent
 
 from .execution import RunExecutor
 from .registry import JsonRegistry
+
+
+def _advance_run_state(registry: JsonRegistry, run_id: str, event: ProgressEvent) -> None:
+    if event.phase not in {"case", "assessment", "scientist"}:
+        return
+    current = registry.get_run(run_id)
+    if current is not None and current.state is RunState.DISCOVERING:
+        registry.set_state(current, RunState.RUNNING)
 
 
 def build_run_executor(settings: Settings, registry: JsonRegistry) -> RunExecutor:
@@ -60,6 +69,7 @@ def build_run_executor(settings: Settings, registry: JsonRegistry) -> RunExecuto
                 scientist_model=scientist_model,
                 artifacts=artifacts,
                 activity_sink=FilesystemActivitySink(artifacts),
+                progress=lambda event: _advance_run_state(registry, run_id, event),
             )
         finally:
             await target.aclose()

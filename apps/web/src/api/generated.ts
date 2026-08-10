@@ -504,8 +504,32 @@ export interface components {
             state: string;
             /** Verdict */
             verdict?: string | null;
+            /** Objectivestatus */
+            objectiveStatus?: string | null;
+            /** Outcome */
+            outcome?: string | null;
+            /** Summary */
+            summary?: string | null;
             /** Latestsequence */
             latestSequence?: number | null;
+        };
+        /** DiscoveryField */
+        DiscoveryField: {
+            /** Name */
+            name: string;
+            /** Value */
+            value: string;
+        };
+        /** DiscoveryResult */
+        DiscoveryResult: {
+            /** Status */
+            status: string;
+            /** Candidatecount */
+            candidateCount: number;
+            /** Fields */
+            fields: components["schemas"]["DiscoveryField"][];
+            /** Reason */
+            reason?: string | null;
         };
         /** EvidenceContentResponse */
         EvidenceContentResponse: {
@@ -692,6 +716,19 @@ export interface components {
             occurredAt?: string | null;
             /** Repliedat */
             repliedAt?: string | null;
+            /**
+             * Updatetype
+             * @default conversation
+             */
+            updateType: string;
+            /** Verdict */
+            verdict?: string | null;
+            /** Objectivestatus */
+            objectiveStatus?: string | null;
+            /** Outcome */
+            outcome?: string | null;
+            /** Assessmentsummary */
+            assessmentSummary?: string | null;
         };
         /** RunVisualization */
         RunVisualization: {
@@ -705,6 +742,7 @@ export interface components {
             /** Latestsequence */
             latestSequence: number;
             latestActivity?: components["schemas"]["ActivityPreview"] | null;
+            discoveryResult?: components["schemas"]["DiscoveryResult"] | null;
         };
         /** RunVisualizationSummary */
         RunVisualizationSummary: {

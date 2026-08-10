@@ -154,7 +154,10 @@ async def test_settle_falls_back_to_prior_operation_id_when_reply_omits_it() -> 
         # A bridge-routed reply that doesn't echo an operationId of its own --
         # settle() must fall back to the in-flight operation instead of
         # treating the reply as already settled.
-        reply = {"state": "unknown", "response": "sent this across the bridge"}
+        reply: dict[str, object] = {
+            "state": "unknown",
+            "response": "sent this across the bridge",
+        }
         settled = await client.settle(reply, operation_id="op-prev")
     finally:
         await client.aclose()
@@ -174,7 +177,7 @@ async def test_settle_returns_reply_unchanged_without_any_operation_id() -> None
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )
     try:
-        reply = {"state": "unknown", "response": "no operation yet"}
+        reply: dict[str, object] = {"state": "unknown", "response": "no operation yet"}
         settled = await client.settle(reply)
     finally:
         await client.aclose()

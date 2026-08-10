@@ -49,6 +49,7 @@ function label(value: string | null | undefined): string {
   if (value === "scientist") return "Scientist";
   if (value === "generating") return "Generating";
   if (value === "ready") return "Ready";
+  if (value === "skipped") return "Skipped";
   return value.replaceAll("_", " ").replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
@@ -103,6 +104,28 @@ function currentPhaseLabel(
 function isScientistGeneration(turn: RunTurn): boolean {
   return turn.stage === "scientist" && !turn.tyrMessage
     && ["generating", "failed", "ready", "completed"].includes(turn.status);
+}
+
+function isEvaluation(turn: RunTurn): boolean {
+  return turn.updateType === "evaluation";
+}
+
+function isDiscoveryResult(turn: RunTurn): boolean {
+  return turn.updateType === "discovery";
+}
+
+function discoveryFields(message: string): Array<{ name: string; value: string }> {
+  return message
+    .split("\n")
+    .map((line) => {
+      const separator = line.indexOf(":");
+      if (separator <= 0) return null;
+      const name = line.slice(0, separator).trim();
+      const value = line.slice(separator + 1).trim();
+      if (!name || !value) return null;
+      return { name, value };
+    })
+    .filter((item): item is { name: string; value: string } => item !== null);
 }
 
 function connectionLabel(state: RunConnectionState): string {
@@ -206,6 +229,7 @@ function stageStatusLabel(
   if (phaseState === "failed") return "Failed";
   if (phaseState === "cancelled") return "Cancelled";
   if (phaseState === "interrupted") return "Interrupted";
+  if (phaseState === "skipped") return "Off";
   return null;
 }
 
@@ -239,13 +263,11 @@ export function RunPage() {
   const events = useRunEvents(runId);
   const [olderTurns, setOlderTurns] = useState<RunTurn[]>([]);
   const [visibleLatestTurns, setVisibleLatestTurns] = useState<RunTurn[]>([]);
-  const [followingLatest, setFollowingLatest] = useState(true);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [flashIds, setFlashIds] = useState<Set<string>>(() => new Set());
-  const turnsSection = useRef<HTMLElement>(null);
   const previousVisible = useRef<Map<string, RunTurn>>(new Map());
   const run = visualization.data?.run;
   const scientistIterations = runRecord.data?.configuration?.scientistIterations ?? 0;
@@ -287,7 +309,6 @@ export function RunPage() {
   useEffect(() => {
     setOlderTurns([]);
     setVisibleLatestTurns([]);
-    setFollowingLatest(true);
     setFlashIds(new Set());
     setCancelling(false);
     setCancelError(null);
@@ -295,14 +316,8 @@ export function RunPage() {
   }, [runId]);
 
   useEffect(() => {
-    if (followingLatest && latestTurns) setVisibleLatestTurns(latestTurns);
-  }, [followingLatest, latestTurns]);
-
-  useEffect(() => {
-    const handleScroll = () => setFollowingLatest(window.scrollY < 160);
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+    if (latestTurns) setVisibleLatestTurns(latestTurns);
+  }, [latestTurns]);
 
   useEffect(() => {
     if (!isLive && !waitingForTyr) return undefined;
@@ -331,13 +346,6 @@ export function RunPage() {
     return () => window.clearTimeout(timer);
   }, [visibleLatestTurns]);
 
-  const visibleById = useMemo(
-    () => new Map(visibleLatestTurns.map((turn) => [turn.id, turn])),
-    [visibleLatestTurns],
-  );
-  const pendingTurnCount = latestTurns?.filter(
-    (turn) => !sameTurn(visibleById.get(turn.id), turn),
-  ).length ?? 0;
   const allTurns = useMemo(() => {
     const byId = new Map([...olderTurns, ...visibleLatestTurns].map((turn) => [turn.id, turn]));
     return [...byId.values()].sort((left, right) => right.sequence - left.sequence);
@@ -360,12 +368,6 @@ export function RunPage() {
     } finally {
       setLoadingOlder(false);
     }
-  };
-
-  const showNewTurns = () => {
-    setVisibleLatestTurns(latestTurns ?? []);
-    setFollowingLatest(true);
-    turnsSection.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
   };
 
   return (
@@ -519,35 +521,27 @@ export function RunPage() {
 
       <TyrNetworkMap runId={runId} isLive={isLive} refreshMs={refreshMs} />
 
-      <section ref={turnsSection} className="turns-section" aria-labelledby="turns-title">
+      <section className="turns-section" aria-labelledby="turns-title">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">Conversation</p>
-            <h2 id="turns-title">Turns</h2>
+            <p className="eyebrow">Run history</p>
+            <h2 id="turns-title">Updates</h2>
           </div>
-          <span className="turn-count mono">{turns.data?.latestSequence ?? 0} persisted</span>
+          <span className="turn-count mono">{turns.data?.latestSequence ?? 0} updates persisted</span>
         </div>
         {turns.data?.nextCursor ? (
           <button className="button button-secondary" type="button" disabled={loadingOlder} onClick={() => void loadOlder()}>
-            {loadingOlder ? "Loading earlier turns…" : `Load ${turns.data.omittedBefore} earlier turns`}
+            {loadingOlder ? "Loading earlier updates…" : `Load ${turns.data.omittedBefore} earlier updates`}
           </button>
         ) : null}
-        {pendingTurnCount ? (
-          <div className="new-turns-action" role="status" aria-live="polite">
-            <button className="button button-primary" type="button" onClick={showNewTurns}>
-              <span className="new-turns-pulse" aria-hidden="true" />
-              {`Show ${pendingTurnCount} new ${pendingTurnCount === 1 ? "turn" : "turns"}`}
-            </button>
-          </div>
-        ) : null}
-        {turns.isLoading ? <p className="secondary">Loading persisted turns…</p> : null}
+        {turns.isLoading ? <p className="secondary">Loading persisted updates…</p> : null}
         {turns.error ? <p className="callout callout-warning" role="alert">{turns.error.message}</p> : null}
-        {!turns.isLoading && !allTurns.length && !pendingTurnCount ? (
+        {!turns.isLoading && !allTurns.length ? (
           <p className="empty-state run-empty">
-            {isLive ? "Waiting for the first turn…" : "No turns have been persisted yet."}
+            {isLive ? "Waiting for the first update…" : "No updates have been persisted yet."}
           </p>
         ) : null}
-        <ol className="turn-list" aria-label="Run conversation turns">
+        <ol className="turn-list" aria-label="Run updates">
           {awaitingNextTurn ? <PendingNextTurn /> : null}
           {allTurns.map((turn, index) => (
             <Turn
@@ -591,10 +585,20 @@ function Turn({
 }) {
   const waiting = turn.status === "waiting_for_tyr" && !turn.tyrMessage;
   const scientistGeneration = isScientistGeneration(turn);
+  const evaluation = isEvaluation(turn);
+  const discoveryResult = isDiscoveryResult(turn);
   const waitMs = turnWaitMs(turn, now);
-  const heading = scientistGeneration
-    ? `Scientist - Iteration ${turn.number}`
-    : `${label(turn.stage)} - Turn ${turn.number}`;
+  const heading = evaluation
+    ? `${turn.stage === "scientist" ? "Scientist evaluation" : "Evaluation result"} - ${turn.caseId ?? `Case ${turn.number}`}`
+    : discoveryResult
+      ? turn.status === "blocked"
+        ? "Discovery blocked"
+        : "Discovery complete"
+      : scientistGeneration
+        ? `Scientist - Iteration ${turn.number}`
+        : `${label(turn.stage)} - Turn ${turn.number}`;
+  const status = evaluation ? turn.verdict ?? turn.status : turn.status;
+  const discovered = discoveryResult ? discoveryFields(turn.agentMessage) : [];
   return (
     <li
       className={[
@@ -602,7 +606,10 @@ function Turn({
         newest ? "newest-turn" : "",
         waiting ? "turn-waiting" : "",
         scientistGeneration ? "turn-scientist" : "",
-        turn.status === "failed" ? "turn-failed" : "",
+        evaluation ? "turn-evaluation" : "",
+        evaluation ? `verdict-${turn.verdict ?? "unknown"}` : "",
+        discoveryResult ? "turn-discovery" : "",
+        turn.status === "failed" || turn.status === "blocked" ? "turn-failed" : "",
         flash ? "turn-flash" : "",
       ].filter(Boolean).join(" ")}
       data-turn-id={turn.id}
@@ -639,13 +646,48 @@ function Turn({
             ) : null}
           </p>
           <StatusBadge
-            label={label(turn.status)}
-            tone={tone(turn.status)}
+            label={label(status)}
+            tone={tone(status)}
             pulse={waiting || turn.status === "generating"}
           />
         </div>
       </div>
-      {scientistGeneration ? (
+      {evaluation ? (
+        <div className="turn-messages turn-messages-single">
+          <article className={`turn-message evaluation-message verdict-${turn.verdict ?? "unknown"}`}>
+            <p className="turn-speaker"><span aria-hidden="true">A</span>Case assessment</p>
+            <dl className="evaluation-facts">
+              <div>
+                <dt>Objective</dt>
+                <dd>{label(turn.objectiveStatus)}</dd>
+              </div>
+              <div>
+                <dt>Execution</dt>
+                <dd>{label(turn.outcome)}</dd>
+              </div>
+            </dl>
+            <MarkdownMessage content={turn.assessmentSummary ?? turn.agentMessage} />
+          </article>
+        </div>
+      ) : discoveryResult ? (
+        <div className="turn-messages turn-messages-single">
+          <article className={`turn-message discovery-message status-${turn.status}`}>
+            <p className="turn-speaker"><span aria-hidden="true">D</span>Discovery</p>
+            {discovered.length ? (
+              <dl className="discovery-variable-list" aria-label="Discovered variables">
+                {discovered.map((field) => (
+                  <div key={field.name} className="discovery-variable-row">
+                    <dt className="mono">{field.name}</dt>
+                    <dd className="mono">{field.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            ) : (
+              <MarkdownMessage content={turn.agentMessage} />
+            )}
+          </article>
+        </div>
+      ) : scientistGeneration ? (
         <div className="turn-messages turn-messages-single">
           <article className={`turn-message scientist-message status-${turn.status}`}>
             <p className="turn-speaker"><span aria-hidden="true">S</span>Scientist</p>
@@ -733,13 +775,13 @@ function PendingNextTurn() {
         className="pending-next-turn"
         role="status"
         aria-live="polite"
-        aria-label="Awaiting next turn"
+        aria-label="Awaiting next update"
       >
         <span className="tyr-waiting-spinner" aria-hidden="true" />
         <div>
           <p className="pending-next-title">Agent working</p>
           <p className="pending-next-detail">
-            Next turn will appear when the agent sends a message.
+            Next update will appear when the agent sends a message.
           </p>
         </div>
       </div>

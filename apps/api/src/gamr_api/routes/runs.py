@@ -48,6 +48,9 @@ class CaseProgress(BaseModel):
     order: int
     state: str
     verdict: str | None = None
+    objective_status: str | None = Field(default=None, alias="objectiveStatus")
+    outcome: str | None = None
+    summary: str | None = None
     latest_sequence: int | None = Field(default=None, alias="latestSequence")
 
     model_config = {"populate_by_name": True}
@@ -97,6 +100,22 @@ class ActivityPreview(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class DiscoveryField(BaseModel):
+    name: str
+    value: str
+
+    model_config = {"populate_by_name": True}
+
+
+class DiscoveryResult(BaseModel):
+    status: str
+    candidate_count: int = Field(alias="candidateCount")
+    fields: list[DiscoveryField]
+    reason: str | None = None
+
+    model_config = {"populate_by_name": True}
+
+
 class RunVisualization(BaseModel):
     run: RunVisualizationSummary
     phases: list[ProgressItem]
@@ -105,6 +124,7 @@ class RunVisualization(BaseModel):
     counts: RunCounts
     latest_sequence: int = Field(alias="latestSequence")
     latest_activity: ActivityPreview | None = Field(default=None, alias="latestActivity")
+    discovery_result: DiscoveryResult | None = Field(default=None, alias="discoveryResult")
 
     model_config = {"populate_by_name": True}
 

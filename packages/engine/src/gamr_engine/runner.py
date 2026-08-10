@@ -32,6 +32,7 @@ from gamr_core import (
     RunState,
     Scenario,
     SecurityVerdict,
+    escape_unknown_template_placeholders,
     render_template,
     validate_template_placeholders,
 )
@@ -89,6 +90,10 @@ Return only one JSON object (no markdown fence) with this exact shape:
 spec requires objective, steps, expectedControl, and evidenceRequirements.
 successCriteria is optional but recommended. Do not use prompt or constraints
 fields under spec or anywhere else.
+Curly braces {name} are ONLY for declared dataset variables. Do not invent
+names such as {http_code}. For curl write-out or other tool syntax, write the
+status capture in plain English (for example "capture the HTTP status code")
+instead of brace placeholders.
 """
 _DISCOVERY_DECISION_PROMPT = (
     "Return only a JSON NextTurnDecision each turn. "
@@ -180,6 +185,7 @@ class ProgressEvent:
     case_id: str | None = None
     turn: int | None = None
     detail: str | None = None
+    fields: tuple[tuple[str, str], ...] | None = None
 
 
 ProgressCallback = Callable[[ProgressEvent], None]
@@ -291,19 +297,41 @@ class ExperimentRunner:
             if case_error:
                 errors.append(case_error)
         if config.scientist_iterations:
-            scientist_records, scientist_errors = await self._run_scientist(
-                dataset,
-                target_candidate,
-                config,
-                target,
-                scientist_model or model,
-                identifier,
-                artifacts,
-                conversation,
-                case_records,
-            )
-            case_records.extend(scientist_records)
-            errors.extend(scientist_errors)
+            if self._base_cases_ready_for_scientist(case_records):
+                scientist_records, scientist_errors = await self._run_scientist(
+                    dataset,
+                    target_candidate,
+                    config,
+                    target,
+                    scientist_model or model,
+                    identifier,
+                    artifacts,
+                    conversation,
+                    case_records,
+                )
+                case_records.extend(scientist_records)
+                errors.extend(scientist_errors)
+            else:
+                incomplete = [
+                    (
+                        f"{record.case.scenario_id}:"
+                        f"{record.case.outcome.value}/"
+                        f"{record.case.objective_status.value}"
+                    )
+                    for record in case_records
+                    if not self._case_succeeded_for_scientist(record.case)
+                ]
+                detail = (
+                    "scientist skipped: base cases did not succeed"
+                    + (f" ({', '.join(incomplete)})" if incomplete else "")
+                )
+                self._emit(
+                    "scientist.skipped",
+                    identifier,
+                    phase="scientist",
+                    detail=detail,
+                )
+                errors.append(detail)
         case_results = [record.case for record in case_records]
         return self._result(identifier, started_at, dataset, config, case_results, errors=errors)
 
@@ -515,13 +543,6 @@ class ExperimentRunner:
                 f"strings.\n\n{_SCIENTIST_SCENARIO_SHAPE}\n"
                 f"Earlier attempts (scenario, steps, transcript, assessment):\n{history}"
             )
-            self._emit(
-                "model.thinking",
-                run_id,
-                phase="scientist",
-                turn=index,
-                detail=f"Generating follow-up scenario {index}",
-            )
             content: str | None = None
             completion: dict[str, object] | None = None
             try:
@@ -535,8 +556,9 @@ class ExperimentRunner:
                     )
                 content = raw_content
                 payload = json.loads(self._strip_code_fence(content))
-                scenario = self._prepare_scientist_scenario(payload, index, used_ids)
                 declared_vars = set(dataset.manifest.spec.variables)
+                scenario = self._prepare_scientist_scenario(payload, index, used_ids)
+                scenario = self._escape_scientist_placeholders(scenario, declared_vars)
                 texts = [
                     scenario.metadata.title,
                     scenario.spec.objective,
@@ -554,6 +576,7 @@ class ExperimentRunner:
                     "scientist.failed",
                     run_id,
                     phase="scientist",
+                    turn=index,
                     detail=error,
                 )
                 self._write_raw(
@@ -574,6 +597,7 @@ class ExperimentRunner:
                 run_id,
                 phase="scientist",
                 case_id=scenario.metadata.id,
+                turn=index,
                 detail=scenario.metadata.title,
             )
             record, case_error = await self._run_case(
@@ -629,6 +653,31 @@ class ExperimentRunner:
         return Scenario.model_validate(payload)
 
     @staticmethod
+    def _escape_scientist_placeholders(scenario: Scenario, declared: set[str]) -> Scenario:
+        data = scenario.model_dump(by_alias=True)
+        metadata = data.get("metadata")
+        if isinstance(metadata, dict) and isinstance(metadata.get("title"), str):
+            metadata["title"] = escape_unknown_template_placeholders(
+                metadata["title"], declared
+            )
+        spec = data.get("spec")
+        if isinstance(spec, dict):
+            for key in ("objective", "successCriteria", "expectedControl"):
+                value = spec.get(key)
+                if isinstance(value, str):
+                    spec[key] = escape_unknown_template_placeholders(value, declared)
+            for key in ("steps", "evidenceRequirements"):
+                value = spec.get(key)
+                if isinstance(value, list):
+                    spec[key] = [
+                        escape_unknown_template_placeholders(item, declared)
+                        if isinstance(item, str)
+                        else item
+                        for item in value
+                    ]
+        return Scenario.model_validate(data)
+
+    @staticmethod
     def _select_scenarios(dataset: LoadedDataset, config: ExperimentConfig) -> list[Scenario]:
         if config.case_ids is None:
             selected_ids = dataset.manifest.spec.defaults.default_case_ids
@@ -670,11 +719,16 @@ class ExperimentRunner:
             artifacts=artifacts,
             phase="discovery",
         )
+        fields = (
+            self._discovery_fields(result.candidates[0]) if result.candidates else None
+        )
+        self._write_discovery_result(artifacts, run_id, result)
         self._emit(
             "discovery.completed",
             run_id,
             phase="discovery",
             detail=f"{len(result.candidates)} candidate(s)" if result.candidates else "blocked",
+            fields=fields,
         )
         return result
 
@@ -715,6 +769,7 @@ class ExperimentRunner:
                 summary=f"Missing runtime dataset variable: {exc.args[0]}",
                 turn_ids=[],
             )
+            self._write_case_result(artifacts, run_id, case, stage=phase)
             self._emit(
                 "case.completed",
                 run_id,
@@ -768,6 +823,7 @@ class ExperimentRunner:
                 summary=result.error,
                 turn_ids=turn_ids,
             )
+            self._write_case_result(artifacts, run_id, case, stage=phase)
             self._emit(
                 "case.completed",
                 run_id,
@@ -787,7 +843,6 @@ class ExperimentRunner:
             return record, result.error
         self._emit("assessment.started", run_id, phase="assessment", case_id=case_id)
         assessment = await self._assess(dataset, scenario, result.transcript, model)
-        self._emit("assessment.completed", run_id, phase="assessment", case_id=case_id)
         if assessment is not None:
             valid_evidence = [
                 turn_id for turn_id in assessment.evidence_turn_ids if turn_id in turn_ids
@@ -811,6 +866,21 @@ class ExperimentRunner:
                 ),
                 evidenceTurnIds=turn_ids or [new_id()],
             )
+        self._emit(
+            "assessment.completed",
+            run_id,
+            phase="assessment",
+            case_id=case_id,
+            detail=(
+                f"{assessment.verdict.value} · {assessment.objective_status.value} · "
+                f"{assessment.summary}"
+            ),
+            fields=(
+                ("verdict", assessment.verdict.value),
+                ("objective", assessment.objective_status.value),
+                ("summary", assessment.summary),
+            ),
+        )
         case = self._case_result(
             scenario,
             outcome=ExecutionOutcome.COMPLETED,
@@ -819,12 +889,13 @@ class ExperimentRunner:
             summary=assessment.summary,
             turn_ids=assessment.evidence_turn_ids,
         )
+        self._write_case_result(artifacts, run_id, case, stage=phase)
         self._emit(
             "case.completed",
             run_id,
             phase=phase,
             case_id=case_id,
-            detail="completed",
+            detail=f"completed · {assessment.verdict.value}",
         )
         record = CaseRecord(
             scenario=scenario,
@@ -1256,12 +1327,17 @@ class ExperimentRunner:
         text = ExperimentRunner._strip_code_fence(content)
         if text.startswith("<<"):
             raise ValueError("harness control tokens are not accepted")
+        stripped = text.strip()
+        if not stripped:
+            return None
         try:
-            payload = json.loads(text)
+            payload, end = json.JSONDecoder().raw_decode(stripped)
         except json.JSONDecodeError:
-            if strict:
+            if strict or stripped.startswith("{"):
                 return None
             return NextTurnDecision(kind="send", message=content)
+        if stripped[end:].strip():
+            return None
         if not isinstance(payload, dict):
             if strict:
                 return None
@@ -1390,6 +1466,7 @@ class ExperimentRunner:
         turn: int | None = None,
         turn_id: str | None = None,
         detail: str | None = None,
+        fields: tuple[tuple[str, str], ...] | None = None,
     ) -> None:
         sink = self._activity_sink
         if sink is not None:
@@ -1409,7 +1486,7 @@ class ExperimentRunner:
                     else {"eventType": event_type}
                 )
                 metadata.update(participant_meta)
-                activity_fields = dict(
+                activity_fields: dict[str, Any] = dict(
                     id=new_id(),
                     runId=run_id,
                     sequence=sequence,
@@ -1456,6 +1533,7 @@ class ExperimentRunner:
                     case_id=case_id,
                     turn=turn,
                     detail=detail,
+                    fields=fields,
                 )
             )
 
@@ -1466,7 +1544,7 @@ class ExperimentRunner:
         if event_type.startswith(("discovery.", "scientist.")):
             return (
                 ActivityType.ERROR
-                if event_type.endswith(".failed")
+                if event_type.endswith((".failed", ".skipped"))
                 else ActivityType.PHASE
             )
         if event_type.startswith("case."):
@@ -1576,6 +1654,75 @@ class ExperimentRunner:
                 if isinstance(value, str):
                     values[name] = value
         return values
+
+    @staticmethod
+    def _discovery_fields(candidate: DiscoveryCandidate) -> tuple[tuple[str, str], ...]:
+        return (
+            ("path", candidate.path),
+            ("workspace", candidate.workspace),
+            ("agent", candidate.agent),
+            ("bridgeId", candidate.bridge_id),
+        )
+
+    @staticmethod
+    def _write_discovery_result(
+        artifacts: ArtifactStore | None,
+        run_id: str,
+        result: PhaseResult,
+    ) -> None:
+        if artifacts is None:
+            return
+        occurred_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+        if result.candidates:
+            fields = [
+                {"name": name, "value": value}
+                for name, value in ExperimentRunner._discovery_fields(result.candidates[0])
+            ]
+            payload: dict[str, object] = {
+                "status": "found",
+                "candidateCount": len(result.candidates),
+                "fields": fields,
+                "occurredAt": occurred_at,
+            }
+        else:
+            payload = {
+                "status": "blocked",
+                "candidateCount": 0,
+                "fields": [],
+                "reason": result.error or "blocked",
+                "occurredAt": occurred_at,
+            }
+        artifacts.write_json(f"runs/{run_id}/discovery-result.json", payload)
+
+    @staticmethod
+    def _write_case_result(
+        artifacts: ArtifactStore | None,
+        run_id: str,
+        case: CaseResult,
+        *,
+        stage: str,
+    ) -> None:
+        if artifacts is None:
+            return
+        safe_id = _UNSAFE_ID_CHAR.sub("-", case.scenario_id)[:128] or "case"
+        payload = case.model_dump(by_alias=True, exclude_none=True, mode="json")
+        payload["stage"] = "scientist" if stage == "scientist" else "case"
+        payload["occurredAt"] = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+        artifacts.write_json(f"runs/{run_id}/case-results/{safe_id}.json", payload)
+
+    @staticmethod
+    def _case_succeeded_for_scientist(case: CaseResult) -> bool:
+        return (
+            case.outcome is ExecutionOutcome.COMPLETED
+            and case.objective_status is ObjectiveStatus.ACHIEVED
+        )
+
+    @staticmethod
+    def _base_cases_ready_for_scientist(records: list[CaseRecord]) -> bool:
+        return bool(records) and all(
+            ExperimentRunner._case_succeeded_for_scientist(record.case)
+            for record in records
+        )
 
     @staticmethod
     def _case_result(

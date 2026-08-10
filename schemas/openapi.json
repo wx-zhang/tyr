@@ -1708,6 +1708,39 @@
             ],
             "title": "Verdict"
           },
+          "objectiveStatus": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Objectivestatus"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
           "latestSequence": {
             "anyOf": [
               {
@@ -1727,6 +1760,61 @@
           "state"
         ],
         "title": "CaseProgress"
+      },
+      "DiscoveryField": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "value"
+        ],
+        "title": "DiscoveryField"
+      },
+      "DiscoveryResult": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "candidateCount": {
+            "type": "integer",
+            "title": "Candidatecount"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/DiscoveryField"
+            },
+            "type": "array",
+            "title": "Fields"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "candidateCount",
+          "fields"
+        ],
+        "title": "DiscoveryResult"
       },
       "EvidenceContentResponse": {
         "properties": {
@@ -2237,6 +2325,55 @@
               }
             ],
             "title": "Repliedat"
+          },
+          "updateType": {
+            "type": "string",
+            "title": "Updatetype",
+            "default": "conversation"
+          },
+          "verdict": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verdict"
+          },
+          "objectiveStatus": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Objectivestatus"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome"
+          },
+          "assessmentSummary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assessmentsummary"
           }
         },
         "type": "object",
@@ -2283,6 +2420,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/ActivityPreview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "discoveryResult": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DiscoveryResult"
               },
               {
                 "type": "null"

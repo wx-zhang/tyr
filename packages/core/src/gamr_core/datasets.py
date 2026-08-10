@@ -144,13 +144,23 @@ DatasetDocument = Annotated[
     Field(discriminator="kind"),
 ]
 _DOCUMENT_ADAPTER: TypeAdapter[DatasetDocument] = TypeAdapter(DatasetDocument)
-_PLACEHOLDER_RE = re.compile(r"\{([A-Za-z_][A-Za-z0-9_]*)\}")
+_PLACEHOLDER_RE = re.compile(r"(?<!\{)\{([A-Za-z_][A-Za-z0-9_]*)\}(?!\})")
 
 
 def validate_template_placeholders(text: str, declared: set[str]) -> None:
     unknown = sorted(set(_PLACEHOLDER_RE.findall(text)) - declared)
     if unknown:
         raise ValueError(f"unknown dataset template variables: {', '.join(unknown)}")
+
+
+def escape_unknown_template_placeholders(text: str, declared: set[str]) -> str:
+    def replace(match: re.Match[str]) -> str:
+        name = match.group(1)
+        if name in declared:
+            return match.group(0)
+        return "{{" + name + "}}"
+
+    return _PLACEHOLDER_RE.sub(replace, text)
 
 
 def render_template(text: str, values: dict[str, str]) -> str:
