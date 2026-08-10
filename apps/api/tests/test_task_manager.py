@@ -2,9 +2,11 @@ import asyncio
 from pathlib import Path
 
 import pytest
+from gamr_api.composition import _advance_run_state
 from gamr_api.execution import RunTaskManager
 from gamr_api.registry import JsonRegistry
 from gamr_core import ExperimentConfig, RunSource, RunState
+from gamr_engine import ProgressEvent
 
 
 @pytest.mark.asyncio
@@ -43,6 +45,59 @@ async def test_task_manager_runs_three_and_queues_the_rest_fifo(tmp_path: Path) 
     completed = [registry.get_run(run.id) for run in runs]
     assert all(run is not None and run.state is RunState.COMPLETED for run in completed)
     await manager.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_task_manager_keeps_run_in_discovery_until_execution_reports_a_case(
+    tmp_path: Path,
+) -> None:
+    registry = JsonRegistry(tmp_path)
+    started = asyncio.Event()
+    release = asyncio.Event()
+
+    async def execute(run_id: str) -> str:
+        started.set()
+        await release.wait()
+        return f"runs/{run_id}/result.json"
+
+    manager = RunTaskManager(registry, execute)
+    await manager.start()
+    run = registry.create_run(
+        None,
+        "datasets/first-plan",
+        ExperimentConfig(),
+        source=RunSource.SERVICE,
+    )
+    await manager.submit(run.id)
+
+    try:
+        await started.wait()
+        current = registry.get_run(run.id)
+        assert current is not None and current.state is RunState.DISCOVERING
+    finally:
+        release.set()
+        await manager.join()
+        await manager.shutdown()
+
+    completed = registry.get_run(run.id)
+    assert completed is not None and completed.state is RunState.COMPLETED
+
+
+def test_progress_promotes_discovery_run_when_case_phase_starts(tmp_path: Path) -> None:
+    registry = JsonRegistry(tmp_path)
+    run = registry.create_run(
+        None,
+        "datasets/first-plan",
+        ExperimentConfig(),
+        source=RunSource.SERVICE,
+    )
+    registry.set_state(run, RunState.PREPARING)
+    registry.set_state(run, RunState.DISCOVERING)
+
+    _advance_run_state(registry, run.id, ProgressEvent("case.started", run.id, phase="case"))
+
+    current = registry.get_run(run.id)
+    assert current is not None and current.state is RunState.RUNNING
 
 
 @pytest.mark.asyncio

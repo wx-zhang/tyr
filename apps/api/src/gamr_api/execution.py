@@ -103,7 +103,6 @@ class RunTaskManager:
                     continue
                 self.registry.set_state(run, RunState.PREPARING)
                 self.registry.set_state(run, RunState.DISCOVERING)
-                self.registry.set_state(run, RunState.RUNNING)
                 task: asyncio.Task[str] = asyncio.create_task(
                     self.execute(run_id), name=f"gamr-run-{run_id}"
                 )
@@ -131,7 +130,11 @@ class RunTaskManager:
                         )
                     continue
                 current = self.registry.get_run(run_id)
-                if current is None or current.state is not RunState.RUNNING:
+                if current is None:
+                    continue
+                if current.state is RunState.DISCOVERING:
+                    self.registry.set_state(current, RunState.RUNNING)
+                if current.state is not RunState.RUNNING:
                     continue
                 self.registry.set_result(current, result_path)
                 self.registry.set_state(current, RunState.EVALUATING)
