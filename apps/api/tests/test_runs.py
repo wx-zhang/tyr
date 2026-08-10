@@ -69,21 +69,26 @@ def test_service_accepts_approval_required_experiment() -> None:
 
 
 def test_create_experiment_accepts_dataset_id_and_case_ids() -> None:
-    client = TestClient(app)
-    response = client.post(
-        "/api/v1/experiments",
-        json={
-            "name": "case selection",
-            "dataset": "first-plan",
-            "actionMode": "approval_required",
-            "caseIds": ["rename-relocate-fresh-agent-upload"],
-        },
-    )
-    assert response.status_code == 201
-    body = response.json()
-    assert body["dataset"] == "first-plan"
-    assert body["configuration"]["actionMode"] == "approval_required"
-    assert body["configuration"]["caseIds"] == ["rename-relocate-fresh-agent-upload"]
+    registry = InMemoryRegistry()
+    app.dependency_overrides[get_registry] = lambda: registry
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/api/v1/experiments",
+            json={
+                "name": "case selection",
+                "dataset": "first-plan",
+                "actionMode": "approval_required",
+                "caseIds": ["rename-relocate-fresh-agent-upload"],
+            },
+        )
+        assert response.status_code == 201
+        body = response.json()
+        assert body["dataset"] == "first-plan"
+        assert body["configuration"]["actionMode"] == "approval_required"
+        assert body["configuration"]["caseIds"] == ["rename-relocate-fresh-agent-upload"]
+    finally:
+        app.dependency_overrides.clear()
 
 
 def test_create_experiment_rejects_unknown_case_id() -> None:
@@ -101,27 +106,108 @@ def test_create_experiment_rejects_unknown_case_id() -> None:
 
 
 def test_run_events_support_last_event_id() -> None:
-    client = TestClient(app)
-    experiment_id = _experiment(client)
-    run = client.post(f"/api/v1/experiments/{experiment_id}/runs", json={}).json()
-    response = client.get(f"/api/v1/runs/{run['id']}/events")
-    assert "id: 1" in response.text
-    resumed = client.get(
-        f"/api/v1/runs/{run['id']}/events", headers={"Last-Event-ID": "1"}
-    )
-    assert ": heartbeat; interval=15" in resumed.text
-    assert "event: heartbeat" in resumed.text
-    assert '"interval": 15' in resumed.text
+    registry = InMemoryRegistry()
+    app.dependency_overrides[get_registry] = lambda: registry
+    try:
+        client = TestClient(app)
+        experiment_id = _experiment(client)
+        run = client.post(f"/api/v1/experiments/{experiment_id}/runs", json={}).json()
+        response = client.get(f"/api/v1/runs/{run['id']}/events")
+        assert "id: 1" in response.text
+        resumed = client.get(
+            f"/api/v1/runs/{run['id']}/events", headers={"Last-Event-ID": "1"}
+        )
+        assert ": heartbeat; interval=15" in resumed.text
+        assert "event: heartbeat" in resumed.text
+        assert '"interval": 15' in resumed.text
+    finally:
+        app.dependency_overrides.clear()
 
 
 def test_cancelled_queued_run_is_persisted() -> None:
+    registry = InMemoryRegistry()
+    app.dependency_overrides[get_registry] = lambda: registry
+    try:
+        client = TestClient(app)
+        experiment_id = _experiment(client)
+        run = client.post(f"/api/v1/experiments/{experiment_id}/runs", json={}).json()
+        cancelled = client.post(f"/api/v1/runs/{run['id']}/cancel")
+        assert cancelled.status_code == 200
+        assert cancelled.json()["state"] == "cancelled"
+        assert client.get(f"/api/v1/runs/{run['id']}").json()["state"] == "cancelled"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_delete_run_removes_it_from_the_registry() -> None:
+    registry = InMemoryRegistry()
+    finished = registry.create_run(
+        None,
+        "datasets/first-plan",
+        ExperimentConfig(),
+        source=RunSource.SERVICE,
+    )
+    registry.set_state(finished, RunState.PREPARING)
+    registry.set_state(finished, RunState.DISCOVERING)
+    registry.set_state(finished, RunState.RUNNING)
+    registry.set_state(finished, RunState.EVALUATING)
+    registry.set_state(finished, RunState.REPORTING)
+    registry.set_state(finished, RunState.COMPLETED)
+    app.dependency_overrides[get_registry] = lambda: registry
+    try:
+        client = TestClient(app)
+        response = client.delete(f"/api/v1/runs/{finished.id}")
+        assert response.status_code == 204
+        assert client.get(f"/api/v1/runs/{finished.id}").status_code == 404
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_delete_run_removes_a_queued_run_without_requiring_cancel_first() -> None:
+    registry = InMemoryRegistry()
+    queued = registry.create_run(
+        None,
+        "datasets/first-plan",
+        ExperimentConfig(),
+        source=RunSource.SERVICE,
+    )
+    assert queued.state is RunState.QUEUED
+    app.dependency_overrides[get_registry] = lambda: registry
+    try:
+        client = TestClient(app)
+        response = client.delete(f"/api/v1/runs/{queued.id}")
+        assert response.status_code == 204
+        assert client.get(f"/api/v1/runs/{queued.id}").status_code == 404
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_delete_run_rejects_a_run_still_in_progress() -> None:
+    registry = InMemoryRegistry()
+    running = registry.create_run(
+        None,
+        "datasets/first-plan",
+        ExperimentConfig(),
+        source=RunSource.SERVICE,
+    )
+    registry.set_state(running, RunState.PREPARING)
+    registry.set_state(running, RunState.DISCOVERING)
+    registry.set_state(running, RunState.RUNNING)
+    app.dependency_overrides[get_registry] = lambda: registry
+    try:
+        client = TestClient(app)
+        response = client.delete(f"/api/v1/runs/{running.id}")
+        assert response.status_code == 409
+        assert response.json()["detail"]["code"] == "run_not_deletable"
+        assert client.get(f"/api/v1/runs/{running.id}").status_code == 200
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_delete_run_returns_404_for_unknown_run() -> None:
     client = TestClient(app)
-    experiment_id = _experiment(client)
-    run = client.post(f"/api/v1/experiments/{experiment_id}/runs", json={}).json()
-    cancelled = client.post(f"/api/v1/runs/{run['id']}/cancel")
-    assert cancelled.status_code == 200
-    assert cancelled.json()["state"] == "cancelled"
-    assert client.get(f"/api/v1/runs/{run['id']}").json()["state"] == "cancelled"
+    response = client.delete("/api/v1/runs/does-not-exist")
+    assert response.status_code == 404
 
 
 def test_retry_creates_a_linked_new_bundle_and_approval_routes_are_removed() -> None:

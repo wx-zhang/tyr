@@ -47,3 +47,21 @@ def test_json_registry_redacts_persisted_values_and_rejects_escaped_ids(tmp_path
     assert "top-secret" not in (tmp_path / "runs" / run.id / "run.json").read_text()
     with pytest.raises(ValueError, match="identifier"):
         registry.get_run("../outside")
+
+
+def test_json_registry_delete_run_removes_bundle_and_index_entry(tmp_path: Path) -> None:
+    registry = JsonRegistry(tmp_path)
+    run = registry.create_run(
+        None,
+        "datasets/first-plan",
+        ExperimentConfig(),
+        source=RunSource.CLI,
+    )
+    run_root = tmp_path / "runs" / run.id
+    assert run_root.is_dir()
+
+    registry.delete_run(run.id)
+
+    assert not run_root.exists()
+    assert run.id not in registry.runs
+    assert registry.get_run(run.id) is None

@@ -24,7 +24,7 @@ from ..dependencies import (
     get_task_manager,
     redaction_secrets,
 )
-from ..errors import browser_safe_value, not_found
+from ..errors import browser_safe_value, conflict, not_found
 from ..execution import RunTaskManager
 from ..registry import InMemoryRegistry, RunRecord
 
@@ -32,6 +32,13 @@ router = APIRouter(prefix="/api/v1/runs", tags=["runs"])
 
 MAX_REPLAY_NOTIFICATIONS = 1000
 HEARTBEAT_SECONDS = 15
+TERMINAL_RUN_STATES = {
+    RunState.COMPLETED,
+    RunState.FAILED,
+    RunState.CANCELLED,
+    RunState.INTERRUPTED,
+}
+DELETABLE_RUN_STATES = TERMINAL_RUN_STATES | {RunState.QUEUED}
 
 
 class ProgressItem(BaseModel):
@@ -177,14 +184,23 @@ async def cancel_run(
     if manager is not None:
         await manager.cancel(run_id)
         run = _find_run(run_id, registry)
-    elif run.state not in {
-        RunState.COMPLETED,
-        RunState.FAILED,
-        RunState.CANCELLED,
-        RunState.INTERRUPTED,
-    }:
+    elif run.state not in TERMINAL_RUN_STATES:
         registry.set_state(run, RunState.CANCELLED, event_type="run.cancelled")
     return _run_payload(run)
+
+
+@router.delete("/{run_id}", status_code=204)
+async def delete_run(
+    run_id: str,
+    registry: InMemoryRegistry = Depends(get_registry),
+    manager: RunTaskManager | None = Depends(get_task_manager),
+) -> None:
+    run = _find_run(run_id, registry)
+    if run.state not in DELETABLE_RUN_STATES:
+        raise conflict("run_not_deletable", "run must be stopped before it can be deleted")
+    if manager is not None and run.state is RunState.QUEUED:
+        await manager.cancel(run_id)
+    registry.delete_run(run_id)
 
 
 @router.post("/{run_id}/retry", status_code=202)

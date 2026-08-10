@@ -32,6 +32,13 @@ def invalid_query(detail: str = "invalid query") -> HTTPException:
     )
 
 
+def conflict(code: str, detail: str) -> HTTPException:
+    return HTTPException(
+        status_code=409,
+        detail={"type": "about:blank", "code": code, "detail": detail},
+    )
+
+
 _UNSAFE_KEY = re.compile(
     r"(?:authorization|api[_-]?key|bearer|cookie|credential|idempotency|password|secret|token|path)",
     re.IGNORECASE,

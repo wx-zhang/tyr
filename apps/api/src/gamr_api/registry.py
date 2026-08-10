@@ -126,6 +126,12 @@ class InMemoryRegistry:
     def save_run(self, run: RunRecord) -> None:
         self.runs[run.id] = run
 
+    def delete_run(self, run_id: str) -> None:
+        _validate_id(run_id)
+        self.runs.pop(run_id, None)
+        self.activities.pop(run_id, None)
+        self.case_runs.pop(run_id, None)
+
     def append_event(
         self, run: RunRecord, event_type: str, payload: dict[str, object]
     ) -> RunEvent:
@@ -420,6 +426,11 @@ class JsonRegistry(InMemoryRegistry):
     def save_run(self, run: RunRecord) -> None:
         super().save_run(run)
         self._persist_run(run)
+
+    def delete_run(self, run_id: str) -> None:
+        _validate_id(run_id)
+        self.store.delete_run(run_id)
+        super().delete_run(run_id)
 
     def append_event(
         self, run: RunRecord, event_type: str, payload: dict[str, object]

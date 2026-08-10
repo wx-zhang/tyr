@@ -238,6 +238,14 @@ export async function cancelRun(runId: string): Promise<Run> {
   return response.json() as Promise<Run>;
 }
 
+export async function deleteRun(runId: string): Promise<void> {
+  const response = await fetch(
+    `${apiOrigin}/api/v1/runs/${encodeURIComponent(runId)}`,
+    { method: "DELETE" },
+  );
+  if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+}
+
 export function fetchRunVisualization(runId: string): Promise<RunVisualization> {
   return get<RunVisualization>(
     `/api/v1/runs/${encodeURIComponent(runId)}/visualization`,

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 from collections import defaultdict
 from collections.abc import Iterable
 from pathlib import Path
@@ -55,6 +56,11 @@ class FilesystemArtifactStore:
         if create:
             path.mkdir(parents=True, exist_ok=True)
         return path
+
+    def delete_run(self, run_id: str) -> None:
+        run_root = self._run_root(run_id, create=False)
+        if run_root.is_dir():
+            shutil.rmtree(run_root)
 
     def _safe_path(self, relative_path: str) -> Path:
         path = (self.root / relative_path).resolve()

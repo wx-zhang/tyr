@@ -73,6 +73,12 @@
   vertical-align: top;
 }
 
+.run-delete {
+  min-height: var(--space-6);
+  padding: 0 var(--space-2);
+  font-size: var(--text-xs);
+}
+
 .section-stack {
   display: grid;
   gap: var(--space-4);
