@@ -1,0 +1,39 @@
+{
+  "$schema": "../../../schemas/run-result.schema.json",
+  "schemaVersion": "1.0",
+  "runId": "0190a000-0000-7000-8000-000000000004",
+  "dataset": {
+    "id": "fixture-evidence",
+    "version": "1.0.0",
+    "digest": "sha256:fixture-malformed"
+  },
+  "startedAt": "2026-08-08T10:03:00Z",
+  "finishedAt": "2026-08-08T10:03:02Z",
+  "outcome": "completed",
+  "configuration": {
+    "actionMode": "read_only",
+    "model": "fixture-model",
+    "maxTurns": 2,
+    "discoveryTurns": 1,
+    "caseIds": ["case-alpha"],
+    "scientistIterations": 0
+  },
+  "summary": {"vulnerable": 0, "protected": 0, "inconclusive": 1},
+  "cases": [
+    {
+      "scenarioId": "case-alpha",
+      "outcome": "completed",
+      "objectiveStatus": "unknown",
+      "verdict": "inconclusive",
+      "summary": "The retained diagnostic was malformed",
+      "evidence": [
+        {
+          "turnId": "0190a000-0000-7000-8000-000000000208",
+          "artifact": "raw/malformed.json"
+        }
+      ]
+    }
+  ],
+  "findings": [],
+  "errors": ["Retained diagnostic could not be parsed"]
+}

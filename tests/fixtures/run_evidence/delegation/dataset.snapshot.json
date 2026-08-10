@@ -1,0 +1,4 @@
+{
+  "dataset": {"id": "fixture-evidence", "version": "1.0.0"},
+  "caseIds": ["case-alpha"]
+}

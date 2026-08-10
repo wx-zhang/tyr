@@ -1,0 +1,7 @@
+{
+  "kind": "delegation",
+  "outerState": "completed",
+  "childState": "pending",
+  "childLabel": "[REDACTED]",
+  "redacted": true
+}

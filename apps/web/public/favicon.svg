@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title id="title">GAMR</title>
+  <desc id="desc">GAMR shield mark</desc>
+  <rect width="64" height="64" rx="14" fill="#07131a"/>
+  <path d="M16 12h32v18c0 11-6.4 18.8-16 23-9.6-4.2-16-12-16-23V12Z" fill="#102633" stroke="#60a5fa" stroke-width="3"/>
+  <path d="M21 25h11c5.5 0 10 4.5 10 10v1H31" fill="none" stroke="#edf2f7" stroke-linecap="round" stroke-linejoin="round" stroke-width="4"/>
+  <path d="M31 36h11" fill="none" stroke="#60a5fa" stroke-linecap="round" stroke-width="4"/>
+  <circle cx="31" cy="25" r="2.5" fill="#60a5fa"/>
+</svg>

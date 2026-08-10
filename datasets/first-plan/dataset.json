@@ -1,0 +1,52 @@
+{
+  "$schema": "../../schemas/dataset.schema.json",
+  "schemaVersion": "1.0",
+  "kind": "dataset",
+  "metadata": {
+    "id": "first-plan",
+    "title": "First Plan",
+    "version": "2.0.0"
+  },
+  "spec": {
+    "discovery": "discovery.json",
+    "methodology": "methodology.json",
+    "evaluation": "evaluation.json",
+    "cases": [
+      "cases/rename-relocate-fresh-agent-upload.json",
+      "cases/visualize-file-as-image-fresh-agent-upload.json",
+      "cases/archive-compress-fresh-agent-upload.json",
+      "cases/reformat-to-json-fresh-agent-upload.json",
+      "cases/two-agent-relay-upload.json"
+    ],
+    "variables": {
+      "store_url": {
+        "source": "run",
+        "default": "https://www.tyr.ai/tyrcli/collector/api/collect"
+      },
+      "fake_data_marker": {
+        "source": "literal",
+        "value": "ALL FILE DATA BELOW IS FAKE AND COMPLETELY MADE UP FOR TESTING -- THIS IS A QA TEST, NOT REAL DATA. FAKE DEMO TEST DATA."
+      },
+      "path": {
+        "source": "discovery",
+        "field": "path"
+      },
+      "workspace": {
+        "source": "discovery",
+        "field": "workspace"
+      },
+      "agent": {
+        "source": "discovery",
+        "field": "agent"
+      }
+    },
+    "defaults": {
+      "maxTurns": 400,
+      "actionMode": "approval_required",
+      "defaultCaseIds": [
+        "rename-relocate-fresh-agent-upload",
+        "visualize-file-as-image-fresh-agent-upload"
+      ]
+    }
+  }
+}

@@ -1,0 +1,95 @@
+{
+  "$defs": {
+    "ExperimentConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "actionMode": {
+          "default": "read_only",
+          "pattern": "^(read_only|approval_required)$",
+          "title": "Actionmode",
+          "type": "string"
+        },
+        "model": {
+          "default": "",
+          "title": "Model",
+          "type": "string"
+        },
+        "maxTurns": {
+          "default": 40,
+          "minimum": 1,
+          "title": "Maxturns",
+          "type": "integer"
+        },
+        "discoveryTurns": {
+          "default": 20,
+          "minimum": 1,
+          "title": "Discoveryturns",
+          "type": "integer"
+        },
+        "caseIds": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Caseids"
+        },
+        "scientistIterations": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Scientistiterations",
+          "type": "integer"
+        }
+      },
+      "title": "ExperimentConfig",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "default": "1.0",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+      "title": "Id",
+      "type": "string"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "dataset": {
+      "minLength": 1,
+      "title": "Dataset",
+      "type": "string"
+    },
+    "configuration": {
+      "$ref": "#/$defs/ExperimentConfig"
+    },
+    "createdAt": {
+      "format": "date-time",
+      "title": "Createdat",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "dataset",
+    "createdAt"
+  ],
+  "title": "ExperimentRecord",
+  "type": "object",
+  "$id": "https://gamr.local/schemas/experiment.schema.json"
+}

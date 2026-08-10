@@ -1,0 +1,53 @@
+schema_version: "1.0"
+
+extension:
+  id: "parallel-implement"
+  name: "Parallel Implement"
+  version: "1.1.0"
+  description: "Thin tech-lead parallel implementation: worktrees, delegated story lanes, sequential merges, and validation without polluting orchestrator context."
+  author: "SoftServe, Inc."
+  repository: "https://github.com/github/spec-kit"
+  license: "MIT"
+
+requires:
+  speckit_version: ">=0.3.0"
+  tools:
+    - name: "git"
+      required: true
+    - name: "gh"
+      required: false
+  commands:
+    - "speckit.tasks"
+
+provides:
+  commands:
+    - name: "speckit.parallel-implement.run"
+      file: "commands/parallel-implement.md"
+      description: "Orchestrate parallel user-story implementation via worktrees and delegated subagents"
+      aliases: ["speckit.parallel-implement"]
+    - name: "speckit.parallel-implement.phase"
+      file: "commands/parallel-implement-phase.md"
+      description: "Internal delegate: run one sequential tasks.md phase on the integration branch"
+    - name: "speckit.parallel-implement.story"
+      file: "commands/parallel-implement-story.md"
+      description: "Internal delegate: implement one user story in a dedicated worktree"
+    - name: "speckit.parallel-implement.merge"
+      file: "commands/parallel-implement-merge.md"
+      description: "Internal delegate: merge one story branch with gates and conflict resolution"
+    - name: "speckit.parallel-implement.validate"
+      file: "commands/parallel-implement-validate.md"
+      description: "Internal delegate: repo-wide final validation after Polish"
+
+hooks:
+  after_tasks:
+    command: "speckit.parallel-implement.run"
+    optional: true
+    prompt: "Start parallel implementation? User stories run in worktrees concurrently, then merge sequentially."
+    description: "Offer parallel implementation after tasks are generated"
+
+tags:
+  - "implementation"
+  - "git"
+  - "worktrees"
+  - "parallel"
+  - "workflow"

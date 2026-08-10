@@ -1,0 +1,8 @@
+{
+  "runId": "0190a000-0000-7000-8000-000000000003",
+  "status": "interrupted",
+  "phase": "execution",
+  "caseId": "case-beta",
+  "turn": 1,
+  "pendingExternalCall": "tyr_operation_poll"
+}

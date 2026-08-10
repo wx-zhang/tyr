@@ -1,0 +1,160 @@
+:root {
+  --shell-header-h: 52px;
+  --content-max: 1200px;
+  --reading-max: 840px;
+  --inspector-w: 320px;
+  --sidebar-w: 192px;
+  --sidebar-collapsed-w: 56px;
+  --row-h: 36px;
+  --control-h: 36px;
+
+  --space-0-5: 2px;
+  --space-1: 4px;
+  --space-1-5: 6px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  --font-sans:
+    ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono:
+    ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+
+  --text-2xs: 0.6875rem;
+  --leading-2xs: 1rem;
+  --text-xs: 0.75rem;
+  --leading-xs: 1rem;
+  --text-sm: 0.8125rem;
+  --leading-sm: 1.125rem;
+  --text-base: 0.875rem;
+  --leading-base: 1.25rem;
+  --text-md: 0.9375rem;
+  --leading-md: 1.375rem;
+  --text-lg: 1.0625rem;
+  --leading-lg: 1.5rem;
+  --text-xl: 1.25rem;
+  --leading-xl: 1.75rem;
+  --text-2xl: 1.5rem;
+  --leading-2xl: 2rem;
+  --text-display: 1.875rem;
+  --leading-display: 2.25rem;
+  --text-code: 0.78125rem;
+  --leading-code: 1.25rem;
+
+  --bg: #f6f8fa;
+  --bg-subtle: #eef2f6;
+  --surface: #ffffff;
+  --surface-hover: #f2f5f8;
+  --surface-elevated: #ffffff;
+  --border: #d8e0e8;
+  --border-strong: #b9c5d1;
+  --border-focus: #1d4ed8;
+  --text: #17202a;
+  --text-secondary: #455465;
+  --text-muted: #607184;
+  --text-disabled: #9aa7b4;
+  --accent: #1d4ed8;
+  --accent-hover: #1e40af;
+  --accent-active: #1e3a8a;
+  --accent-tint: rgb(29 78 216 / 10%);
+  --accent-on: #ffffff;
+  --success: #157a3d;
+  --success-tint: rgb(21 122 61 / 10%);
+  --info: #1d4ed8;
+  --info-tint: rgb(29 78 216 / 10%);
+  --warning: #8a5a00;
+  --warning-tint: rgb(138 90 0 / 11%);
+  --danger: #b42334;
+  --danger-tint: rgb(180 35 52 / 10%);
+  --neutral-status: #607184;
+  --neutral-status-tint: rgb(96 113 132 / 11%);
+  --shadow-sm: 0 1px 2px rgb(23 32 42 / 8%);
+  --shadow-md: 0 8px 24px rgb(23 32 42 / 14%);
+
+  --radius-xs: 3px;
+  --radius-sm: 5px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-full: 9999px;
+  --border-w: 1px;
+  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--border-focus);
+  --duration-fast: 120ms;
+  --duration-base: 160ms;
+  --duration-slow: 240ms;
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0b0f14;
+  --bg-subtle: #10161d;
+  --surface: #151c24;
+  --surface-hover: #1b2530;
+  --surface-elevated: #202a36;
+  --border: #2a3542;
+  --border-strong: #3a4858;
+  --border-focus: #60a5fa;
+  --text: #edf2f7;
+  --text-secondary: #aab6c4;
+  --text-muted: #8491a1;
+  --text-disabled: #5f6d7b;
+  --accent: #60a5fa;
+  --accent-hover: #93c5fd;
+  --accent-active: #3b82f6;
+  --accent-tint: rgb(96 165 250 / 14%);
+  --accent-on: #07111f;
+  --success: #4ade80;
+  --success-tint: rgb(74 222 128 / 14%);
+  --info: #60a5fa;
+  --info-tint: rgb(96 165 250 / 14%);
+  --warning: #fbbf24;
+  --warning-tint: rgb(251 191 36 / 14%);
+  --danger: #fb7185;
+  --danger-tint: rgb(251 113 133 / 14%);
+  --neutral-status: #8491a1;
+  --neutral-status-tint: rgb(132 145 161 / 14%);
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 38%);
+  --shadow-md: 0 8px 24px rgb(0 0 0 / 46%);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --bg: #0b0f14;
+    --bg-subtle: #10161d;
+    --surface: #151c24;
+    --surface-hover: #1b2530;
+    --surface-elevated: #202a36;
+    --border: #2a3542;
+    --border-strong: #3a4858;
+    --border-focus: #60a5fa;
+    --text: #edf2f7;
+    --text-secondary: #aab6c4;
+    --text-muted: #8491a1;
+    --text-disabled: #5f6d7b;
+    --accent: #60a5fa;
+    --accent-hover: #93c5fd;
+    --accent-active: #3b82f6;
+    --accent-tint: rgb(96 165 250 / 14%);
+    --accent-on: #07111f;
+    --success: #4ade80;
+    --success-tint: rgb(74 222 128 / 14%);
+    --info: #60a5fa;
+    --info-tint: rgb(96 165 250 / 14%);
+    --warning: #fbbf24;
+    --warning-tint: rgb(251 191 36 / 14%);
+    --danger: #fb7185;
+    --danger-tint: rgb(251 113 133 / 14%);
+    --neutral-status: #8491a1;
+    --neutral-status-tint: rgb(132 145 161 / 14%);
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 38%);
+    --shadow-md: 0 8px 24px rgb(0 0 0 / 46%);
+  }
+}

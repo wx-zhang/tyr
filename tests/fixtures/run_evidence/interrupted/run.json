@@ -1,0 +1,10 @@
+{
+  "runId": "0190a000-0000-7000-8000-000000000003",
+  "status": "interrupted",
+  "actionMode": "read_only",
+  "dataset": "fixture-evidence",
+  "startedAt": "2026-08-08T10:02:00Z",
+  "latestUpdateAt": "2026-08-08T10:02:03Z",
+  "phase": "execution",
+  "caseIds": ["case-alpha", "case-beta"]
+}

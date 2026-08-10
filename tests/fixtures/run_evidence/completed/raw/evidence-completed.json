@@ -1,0 +1,6 @@
+{
+  "kind": "diagnostic",
+  "summary": "The target rejected the observed request",
+  "request": {"action": "fixture_read", "scope": "fixture"},
+  "redacted": true
+}

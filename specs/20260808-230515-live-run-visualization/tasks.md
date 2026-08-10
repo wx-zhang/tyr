@@ -1,0 +1,9 @@
+# Completed Tasks: Run Evidence Visualization
+
+- [X] Define validated activity, evidence, participant, query, and visualization contracts.
+- [X] Emit redacted canonical activity and preserve stable run-scoped sequence identity.
+- [X] Normalize live, completed, interrupted, malformed, approval, delegation, and bridge bundles.
+- [X] Implement bounded in-memory search, cursor paging, and relationship aggregation from JSON.
+- [X] Add run-scoped API authorization, SSE replay, evidence reveal, and download confinement.
+- [X] Build accessible progress, relationship, activity, and evidence views in the optional web UI.
+- [X] Validate bundle immutability, redaction, reconnect behavior, and the 10,000-item budget.

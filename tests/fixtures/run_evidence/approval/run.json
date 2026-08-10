@@ -1,0 +1,11 @@
+{
+  "runId": "0190a000-0000-7000-8000-000000000005",
+  "status": "waiting_for_approval",
+  "actionMode": "approval_required",
+  "dataset": "fixture-evidence",
+  "startedAt": "2026-08-08T10:04:00Z",
+  "latestUpdateAt": "2026-08-08T10:04:03Z",
+  "phase": "execution",
+  "caseIds": ["case-alpha"],
+  "pendingApprovalId": "0190a000-0000-7000-8000-000000000209"
+}

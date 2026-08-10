@@ -1,24 +1,64 @@
 [project]
-name = "tyr-agent-tester"
+name = "gamr-workspace"
 version = "0.1.0"
-description = "QA agent and CLI for testing Tyr Assistant"
-readme = "README.md"
-requires-python = ">=3.10"
-dependencies = [
-    "openai>=1.0",
-    "prompt-toolkit>=3.0",
-    "python-dotenv>=1.0",
-    "requests>=2.0",
-    "rich>=13.0",
+description = "GAMR workspace for Tyr red-team experiments"
+requires-python = ">=3.14,<3.15"
+dependencies = []
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["apps/api", "apps/cli", "packages/core", "packages/engine", "packages/adapters"]
+
+[tool.uv.sources]
+gamr-core = { workspace = true }
+gamr-engine = { workspace = true }
+gamr-adapters = { workspace = true }
+
+[dependency-groups]
+dev = [
+  "coverage[toml]>=7.9,<8",
+  "mypy>=1.17,<2",
+  "poethepoet>=0.36,<1",
+  "pytest>=8.4,<9",
+  "pytest-asyncio>=1.1,<2",
+  "ruff>=0.12,<1",
 ]
 
-[project.scripts]
-agent = "tyr_agent_tester.agent_loop:main"
-cli = "tyr_agent_tester.cli_entry:main"
+[tool.poe.tasks]
+lint = "ruff check ."
+typecheck = "mypy packages apps"
+test = "pytest"
+export-dataset = "python scripts/export_dataset_schema.py"
+export-run-result = "python scripts/export_run_result_schema.py"
+export-operational = "python scripts/export_operational_schemas.py"
+export-openapi = "python scripts/export_openapi.py"
+export-web-types = "pnpm --dir apps/web generate:api"
+schemas = ["export-dataset", "export-run-result", "export-operational", "export-openapi", "export-web-types"]
+web-install = "pnpm --dir apps/web install --frozen-lockfile"
+web-build = "pnpm --dir apps/web build"
+build = ["web-build"]
+dataset-validate = "gamr dataset validate datasets/first-plan"
+check = ["lint", "typecheck", "test", "dataset-validate", "web-build"]
+dev = "python scripts/dev.py"
+"dev:watch" = "python scripts/dev.py --watch"
 
-[build-system]
-requires = ["setuptools>=68"]
-build-backend = "setuptools.build_meta"
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+src = ["apps", "packages", "scripts", "tests"]
 
-[tool.setuptools.packages.find]
-where = ["src"]
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+extend-ignore = ["B008"]
+
+[tool.pytest.ini_options]
+testpaths = ["packages", "apps", "tests"]
+addopts = "-ra"
+asyncio_mode = "auto"
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
+packages = ["gamr_core", "gamr_engine", "gamr_adapters", "gamr_cli", "gamr_api"]

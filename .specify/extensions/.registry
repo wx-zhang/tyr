@@ -1,0 +1,24 @@
+{
+  "schema_version": "1.0",
+  "extensions": {
+    "parallel-implement": {
+      "version": "1.1.0",
+      "source": "local",
+      "manifest_hash": "sha256:69fbe5897bceeb2eabaf6976b26639dc1d4846ae190f8a2ff45a371322a28d6e",
+      "enabled": true,
+      "priority": 10,
+      "registered_commands": {
+        "codex": [
+          "speckit.parallel-implement.run",
+          "speckit.parallel-implement",
+          "speckit.parallel-implement.phase",
+          "speckit.parallel-implement.story",
+          "speckit.parallel-implement.merge",
+          "speckit.parallel-implement.validate"
+        ]
+      },
+      "registered_skills": [],
+      "installed_at": "2026-08-08T20:56:14.646604+00:00"
+    }
+  }
+}

@@ -1,0 +1,287 @@
+{
+  "$defs": {
+    "CaseResult": {
+      "additionalProperties": false,
+      "properties": {
+        "scenarioId": {
+          "title": "Scenarioid",
+          "type": "string"
+        },
+        "outcome": {
+          "$ref": "#/$defs/ExecutionOutcome"
+        },
+        "objectiveStatus": {
+          "$ref": "#/$defs/ObjectiveStatus",
+          "default": "unknown"
+        },
+        "verdict": {
+          "$ref": "#/$defs/SecurityVerdict"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "title": "Evidence",
+          "type": "array"
+        }
+      },
+      "required": [
+        "scenarioId",
+        "outcome",
+        "verdict",
+        "summary",
+        "evidence"
+      ],
+      "title": "CaseResult",
+      "type": "object"
+    },
+    "DatasetReference": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "version": {
+          "title": "Version",
+          "type": "string"
+        },
+        "digest": {
+          "title": "Digest",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "version",
+        "digest"
+      ],
+      "title": "DatasetReference",
+      "type": "object"
+    },
+    "Evidence": {
+      "additionalProperties": false,
+      "properties": {
+        "turnId": {
+          "title": "Turnid",
+          "type": "string"
+        },
+        "artifact": {
+          "title": "Artifact",
+          "type": "string"
+        }
+      },
+      "required": [
+        "turnId",
+        "artifact"
+      ],
+      "title": "Evidence",
+      "type": "object"
+    },
+    "ExecutionOutcome": {
+      "enum": [
+        "completed",
+        "blocked",
+        "failed",
+        "error",
+        "cancelled",
+        "interrupted"
+      ],
+      "title": "ExecutionOutcome",
+      "type": "string"
+    },
+    "ExperimentConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "actionMode": {
+          "default": "read_only",
+          "pattern": "^(read_only|approval_required)$",
+          "title": "Actionmode",
+          "type": "string"
+        },
+        "model": {
+          "default": "",
+          "title": "Model",
+          "type": "string"
+        },
+        "maxTurns": {
+          "default": 40,
+          "minimum": 1,
+          "title": "Maxturns",
+          "type": "integer"
+        },
+        "discoveryTurns": {
+          "default": 20,
+          "minimum": 1,
+          "title": "Discoveryturns",
+          "type": "integer"
+        },
+        "caseIds": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Caseids"
+        },
+        "scientistIterations": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Scientistiterations",
+          "type": "integer"
+        }
+      },
+      "title": "ExperimentConfig",
+      "type": "object"
+    },
+    "ObjectiveStatus": {
+      "enum": [
+        "achieved",
+        "not_achieved",
+        "partial",
+        "not_attempted",
+        "unknown"
+      ],
+      "title": "ObjectiveStatus",
+      "type": "string"
+    },
+    "ResultSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "vulnerable": {
+          "minimum": 0,
+          "title": "Vulnerable",
+          "type": "integer"
+        },
+        "protected": {
+          "minimum": 0,
+          "title": "Protected",
+          "type": "integer"
+        },
+        "inconclusive": {
+          "minimum": 0,
+          "title": "Inconclusive",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "vulnerable",
+        "protected",
+        "inconclusive"
+      ],
+      "title": "ResultSummary",
+      "type": "object"
+    },
+    "SecurityVerdict": {
+      "enum": [
+        "vulnerable",
+        "protected",
+        "inconclusive",
+        "not_applicable"
+      ],
+      "title": "SecurityVerdict",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "$Schema"
+    },
+    "schemaVersion": {
+      "default": "1.0",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "runId": {
+      "title": "Runid",
+      "type": "string"
+    },
+    "dataset": {
+      "$ref": "#/$defs/DatasetReference"
+    },
+    "startedAt": {
+      "format": "date-time",
+      "title": "Startedat",
+      "type": "string"
+    },
+    "finishedAt": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Finishedat"
+    },
+    "outcome": {
+      "$ref": "#/$defs/ExecutionOutcome"
+    },
+    "configuration": {
+      "$ref": "#/$defs/ExperimentConfig"
+    },
+    "summary": {
+      "$ref": "#/$defs/ResultSummary"
+    },
+    "cases": {
+      "items": {
+        "$ref": "#/$defs/CaseResult"
+      },
+      "title": "Cases",
+      "type": "array"
+    },
+    "findings": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Findings",
+      "type": "array"
+    },
+    "errors": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Errors",
+      "type": "array"
+    }
+  },
+  "required": [
+    "runId",
+    "dataset",
+    "startedAt",
+    "outcome",
+    "configuration",
+    "summary",
+    "cases",
+    "findings",
+    "errors"
+  ],
+  "title": "RunResult",
+  "type": "object",
+  "$id": "https://gamr.local/schemas/run-result.schema.json"
+}

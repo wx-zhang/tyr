@@ -1,0 +1,1 @@
+"""GAMR command line application."""

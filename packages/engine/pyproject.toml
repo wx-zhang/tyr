@@ -1,0 +1,17 @@
+[build-system]
+requires = ["uv_build>=0.8.0,<0.9"]
+build-backend = "uv_build"
+
+[project]
+name = "gamr-engine"
+version = "0.1.0"
+description = "GAMR experiment orchestration"
+requires-python = ">=3.14,<3.15"
+dependencies = ["gamr-core"]
+
+[tool.uv.sources]
+gamr-core = { workspace = true }
+
+[tool.uv.build-backend]
+module-name = "gamr_engine"
+module-root = "src"

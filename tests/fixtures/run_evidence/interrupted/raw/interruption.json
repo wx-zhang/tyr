@@ -1,0 +1,6 @@
+{
+  "kind": "error",
+  "summary": "Worker stopped before the operation settled",
+  "operationState": "provisional",
+  "redacted": true
+}

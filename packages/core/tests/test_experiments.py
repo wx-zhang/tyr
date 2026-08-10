@@ -1,0 +1,42 @@
+from datetime import UTC, datetime
+
+import pytest
+from gamr_core import ExperimentRecord, RunRecord, RunSource, RunState
+from pydantic import ValidationError
+
+
+def test_json_records_round_trip_with_aliases() -> None:
+    created_at = datetime(2026, 8, 9, tzinfo=UTC)
+    experiment = ExperimentRecord(
+        id="experiment-1",
+        name="Read-only review",
+        dataset="datasets/first-plan",
+        createdAt=created_at,
+    )
+    run = RunRecord(
+        id="run-1",
+        source=RunSource.CLI,
+        experimentId=None,
+        dataset="datasets/first-plan",
+        state=RunState.RUNNING,
+        configuration=experiment.configuration,
+        createdAt=created_at,
+        updatedAt=created_at,
+    )
+
+    assert experiment.model_dump(by_alias=True, mode="json")["schemaVersion"] == "1.0"
+    assert run.model_dump(by_alias=True, mode="json")["experimentId"] is None
+    assert RunRecord.model_validate_json(run.model_dump_json(by_alias=True)) == run
+
+
+def test_run_record_rejects_unsafe_result_path() -> None:
+    with pytest.raises(ValidationError, match="relative"):
+        RunRecord(
+            id="run-1",
+            source=RunSource.SERVICE,
+            dataset="datasets/first-plan",
+            state=RunState.COMPLETED,
+            createdAt=datetime.now(UTC),
+            updatedAt=datetime.now(UTC),
+            resultPath="/tmp/result.json",
+        )

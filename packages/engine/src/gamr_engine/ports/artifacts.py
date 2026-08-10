@@ -1,0 +1,34 @@
+from __future__ import annotations
+
+from typing import Protocol
+
+from gamr_core import RunActivity, RunResult
+
+
+class ActivitySink(Protocol):
+    def append(self, activity: RunActivity) -> RunActivity: ...
+
+    def latest_sequence(self, run_id: str) -> int: ...
+
+
+class ArtifactStore(Protocol):
+    def write_json(self, relative_path: str, payload: dict[str, object]) -> str: ...
+
+    def write_raw(self, run_id: str, turn_id: str, payload: dict[str, object]) -> str: ...
+
+    def write_report(self, run_id: str, content: str) -> str: ...
+
+    def append_event(self, run_id: str, payload: dict[str, object]) -> str: ...
+
+    def append_activity(self, payload: dict[str, object]) -> str: ...
+
+    def write_checkpoint(self, run_id: str, payload: dict[str, object]) -> str: ...
+
+    def append_transcript(self, run_id: str, records: list[dict[str, object]]) -> str: ...
+
+    def write_result(
+        self,
+        run_id: str,
+        result: RunResult,
+        dataset_snapshot: dict[str, object] | None = None,
+    ) -> str: ...

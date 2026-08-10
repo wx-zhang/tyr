@@ -1,0 +1,299 @@
+import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import {
+  createExperiment,
+  fetchDatasetCases,
+  fetchDatasets,
+  type Dataset,
+} from "../../api/client";
+import { PageHeader } from "../../components/PageHeader";
+import { CaseChecklist } from "./CaseChecklist";
+
+function defaultCaseSelection(
+  dataset: Dataset | undefined,
+  caseIds: string[],
+): string[] {
+  if (!dataset) return [];
+  const defaults = dataset.spec.defaults.defaultCaseIds ?? [];
+  const known = new Set(caseIds);
+  const fromDefaults = defaults.filter((id) => known.has(id));
+  if (fromDefaults.length > 0) return fromDefaults;
+  return caseIds;
+}
+
+function defaultExperimentName(datasetTitle: string): string {
+  const stamp = new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date());
+  return `${datasetTitle} · ${stamp}`;
+}
+
+export function ExperimentPage() {
+  const navigate = useNavigate();
+  const [name, setName] = useState("");
+  const [datasetId, setDatasetId] = useState("");
+  const [selectedCaseIds, setSelectedCaseIds] = useState<string[]>([]);
+  const [allowActions, setAllowActions] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const datasets = useQuery({
+    queryKey: ["datasets"],
+    queryFn: fetchDatasets,
+  });
+
+  useEffect(() => {
+    if (datasetId || !datasets.data?.length) return;
+    if (datasets.data.length === 1) {
+      setDatasetId(datasets.data[0].metadata.id);
+    }
+  }, [datasets.data, datasetId]);
+
+  const selectedDataset = useMemo(
+    () => datasets.data?.find((item) => item.metadata.id === datasetId),
+    [datasets.data, datasetId],
+  );
+
+  const cases = useQuery({
+    queryKey: ["dataset-cases", datasetId],
+    queryFn: () => fetchDatasetCases(datasetId),
+    enabled: Boolean(datasetId),
+  });
+
+  useEffect(() => {
+    if (!cases.data) return;
+    setSelectedCaseIds(
+      defaultCaseSelection(
+        selectedDataset,
+        cases.data.map((item) => item.id),
+      ),
+    );
+  }, [cases.data, selectedDataset]);
+
+  const toggleCase = (caseId: string) => {
+    setSelectedCaseIds((current) =>
+      current.includes(caseId)
+        ? current.filter((id) => id !== caseId)
+        : [...current, caseId],
+    );
+  };
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    setError(null);
+    if (!datasetId) {
+      setError("Select a dataset.");
+      return;
+    }
+    if (selectedCaseIds.length === 0) {
+      setError("Select at least one case.");
+      return;
+    }
+    const datasetTitle = selectedDataset?.metadata.title ?? datasetId;
+    const experimentName = name.trim() || defaultExperimentName(datasetTitle);
+    setSubmitting(true);
+    try {
+      const experiment = await createExperiment({
+        name: experimentName,
+        dataset: datasetId,
+        actionMode: allowActions ? "approval_required" : "read_only",
+        caseIds: selectedCaseIds,
+      });
+      if (!experiment.id) throw new Error("Experiment was not created");
+      navigate(`/experiments/${experiment.id}`);
+    } catch (reason) {
+      setError(
+        reason instanceof Error ? reason.message : "Could not create experiment",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const caseList = cases.data ?? [];
+  const canSubmit =
+    Boolean(datasetId) &&
+    selectedCaseIds.length > 0 &&
+    !submitting &&
+    !cases.isLoading;
+
+  return (
+    <section className="section-stack">
+      <PageHeader
+        eyebrow="Experiment execution"
+        title="Execute experiment"
+        description="Choose a dataset and cases, then start a live run."
+        actions={
+          <Link className="button button-secondary" to="/datasets">
+            Browse datasets
+          </Link>
+        }
+      />
+
+      <div className="form-layout">
+        <form className="card form-card" onSubmit={submit}>
+          <div className="field-group">
+            <label htmlFor="experiment-name">Name</label>
+            <input
+              id="experiment-name"
+              name="name"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="Optional · defaults to dataset and time"
+            />
+          </div>
+
+          <div className="field-group">
+            <label htmlFor="experiment-dataset">Dataset</label>
+            <select
+              id="experiment-dataset"
+              name="dataset"
+              value={datasetId}
+              onChange={(event) => {
+                setDatasetId(event.target.value);
+                setSelectedCaseIds([]);
+                setError(null);
+              }}
+              required
+              disabled={datasets.isLoading}
+            >
+              <option value="" disabled>
+                {datasets.isLoading
+                  ? "Loading datasets…"
+                  : "Select a validated dataset"}
+              </option>
+              {(datasets.data ?? []).map((dataset) => (
+                <option key={dataset.metadata.id} value={dataset.metadata.id}>
+                  {dataset.metadata.title} ({dataset.metadata.id})
+                </option>
+              ))}
+            </select>
+            {datasets.isError ? (
+              <p className="field-help" role="alert">
+                Could not load datasets. Check the API connection.
+              </p>
+            ) : null}
+          </div>
+
+          <fieldset className="fieldset">
+            <legend>Test cases</legend>
+            {!datasetId ? (
+              <p className="field-help">Select a dataset to load cases.</p>
+            ) : cases.isLoading ? (
+              <p className="field-help" role="status">
+                Loading cases…
+              </p>
+            ) : cases.isError ? (
+              <p className="field-help" role="alert">
+                Could not load cases for this dataset.
+              </p>
+            ) : caseList.length === 0 ? (
+              <p className="field-help">No cases in this dataset.</p>
+            ) : (
+              <CaseChecklist
+                cases={caseList}
+                selectedCaseIds={selectedCaseIds}
+                onToggle={toggleCase}
+                onSelectDefaults={() =>
+                  setSelectedCaseIds(
+                    defaultCaseSelection(
+                      selectedDataset,
+                      caseList.map((item) => item.id),
+                    ),
+                  )
+                }
+                onSelectAll={() =>
+                  setSelectedCaseIds(caseList.map((item) => item.id))
+                }
+                onClear={() => setSelectedCaseIds([])}
+              />
+            )}
+          </fieldset>
+
+          <label className="choice-card case-choice">
+            <input
+              type="checkbox"
+              checked={allowActions}
+              onChange={(event) => setAllowActions(event.target.checked)}
+              aria-label="Actions Allowed"
+            />
+            <span>
+              <span className="choice-title" aria-hidden="true">
+                Actions Allowed
+              </span>
+              <span className="choice-description">
+                Tyr still requires a human decision per action. Uncheck for
+                read-only.
+              </span>
+            </span>
+          </label>
+
+          {allowActions ? (
+            <div className="callout callout-warning">
+              <p>
+                <strong>Actions Allowed.</strong> Approvals happen in Tyr, not
+                automatically in GAMR.
+              </p>
+            </div>
+          ) : (
+            <div className="callout">
+              <p>
+                <strong>Read-only.</strong> Query-only Tyr access.
+              </p>
+            </div>
+          )}
+
+          <div className="form-actions">
+            {error ? (
+              <p className="form-status form-status-error" role="alert">
+                {error}
+              </p>
+            ) : null}
+            <button
+              className="button button-primary"
+              type="submit"
+              disabled={!canSubmit}
+            >
+              {submitting ? "Creating…" : "Continue"}
+            </button>
+          </div>
+        </form>
+
+        <aside className="card" aria-labelledby="run-safety-title">
+          <div className="card-header">
+            <div>
+              <p className="eyebrow">Safety boundary</p>
+              <h2 id="run-safety-title">Before you execute</h2>
+            </div>
+          </div>
+          <div className="callout">
+            <p>
+              Credentials stay on the API server. The browser never receives Tyr
+              or model secrets.
+            </p>
+          </div>
+          <dl className="detail-list spaced">
+            <div className="detail-row">
+              <dt>Dataset snapshot</dt>
+              <dd>At run creation</dd>
+            </div>
+            <div className="detail-row">
+              <dt>Action mode</dt>
+              <dd>{allowActions ? "Actions Allowed" : "Read-only"}</dd>
+            </div>
+            <div className="detail-row">
+              <dt>Selected cases</dt>
+              <dd className="mono tabular">{selectedCaseIds.length}</dd>
+            </div>
+            <div className="detail-row">
+              <dt>Evidence</dt>
+              <dd className="mono">JSON bundle</dd>
+            </div>
+          </dl>
+        </aside>
+      </div>
+    </section>
+  );
+}

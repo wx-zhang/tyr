@@ -1,0 +1,61 @@
+.sidebar-collapsed .sidebar-inner {
+  padding-inline: var(--space-2);
+}
+
+.sidebar-collapsed .sidebar-top {
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-2);
+  margin-inline: 0;
+}
+
+.sidebar-collapsed .brand {
+  margin: 0;
+}
+
+.sidebar-collapsed .brand > span:not(.brand-mark),
+.sidebar-collapsed .sidebar-health > span:not(.status-dot),
+.sidebar-collapsed .sidebar-label,
+.sidebar-collapsed .sidebar-context,
+.sidebar-collapsed .theme-toggle > span:not(:first-child),
+.sidebar-collapsed .nav-label {
+  display: none;
+}
+
+.sidebar-collapsed .sidebar-toggle {
+  position: static;
+}
+
+.sidebar-collapsed .sidebar-health {
+  justify-content: center;
+  margin-inline: 0;
+}
+
+.sidebar-collapsed .nav-link {
+  justify-content: center;
+  padding-inline: 0;
+}
+
+.sidebar-collapsed .nav-link::after {
+  color: currentColor;
+  content: attr(data-short);
+  font-size: var(--text-md);
+  line-height: 1;
+}
+
+.sidebar-collapsed .nav-link.active::before {
+  left: calc(-1 * var(--space-2));
+}
+
+.sidebar-collapsed .sidebar-footer {
+  align-items: center;
+}
+
+.sidebar-collapsed .theme-toggle {
+  justify-content: center;
+  padding-inline: 0;
+}
+
+.sidebar-collapsed {
+  --sidebar-current-w: var(--sidebar-collapsed-w);
+}

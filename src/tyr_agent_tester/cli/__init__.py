@@ -1,1 +1,0 @@
-"""Interactive Tyr CLI package."""

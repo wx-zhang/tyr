@@ -1,0 +1,14 @@
+[build-system]
+requires = ["uv_build>=0.8.0,<0.9"]
+build-backend = "uv_build"
+
+[project]
+name = "gamr-core"
+version = "0.1.0"
+description = "Pure GAMR domain models and contracts"
+requires-python = ">=3.14,<3.15"
+dependencies = ["pydantic>=2.11,<3"]
+
+[tool.uv.build-backend]
+module-name = "gamr_core"
+module-root = "src"

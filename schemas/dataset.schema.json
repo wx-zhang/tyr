@@ -1,0 +1,466 @@
+{
+  "$defs": {
+    "DatasetDefaults": {
+      "additionalProperties": false,
+      "properties": {
+        "maxTurns": {
+          "minimum": 1,
+          "title": "Maxturns",
+          "type": "integer"
+        },
+        "actionMode": {
+          "pattern": "^(read_only|approval_required)$",
+          "title": "Actionmode",
+          "type": "string"
+        },
+        "defaultCaseIds": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Defaultcaseids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "maxTurns",
+        "actionMode"
+      ],
+      "title": "DatasetDefaults",
+      "type": "object"
+    },
+    "DatasetManifest": {
+      "additionalProperties": false,
+      "properties": {
+        "$schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "$Schema"
+        },
+        "schemaVersion": {
+          "default": "1.0",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "kind": {
+          "const": "dataset",
+          "default": "dataset",
+          "title": "Kind",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/$defs/DatasetMetadata"
+        },
+        "spec": {
+          "$ref": "#/$defs/DatasetSpec"
+        }
+      },
+      "required": [
+        "metadata",
+        "spec"
+      ],
+      "title": "DatasetManifest",
+      "type": "object"
+    },
+    "DatasetMetadata": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "version": {
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "version"
+      ],
+      "title": "DatasetMetadata",
+      "type": "object"
+    },
+    "DatasetSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "discovery": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Discovery"
+        },
+        "methodology": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Methodology"
+        },
+        "evaluation": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evaluation"
+        },
+        "cases": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Cases",
+          "type": "array"
+        },
+        "defaults": {
+          "$ref": "#/$defs/DatasetDefaults"
+        },
+        "variables": {
+          "additionalProperties": {
+            "$ref": "#/$defs/DatasetVariable"
+          },
+          "title": "Variables",
+          "type": "object"
+        }
+      },
+      "required": [
+        "cases",
+        "defaults"
+      ],
+      "title": "DatasetSpec",
+      "type": "object"
+    },
+    "DatasetVariable": {
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "enum": [
+            "run",
+            "literal",
+            "discovery"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "default": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Default"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        },
+        "field": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Field"
+        }
+      },
+      "required": [
+        "source"
+      ],
+      "title": "DatasetVariable",
+      "type": "object"
+    },
+    "DiscoveryPlan": {
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": {
+          "default": "1.0",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "kind": {
+          "const": "discovery",
+          "default": "discovery",
+          "title": "Kind",
+          "type": "string"
+        },
+        "prompt": {
+          "minLength": 1,
+          "title": "Prompt",
+          "type": "string"
+        },
+        "outputFields": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Outputfields",
+          "type": "array"
+        }
+      },
+      "required": [
+        "prompt"
+      ],
+      "title": "DiscoveryPlan",
+      "type": "object"
+    },
+    "EvaluationPlan": {
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": {
+          "default": "1.0",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "kind": {
+          "const": "evaluation",
+          "default": "evaluation",
+          "title": "Kind",
+          "type": "string"
+        },
+        "prompt": {
+          "minLength": 1,
+          "title": "Prompt",
+          "type": "string"
+        }
+      },
+      "required": [
+        "prompt"
+      ],
+      "title": "EvaluationPlan",
+      "type": "object"
+    },
+    "PromptBundle": {
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": {
+          "default": "1.0",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "kind": {
+          "const": "methodology",
+          "default": "methodology",
+          "title": "Kind",
+          "type": "string"
+        },
+        "systemBrief": {
+          "minLength": 1,
+          "title": "Systembrief",
+          "type": "string"
+        },
+        "unstickingGuidance": {
+          "minLength": 1,
+          "title": "Unstickingguidance",
+          "type": "string"
+        },
+        "testingMethodology": {
+          "minLength": 1,
+          "title": "Testingmethodology",
+          "type": "string"
+        }
+      },
+      "required": [
+        "systemBrief",
+        "unstickingGuidance",
+        "testingMethodology"
+      ],
+      "title": "PromptBundle",
+      "type": "object"
+    },
+    "Scenario": {
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": {
+          "default": "1.0",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "kind": {
+          "const": "scenario",
+          "default": "scenario",
+          "title": "Kind",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/$defs/ScenarioMetadata"
+        },
+        "spec": {
+          "$ref": "#/$defs/ScenarioSpec"
+        }
+      },
+      "required": [
+        "metadata",
+        "spec"
+      ],
+      "title": "Scenario",
+      "type": "object"
+    },
+    "ScenarioMetadata": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "category": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Category"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "title"
+      ],
+      "title": "ScenarioMetadata",
+      "type": "object"
+    },
+    "ScenarioSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "objective": {
+          "minLength": 1,
+          "title": "Objective",
+          "type": "string"
+        },
+        "steps": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Steps",
+          "type": "array"
+        },
+        "successCriteria": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Successcriteria"
+        },
+        "expectedControl": {
+          "minLength": 1,
+          "title": "Expectedcontrol",
+          "type": "string"
+        },
+        "evidenceRequirements": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Evidencerequirements",
+          "type": "array"
+        }
+      },
+      "required": [
+        "objective",
+        "steps",
+        "expectedControl",
+        "evidenceRequirements"
+      ],
+      "title": "ScenarioSpec",
+      "type": "object"
+    }
+  },
+  "discriminator": {
+    "mapping": {
+      "dataset": "#/$defs/DatasetManifest",
+      "discovery": "#/$defs/DiscoveryPlan",
+      "evaluation": "#/$defs/EvaluationPlan",
+      "methodology": "#/$defs/PromptBundle",
+      "scenario": "#/$defs/Scenario"
+    },
+    "propertyName": "kind"
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/DatasetManifest"
+    },
+    {
+      "$ref": "#/$defs/DiscoveryPlan"
+    },
+    {
+      "$ref": "#/$defs/PromptBundle"
+    },
+    {
+      "$ref": "#/$defs/EvaluationPlan"
+    },
+    {
+      "$ref": "#/$defs/Scenario"
+    }
+  ],
+  "$id": "https://gamr.local/schemas/dataset.schema.json"
+}

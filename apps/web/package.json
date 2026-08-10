@@ -1,0 +1,39 @@
+{
+  "name": "@gamr/web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "test": "vitest",
+    "lint": "eslint .",
+    "format": "prettier --check .",
+    "generate:api": "openapi-typescript ../../schemas/openapi.json -o src/api/generated.ts"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.90.0",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "react-markdown": "^10.1.0",
+    "react-router-dom": "^7.8.2",
+    "remark-gfm": "^4.0.1"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.8.0",
+    "@testing-library/react": "^16.3.0",
+    "@types/react": "^19.1.10",
+    "@types/react-dom": "^19.1.7",
+    "@vitejs/plugin-react": "^5.0.2",
+    "eslint": "^9.34.0",
+    "jsdom": "^26.1.0",
+    "openapi-typescript": "7.9.1",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.2",
+    "vite": "^8.0.0",
+    "vitest": "^3.2.4"
+  }
+}

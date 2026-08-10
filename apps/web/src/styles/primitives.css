@@ -1,0 +1,143 @@
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.button {
+  display: inline-flex;
+  min-height: var(--control-h);
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  border: var(--border-w) solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 0 var(--space-3);
+  cursor: pointer;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: 1;
+  text-decoration: none;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.button-primary {
+  background: var(--accent);
+  color: var(--accent-on);
+}
+
+.button-primary:hover {
+  background: var(--accent-hover);
+  color: var(--accent-on);
+}
+
+.button-secondary {
+  border-color: var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.button-secondary:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.button-ghost {
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.button-ghost:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.button-danger {
+  border-color: var(--danger);
+  background: transparent;
+  color: var(--danger);
+}
+
+.button-danger:hover {
+  background: var(--danger-tint);
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.56;
+}
+
+.theme-toggle {
+  min-width: 68px;
+  padding-inline: var(--space-2);
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  border-radius: var(--radius-full);
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  line-height: var(--leading-xs);
+  white-space: nowrap;
+}
+
+.status-info {
+  background: var(--info-tint);
+  color: var(--info);
+}
+
+.status-success {
+  background: var(--success-tint);
+  color: var(--success);
+}
+
+.status-warning {
+  background: var(--warning-tint);
+  color: var(--warning);
+}
+
+.status-danger {
+  background: var(--danger-tint);
+  color: var(--danger);
+}
+
+.status-neutral {
+  background: var(--neutral-status-tint);
+  color: var(--neutral-status);
+}
+
+.status-dot {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: currentColor;
+}
+
+.status-dot-success {
+  color: var(--success);
+  background: currentColor;
+}
+
+.status-dot-pulse {
+  animation: status-pulse 1.6s var(--ease-in-out) infinite;
+}
+
+@keyframes status-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.4;
+  }
+}

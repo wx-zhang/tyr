@@ -1,0 +1,189 @@
+{
+  "$defs": {
+    "ExperimentConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "actionMode": {
+          "default": "read_only",
+          "pattern": "^(read_only|approval_required)$",
+          "title": "Actionmode",
+          "type": "string"
+        },
+        "model": {
+          "default": "",
+          "title": "Model",
+          "type": "string"
+        },
+        "maxTurns": {
+          "default": 40,
+          "minimum": 1,
+          "title": "Maxturns",
+          "type": "integer"
+        },
+        "discoveryTurns": {
+          "default": 20,
+          "minimum": 1,
+          "title": "Discoveryturns",
+          "type": "integer"
+        },
+        "caseIds": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Caseids"
+        },
+        "scientistIterations": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Scientistiterations",
+          "type": "integer"
+        }
+      },
+      "title": "ExperimentConfig",
+      "type": "object"
+    },
+    "RunSource": {
+      "enum": [
+        "cli",
+        "service"
+      ],
+      "title": "RunSource",
+      "type": "string"
+    },
+    "RunState": {
+      "enum": [
+        "queued",
+        "preparing",
+        "discovering",
+        "running",
+        "waiting_for_approval",
+        "evaluating",
+        "reporting",
+        "completed",
+        "failed",
+        "cancelled",
+        "interrupted"
+      ],
+      "title": "RunState",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "default": "1.0",
+      "title": "Schemaversion",
+      "type": "string"
+    },
+    "id": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+      "title": "Id",
+      "type": "string"
+    },
+    "source": {
+      "$ref": "#/$defs/RunSource"
+    },
+    "experimentId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Experimentid"
+    },
+    "retryOf": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Retryof"
+    },
+    "dataset": {
+      "minLength": 1,
+      "title": "Dataset",
+      "type": "string"
+    },
+    "state": {
+      "$ref": "#/$defs/RunState"
+    },
+    "configuration": {
+      "$ref": "#/$defs/ExperimentConfig"
+    },
+    "resultPath": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Resultpath"
+    },
+    "errorSummary": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Errorsummary"
+    },
+    "createdAt": {
+      "format": "date-time",
+      "title": "Createdat",
+      "type": "string"
+    },
+    "updatedAt": {
+      "format": "date-time",
+      "title": "Updatedat",
+      "type": "string"
+    },
+    "finishedAt": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Finishedat"
+    }
+  },
+  "required": [
+    "id",
+    "source",
+    "dataset",
+    "state",
+    "createdAt",
+    "updatedAt"
+  ],
+  "title": "RunRecord",
+  "type": "object",
+  "$id": "https://gamr.local/schemas/run.schema.json"
+}
