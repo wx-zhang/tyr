@@ -170,11 +170,24 @@ textarea {
   background: var(--accent-tint);
 }
 
+.choice-card-risk:has(input:checked) {
+  border-color: var(--warning);
+  background: var(--warning-tint);
+}
+
+.choice-card-risk:has(input:checked) .choice-title {
+  color: var(--warning);
+}
+
 .choice-card input {
   width: auto;
   min-height: 0;
   margin-top: var(--space-1);
   accent-color: var(--accent);
+}
+
+.choice-card-risk input {
+  accent-color: var(--warning);
 }
 
 .choice-title {

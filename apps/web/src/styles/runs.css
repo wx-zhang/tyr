@@ -94,6 +94,11 @@
   font-weight: 500;
 }
 
+.run-mode-actions {
+  background: var(--warning-tint);
+  color: var(--warning);
+}
+
 .run-header-tools {
   display: flex;
   flex-direction: column;

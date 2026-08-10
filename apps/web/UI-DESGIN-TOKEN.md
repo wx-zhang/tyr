@@ -151,8 +151,8 @@ The palette is deliberately neutral. Signal blue is the interaction accent so re
   --success-tint: rgb(21 122 61 / 10%);
   --info: #1d4ed8;
   --info-tint: rgb(29 78 216 / 10%);
-  --warning: #8a5a00;
-  --warning-tint: rgb(138 90 0 / 11%);
+  --warning: #b54708;
+  --warning-tint: rgb(181 71 8 / 12%);
   --danger: #b42334;
   --danger-tint: rgb(180 35 52 / 10%);
   --neutral-status: #607184;
@@ -194,8 +194,8 @@ The palette is deliberately neutral. Signal blue is the interaction accent so re
   --success-tint: rgb(74 222 128 / 14%);
   --info: #60a5fa;
   --info-tint: rgb(96 165 250 / 14%);
-  --warning: #fbbf24;
-  --warning-tint: rgb(251 191 36 / 14%);
+  --warning: #fb923c;
+  --warning-tint: rgb(251 146 60 / 14%);
   --danger: #fb7185;
   --danger-tint: rgb(251 113 133 / 14%);
   --neutral-status: #8491a1;

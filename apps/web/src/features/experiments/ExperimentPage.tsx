@@ -206,7 +206,7 @@ export function ExperimentPage() {
             </div>
           ) : null}
 
-          <label className="choice-card case-choice">
+          <label className="choice-card case-choice choice-card-risk">
             <input
               type="checkbox"
               checked={allowActions}

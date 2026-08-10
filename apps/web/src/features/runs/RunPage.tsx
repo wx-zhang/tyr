@@ -379,7 +379,13 @@ export function RunPage() {
               tone={tone(run?.state)}
               pulse={isLive}
             />
-            <span className="run-mode">{label(run?.actionMode ?? "read_only")}</span>
+            <span
+              className={`run-mode${
+                run?.actionMode === "approval_required" ? " run-mode-actions" : ""
+              }`}
+            >
+              {label(run?.actionMode ?? "read_only")}
+            </span>
           </div>
           <dl className="run-facts">
             <div>
