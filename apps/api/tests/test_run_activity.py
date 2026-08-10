@@ -109,7 +109,11 @@ def test_historical_visualization_uses_canonical_lifecycle_stages(
         "evaluating",
         "reporting",
     ]
-    assert {phase["state"] for phase in payload["phases"]} == {"completed"}
+    phases = {phase["id"]: phase["state"] for phase in payload["phases"]}
+    assert phases["scientist"] == "skipped"
+    assert {state for phase_id, state in phases.items() if phase_id != "scientist"} == {
+        "completed"
+    }
     assert payload["run"]["currentPhase"] is not None
     assert payload["run"]["currentPhase"] != "unknown"
 
@@ -195,6 +199,61 @@ def test_historical_visualization_exposes_scientist_phase_and_current_phase(
     assert phases["running"] == "completed"
     cases = {case["caseId"]: case["state"] for case in payload["cases"]}
     assert cases["case-alpha"] == "completed"
+
+
+def test_historical_visualization_marks_scientist_skipped_when_unused(
+    historical_client: TestClient,
+) -> None:
+    settings = app.dependency_overrides[get_settings]()
+    root = Path(settings.artifact_root) / "runs" / RUN_ID
+    records = [
+        {
+            "id": "activity-1",
+            "runId": RUN_ID,
+            "sequence": 1,
+            "occurredAt": "2026-08-08T10:01:00Z",
+            "activityType": "phase",
+            "status": "discovery_completed",
+            "phase": "discovery",
+            "summary": "1 candidate(s)",
+            "evidenceType": "event",
+            "detailAvailability": "available",
+        },
+        {
+            "id": "activity-2",
+            "runId": RUN_ID,
+            "sequence": 2,
+            "occurredAt": "2026-08-08T10:02:00Z",
+            "activityType": "case",
+            "status": "case_completed",
+            "phase": "case",
+            "caseId": "case-alpha",
+            "summary": "completed",
+            "evidenceType": "event",
+            "detailAvailability": "available",
+        },
+        {
+            "id": "activity-3",
+            "runId": RUN_ID,
+            "sequence": 3,
+            "occurredAt": "2026-08-08T10:04:00Z",
+            "activityType": "run_state",
+            "status": "completed",
+            "summary": "Run state is completed",
+            "evidenceType": "event",
+            "detailAvailability": "available",
+        },
+    ]
+    (root / "activity.jsonl").write_text(
+        "".join(json.dumps(record) + "\n" for record in records), encoding="utf-8"
+    )
+
+    payload = historical_client.get(f"/api/v1/runs/{RUN_ID}/visualization").json()
+
+    phases = {phase["id"]: phase["state"] for phase in payload["phases"]}
+    assert phases["scientist"] == "skipped"
+    assert phases["running"] == "completed"
+    assert phases["evaluating"] == "completed"
 
 
 def test_activity_search_filters_cursor_and_omitted_counts(historical_client: TestClient) -> None:

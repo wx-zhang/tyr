@@ -178,6 +178,66 @@ def test_visualization_does_not_disclose_an_unknown_run() -> None:
         app.dependency_overrides.clear()
 
 
+def test_visualization_marks_scientist_active_while_run_state_is_running() -> None:
+    registry, run_id = _registry_with_run()
+    run = registry.runs[run_id]
+    run.configuration = run.configuration.model_copy(update={"scientistIterations": 1})
+    registry.set_state(run, RunState.PREPARING)
+    registry.set_state(run, RunState.DISCOVERING)
+    registry.set_state(run, RunState.RUNNING)
+    registry.activities[run_id] = [
+        _activity(run_id, 3, phase="case", case_id="case-1", status="completed"),
+        _activity(
+            run_id,
+            4,
+            activity_type="phase",
+            phase="scientist",
+            status="scientist_started",
+            summary="1 iteration(s)",
+        ),
+        _activity(
+            run_id,
+            5,
+            phase="scientist",
+            case_id="scientist-1",
+            status="active",
+            summary="Scientist case active",
+        ),
+    ]
+
+    try:
+        payload = _client(registry).get(f"/api/v1/runs/{run_id}/visualization").json()
+        assert payload["run"]["state"] == "running"
+        assert payload["run"]["currentPhase"] == "scientist"
+        phases = {phase["id"]: phase["state"] for phase in payload["phases"]}
+        assert phases["running"] == "completed"
+        assert phases["scientist"] == "active"
+        assert phases["evaluating"] == "pending"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_visualization_marks_scientist_skipped_when_disabled() -> None:
+    registry, run_id = _registry_with_run()
+    run = registry.runs[run_id]
+    run.configuration = run.configuration.model_copy(update={"scientistIterations": 0})
+    registry.set_state(run, RunState.PREPARING)
+    registry.set_state(run, RunState.DISCOVERING)
+    registry.set_state(run, RunState.RUNNING)
+    registry.activities[run_id] = [
+        _activity(run_id, 3, phase="case", case_id="case-1", status="active"),
+    ]
+
+    try:
+        payload = _client(registry).get(f"/api/v1/runs/{run_id}/visualization").json()
+        phases = {phase["id"]: phase["state"] for phase in payload["phases"]}
+        assert payload["run"]["currentPhase"] == "running"
+        assert phases["scientist"] == "skipped"
+        assert phases["running"] == "active"
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_historical_visualization_merges_canonical_case_results(tmp_path: Path) -> None:
     artifact_root = tmp_path / "artifacts"
     source = Path("tests/fixtures/run_evidence/completed")

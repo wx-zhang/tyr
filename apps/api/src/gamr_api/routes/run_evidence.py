@@ -61,8 +61,8 @@ _ACTIVITY_STAGE = {
     "case": "running",
     "execution": "running",
     "scientist": "scientist",
-    "assessment": "evaluating",
 }
+_COARSE_RUN_STATES = frozenset({"running", "waiting_for_approval"})
 _CASE_STATE = {
     "case_started": "active",
     "case_completed": "completed",
@@ -347,17 +347,26 @@ def _activity_case_state(activities: list[RunActivity]) -> dict[str, dict[str, o
     return cases
 
 
+def _activity_current_phase(activities: list[RunActivity]) -> str | None:
+    for activity in reversed(activities):
+        mapped = _map_activity_stage(activity.phase)
+        if mapped is not None:
+            return mapped
+    return None
+
+
 def _current_phase(
     state: str,
     metadata: dict[str, object],
     activities: list[RunActivity],
 ) -> str | None:
+    activity_phase = _activity_current_phase(activities)
+    if state in _COARSE_RUN_STATES:
+        return activity_phase or "running"
     if state in _LIFECYCLE_STAGES:
         return state
-    for activity in reversed(activities):
-        mapped = _map_activity_stage(activity.phase)
-        if mapped is not None:
-            return mapped
+    if activity_phase is not None:
+        return activity_phase
     raw_phase = metadata.get("phase")
     if raw_phase:
         mapped = _map_activity_stage(str(raw_phase))
@@ -370,17 +379,52 @@ def _current_phase(
     return None
 
 
+def _scientist_stage_state(
+    *,
+    scientist_seen: bool,
+    scientist_enabled: bool,
+    current_index: int,
+    scientist_index: int,
+    terminal: bool,
+    state: str,
+) -> str:
+    if scientist_seen:
+        if current_index == scientist_index:
+            return state if terminal else "active"
+        if state == "completed" or current_index > scientist_index:
+            return "completed"
+        return "pending"
+    if scientist_enabled and not terminal and current_index < scientist_index:
+        return "pending"
+    return "skipped"
+
+
 def _lifecycle_progress(
     state: str,
     metadata: dict[str, object],
     activities: list[RunActivity],
+    *,
+    scientist_enabled: bool = False,
 ) -> tuple[list[dict[str, object]], str | None]:
     current = _current_phase(state, metadata, activities)
     current_index = _LIFECYCLE_STAGES.index(current) if current in _LIFECYCLE_STAGES else -1
     terminal = state in {"completed", "failed", "cancelled", "interrupted"}
+    scientist_index = _LIFECYCLE_STAGES.index("scientist")
+    scientist_seen = any(
+        _map_activity_stage(activity.phase) == "scientist" for activity in activities
+    )
     result: list[dict[str, object]] = []
     for index, stage in enumerate(_LIFECYCLE_STAGES):
-        if state == "completed" or index < current_index:
+        if stage == "scientist":
+            stage_state = _scientist_stage_state(
+                scientist_seen=scientist_seen,
+                scientist_enabled=scientist_enabled or scientist_seen,
+                current_index=current_index,
+                scientist_index=scientist_index,
+                terminal=terminal,
+                state=state,
+            )
+        elif state == "completed" or index < current_index:
             stage_state = "completed"
         elif index == current_index:
             stage_state = state if terminal else "active"
@@ -458,7 +502,18 @@ def visualization(
                 "latestSequence": None,
             },
         )
-    phases, current_phase = _lifecycle_progress(state, metadata, bundle.activities)
+    scientist_enabled = run.configuration.scientist_iterations > 0
+    config_meta = metadata.get("configuration")
+    if isinstance(config_meta, dict):
+        iterations = config_meta.get("scientistIterations", config_meta.get("scientist_iterations"))
+        if isinstance(iterations, int):
+            scientist_enabled = iterations > 0
+    phases, current_phase = _lifecycle_progress(
+        state,
+        metadata,
+        bundle.activities,
+        scientist_enabled=scientist_enabled,
+    )
     pending_approvals = sum(
         activity.activity_type is ActivityType.APPROVAL and activity.status == "pending"
         for activity in bundle.activities

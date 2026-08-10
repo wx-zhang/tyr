@@ -49,6 +49,7 @@ function label(value: string | null | undefined): string {
   if (value === "scientist") return "Scientist";
   if (value === "generating") return "Generating";
   if (value === "ready") return "Ready";
+  if (value === "skipped") return "Skipped";
   return value.replaceAll("_", " ").replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
@@ -210,6 +211,7 @@ function stageStatusLabel(
   if (phaseState === "failed") return "Failed";
   if (phaseState === "cancelled") return "Cancelled";
   if (phaseState === "interrupted") return "Interrupted";
+  if (phaseState === "skipped") return "Off";
   return null;
 }
 

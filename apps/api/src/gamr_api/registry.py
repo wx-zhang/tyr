@@ -201,24 +201,42 @@ class InMemoryRegistry:
             "case": "running",
             "execution": "running",
             "scientist": "scientist",
-            "assessment": "evaluating",
         }
-        current_phase: str | None = (
-            run.state.value if run.state.value in phase_names else None
-        )
-        if current_phase is None:
-            for activity in reversed(activities):
-                if not activity.phase:
-                    continue
-                mapped = stage_map.get(activity.phase, activity.phase)
-                if mapped in phase_names:
-                    current_phase = mapped
-                    break
+        coarse_states = {RunState.RUNNING, RunState.WAITING_FOR_APPROVAL}
+        activity_phase: str | None = None
+        for activity in reversed(activities):
+            if not activity.phase:
+                continue
+            mapped = stage_map.get(activity.phase, activity.phase)
+            if mapped in phase_names:
+                activity_phase = mapped
+                break
+        if run.state in coarse_states:
+            current_phase: str | None = activity_phase or "running"
+        elif run.state.value in phase_names:
+            current_phase = run.state.value
+        else:
+            current_phase = activity_phase
         phases = []
         current_index = phase_names.index(current_phase) if current_phase in phase_names else -1
+        scientist_index = phase_names.index("scientist")
+        scientist_seen = any(
+            stage_map.get(item.phase or "", item.phase) == "scientist" for item in activities
+        )
+        scientist_enabled = run.configuration.scientist_iterations > 0 or scientist_seen
+        terminal = run.state in {
+            RunState.COMPLETED,
+            RunState.FAILED,
+            RunState.CANCELLED,
+            RunState.INTERRUPTED,
+        }
         for index, phase in enumerate(phase_names):
-            state = "pending"
-            if run.state is RunState.COMPLETED or index < current_index:
+            if phase == "scientist" and not scientist_seen:
+                if scientist_enabled and not terminal and current_index < scientist_index:
+                    state = "pending"
+                else:
+                    state = "skipped"
+            elif run.state is RunState.COMPLETED or index < current_index:
                 state = "completed"
             elif index == current_index:
                 state = run.state.value if run.state in {
@@ -226,6 +244,13 @@ class InMemoryRegistry:
                     RunState.CANCELLED,
                     RunState.INTERRUPTED,
                 } else "active"
+            else:
+                state = "pending"
+            if phase == "scientist" and scientist_seen:
+                if current_index == scientist_index:
+                    state = run.state.value if terminal else "active"
+                elif run.state is RunState.COMPLETED or current_index > scientist_index:
+                    state = "completed"
             phases.append(
                 {
                     "id": phase,

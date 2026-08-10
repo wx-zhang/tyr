@@ -425,6 +425,28 @@
   font-weight: 400;
 }
 
+.stage-skipped {
+  border-top-color: var(--border);
+  border-top-style: dashed;
+}
+
+.stage-skipped .stage-marker {
+  border-color: var(--border);
+  background: var(--surface);
+  opacity: 0.7;
+}
+
+.stage-skipped strong {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.stage-skipped .stage-state {
+  color: var(--text-muted);
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
 @keyframes stage-arrow-slide {
   0% {
     left: 8%;

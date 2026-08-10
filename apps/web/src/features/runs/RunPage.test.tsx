@@ -198,6 +198,35 @@ function renderPageWithCachedTurns() {
   );
 }
 
+it("shows scientist stage as Off when the timeline marks it skipped", async () => {
+  vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url.includes("/visualization")) {
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          ...visualization,
+          phases: visualization.phases.map((phase) =>
+            phase.id === "scientist"
+              ? { ...phase, state: "skipped" }
+              : phase,
+          ),
+        }),
+      } as Response);
+    }
+    if (url.includes("/turns")) {
+      return Promise.resolve({ ok: true, json: async () => turns } as Response);
+    }
+    return Promise.resolve({ ok: true, json: async () => ({ items: [] }) } as Response);
+  });
+
+  const { container } = renderPage();
+
+  expect(await screen.findByText("Scientist")).toBeInTheDocument();
+  expect(screen.getByText("Off")).toBeInTheDocument();
+  expect(container.querySelector(".stage-skipped")).not.toBeNull();
+});
+
 it("shows the run lifecycle and grouped Agent to Tyr turns newest first", async () => {
   const { container } = renderPage();
 
