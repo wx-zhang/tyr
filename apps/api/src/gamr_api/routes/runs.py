@@ -294,6 +294,10 @@ async def events(
                         f"data: {json.dumps(item, default=str)}\n\n"
                     )
             yield f": heartbeat; interval={HEARTBEAT_SECONDS}\n\n"
+            yield (
+                f"event: heartbeat\n"
+                f"data: {json.dumps({'interval': HEARTBEAT_SECONDS})}\n\n"
+            )
             if not follows_stream:
                 break
             await asyncio.sleep(HEARTBEAT_SECONDS)

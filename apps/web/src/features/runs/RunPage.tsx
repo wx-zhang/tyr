@@ -160,12 +160,20 @@ function sameTurn(left: RunTurn | undefined, right: RunTurn): boolean {
     && left.repliedAt === right.repliedAt);
 }
 
+function turnHasOpenWork(turn: RunTurn): boolean {
+  if (turn.status === "waiting_for_tyr" && !turn.tyrMessage) return true;
+  if (turn.status === "generating") return true;
+  return false;
+}
+
 function stageStatusLabel(
   phaseState: string,
   waitingForTyr: boolean,
+  awaitingNextTurn: boolean,
   isActive: boolean,
 ): string | null {
   if (isActive && waitingForTyr) return "Waiting for Tyr";
+  if (isActive && awaitingNextTurn) return "Agent working";
   if (phaseState === "active") return "Active";
   if (phaseState === "failed") return "Failed";
   if (phaseState === "cancelled") return "Cancelled";
@@ -277,6 +285,13 @@ export function RunPage() {
     const byId = new Map([...olderTurns, ...visibleLatestTurns].map((turn) => [turn.id, turn]));
     return [...byId.values()].sort((left, right) => right.sequence - left.sequence);
   }, [olderTurns, visibleLatestTurns]);
+  const hasOpenTurnWork = Boolean(
+    visibleLatestTurns.some(turnHasOpenWork) || latestTurns?.some(turnHasOpenWork),
+  );
+  const hasPersistedTurns = Boolean(
+    allTurns.length || latestTurns?.length || (turns.data?.latestSequence ?? 0) > 0,
+  );
+  const awaitingNextTurn = Boolean(isLive && hasPersistedTurns && !hasOpenTurnWork);
 
   const loadOlder = async () => {
     const cursor = turns.data?.nextCursor;
@@ -364,7 +379,12 @@ export function RunPage() {
       ) : null}
 
       <section
-        className={`lifecycle-panel${isLive ? " lifecycle-live" : ""}${waitingForTyr ? " lifecycle-waiting" : ""}`}
+        className={[
+          "lifecycle-panel",
+          isLive ? "lifecycle-live" : "",
+          waitingForTyr ? "lifecycle-waiting" : "",
+          awaitingNextTurn ? "lifecycle-working" : "",
+        ].filter(Boolean).join(" ")}
         aria-labelledby="stages-title"
       >
         <div className="section-heading">
@@ -372,14 +392,21 @@ export function RunPage() {
           <span className="muted" role="status" aria-live="polite">
             {waitingForTyr
               ? "Waiting for Tyr"
-              : currentPhaseLabel(run, visualization.data?.phases)}
+              : awaitingNextTurn
+                ? "Agent working"
+                : currentPhaseLabel(run, visualization.data?.phases)}
           </span>
         </div>
         {visualization.isLoading ? <p className="secondary">Loading run stages…</p> : null}
         <ol className="run-stages" aria-label="Run stages">
           {(visualization.data?.phases ?? []).map((phase) => {
             const active = phase.state === "active";
-            const statusText = stageStatusLabel(phase.state, waitingForTyr, active);
+            const statusText = stageStatusLabel(
+              phase.state,
+              waitingForTyr,
+              awaitingNextTurn,
+              active,
+            );
             return (
               <li
                 key={phase.id}
@@ -387,6 +414,7 @@ export function RunPage() {
                   "run-stage",
                   `stage-${phase.state}`,
                   active && waitingForTyr ? "stage-waiting" : "",
+                  active && awaitingNextTurn ? "stage-working" : "",
                 ].filter(Boolean).join(" ")}
                 aria-current={active ? "step" : undefined}
                 title={statusText ? `${phase.label}: ${statusText}` : phase.label}
@@ -429,11 +457,12 @@ export function RunPage() {
           </p>
         ) : null}
         <ol className="turn-list" aria-label="Run conversation turns">
+          {awaitingNextTurn ? <PendingNextTurn /> : null}
           {allTurns.map((turn, index) => (
             <Turn
               key={turn.id}
               turn={turn}
-              newest={index === 0}
+              newest={index === 0 && !awaitingNextTurn}
               flash={flashIds.has(turn.id)}
               now={now}
             />
@@ -567,5 +596,26 @@ function WaitingTyr() {
         </span>
       </p>
     </div>
+  );
+}
+
+function PendingNextTurn() {
+  return (
+    <li className="turn turn-pending-next newest-turn">
+      <div
+        className="pending-next-turn"
+        role="status"
+        aria-live="polite"
+        aria-label="Awaiting next turn"
+      >
+        <span className="tyr-waiting-spinner" aria-hidden="true" />
+        <div>
+          <p className="pending-next-title">Agent working</p>
+          <p className="pending-next-detail">
+            Next turn will appear when the agent sends a message.
+          </p>
+        </div>
+      </div>
+    </li>
   );
 }

@@ -349,3 +349,98 @@ it("defaults refresh rate to 30s and lets the operator change it", async () => {
   expect(screen.getByRole("radio", { name: "30s" })).toHaveAttribute("aria-checked", "false");
   expect(window.localStorage.getItem("gamr-run-refresh-ms")).toBe("5000");
 });
+
+it("shows agent working when the run is live and the latest turn is complete", async () => {
+  vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url.includes("/visualization")) {
+      return Promise.resolve({ ok: true, json: async () => visualization } as Response);
+    }
+    if (url.includes("/turns")) {
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          items: [
+            {
+              id: "turn-done",
+              sequence: 1,
+              number: 1,
+              stage: "case",
+              caseId: "case-alpha",
+              status: "completed",
+              agentMessage: "Upload the file.",
+              tyrMessage: "The exact HTTP status code was 201.",
+              occurredAt: "2026-08-08T10:01:00Z",
+              repliedAt: "2026-08-08T10:01:28Z",
+            },
+          ],
+          omittedBefore: 0,
+          nextCursor: null,
+          latestSequence: 1,
+        }),
+      } as Response);
+    }
+    return Promise.resolve({ ok: true, json: async () => ({ items: [] }) } as Response);
+  });
+
+  const { container } = renderPage();
+  expect(
+    await screen.findByText("Next turn will appear when the agent sends a message."),
+  ).toBeInTheDocument();
+  expect(screen.getByRole("status", { name: "Awaiting next turn" })).toBeInTheDocument();
+  expect(screen.getAllByText("Agent working").length).toBeGreaterThan(0);
+  expect(container.querySelector(".pending-next-turn")).not.toBeNull();
+  expect(container.querySelector(".stage-working")).not.toBeNull();
+  expect(screen.queryByText("Waiting for Tyr")).not.toBeInTheDocument();
+});
+it("does not show agent working while waiting for Tyr", async () => {
+  renderPage();
+  await screen.findByText("read_file");
+  expect(screen.getAllByText("Waiting for Tyr").length).toBeGreaterThan(0);
+  expect(screen.queryByText("Agent working")).not.toBeInTheDocument();
+});
+
+it("does not show agent working after the run ends", async () => {
+  vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url.includes("/visualization")) {
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          ...visualization,
+          run: {
+            ...visualization.run,
+            state: "completed",
+            currentPhase: null,
+            finishedAt: "2026-08-08T10:10:00Z",
+            outcome: "completed",
+          },
+          phases: visualization.phases.map((phase) => ({ ...phase, state: "completed" })),
+        }),
+      } as Response);
+    }
+    if (url.includes("/turns")) {
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          items: [
+            {
+              ...turns.items[0],
+              status: "completed",
+              tyrMessage: "Done",
+              repliedAt: "2026-08-08T10:01:12Z",
+            },
+          ],
+          omittedBefore: 0,
+          nextCursor: null,
+          latestSequence: 1,
+        }),
+      } as Response);
+    }
+    return Promise.resolve({ ok: true, json: async () => ({ items: [] }) } as Response);
+  });
+
+  renderPage();
+  await screen.findByText("Done");
+  expect(screen.queryByText("Agent working")).not.toBeInTheDocument();
+});

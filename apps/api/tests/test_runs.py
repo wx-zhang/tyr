@@ -109,7 +109,9 @@ def test_run_events_support_last_event_id() -> None:
     resumed = client.get(
         f"/api/v1/runs/{run['id']}/events", headers={"Last-Event-ID": "1"}
     )
-    assert resumed.text == ": heartbeat; interval=15\n\n"
+    assert ": heartbeat; interval=15" in resumed.text
+    assert "event: heartbeat" in resumed.text
+    assert '"interval": 15' in resumed.text
 
 
 def test_cancelled_queued_run_is_persisted() -> None:

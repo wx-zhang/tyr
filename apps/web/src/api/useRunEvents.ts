@@ -194,10 +194,15 @@ export function useRunEvents(
       clearConnectionTimers();
       staleTimer = setTimeout(markStale, RUN_EVENT_STALE_MS);
     };
-    const handleOpen = () => {
-      setState((current) => ({ ...current, connectionState: "connected", error: null }));
+    const markLive = () => {
+      setState((current) =>
+        current.connectionState === "connected" && current.error === null
+          ? current
+          : { ...current, connectionState: "connected", error: null },
+      );
       armStaleTimer();
     };
+    const handleOpen = () => markLive();
     const handleError = () => {
       setState((current) => ({ ...current, connectionState: "reconnecting" }));
       armStaleTimer();
@@ -206,7 +211,12 @@ export function useRunEvents(
       const notification = parseNotification((event as MessageEvent).data);
       if (!notification || notification.sequence <= lastSequenceRef.current) return;
       lastSequenceRef.current = notification.sequence;
-      setState((current) => ({ ...current, lastSequence: notification.sequence }));
+      setState((current) => ({
+        ...current,
+        connectionState: "connected",
+        lastSequence: notification.sequence,
+        error: null,
+      }));
       onNotificationRef.current?.(notification);
       invalidate();
       armStaleTimer();
@@ -221,7 +231,7 @@ export function useRunEvents(
       }));
       void resync();
     };
-    const handleHeartbeat = () => armStaleTimer();
+    const handleHeartbeat = () => markLive();
 
     source.addEventListener("run-activity", handleActivity);
     source.addEventListener("resync-required", handleResync);

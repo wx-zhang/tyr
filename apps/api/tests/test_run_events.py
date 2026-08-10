@@ -1,7 +1,6 @@
 import json
 from collections.abc import Iterator
 from contextlib import contextmanager
-from pathlib import Path
 
 from fastapi.testclient import TestClient
 from gamr_adapters.config import Settings
@@ -35,7 +34,9 @@ def test_replay_window_emits_one_resync_signal_instead_of_unbounded_events() -> 
         response = client.get(f"/api/v1/runs/{run.id}/events")
 
         assert response.status_code == 200
-        assert response.text.count("event: ") == 1
+        assert response.text.count("event: resync-required") == 1
+        assert "event: run-activity" not in response.text
+        assert "event: heartbeat" in response.text
         assert "event: resync-required" in response.text
         payload = json.loads(response.text.split("data: ", 1)[1].split("\n", 1)[0])
         assert payload["latestSequence"] == 1002
@@ -52,15 +53,15 @@ def test_event_stream_includes_fifteen_second_heartbeat_and_reconnects_in_sequen
         )
 
         assert ": heartbeat; interval=15" in response.text
+        assert "event: heartbeat" in response.text
+        assert '"interval": 15' in response.text
         assert [line for line in response.text.splitlines() if line.startswith("id: ")] == [
             "id: 2",
             "id: 3",
         ]
 
 
-def test_json_bundle_event_stream_survives_unsafe_transcript_summary(
-    tmp_path: Path,
-) -> None:
+def test_json_bundle_event_stream_survives_unsafe_transcript_summary(tmp_path) -> None:
     artifact_root = tmp_path / ".gamr"
     registry = JsonRegistry(artifact_root)
     run = registry.create_run(None, "fixture-evidence")
@@ -112,6 +113,7 @@ def test_run_activity_events_are_named_ordered_resumable_and_heartbeat() -> None
         assert "id: 1" in response.text
         assert "id: 2" in response.text
         assert ": heartbeat" in response.text
+        assert "event: heartbeat" in response.text
         assert response.text.index("id: 1") < response.text.index("id: 2")
 
         resumed = client.get(
