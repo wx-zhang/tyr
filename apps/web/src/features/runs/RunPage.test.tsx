@@ -331,3 +331,21 @@ it("holds a new Tyr reply behind the same action while reviewing older content",
   expect(await screen.findByRole("button", { name: "Show 1 new turn" })).toBeInTheDocument();
   expect(screen.queryByText("Request allowed")).not.toBeInTheDocument();
 });
+
+it("defaults refresh rate to 30s and lets the operator change it", async () => {
+  window.localStorage.removeItem("gamr-run-refresh-ms");
+  renderPage();
+  await screen.findByRole("heading", { name: "Run run-1" });
+
+  const group = screen.getByRole("radiogroup", { name: "Refresh rate" });
+  expect(group).toBeInTheDocument();
+  expect(screen.getByRole("radio", { name: "1s" })).toHaveAttribute("aria-checked", "false");
+  expect(screen.getByRole("radio", { name: "5s" })).toHaveAttribute("aria-checked", "false");
+  expect(screen.getByRole("radio", { name: "10s" })).toHaveAttribute("aria-checked", "false");
+  expect(screen.getByRole("radio", { name: "30s" })).toHaveAttribute("aria-checked", "true");
+
+  fireEvent.click(screen.getByRole("radio", { name: "5s" }));
+  expect(screen.getByRole("radio", { name: "5s" })).toHaveAttribute("aria-checked", "true");
+  expect(screen.getByRole("radio", { name: "30s" })).toHaveAttribute("aria-checked", "false");
+  expect(window.localStorage.getItem("gamr-run-refresh-ms")).toBe("5000");
+});

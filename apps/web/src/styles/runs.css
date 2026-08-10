@@ -94,6 +94,59 @@
   font-weight: 500;
 }
 
+.run-header-tools {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+
+.refresh-rate {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  border: var(--border-w) solid var(--border);
+  border-radius: var(--radius-full);
+  padding: 2px;
+  background: var(--bg-subtle);
+}
+
+.refresh-rate button {
+  min-height: 24px;
+  min-width: 2rem;
+  border: var(--border-w) solid transparent;
+  border-radius: var(--radius-full);
+  padding: 0 var(--space-2);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.refresh-rate button:hover {
+  color: var(--text-secondary);
+}
+
+.refresh-rate button.is-selected,
+.refresh-rate button[aria-checked="true"] {
+  border: var(--border-w) solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.refresh-rate button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 .run-connection {
   display: inline-flex;
   align-items: center;
@@ -679,6 +732,10 @@
 @media (max-width: 720px) {
   .run-header {
     grid-template-columns: 1fr;
+  }
+
+  .run-header-tools {
+    align-items: flex-start;
   }
 
   .run-connection {

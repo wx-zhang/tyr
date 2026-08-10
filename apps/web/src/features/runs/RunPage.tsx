@@ -11,6 +11,30 @@ import { StatusBadge } from "../../components/StatusBadge";
 import { MarkdownMessage } from "./MarkdownMessage";
 
 const terminalStates = new Set(["completed", "failed", "cancelled", "interrupted"]);
+const REFRESH_RATES_MS = [1000, 5000, 10_000, 30_000] as const;
+const DEFAULT_REFRESH_MS = 30_000;
+const REFRESH_STORAGE_KEY = "gamr-run-refresh-ms";
+
+type RefreshRateMs = (typeof REFRESH_RATES_MS)[number];
+
+function isRefreshRateMs(value: number): value is RefreshRateMs {
+  return (REFRESH_RATES_MS as readonly number[]).includes(value);
+}
+
+function readStoredRefreshMs(): RefreshRateMs {
+  try {
+    const raw = window.localStorage.getItem(REFRESH_STORAGE_KEY);
+    if (!raw) return DEFAULT_REFRESH_MS;
+    const parsed = Number(raw);
+    return isRefreshRateMs(parsed) ? parsed : DEFAULT_REFRESH_MS;
+  } catch {
+    return DEFAULT_REFRESH_MS;
+  }
+}
+
+function formatRefreshRate(ms: RefreshRateMs): string {
+  return `${ms / 1000}s`;
+}
 
 function label(value: string | null | undefined): string {
   if (!value) return "—";
@@ -152,13 +176,24 @@ function stageStatusLabel(
 export function RunPage() {
   const { id } = useParams();
   const runId = id ?? "unknown";
+  const [refreshMs, setRefreshMs] = useState<RefreshRateMs>(() => readStoredRefreshMs());
   const visualization = useQuery({
     queryKey: ["run-visualization", runId],
     queryFn: () => fetchRunVisualization(runId),
+    refetchInterval: (query) => {
+      const state = query.state.data?.run?.state;
+      if (state && terminalStates.has(state)) return false;
+      return refreshMs;
+    },
   });
   const turns = useQuery({
     queryKey: ["run-turns", runId],
     queryFn: () => fetchRunTurns(runId),
+    refetchInterval: () => {
+      const state = visualization.data?.run?.state;
+      if (state && terminalStates.has(state)) return false;
+      return refreshMs;
+    },
   });
   const events = useRunEvents(runId);
   const [olderTurns, setOlderTurns] = useState<RunTurn[]>([]);
@@ -176,6 +211,15 @@ export function RunPage() {
     visibleLatestTurns.some((turn) => turn.status === "waiting_for_tyr" && !turn.tyrMessage)
     || latestTurns?.some((turn) => turn.status === "waiting_for_tyr" && !turn.tyrMessage),
   );
+
+  const selectRefreshMs = (next: RefreshRateMs) => {
+    setRefreshMs(next);
+    try {
+      window.localStorage.setItem(REFRESH_STORAGE_KEY, String(next));
+    } catch {
+      /* ignore quota / private mode */
+    }
+  };
 
   useEffect(() => {
     setOlderTurns([]);
@@ -198,10 +242,10 @@ export function RunPage() {
   useEffect(() => {
     if (!isLive && !waitingForTyr) return undefined;
     setNow(Date.now());
-    const intervalMs = waitingForTyr ? 1000 : 15_000;
+    const intervalMs = waitingForTyr ? Math.min(1000, refreshMs) : refreshMs;
     const timer = window.setInterval(() => setNow(Date.now()), intervalMs);
     return () => window.clearInterval(timer);
-  }, [isLive, waitingForTyr]);
+  }, [isLive, waitingForTyr, refreshMs]);
 
   useEffect(() => {
     const previous = previousVisible.current;
@@ -283,15 +327,36 @@ export function RunPage() {
             </div>
           </dl>
         </div>
-        <p
-          className={`run-connection connection-${events.connectionState}`}
-          role="status"
-          aria-live="polite"
-          title={connectionDetail(events.connectionState)}
-        >
-          <span className="connection-dot" aria-hidden="true" />
-          <span className="connection-label">{connectionLabel(events.connectionState)}</span>
-        </p>
+        <div className="run-header-tools">
+          <div
+            className="refresh-rate"
+            role="radiogroup"
+            aria-label="Refresh rate"
+            title="How often to refresh run data"
+          >
+            {REFRESH_RATES_MS.map((ms) => (
+              <button
+                key={ms}
+                type="button"
+                role="radio"
+                className={refreshMs === ms ? "is-selected" : undefined}
+                aria-checked={refreshMs === ms}
+                onClick={() => selectRefreshMs(ms)}
+              >
+                {formatRefreshRate(ms)}
+              </button>
+            ))}
+          </div>
+          <p
+            className={`run-connection connection-${events.connectionState}`}
+            role="status"
+            aria-live="polite"
+            title={connectionDetail(events.connectionState)}
+          >
+            <span className="connection-dot" aria-hidden="true" />
+            <span className="connection-label">{connectionLabel(events.connectionState)}</span>
+          </p>
+        </div>
       </header>
 
       {visualization.error ? (
