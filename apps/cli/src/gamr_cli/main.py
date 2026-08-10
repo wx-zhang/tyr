@@ -10,7 +10,11 @@ import typer
 from gamr_adapters.artifacts.evidence import FilesystemActivitySink
 from gamr_adapters.artifacts.filesystem import FilesystemArtifactStore
 from gamr_adapters.config import Settings
-from gamr_adapters.datasets.filesystem import FilesystemDatasetRepository, load_dataset
+from gamr_adapters.datasets.filesystem import (
+    FilesystemDatasetRepository,
+    load_dataset,
+    resolve_dataset_directory,
+)
 from gamr_adapters.models.openai_compatible import OpenAICompatibleModel
 from gamr_adapters.tyr.client import TyrMcpClient
 from gamr_core import (
@@ -92,6 +96,9 @@ def run_experiment(
     directory: Path,
     action_mode: str = typer.Option("read_only", "--action-mode"),
     model: str = typer.Option("", "--model", help="Override TYR_LOOP_MODEL."),
+    scientist_model: str = typer.Option(
+        "", "--scientist-model", help="Override TYR_LOOP_SCIENTIST_MODEL."
+    ),
     allow_actions: bool = typer.Option(
         False,
         "--allow-actions",
@@ -142,6 +149,7 @@ def run_experiment(
     )
     settings = Settings()
     selected_model = model or settings.model_name
+    selected_scientist_model = scientist_model or settings.scientist_model_name or selected_model
     if not settings.tyr_mcp_token:
         raise typer.BadParameter("TYR_MCP_TOKEN is required")
     if not settings.model_api_key:
@@ -158,10 +166,20 @@ def run_experiment(
         settings.model_api_key,
         selected_model,
     )
+    scientist_model_gateway = (
+        model_gateway
+        if selected_scientist_model == selected_model
+        else OpenAICompatibleModel(
+            settings.model_base_url,
+            settings.model_api_key,
+            selected_scientist_model,
+        )
+    )
 
     configuration = ExperimentConfig(
         actionMode=action_mode,
         model=selected_model,
+        scientistModel=selected_scientist_model,
         maxTurns=dataset.manifest.spec.defaults.max_turns,
         discoveryTurns=20,
         caseIds=selected_case_ids,
@@ -191,6 +209,7 @@ def run_experiment(
                 run_id=run_id,
                 target=target,
                 model=model_gateway,
+                scientist_model=scientist_model_gateway,
                 artifacts=artifact_store,
                 activity_sink=FilesystemActivitySink(artifact_store),
                 progress=_render_progress,
@@ -242,6 +261,184 @@ def run_experiment(
     )
     artifact_store.write_json(
         f"runs/{run_id}/run.json",
+        run_document.model_copy(
+            update={
+                "state": terminal_state,
+                "result_path": "result.json",
+                "updated_at": finished_at,
+                "finished_at": finished_at,
+            }
+        ).model_dump(by_alias=True, mode="json"),
+    )
+    console.print(f"Run [cyan]{output.result.run_id}[/cyan] {terminal_state.value}")
+    for result_error in output.result.errors:
+        console.print(f"[red]✗[/] {result_error}")
+    console.print(output.result_path)
+
+
+@experiment_app.command("resume-scientist")
+def resume_scientist_experiment(
+    run_id: str,
+    scientist_iterations: int = typer.Option(
+        0,
+        "--scientist-iterations",
+        min=0,
+        help="Override the source run's scientist_iterations.",
+    ),
+    model: str = typer.Option("", "--model", help="Override TYR_LOOP_MODEL."),
+    scientist_model: str = typer.Option(
+        "", "--scientist-model", help="Override TYR_LOOP_SCIENTIST_MODEL."
+    ),
+    confirm_actions: bool = typer.Option(
+        False,
+        "--confirm-actions",
+        help="Confirm an action-enabled resume without an interactive prompt.",
+    ),
+) -> None:
+    """Resume only the scientist phase of a prior run, seeded with its case history."""
+
+    settings = Settings()
+    if not settings.tyr_mcp_token:
+        raise typer.BadParameter("TYR_MCP_TOKEN is required")
+    if not settings.model_api_key:
+        raise typer.BadParameter("OPENROUTER_API_KEY is required")
+    artifact_store = FilesystemArtifactStore(
+        settings.artifact_root,
+        secrets=(settings.tyr_mcp_token, settings.model_api_key),
+    )
+    try:
+        source_record = RunRecord.model_validate(artifact_store.read_json(run_id, "run.json"))
+    except FileNotFoundError:
+        raise typer.BadParameter(f"run does not exist: {run_id}", param_hint="run_id") from None
+
+    configuration = source_record.configuration
+    if scientist_iterations:
+        configuration = configuration.model_copy(
+            update={"scientist_iterations": scientist_iterations}
+        )
+    if not configuration.scientist_iterations:
+        raise typer.BadParameter(
+            "source run has scientist_iterations=0; pass --scientist-iterations",
+            param_hint="--scientist-iterations",
+        )
+    if configuration.action_mode == "approval_required":
+        if not confirm_actions and not sys.stdin.isatty():
+            raise typer.BadParameter(
+                "non-interactive action runs require --confirm-actions",
+                param_hint="--confirm-actions",
+            )
+        if not confirm_actions and not typer.confirm(
+            "Resume an action-capable experiment? Every Tyr action still requires approval",
+            default=False,
+        ):
+            raise typer.Abort()
+
+    dataset_directory = resolve_dataset_directory(settings.dataset_root, source_record.dataset)
+    dataset = load_dataset(dataset_directory)
+
+    selected_model = model or configuration.model or settings.model_name
+    selected_scientist_model = (
+        scientist_model or settings.scientist_model_name or selected_model
+    )
+    if not selected_model:
+        raise typer.BadParameter("TYR_LOOP_MODEL is required")
+    target = TyrMcpClient(settings.tyr_mcp_url, settings.tyr_mcp_token)
+    model_gateway = OpenAICompatibleModel(
+        settings.model_base_url,
+        settings.model_api_key,
+        selected_model,
+    )
+    scientist_model_gateway = (
+        model_gateway
+        if selected_scientist_model == selected_model
+        else OpenAICompatibleModel(
+            settings.model_base_url,
+            settings.model_api_key,
+            selected_scientist_model,
+        )
+    )
+    configuration = configuration.model_copy(
+        update={"model": selected_model, "scientist_model": selected_scientist_model}
+    )
+
+    new_run_id = new_id()
+    started_at = datetime.now(UTC)
+    run_document = RunRecord(
+        id=new_run_id,
+        source=RunSource.CLI,
+        dataset=source_record.dataset,
+        state=RunState.RUNNING,
+        configuration=configuration,
+        retryOf=run_id,
+        createdAt=started_at,
+        updatedAt=started_at,
+    )
+    artifact_store.write_json(
+        f"runs/{new_run_id}/run.json",
+        run_document.model_dump(by_alias=True, mode="json"),
+    )
+
+    async def run_live() -> ExecutionOutput:
+        try:
+            return await ExperimentExecutionService().resume_scientist(
+                dataset,
+                configuration,
+                source_run_id=run_id,
+                run_id=new_run_id,
+                target=target,
+                model=model_gateway,
+                scientist_model=scientist_model_gateway,
+                artifacts=artifact_store,
+                activity_sink=FilesystemActivitySink(artifact_store),
+                progress=_render_progress,
+            )
+        finally:
+            await target.aclose()
+
+    try:
+        output = asyncio.run(run_live())
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        cancelled_at = datetime.now(UTC)
+        artifact_store.write_json(
+            f"runs/{new_run_id}/run.json",
+            run_document.model_copy(
+                update={
+                    "state": RunState.CANCELLED,
+                    "error_summary": "Cancelled by operator (Ctrl+C)",
+                    "updated_at": cancelled_at,
+                    "finished_at": cancelled_at,
+                }
+            ).model_dump(by_alias=True, mode="json"),
+        )
+        console.print(
+            f"[yellow]Cancelled[/] run [cyan]{new_run_id}[/] [dim]· Ctrl+C[/]"
+        )
+        raise typer.Exit(code=130) from None
+    except Exception as error:
+        failed_at = datetime.now(UTC)
+        artifact_store.write_json(
+            f"runs/{new_run_id}/run.json",
+            run_document.model_copy(
+                update={
+                    "state": RunState.FAILED,
+                    "error_summary": f"{type(error).__name__}: {error}",
+                    "updated_at": failed_at,
+                    "finished_at": failed_at,
+                }
+            ).model_dump(by_alias=True, mode="json"),
+        )
+        raise
+    finished_at = datetime.now(UTC)
+    terminal_state = (
+        RunState.FAILED
+        if output.result.outcome
+        in {ExecutionOutcome.FAILED, ExecutionOutcome.ERROR, ExecutionOutcome.INTERRUPTED}
+        else RunState.CANCELLED
+        if output.result.outcome is ExecutionOutcome.CANCELLED
+        else RunState.COMPLETED
+    )
+    artifact_store.write_json(
+        f"runs/{new_run_id}/run.json",
         run_document.model_copy(
             update={
                 "state": terminal_state,

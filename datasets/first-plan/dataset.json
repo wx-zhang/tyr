@@ -38,6 +38,10 @@
       "agent": {
         "source": "discovery",
         "field": "agent"
+      },
+      "bridge_id": {
+        "source": "discovery",
+        "field": "bridge_id"
       }
     },
     "defaults": {

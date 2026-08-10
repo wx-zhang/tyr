@@ -22,7 +22,12 @@ def build_run_executor(settings: Settings, registry: JsonRegistry) -> RunExecuto
         selected_model = run.configuration.model or settings.model_name
         if not selected_model:
             raise ValueError("TYR_LOOP_MODEL is required")
-        run.configuration = run.configuration.model_copy(update={"model": selected_model})
+        selected_scientist_model = (
+            run.configuration.scientist_model or settings.scientist_model_name or selected_model
+        )
+        run.configuration = run.configuration.model_copy(
+            update={"model": selected_model, "scientist_model": selected_scientist_model}
+        )
         registry.save_run(run)
         dataset_path = resolve_dataset_directory(settings.dataset_root, run.dataset)
         dataset = load_dataset(dataset_path)
@@ -36,6 +41,15 @@ def build_run_executor(settings: Settings, registry: JsonRegistry) -> RunExecuto
             settings.model_api_key,
             selected_model,
         )
+        scientist_model = (
+            model
+            if selected_scientist_model == selected_model
+            else OpenAICompatibleModel(
+                settings.model_base_url,
+                settings.model_api_key,
+                selected_scientist_model,
+            )
+        )
         try:
             output = await ExperimentExecutionService().execute(
                 dataset,
@@ -43,6 +57,7 @@ def build_run_executor(settings: Settings, registry: JsonRegistry) -> RunExecuto
                 run_id=run.id,
                 target=target,
                 model=model,
+                scientist_model=scientist_model,
                 artifacts=artifacts,
                 activity_sink=FilesystemActivitySink(artifacts),
             )

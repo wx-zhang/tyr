@@ -31,6 +31,7 @@ def test_experiment_run_requires_provider_configuration(
         tyr_mcp_token = ""
         model_api_key = ""
         model_name = ""
+        scientist_model_name = ""
 
     monkeypatch.setattr(cli, "Settings", MissingSettings)
     result = CliRunner().invoke(cli.app, ["experiment", "run", "datasets/first-plan"])
@@ -47,6 +48,7 @@ def test_experiment_run_ctrl_c_cancels_run(monkeypatch: pytest.MonkeyPatch) -> N
         tyr_mcp_url = "https://example.test/mcp"
         model_api_key = "key"
         model_name = "model"
+        scientist_model_name = ""
         model_base_url = "https://example.test"
         artifact_root = ".gamr"
 
@@ -228,6 +230,7 @@ def test_experiment_run_prints_result_errors(monkeypatch: pytest.MonkeyPatch) ->
         tyr_mcp_url = "https://example.test/mcp"
         model_api_key = "key"
         model_name = "model"
+        scientist_model_name = ""
         model_base_url = "https://example.test"
         artifact_root = ".gamr"
 

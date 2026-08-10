@@ -29,6 +29,7 @@ class ExperimentConfig(BaseModel):
         default="read_only", alias="actionMode", pattern=r"^(read_only|approval_required)$"
     )
     model: str = ""
+    scientist_model: str = Field(default="", alias="scientistModel")
     max_turns: int = Field(default=40, alias="maxTurns", ge=1)
     discovery_turns: int = Field(default=20, alias="discoveryTurns", ge=1)
     case_ids: list[str] | None = Field(default=None, alias="caseIds")

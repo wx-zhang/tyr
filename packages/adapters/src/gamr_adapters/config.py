@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     )
     model_api_key: str = Field(default="", validation_alias="OPENROUTER_API_KEY")
     model_name: str = Field(default="", validation_alias="TYR_LOOP_MODEL")
+    scientist_model_name: str = Field(default="", validation_alias="TYR_LOOP_SCIENTIST_MODEL")
     max_concurrent_runs: int = Field(
         default=3,
         ge=1,

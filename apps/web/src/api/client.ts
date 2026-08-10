@@ -98,6 +98,7 @@ export type Run = {
   configuration: {
     actionMode: "read_only" | "approval_required";
     model: string;
+    scientistModel: string;
     maxTurns: number;
     discoveryTurns: number;
     caseIds?: string[] | null;
