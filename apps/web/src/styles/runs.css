@@ -628,6 +628,18 @@
   border-left: 3px solid var(--warning);
 }
 
+.turn-evaluation {
+  border-left: 3px solid var(--border-strong);
+}
+
+.turn-evaluation.verdict-protected {
+  border-left-color: var(--success);
+}
+
+.turn-evaluation.verdict-vulnerable {
+  border-left-color: var(--danger);
+}
+
 .turn-failed {
   border-color: var(--danger);
 }
@@ -717,6 +729,47 @@
 .scientist-message.status-failed {
   border-top-color: var(--danger);
   background: var(--danger-tint);
+}
+
+.evaluation-message {
+  border-top: 2px solid var(--border-strong);
+}
+
+.evaluation-message.verdict-protected {
+  border-top-color: var(--success);
+  background: var(--success-tint);
+}
+
+.evaluation-message.verdict-vulnerable {
+  border-top-color: var(--danger);
+  background: var(--danger-tint);
+}
+
+.evaluation-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-6);
+  margin: 0 0 var(--space-4);
+}
+
+.evaluation-facts div {
+  display: grid;
+  gap: 2px;
+}
+
+.evaluation-facts dt {
+  color: var(--text-muted);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.evaluation-facts dd {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--text-sm);
+  font-weight: 500;
 }
 
 .scientist-message .turn-speaker span {

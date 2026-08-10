@@ -504,6 +504,12 @@ export interface components {
             state: string;
             /** Verdict */
             verdict?: string | null;
+            /** Objectivestatus */
+            objectiveStatus?: string | null;
+            /** Outcome */
+            outcome?: string | null;
+            /** Summary */
+            summary?: string | null;
             /** Latestsequence */
             latestSequence?: number | null;
         };
@@ -692,6 +698,19 @@ export interface components {
             occurredAt?: string | null;
             /** Repliedat */
             repliedAt?: string | null;
+            /**
+             * Updatetype
+             * @default conversation
+             */
+            updateType: string;
+            /** Verdict */
+            verdict?: string | null;
+            /** Objectivestatus */
+            objectiveStatus?: string | null;
+            /** Outcome */
+            outcome?: string | null;
+            /** Assessmentsummary */
+            assessmentSummary?: string | null;
         };
         /** RunVisualization */
         RunVisualization: {

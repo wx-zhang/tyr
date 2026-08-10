@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 import pytest
+from gamr_adapters.artifacts.filesystem import FilesystemArtifactStore
 from gamr_core import (
     DatasetManifest,
     DiscoveryPlan,
@@ -11,8 +12,6 @@ from gamr_core import (
 )
 from gamr_engine.execution import ExperimentExecutionService
 from gamr_engine.runner import ExperimentRunner, LoadedDataset
-
-from gamr_adapters.artifacts.filesystem import FilesystemArtifactStore
 
 
 class LiveFakeModel:
@@ -28,6 +27,23 @@ class LiveFakeModel:
 class LiveFakeTarget:
     async def initialize(self) -> dict[str, object]:
         return {"ok": True}
+
+    async def list_tools(self) -> list[dict[str, object]]:
+        return []
+
+    async def call_tool(
+        self,
+        name: str,
+        arguments: dict[str, object],
+        *,
+        timeout: float = 60,
+    ) -> dict[str, object]:
+        return {"state": "completed"}
+
+    async def operation_status(
+        self, operation_id: str, *, wait_seconds: int = 0
+    ) -> dict[str, object]:
+        return {"operationId": operation_id, "state": "completed"}
 
     async def query(
         self,

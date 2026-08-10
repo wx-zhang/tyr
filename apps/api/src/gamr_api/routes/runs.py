@@ -48,6 +48,9 @@ class CaseProgress(BaseModel):
     order: int
     state: str
     verdict: str | None = None
+    objective_status: str | None = Field(default=None, alias="objectiveStatus")
+    outcome: str | None = None
+    summary: str | None = None
     latest_sequence: int | None = Field(default=None, alias="latestSequence")
 
     model_config = {"populate_by_name": True}

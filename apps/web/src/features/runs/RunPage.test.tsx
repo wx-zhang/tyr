@@ -223,7 +223,7 @@ it("shows the run lifecycle and grouped Agent to Tyr turns newest first", async 
   expect(screen.getByText("Pending")).toBeInTheDocument();
   expect(screen.getByText("Inspect")).toHaveProperty("tagName", "STRONG");
   expect(
-    screen.getByRole("list", { name: "Run conversation turns" }).textContent,
+    screen.getByRole("list", { name: "Run updates" }).textContent,
   ).toContain("Alice");
   expect(screen.queryByText("Agent request sent · Tyr reply pending")).not.toBeInTheDocument();
   expect(container.querySelector(".stage-active")).not.toBeNull();
@@ -396,9 +396,96 @@ it("shows ready scientist generation turns as iteration cards", async () => {
   expect(screen.getByText("2")).toBeInTheDocument();
 });
 
+it("shows configured and scientist evaluation outcomes as updates", async () => {
+  vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url.includes("/visualization")) {
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          ...visualization,
+          run: { ...visualization.run, state: "completed", currentPhase: null },
+          cases: [
+            {
+              caseId: "case-alpha",
+              order: 1,
+              state: "completed",
+              verdict: "protected",
+              objectiveStatus: "not_achieved",
+              outcome: "completed",
+              summary: "The risky action was rejected.",
+              latestSequence: 5,
+            },
+          ],
+        }),
+      } as Response);
+    }
+    if (url.includes("/turns")) {
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          items: [
+            {
+              id: "evaluation-case-alpha",
+              sequence: 3,
+              number: 1,
+              stage: "case",
+              caseId: "case-alpha",
+              status: "completed",
+              agentMessage: "The risky action was rejected.",
+              tyrMessage: null,
+              occurredAt: "2026-08-08T10:03:00Z",
+              repliedAt: null,
+              updateType: "evaluation",
+              verdict: "protected",
+              objectiveStatus: "not_achieved",
+              outcome: "completed",
+              assessmentSummary: "The risky action was rejected.",
+            },
+            {
+              id: "evaluation-scientist-alpha",
+              sequence: 4,
+              number: 2,
+              stage: "scientist",
+              caseId: "scientist-alpha",
+              status: "completed",
+              agentMessage: "The control was bypassed.",
+              tyrMessage: null,
+              occurredAt: "2026-08-08T10:04:00Z",
+              repliedAt: null,
+              updateType: "evaluation",
+              verdict: "vulnerable",
+              objectiveStatus: "achieved",
+              outcome: "completed",
+              assessmentSummary: "The control was bypassed.",
+            },
+          ],
+          omittedBefore: 0,
+          nextCursor: null,
+          latestSequence: 4,
+        }),
+      } as Response);
+    }
+    return Promise.resolve({ ok: true, json: async () => ({ items: [] }) } as Response);
+  });
+
+  renderPage();
+
+  expect(await screen.findByRole("heading", { name: "Updates" })).toBeInTheDocument();
+  expect(await screen.findByRole("heading", { name: "Evaluation result - case-alpha" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Scientist evaluation - scientist-alpha" })).toBeInTheDocument();
+  expect(screen.getAllByText("Protected").length).toBeGreaterThan(0);
+  expect(screen.getByText("Vulnerable")).toBeInTheDocument();
+  expect(screen.getByText("Not Achieved")).toBeInTheDocument();
+  expect(screen.getByText("Achieved")).toBeInTheDocument();
+  expect(screen.getByText("The control was bypassed.")).toBeInTheDocument();
+  expect(screen.getAllByText("Case assessment")).toHaveLength(2);
+  expect(screen.queryByText("LLM evaluation")).not.toBeInTheDocument();
+});
+
 it("removes the previous evidence navigation and controls", async () => {
   renderPage();
-  await screen.findByRole("heading", { name: "Turns" });
+  await screen.findByRole("heading", { name: "Updates" });
 
   expect(screen.queryByRole("link", { name: "Cases" })).not.toBeInTheDocument();
   expect(screen.queryByRole("link", { name: "Artifacts" })).not.toBeInTheDocument();
@@ -607,7 +694,7 @@ it("does not render raw HTML from conversation markdown", async () => {
   });
 
   const { container } = renderPage();
-  await screen.findByRole("heading", { name: "Turns" });
+  await screen.findByRole("heading", { name: "Updates" });
   expect(container.querySelector("script")).toBeNull();
   expect(container.querySelector("img")).toBeNull();
 });
@@ -645,9 +732,9 @@ it("holds newer turns behind a concise action while reviewing older content", as
   });
 
   await queryClient.invalidateQueries({ queryKey: ["run-turns", "run-1"] });
-  expect(await screen.findByRole("button", { name: "Show 1 new turn" })).toBeInTheDocument();
+  expect(await screen.findByRole("button", { name: "Show 1 new update" })).toBeInTheDocument();
   expect(screen.queryByText("Newest request")).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "Show 1 new turn" }));
+  fireEvent.click(screen.getByRole("button", { name: "Show 1 new update" }));
   await waitFor(() => expect(screen.getByText("Newest request")).toBeInTheDocument());
 });
 
@@ -676,7 +763,7 @@ it("holds a new Tyr reply behind the same action while reviewing older content",
   });
 
   await queryClient.invalidateQueries({ queryKey: ["run-turns", "run-1"] });
-  expect(await screen.findByRole("button", { name: "Show 1 new turn" })).toBeInTheDocument();
+  expect(await screen.findByRole("button", { name: "Show 1 new update" })).toBeInTheDocument();
   expect(screen.queryByText("Request allowed")).not.toBeInTheDocument();
 });
 
@@ -733,9 +820,9 @@ it("shows agent working when the run is live and the latest turn is complete", a
 
   const { container } = renderPage();
   expect(
-    await screen.findByText("Next turn will appear when the agent sends a message."),
+    await screen.findByText("Next update will appear when the agent sends a message."),
   ).toBeInTheDocument();
-  expect(screen.getByRole("status", { name: "Awaiting next turn" })).toBeInTheDocument();
+  expect(screen.getByRole("status", { name: "Awaiting next update" })).toBeInTheDocument();
   expect(screen.getAllByText("Agent working").length).toBeGreaterThan(0);
   expect(container.querySelector(".pending-next-turn")).not.toBeNull();
   expect(container.querySelector(".stage-working")).not.toBeNull();

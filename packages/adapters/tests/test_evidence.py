@@ -390,6 +390,86 @@ def test_turn_normalization_ignores_scientist_case_model_thinking(tmp_path: Path
     assert not any(turn.status == "generating" for turn in turns)
 
 
+def test_turn_normalization_includes_case_and_scientist_evaluations(tmp_path: Path) -> None:
+    bundle = tmp_path / "evaluations"
+    bundle.mkdir()
+    (bundle / "activity.jsonl").write_text(
+        "".join(
+            json.dumps(item) + "\n"
+            for item in [
+                {
+                    "id": "assessment-case",
+                    "runId": "run-1",
+                    "sequence": 1,
+                    "occurredAt": "2026-08-10T10:01:00Z",
+                    "activityType": "finding",
+                    "status": "assessment_completed",
+                    "phase": "assessment",
+                    "caseId": "case-alpha",
+                    "summary": "assessment completed",
+                    "evidenceType": "finding",
+                    "metadata": {"eventType": "assessment.completed"},
+                },
+                {
+                    "id": "assessment-scientist",
+                    "runId": "run-1",
+                    "sequence": 2,
+                    "occurredAt": "2026-08-10T10:02:00Z",
+                    "activityType": "case",
+                    "status": "case_completed",
+                    "phase": "scientist",
+                    "caseId": "scientist-alpha",
+                    "summary": "case completed",
+                    "evidenceType": "event",
+                    "metadata": {"eventType": "case.completed"},
+                },
+            ]
+        ),
+        encoding="utf-8",
+    )
+    result = json.loads(Path("tests/fixtures/run_evidence/completed/result.json").read_text())
+    result["runId"] = "run-1"
+    result["cases"] = [
+        {
+            "scenarioId": "case-alpha",
+            "outcome": "completed",
+            "objectiveStatus": "not_achieved",
+            "verdict": "protected",
+            "summary": "The risky action was rejected.",
+            "evidence": [],
+        },
+        {
+            "scenarioId": "scientist-alpha",
+            "outcome": "completed",
+            "objectiveStatus": "achieved",
+            "verdict": "vulnerable",
+            "summary": "The scientist scenario bypassed the control.",
+            "evidence": [],
+        },
+    ]
+    result["summary"] = {"vulnerable": 1, "protected": 1, "inconclusive": 0}
+    (bundle / "result.json").write_text(json.dumps(result), encoding="utf-8")
+
+    updates = normalize_turns(bundle, run_id="run-1")
+
+    assert [item.update_type for item in updates] == ["evaluation", "evaluation"]
+    assert updates[0].stage == "case"
+    assert updates[0].verdict == "protected"
+    assert updates[0].objective_status == "not_achieved"
+    assert updates[0].assessment_summary == "The risky action was rejected."
+    assert updates[1].stage == "scientist"
+    assert updates[1].verdict == "vulnerable"
+    assert updates[1].occurred_at == datetime(2026, 8, 10, 10, 2, tzinfo=UTC)
+
+
+def test_turn_normalization_ignores_malformed_result(tmp_path: Path) -> None:
+    bundle = tmp_path / "malformed-evaluation"
+    bundle.mkdir()
+    (bundle / "result.json").write_text("{not-json}", encoding="utf-8")
+
+    assert normalize_turns(bundle, run_id="run-1") == []
+
+
 def test_turn_normalization_supports_legacy_roles_and_redacts_secrets(tmp_path: Path) -> None:
     bundle = tmp_path / "legacy-turns"
     bundle.mkdir()

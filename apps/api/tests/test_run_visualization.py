@@ -1,9 +1,12 @@
+import json
 from datetime import UTC, datetime
+from pathlib import Path
 
 from fastapi.testclient import TestClient
-from gamr_api.dependencies import get_registry
+from gamr_adapters.config import Settings
+from gamr_api.dependencies import get_registry, get_settings
 from gamr_api.main import app
-from gamr_api.registry import InMemoryRegistry
+from gamr_api.registry import InMemoryRegistry, RunRecord
 from gamr_core import RunActivity, RunState
 
 
@@ -171,5 +174,37 @@ def test_visualization_does_not_disclose_an_unknown_run() -> None:
     try:
         response = _client(registry).get("/api/v1/runs/missing/visualization")
         assert response.status_code == 404
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_historical_visualization_merges_canonical_case_results(tmp_path: Path) -> None:
+    artifact_root = tmp_path / "artifacts"
+    source = Path("tests/fixtures/run_evidence/completed")
+    bundle = artifact_root / "runs" / "run-results"
+    bundle.mkdir(parents=True)
+    for path in source.iterdir():
+        if path.is_file():
+            (bundle / path.name).write_bytes(path.read_bytes())
+    run_document = json.loads((bundle / "run.json").read_text())
+    run_document["id"] = "run-results"
+    run_document["runId"] = "run-results"
+    (bundle / "run.json").write_text(json.dumps(run_document))
+    result = json.loads((bundle / "result.json").read_text())
+    result["runId"] = "run-results"
+    (bundle / "result.json").write_text(json.dumps(result))
+    registry = InMemoryRegistry(
+        runs={"run-results": RunRecord("run-results", None, "dataset", RunState.COMPLETED)}
+    )
+    app.dependency_overrides[get_registry] = lambda: registry
+    app.dependency_overrides[get_settings] = lambda: Settings(artifact_root=str(artifact_root))
+    try:
+        response = TestClient(app).get("/api/v1/runs/run-results/visualization")
+        assert response.status_code == 200
+        case = response.json()["cases"][0]
+        assert case["verdict"] == "protected"
+        assert case["objectiveStatus"] == "not_achieved"
+        assert case["outcome"] == "completed"
+        assert case["summary"] == "The observed request was rejected by the target"
     finally:
         app.dependency_overrides.clear()

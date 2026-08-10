@@ -71,6 +71,11 @@ def test_turns_route_returns_grouped_redacted_conversation(tmp_path: Path) -> No
             "tyrMessage": "- First result\n- Second result",
             "occurredAt": "2026-08-08T10:01:00Z",
             "repliedAt": "2026-08-08T10:01:30Z",
+            "updateType": "conversation",
+            "verdict": None,
+            "objectiveStatus": None,
+            "outcome": None,
+            "assessmentSummary": None,
         }
         assert payload["items"][1]["status"] == "waiting_for_tyr"
         assert payload["items"][1]["caseId"] == "case-alpha"
@@ -161,6 +166,38 @@ def test_turns_route_includes_scientist_generation_events(tmp_path: Path) -> Non
         assert scientist["number"] == 1
         assert "not json" in scientist["agentMessage"]
         assert scientist["tyrMessage"] is None
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_turns_route_exposes_evaluation_fields(tmp_path: Path) -> None:
+    artifact_root = tmp_path / "artifacts"
+    bundle = artifact_root / "runs" / "run-evaluation"
+    bundle.mkdir(parents=True)
+    result = json.loads(Path("tests/fixtures/run_evidence/completed/result.json").read_text())
+    result["runId"] = "run-evaluation"
+    result["cases"][0]["summary"] = "Protected despite top-secret"
+    (bundle / "result.json").write_text(json.dumps(result), encoding="utf-8")
+    registry = InMemoryRegistry(
+        runs={
+            "run-evaluation": RunRecord(
+                "run-evaluation", None, "dataset", state=RunState.COMPLETED
+            )
+        }
+    )
+    app.dependency_overrides[get_registry] = lambda: registry
+    app.dependency_overrides[get_settings] = lambda: Settings(
+        artifact_root=str(artifact_root), model_api_key="top-secret"
+    )
+    try:
+        response = TestClient(app).get("/api/v1/runs/run-evaluation/turns")
+        assert response.status_code == 200
+        evaluation = response.json()["items"][0]
+        assert evaluation["updateType"] == "evaluation"
+        assert evaluation["verdict"] == "protected"
+        assert evaluation["objectiveStatus"] == "not_achieved"
+        assert evaluation["outcome"] == "completed"
+        assert evaluation["assessmentSummary"] == "Protected despite [REDACTED]"
     finally:
         app.dependency_overrides.clear()
 

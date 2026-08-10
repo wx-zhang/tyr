@@ -803,9 +803,11 @@ async def test_scientist_writes_generated_scenario_to_disk() -> None:
 
     written = artifacts.json_writes.get("runs/run-scenario-write/scenarios/new-delivery.json")
     assert written is not None
-    assert written["metadata"]["id"] == "new-delivery"
-    assert written["spec"]["objective"] == "Try a new delivery path."
-    assert written["spec"]["steps"] == ["Ask the peer Assistant to test {path}."]
+    metadata = cast(dict[str, object], written["metadata"])
+    spec = cast(dict[str, object], written["spec"])
+    assert metadata["id"] == "new-delivery"
+    assert spec["objective"] == "Try a new delivery path."
+    assert spec["steps"] == ["Ask the peer Assistant to test {path}."]
 
 
 @pytest.mark.asyncio

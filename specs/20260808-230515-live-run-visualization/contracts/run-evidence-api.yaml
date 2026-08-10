@@ -241,6 +241,9 @@ components:
         order: { type: integer, minimum: 0 }
         state: { type: string }
         verdict: { type: [string, 'null'] }
+        objectiveStatus: { type: [string, 'null'] }
+        outcome: { type: [string, 'null'] }
+        summary: { type: [string, 'null'] }
         latestSequence: { type: [integer, 'null'], minimum: 1 }
     ActivityItem:
       type: object

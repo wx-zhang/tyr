@@ -6,7 +6,12 @@ from pathlib import Path
 from typing import Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from gamr_adapters.artifacts.evidence import BundleNormalizer, NormalizedBundle, normalize_turns
+from gamr_adapters.artifacts.evidence import (
+    BundleNormalizer,
+    NormalizedBundle,
+    load_run_result,
+    normalize_turns,
+)
 from gamr_adapters.artifacts.filesystem import (
     FilesystemArtifactStore,
 )
@@ -158,6 +163,11 @@ class RunTurnResponse(BaseModel):
     tyr_message: str | None = Field(default=None, alias="tyrMessage")
     occurred_at: datetime | None = Field(default=None, alias="occurredAt")
     replied_at: datetime | None = Field(default=None, alias="repliedAt")
+    update_type: str = Field(default="conversation", alias="updateType")
+    verdict: str | None = None
+    objective_status: str | None = Field(default=None, alias="objectiveStatus")
+    outcome: str | None = None
+    assessment_summary: str | None = Field(default=None, alias="assessmentSummary")
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -416,6 +426,26 @@ def visualization(
     if state == "blocked":
         state = RunState.COMPLETED.value
     cases = _activity_case_state(bundle.activities)
+    result = load_run_result(root, secrets)
+    if result is not None:
+        for case in result.cases:
+            item = cases.setdefault(
+                case.scenario_id,
+                {
+                    "caseId": case.scenario_id,
+                    "order": len(cases),
+                    "latestSequence": None,
+                },
+            )
+            item.update(
+                {
+                    "state": case.outcome.value,
+                    "verdict": case.verdict.value,
+                    "objectiveStatus": case.objective_status.value,
+                    "outcome": case.outcome.value,
+                    "summary": case.summary,
+                }
+            )
     known_cases = metadata.get("caseIds") or run.configuration.case_ids or list(cases)
     for order, case_id in enumerate(known_cases if isinstance(known_cases, list) else [], 0):
         cases.setdefault(
@@ -528,6 +558,11 @@ def turns(
             tyrMessage=item.tyr_message,
             occurredAt=item.occurred_at,
             repliedAt=item.replied_at,
+            updateType=item.update_type,
+            verdict=item.verdict,
+            objectiveStatus=item.objective_status,
+            outcome=item.outcome,
+            assessmentSummary=item.assessment_summary,
         )
         for item in page
     ]

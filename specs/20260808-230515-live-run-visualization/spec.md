@@ -145,11 +145,12 @@ As a reviewer, I can pause automatic following, filter or select activity, inspe
 - **FR-029**: Reviewers MUST be able to search exact text within permitted redacted evidence content and combine that search with case, participant, activity type, status, evidence type, and time-range filters for the selected run.
 - **FR-030**: The agent/Tyr relationship graph MUST aggregate repeated observed relationships that match the current search and filters, show the number and types of contributing interactions, and expose every contributing permitted evidence item on selection.
 - **FR-031**: The evidence inspector MUST show a readable summary by default and MUST allow the reviewer to deliberately reveal the complete permitted redacted content of a retained diagnostic evidence item on demand.
+- **FR-032**: The Updates timeline MUST show each canonical case evaluation, including scientist-generated cases, with security verdict as the primary result and objective status, execution outcome, and redacted assessment summary as supporting evidence.
 
 ### Key Entities
 
 - **Run progress**: The run's current and terminal state, action mode, known phases, selected case totals, completed work, active work, blockers, and timestamps.
-- **Case progress**: One selected test case's order, current phase, status, verdict when available, and relationship to its activity and approvals.
+- **Case progress**: One selected test case's order, current phase, status, security verdict, objective status, execution outcome, assessment summary, and relationship to its activity and approvals.
 - **Activity item**: One ordered, persisted occurrence with an identity, timestamp, type, status, summary, permitted details, and related run, phase, case, participants, operation, or approval.
 - **Participant**: An observed human, GAMR component, model agent, Tyr agent, delegated agent, bridge, or tool endpoint, identified only to the extent supported by permitted evidence.
 - **Observed relationship**: An aggregated communication, delegation, bridge, operation, tool invocation, or approval link between known participants, with counts and types derived from the current search and filters and references to every contributing permitted activity or evidence item.

@@ -4,7 +4,7 @@ import hashlib
 import json
 import re
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID
@@ -17,6 +17,7 @@ from gamr_core import (
     ParticipantKind,
     RunActivity,
     RunParticipant,
+    RunResult,
     RunState,
 )
 from pydantic import ValidationError
@@ -71,6 +72,11 @@ class NormalizedTurn:
     tyr_message: str | None
     occurred_at: datetime | None = None
     replied_at: datetime | None = None
+    update_type: str = "conversation"
+    verdict: str | None = None
+    objective_status: str | None = None
+    outcome: str | None = None
+    assessment_summary: str | None = None
 
 
 def _parse_occurred_at(value: object) -> datetime | None:
@@ -274,6 +280,95 @@ def _scientist_errors_from_result(
     ]
 
 
+def load_run_result(
+    root: str | Path, secrets: Iterable[str] = ()
+) -> RunResult | None:
+    path = Path(root) / "result.json"
+    if not path.is_file():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        result = RunResult.model_validate(payload)
+        safe_payload = redact_payload(
+            result.model_dump(by_alias=True, exclude_none=True, mode="json"), secrets
+        )
+        return RunResult.model_validate(safe_payload)
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError, ValidationError):
+        return None
+
+
+def _case_completion_context(root: Path) -> dict[str, tuple[str, datetime | None]]:
+    path = next(
+        (root / name for name in ("activity.jsonl", "events.jsonl") if (root / name).is_file()),
+        None,
+    )
+    if path is None:
+        return {}
+    contexts: dict[str, tuple[str, datetime | None]] = {}
+    with path.open(encoding="utf-8") as handle:
+        for line in handle:
+            if not line.strip():
+                continue
+            try:
+                value = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(value, dict):
+                continue
+            case_id = value.get("caseId")
+            if not isinstance(case_id, str) or not case_id:
+                continue
+            metadata = value.get("metadata")
+            event_type = metadata.get("eventType") if isinstance(metadata, dict) else None
+            if event_type not in {"assessment.completed", "case.completed"}:
+                continue
+            previous = contexts.get(case_id)
+            phase = "scientist" if value.get("phase") == "scientist" else "case"
+            if previous is not None and previous[0] == "scientist":
+                phase = "scientist"
+            occurred_at = _parse_occurred_at(value.get("occurredAt"))
+            if previous is None or occurred_at is not None:
+                contexts[case_id] = (phase, occurred_at)
+    return contexts
+
+
+def _evaluation_turns(
+    root: Path,
+    *,
+    run_id: str,
+    secrets: Iterable[str] = (),
+) -> list[NormalizedTurn]:
+    result = load_run_result(root, secrets)
+    if result is None:
+        return []
+    contexts = _case_completion_context(root)
+    updates: list[NormalizedTurn] = []
+    for number, case in enumerate(result.cases, 1):
+        stage, occurred_at = contexts.get(
+            case.scenario_id, ("case", result.finished_at)
+        )
+        updates.append(
+            NormalizedTurn(
+                id=f"{run_id}-evaluation-{case.scenario_id}",
+                sequence=0,
+                number=number,
+                stage=stage,
+                case_id=case.scenario_id,
+                status=case.outcome.value,
+                agent_message=case.summary,
+                tyr_message=None,
+                occurred_at=occurred_at,
+                replied_at=None,
+                update_type="evaluation",
+                verdict=case.verdict.value,
+                objective_status=case.objective_status.value,
+                outcome=case.outcome.value,
+                assessment_summary=case.summary,
+            )
+        )
+    return updates
+
+
 def normalize_turns(
     bundle: str | Path,
     *,
@@ -376,15 +471,20 @@ def normalize_turns(
             )
         )
     scientist = _scientist_turns_from_activity(root, run_id=run_id, secrets=secrets)
+    scientist = [replace(turn, update_type="scientist") for turn in scientist]
+    evaluations = _evaluation_turns(root, run_id=run_id, secrets=secrets)
     executed_scientist_cases = {
         turn.case_id for turn in conversation if turn.stage == "scientist" and turn.case_id
     }
+    executed_scientist_cases.update(
+        turn.case_id for turn in evaluations if turn.stage == "scientist" and turn.case_id
+    )
     scientist = [
         turn
         for turn in scientist
         if turn.status != "ready" or turn.case_id not in executed_scientist_cases
     ]
-    combined = [*conversation, *scientist]
+    combined = [*conversation, *scientist, *evaluations]
     minimum = datetime.min.replace(tzinfo=UTC)
 
     def sort_key(turn: NormalizedTurn) -> tuple[datetime, int, str]:
@@ -403,6 +503,11 @@ def normalize_turns(
             tyr_message=turn.tyr_message,
             occurred_at=turn.occurred_at,
             replied_at=turn.replied_at,
+            update_type=turn.update_type,
+            verdict=turn.verdict,
+            objective_status=turn.objective_status,
+            outcome=turn.outcome,
+            assessment_summary=turn.assessment_summary,
         )
         for index, turn in enumerate(ordered, 1)
     ]
