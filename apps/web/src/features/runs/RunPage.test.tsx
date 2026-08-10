@@ -787,7 +787,7 @@ it("does not render raw HTML from conversation markdown", async () => {
   expect(container.querySelector("img")).toBeNull();
 });
 
-it("holds newer turns behind a concise action while reviewing older content", async () => {
+it("shows newer turns while reviewing older content", async () => {
   const { queryClient } = renderPage();
   await screen.findByText("read_file");
   Object.defineProperty(window, "scrollY", { configurable: true, value: 600 });
@@ -820,13 +820,11 @@ it("holds newer turns behind a concise action while reviewing older content", as
   });
 
   await queryClient.invalidateQueries({ queryKey: ["run-turns", "run-1"] });
-  expect(await screen.findByRole("button", { name: "Show 1 new update" })).toBeInTheDocument();
-  expect(screen.queryByText("Newest request")).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "Show 1 new update" }));
-  await waitFor(() => expect(screen.getByText("Newest request")).toBeInTheDocument());
+  expect(await screen.findByText("Newest request")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /Show \d+ new updates?/ })).not.toBeInTheDocument();
 });
 
-it("holds a new Tyr reply behind the same action while reviewing older content", async () => {
+it("shows a new Tyr reply while reviewing older content", async () => {
   const { queryClient } = renderPage();
   await screen.findByText("read_file");
   Object.defineProperty(window, "scrollY", { configurable: true, value: 600 });
@@ -851,8 +849,8 @@ it("holds a new Tyr reply behind the same action while reviewing older content",
   });
 
   await queryClient.invalidateQueries({ queryKey: ["run-turns", "run-1"] });
-  expect(await screen.findByRole("button", { name: "Show 1 new update" })).toBeInTheDocument();
-  expect(screen.queryByText("Request allowed")).not.toBeInTheDocument();
+  expect(await screen.findByText("Request allowed")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /Show \d+ new updates?/ })).not.toBeInTheDocument();
 });
 
 it("defaults refresh rate to 30s and lets the operator change it", async () => {

@@ -612,33 +612,6 @@
   scroll-margin-top: var(--space-6);
 }
 
-.new-turns-action {
-  position: sticky;
-  top: var(--space-3);
-  z-index: 2;
-  display: flex;
-  justify-content: center;
-  pointer-events: none;
-}
-
-.new-turns-action .button {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  pointer-events: auto;
-  border-color: var(--accent);
-  border-radius: var(--radius-full);
-  box-shadow: var(--shadow-md);
-}
-
-.new-turns-pulse {
-  width: 7px;
-  height: 7px;
-  border-radius: var(--radius-full);
-  background: currentColor;
-  animation: status-pulse 1.2s var(--ease-in-out) infinite;
-}
-
 .turn-count {
   border: var(--border-w) solid var(--border);
   border-radius: var(--radius-full);

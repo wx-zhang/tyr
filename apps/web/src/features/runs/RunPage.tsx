@@ -263,13 +263,11 @@ export function RunPage() {
   const events = useRunEvents(runId);
   const [olderTurns, setOlderTurns] = useState<RunTurn[]>([]);
   const [visibleLatestTurns, setVisibleLatestTurns] = useState<RunTurn[]>([]);
-  const [followingLatest, setFollowingLatest] = useState(true);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [flashIds, setFlashIds] = useState<Set<string>>(() => new Set());
-  const turnsSection = useRef<HTMLElement>(null);
   const previousVisible = useRef<Map<string, RunTurn>>(new Map());
   const run = visualization.data?.run;
   const scientistIterations = runRecord.data?.configuration?.scientistIterations ?? 0;
@@ -311,7 +309,6 @@ export function RunPage() {
   useEffect(() => {
     setOlderTurns([]);
     setVisibleLatestTurns([]);
-    setFollowingLatest(true);
     setFlashIds(new Set());
     setCancelling(false);
     setCancelError(null);
@@ -319,14 +316,8 @@ export function RunPage() {
   }, [runId]);
 
   useEffect(() => {
-    if (followingLatest && latestTurns) setVisibleLatestTurns(latestTurns);
-  }, [followingLatest, latestTurns]);
-
-  useEffect(() => {
-    const handleScroll = () => setFollowingLatest(window.scrollY < 160);
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+    if (latestTurns) setVisibleLatestTurns(latestTurns);
+  }, [latestTurns]);
 
   useEffect(() => {
     if (!isLive && !waitingForTyr) return undefined;
@@ -355,13 +346,6 @@ export function RunPage() {
     return () => window.clearTimeout(timer);
   }, [visibleLatestTurns]);
 
-  const visibleById = useMemo(
-    () => new Map(visibleLatestTurns.map((turn) => [turn.id, turn])),
-    [visibleLatestTurns],
-  );
-  const pendingTurnCount = latestTurns?.filter(
-    (turn) => !sameTurn(visibleById.get(turn.id), turn),
-  ).length ?? 0;
   const allTurns = useMemo(() => {
     const byId = new Map([...olderTurns, ...visibleLatestTurns].map((turn) => [turn.id, turn]));
     return [...byId.values()].sort((left, right) => right.sequence - left.sequence);
@@ -384,12 +368,6 @@ export function RunPage() {
     } finally {
       setLoadingOlder(false);
     }
-  };
-
-  const showNewTurns = () => {
-    setVisibleLatestTurns(latestTurns ?? []);
-    setFollowingLatest(true);
-    turnsSection.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
   };
 
   return (
@@ -543,7 +521,7 @@ export function RunPage() {
 
       <TyrNetworkMap runId={runId} isLive={isLive} refreshMs={refreshMs} />
 
-      <section ref={turnsSection} className="turns-section" aria-labelledby="turns-title">
+      <section className="turns-section" aria-labelledby="turns-title">
         <div className="section-heading">
           <div>
             <p className="eyebrow">Run history</p>
@@ -556,17 +534,9 @@ export function RunPage() {
             {loadingOlder ? "Loading earlier updates…" : `Load ${turns.data.omittedBefore} earlier updates`}
           </button>
         ) : null}
-        {pendingTurnCount ? (
-          <div className="new-turns-action" role="status" aria-live="polite">
-            <button className="button button-primary" type="button" onClick={showNewTurns}>
-              <span className="new-turns-pulse" aria-hidden="true" />
-              {`Show ${pendingTurnCount} new ${pendingTurnCount === 1 ? "update" : "updates"}`}
-            </button>
-          </div>
-        ) : null}
         {turns.isLoading ? <p className="secondary">Loading persisted updates…</p> : null}
         {turns.error ? <p className="callout callout-warning" role="alert">{turns.error.message}</p> : null}
-        {!turns.isLoading && !allTurns.length && !pendingTurnCount ? (
+        {!turns.isLoading && !allTurns.length ? (
           <p className="empty-state run-empty">
             {isLive ? "Waiting for the first update…" : "No updates have been persisted yet."}
           </p>
