@@ -536,16 +536,16 @@ it("shows configured and scientist evaluation outcomes as updates", async () => 
               number: 2,
               stage: "scientist",
               caseId: "scientist-alpha",
-              status: "completed",
+              status: "failed",
               agentMessage: "The control was bypassed.",
               tyrMessage: null,
               occurredAt: "2026-08-08T10:04:00Z",
               repliedAt: null,
               updateType: "evaluation",
-              verdict: "vulnerable",
-              objectiveStatus: "achieved",
-              outcome: "completed",
-              assessmentSummary: "The control was bypassed.",
+              verdict: "inconclusive",
+              objectiveStatus: "partial",
+              outcome: "failed",
+              assessmentSummary: "The request was refused and never attempted.",
             },
           ],
           omittedBefore: 0,
@@ -557,16 +557,18 @@ it("shows configured and scientist evaluation outcomes as updates", async () => 
     return Promise.resolve({ ok: true, json: async () => ({ items: [] }) } as Response);
   });
 
-  renderPage();
+  const { container } = renderPage();
 
   expect(await screen.findByRole("heading", { name: "Updates" })).toBeInTheDocument();
   expect(await screen.findByRole("heading", { name: "Evaluation result - case-alpha" })).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "Scientist evaluation - scientist-alpha" })).toBeInTheDocument();
-  expect(screen.getAllByText("Protected").length).toBeGreaterThan(0);
-  expect(screen.getByText("Vulnerable")).toBeInTheDocument();
+  expect(screen.getAllByText("No breach").length).toBeGreaterThan(0);
+  expect(screen.queryByText("Vulnerability Exposed (partial)")).not.toBeInTheDocument();
   expect(screen.getByText("Not Achieved")).toBeInTheDocument();
-  expect(screen.getByText("Achieved")).toBeInTheDocument();
-  expect(screen.getByText("The control was bypassed.")).toBeInTheDocument();
+  expect(screen.getByText("Partial")).toBeInTheDocument();
+  expect(screen.getByText("The request was refused and never attempted.")).toBeInTheDocument();
+  expect(container.querySelector("[data-turn-id=\"evaluation-scientist-alpha\"]"))
+    .not.toHaveClass("turn-failed");
   expect(screen.getAllByText("Case assessment")).toHaveLength(2);
   expect(screen.queryByText("LLM evaluation")).not.toBeInTheDocument();
 });

@@ -53,7 +53,7 @@ function label(value: string | null | undefined): string {
   return value.replaceAll("_", " ").replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
-function tone(state: string | undefined): "info" | "success" | "warning" | "danger" | "neutral" {
+function tone(state: string | null | undefined): "info" | "success" | "warning" | "danger" | "neutral" {
   if (state === "completed" || state === "ready" || state === "protected" || state === "pass" || state === "passed") {
     return "success";
   }
@@ -81,8 +81,32 @@ function tone(state: string | undefined): "info" | "success" | "warning" | "dang
   return "info";
 }
 
+type ResultDisplay = {
+  label: string;
+  tone: ReturnType<typeof tone>;
+  className: string;
+};
+
+function resultDisplay(
+  verdict: string | null | undefined,
+  objectiveStatus: string | null | undefined,
+  outcome: string | null | undefined,
+): ResultDisplay {
+  if (verdict === "protected" || (verdict !== "vulnerable" && outcome === "failed")) {
+    return { label: "No breach", tone: "success", className: "protected" };
+  }
+  if (verdict === "vulnerable" || (verdict === "inconclusive" && objectiveStatus === "partial")) {
+    return {
+      label: `Vulnerability Exposed${objectiveStatus === "partial" ? " (partial)" : ""}`,
+      tone: "danger",
+      className: "vulnerable",
+    };
+  }
+  return { label: label(verdict), tone: tone(verdict), className: verdict ?? "unknown" };
+}
+
 function caseStatus(item: CaseProgress): { label: string; tone: ReturnType<typeof tone> } {
-  if (item.verdict) return { label: label(item.verdict), tone: tone(item.verdict) };
+  if (item.verdict) return resultDisplay(item.verdict, item.objectiveStatus, item.outcome);
   return { label: label(item.state), tone: tone(item.state) };
 }
 
@@ -597,7 +621,13 @@ function Turn({
       : scientistGeneration
         ? `Scientist - Iteration ${turn.number}`
         : `${label(turn.stage)} - Turn ${turn.number}`;
-  const status = evaluation ? turn.verdict ?? turn.status : turn.status;
+  const evaluationResult = evaluation
+    ? resultDisplay(turn.verdict, turn.objectiveStatus, turn.outcome)
+    : null;
+  const status = evaluationResult ?? {
+    label: label(turn.status),
+    tone: tone(turn.status),
+  };
   const discovered = discoveryResult ? discoveryFields(turn.agentMessage) : [];
   return (
     <li
@@ -607,9 +637,11 @@ function Turn({
         waiting ? "turn-waiting" : "",
         scientistGeneration ? "turn-scientist" : "",
         evaluation ? "turn-evaluation" : "",
-        evaluation ? `verdict-${turn.verdict ?? "unknown"}` : "",
+        evaluation ? `verdict-${evaluationResult?.className ?? "unknown"}` : "",
         discoveryResult ? "turn-discovery" : "",
-        turn.status === "failed" || turn.status === "blocked" ? "turn-failed" : "",
+        turn.status === "failed" || turn.status === "blocked"
+          ? evaluationResult?.className === "protected" ? "" : "turn-failed"
+          : "",
         flash ? "turn-flash" : "",
       ].filter(Boolean).join(" ")}
       data-turn-id={turn.id}
@@ -646,15 +678,15 @@ function Turn({
             ) : null}
           </p>
           <StatusBadge
-            label={label(status)}
-            tone={tone(status)}
+            label={status.label}
+            tone={status.tone}
             pulse={waiting || turn.status === "generating"}
           />
         </div>
       </div>
       {evaluation ? (
         <div className="turn-messages turn-messages-single">
-          <article className={`turn-message evaluation-message verdict-${turn.verdict ?? "unknown"}`}>
+          <article className={`turn-message evaluation-message verdict-${evaluationResult?.className ?? "unknown"}`}>
             <p className="turn-speaker"><span aria-hidden="true">A</span>Case assessment</p>
             <dl className="evaluation-facts">
               <div>

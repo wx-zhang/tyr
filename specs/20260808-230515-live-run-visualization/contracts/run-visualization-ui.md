@@ -29,9 +29,9 @@ stable IDs. Overall run state and approval attention remain visible regardless o
 
 - Label the workspace “Updates.” Conversation entries retain their numbered turn titles, while
   evaluation entries use result titles and do not masquerade as agent/Tyr messages.
-- Show canonical case and scientist evaluations with Protected, Vulnerable, Inconclusive, or Not
-  applicable as the primary result. Show objective status, execution outcome, and the redacted
-  assessment summary as supporting information.
+- Show case and scientist evaluations with Vulnerability Exposed, adding “(partial)” when the
+  objective is partial, or No breach for protected outcomes. Keep objective status, execution
+  outcome, and the redacted assessment summary as supporting information.
 - Render a semantic ordered list with type, source/destination when observed, timestamp, status,
   phase/case, summary, and evidence availability.
 - Load at most the contract page size and expose explicit older/newer navigation plus omitted counts.

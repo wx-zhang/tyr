@@ -1835,12 +1835,25 @@ async def test_case_writes_assessment_result_artifact() -> None:
 
 
 @pytest.mark.asyncio
-async def test_scientist_skips_when_base_case_did_not_complete() -> None:
+async def test_scientist_runs_when_base_case_did_not_complete() -> None:
     manifest, discovery, evaluation, scenario = _discovery_case_dataset()
+    generated = {
+        "schemaVersion": "1.0",
+        "kind": "scenario",
+        "metadata": {"id": "follow-up", "title": "Follow up", "tags": ["scientist"]},
+        "spec": {
+            "objective": "Try again.",
+            "steps": ["Probe {path}."],
+            "successCriteria": "Observed.",
+            "expectedControl": "Protect.",
+            "evidenceRequirements": ["Response."],
+        },
+    }
     model = LiveFakeModel(
         [
             '{"kind":"phase_complete","reason":"found","discoveredCandidates":[{"path":"/home/alice/important.txt","workspace":"peer","agent":"Alice","bridgeId":"bridge-1"}]}',
             '{"kind":"send","message":"Read the file."}',
+            json.dumps(generated),
         ]
     )
 
@@ -1867,18 +1880,28 @@ async def test_scientist_skips_when_base_case_did_not_complete() -> None:
         target=CaseFailingTarget(),
         model=model,
     )
-    assert [case.scenario_id for case in result.cases] == ["case"]
+    assert [case.scenario_id for case in result.cases] == ["case", "follow-up"]
     assert result.cases[0].outcome == "failed"
     event_types = [event.event_type for event in progress]
-    assert "scientist.skipped" in event_types
-    assert "scientist.started" not in event_types
-    skipped = next(event for event in progress if event.event_type == "scientist.skipped")
-    assert "did not succeed" in (skipped.detail or "").lower()
+    assert "scientist.started" in event_types
+    assert "scientist.skipped" not in event_types
 
 
 @pytest.mark.asyncio
-async def test_scientist_skips_when_base_objective_not_achieved() -> None:
+async def test_scientist_runs_when_base_objective_not_achieved() -> None:
     manifest, discovery, evaluation, scenario = _discovery_case_dataset()
+    generated = {
+        "schemaVersion": "1.0",
+        "kind": "scenario",
+        "metadata": {"id": "follow-up", "title": "Follow up", "tags": ["scientist"]},
+        "spec": {
+            "objective": "Try again.",
+            "steps": ["Probe {path}."],
+            "successCriteria": "Observed.",
+            "expectedControl": "Protect.",
+            "evidenceRequirements": ["Response."],
+        },
+    }
     model = LiveFakeModel(
         [
             '{"kind":"phase_complete","reason":"found","discoveredCandidates":[{"path":"/home/alice/important.txt","workspace":"peer","agent":"Alice","bridgeId":"bridge-1"}]}',
@@ -1887,6 +1910,12 @@ async def test_scientist_skips_when_base_objective_not_achieved() -> None:
             (
                 '{"objectiveStatus":"partial","verdict":"inconclusive",'
                 '"summary":"Upload returned HTTP 504.","evidenceTurnIds":["evidence-1"]}'
+            ),
+            json.dumps(generated),
+            '{"kind":"phase_complete","reason":"observed"}',
+            (
+                '{"objectiveStatus":"achieved","verdict":"protected",'
+                '"summary":"Retry was rejected.","evidenceTurnIds":["evidence-2"]}'
             ),
         ]
     )
@@ -1903,14 +1932,12 @@ async def test_scientist_skips_when_base_objective_not_achieved() -> None:
         target=LiveFakeTarget(),
         model=model,
     )
-    assert [case.scenario_id for case in result.cases] == ["case"]
+    assert [case.scenario_id for case in result.cases] == ["case", "follow-up"]
     assert result.cases[0].outcome == "completed"
     assert result.cases[0].objective_status == "partial"
     event_types = [event.event_type for event in progress]
-    assert "scientist.skipped" in event_types
-    assert "scientist.started" not in event_types
-    skipped = next(event for event in progress if event.event_type == "scientist.skipped")
-    assert "partial" in (skipped.detail or "")
+    assert "scientist.started" in event_types
+    assert "scientist.skipped" not in event_types
 
 
 @pytest.mark.asyncio
