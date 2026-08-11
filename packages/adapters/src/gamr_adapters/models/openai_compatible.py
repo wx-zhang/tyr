@@ -14,6 +14,7 @@ class OpenAICompatibleModel:
         response = await self.client.chat.completions.create(
             model=self.model,
             messages=[{"role": "user", "content": prompt}],
+            max_tokens=8192,
         )
         choice = response.choices[0] if response.choices else None
         message = choice.message.content if choice and choice.message.content else ""
