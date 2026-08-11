@@ -2428,6 +2428,13 @@
             },
             "type": "array",
             "title": "Historycaseids"
+          },
+          "historyCaseOrigins": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Historycaseorigins"
           }
         },
         "type": "object",

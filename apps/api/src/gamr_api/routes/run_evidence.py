@@ -171,6 +171,9 @@ class RunTurnResponse(BaseModel):
     outcome: str | None = None
     assessment_summary: str | None = Field(default=None, alias="assessmentSummary")
     history_case_ids: list[str] = Field(default_factory=list, alias="historyCaseIds")
+    history_case_origins: list[str] = Field(
+        default_factory=list, alias="historyCaseOrigins"
+    )
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -672,6 +675,7 @@ def turns(
             outcome=item.outcome,
             assessmentSummary=item.assessment_summary,
             historyCaseIds=list(item.history_case_ids),
+            historyCaseOrigins=list(item.history_case_origins),
         )
         for item in page
     ]

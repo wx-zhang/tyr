@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
   cancelRun,
+  fetchDatasetCases,
   fetchRun,
   fetchRunTurns,
   fetchRunVisualization,
@@ -12,6 +13,13 @@ import {
 import { useRunEvents, type RunConnectionState } from "../../api/useRunEvents";
 import { StatusBadge } from "../../components/StatusBadge";
 import { MarkdownMessage } from "./MarkdownMessage";
+import {
+  buildCaseOriginMap,
+  resolveHistoryCases,
+  ScientistHistoryUsed,
+  type HistoryCaseOrigin,
+} from "./ScientistHistoryUsed";
+import { ScientistScenarioCard } from "./ScientistScenarioCard";
 import { TyrNetworkMap } from "./TyrNetworkMap";
 
 const terminalStates = new Set([
@@ -326,6 +334,13 @@ export function RunPage() {
     queryKey: ["run", runId],
     queryFn: () => fetchRun(runId),
   });
+  const datasetId =
+    visualization.data?.run?.dataset ?? runRecord.data?.dataset ?? null;
+  const datasetCases = useQuery({
+    queryKey: ["dataset-cases", datasetId],
+    queryFn: () => fetchDatasetCases(datasetId!),
+    enabled: Boolean(datasetId),
+  });
   const turns = useQuery({
     queryKey: ["run-turns", runId],
     queryFn: () => fetchRunTurns(runId),
@@ -447,6 +462,23 @@ export function RunPage() {
     }
     return map;
   }, [allTurns]);
+  const datasetCaseIds = useMemo(
+    () =>
+      (Array.isArray(datasetCases.data) ? datasetCases.data : []).map(
+        (item) => item.metadata.id,
+      ),
+    [datasetCases.data],
+  );
+  const caseOriginById = useMemo(
+    () =>
+      buildCaseOriginMap(
+        allTurns,
+        runRecord.data?.configuration?.caseIds?.length
+          ? runRecord.data.configuration.caseIds
+          : datasetCaseIds,
+      ),
+    [allTurns, runRecord.data?.configuration?.caseIds, datasetCaseIds],
+  );
   const hasOpenTurnWork = Boolean(
     visibleLatestTurns.some(turnHasOpenWork) ||
     latestTurns?.some(turnHasOpenWork),
@@ -710,6 +742,8 @@ export function RunPage() {
                   ? scientistIterationByCaseId.get(turn.caseId)
                   : undefined
               }
+              caseOriginById={caseOriginById}
+              datasetCaseIds={datasetCaseIds}
             />
           ))}
         </ol>
@@ -738,12 +772,16 @@ function Turn({
   flash,
   now,
   scientistIteration,
+  caseOriginById,
+  datasetCaseIds,
 }: {
   turn: RunTurn;
   newest: boolean;
   flash: boolean;
   now: number;
   scientistIteration?: number;
+  caseOriginById?: Map<string, HistoryCaseOrigin>;
+  datasetCaseIds?: string[];
 }) {
   const waiting = turn.status === "waiting_for_tyr" && !turn.tyrMessage;
   const scientistGeneration = isScientistGeneration(turn);
@@ -799,7 +837,8 @@ function Turn({
           <h3>{heading}</h3>
           {turn.caseId ? (
             <span className="muted">
-              Evaluation name <span className="mono">{turn.caseId}</span>
+              {scientistGeneration ? "New scenario" : "Evaluation name"}{" "}
+              <span className="mono">{turn.caseId}</span>
             </span>
           ) : null}
         </div>
@@ -900,30 +939,16 @@ function Turn({
             <p className="turn-speaker">
               <span aria-hidden="true">S</span>Scientist
             </p>
+            <ScientistScenarioCard turn={turn} />
             {turn.historyCaseIds ? (
-              <div
-                className="scientist-history"
-                aria-label="Tests used from history"
-              >
-                <p className="scientist-history-label">
-                  Tests used from history
-                </p>
-                {turn.historyCaseIds.length ? (
-                  <ul className="scientist-history-list">
-                    {turn.historyCaseIds.map((caseId) => (
-                      <li key={caseId} className="mono">
-                        {caseId}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="scientist-history-empty">
-                    No prior tests were available.
-                  </p>
-                )}
-              </div>
+              <ScientistHistoryUsed
+                cases={resolveHistoryCases(turn.historyCaseIds, {
+                  origins: turn.historyCaseOrigins,
+                  originByCaseId: caseOriginById,
+                  datasetCaseIds,
+                })}
+              />
             ) : null}
-            <MarkdownMessage content={turn.agentMessage} />
           </article>
         </div>
       ) : (

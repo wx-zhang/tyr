@@ -71,7 +71,9 @@ export function scenarioToCase(scenario: DatasetScenario): DatasetCase {
   };
 }
 export type RunVisualization = components["schemas"]["RunVisualization"];
-export type RunTurn = components["schemas"]["RunTurnResponse"];
+export type RunTurn = components["schemas"]["RunTurnResponse"] & {
+  historyCaseOrigins?: string[];
+};
 export type RunTurnPage = components["schemas"]["RunTurnPageResponse"];
 export type ProgressItem = components["schemas"]["ProgressItem"];
 export type CaseProgress = components["schemas"]["CaseProgress"];

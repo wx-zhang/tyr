@@ -77,6 +77,7 @@ def test_turns_route_returns_grouped_redacted_conversation(tmp_path: Path) -> No
             "outcome": None,
             "assessmentSummary": None,
             "historyCaseIds": [],
+            "historyCaseOrigins": [],
         }
         assert payload["items"][1]["status"] == "waiting_for_tyr"
         assert payload["items"][1]["caseId"] == "case-alpha"
@@ -143,7 +144,11 @@ def test_turns_route_includes_scientist_generation_events(tmp_path: Path) -> Non
                     "summary": "Iteration 1 used 1 prior test",
                     "relatedCaseIds": ["case-alpha"],
                     "evidenceType": "event",
-                    "metadata": {"eventType": "scientist.history_used", "turn": 1},
+                    "metadata": {
+                        "eventType": "scientist.history_used",
+                        "turn": 1,
+                        "historyOrigins": "base",
+                    },
                 },
                 {
                     "id": "a-fail",
@@ -181,6 +186,7 @@ def test_turns_route_includes_scientist_generation_events(tmp_path: Path) -> Non
         assert "not json" in scientist["agentMessage"]
         assert scientist["tyrMessage"] is None
         assert scientist["historyCaseIds"] == ["case-alpha"]
+        assert scientist["historyCaseOrigins"] == ["base"]
     finally:
         app.dependency_overrides.clear()
 

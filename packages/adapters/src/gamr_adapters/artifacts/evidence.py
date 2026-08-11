@@ -79,6 +79,7 @@ class NormalizedTurn:
     outcome: str | None = None
     assessment_summary: str | None = None
     history_case_ids: tuple[str, ...] = ()
+    history_case_origins: tuple[str, ...] = ()
 
 
 def _parse_occurred_at(value: object) -> datetime | None:
@@ -98,6 +99,21 @@ def _stored_case_ids(value: object) -> tuple[str, ...]:
     if not isinstance(value, (list, tuple)):
         return ()
     return tuple(item for item in value if isinstance(item, str) and item.strip())
+
+
+def _history_case_origins(
+    value: dict[str, object], case_ids: tuple[str, ...]
+) -> tuple[str, ...]:
+    if not case_ids:
+        return ()
+    metadata = value.get("metadata")
+    raw = metadata.get("historyOrigins") if isinstance(metadata, dict) else None
+    if not isinstance(raw, str) or not raw.strip():
+        return ()
+    parts = [part.strip() for part in raw.split(",")]
+    if len(parts) != len(case_ids):
+        return ()
+    return tuple("base" if part == "base" else "scientist" for part in parts)
 
 
 def _activity_turn_times(bundle: Path) -> dict[str, dict[str, datetime]]:
@@ -196,6 +212,7 @@ def _scientist_turns_from_activity(
                     next_index = max(next_index, turn_meta + 1)
                 continue
             history_case_ids = _related_case_ids(value)
+            history_case_origins = _history_case_origins(value, history_case_ids)
             if status == "scientist_history_used" or event_type == "scientist.history_used":
                 index = turn_meta or open_iteration or next_index
                 open_iteration = index
@@ -208,6 +225,7 @@ def _scientist_turns_from_activity(
                     "case_id": None,
                     "occurred_at": occurred_at,
                     "history_case_ids": history_case_ids,
+                    "history_case_origins": history_case_origins,
                 }
                 continue
             if status == "scientist_failed" or event_type == "scientist.failed":
@@ -223,6 +241,7 @@ def _scientist_turns_from_activity(
                     "case_id": None,
                     "occurred_at": occurred_at,
                     "history_case_ids": previous.get("history_case_ids", ()),
+                    "history_case_origins": previous.get("history_case_origins", ()),
                 }
                 continue
             if status == "scientist_scenario_ready" or event_type == "scientist.scenario_ready":
@@ -238,6 +257,7 @@ def _scientist_turns_from_activity(
                     "case_id": activity_case_id,
                     "occurred_at": occurred_at,
                     "history_case_ids": previous.get("history_case_ids", ()),
+                    "history_case_origins": previous.get("history_case_origins", ()),
                 }
                 continue
     result_errors = _scientist_errors_from_result(root, secrets)
@@ -256,6 +276,19 @@ def _scientist_turns_from_activity(
             elif message == "scientist failed":
                 message = f"Scientist scenario {number} failed"
         occurred_raw = item.get("occurred_at")
+        history_ids = _stored_case_ids(item.get("history_case_ids", ()))
+        origin_raw = item.get("history_case_origins", ())
+        history_origins = (
+            tuple(
+                "base" if origin == "base" else "scientist"
+                for origin in origin_raw
+                if isinstance(origin, str)
+            )
+            if isinstance(origin_raw, (list, tuple))
+            else ()
+        )
+        if len(history_origins) != len(history_ids):
+            history_origins = ()
         turns.append(
             NormalizedTurn(
                 id=str(item["id"]),
@@ -268,7 +301,8 @@ def _scientist_turns_from_activity(
                 tyr_message=None,
                 occurred_at=occurred_raw if isinstance(occurred_raw, datetime) else None,
                 replied_at=None,
-                history_case_ids=_stored_case_ids(item.get("history_case_ids", ())),
+                history_case_ids=history_ids,
+                history_case_origins=history_origins,
             )
         )
     return turns
@@ -690,6 +724,7 @@ def normalize_turns(
             outcome=turn.outcome,
             assessment_summary=turn.assessment_summary,
             history_case_ids=turn.history_case_ids,
+            history_case_origins=turn.history_case_origins,
         )
         for index, turn in enumerate(ordered, 1)
     ]

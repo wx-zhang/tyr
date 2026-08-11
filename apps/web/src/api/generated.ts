@@ -748,6 +748,8 @@ export interface components {
             assessmentSummary?: string | null;
             /** Historycaseids */
             historyCaseIds?: string[];
+            /** Historycaseorigins */
+            historyCaseOrigins?: string[];
         };
         /** RunVisualization */
         RunVisualization: {

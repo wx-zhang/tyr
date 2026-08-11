@@ -176,6 +176,7 @@ class CaseRecord:
     rendered_success: str
     case: CaseResult
     transcript: list[dict[str, str]]
+    origin: str = "base"
 
 
 @dataclass(frozen=True)
@@ -606,6 +607,7 @@ class ExperimentRunner:
                     rendered_success=success,
                     case=case,
                     transcript=transcript_by_case.get(case.scenario_id, []),
+                    origin="base" if is_base else "scientist",
                 )
             )
         return records
@@ -664,6 +666,10 @@ class ExperimentRunner:
             history_case_ids = tuple(
                 record.case.scenario_id for record in history_records
             )[:100]
+            history_origins = tuple(
+                "base" if record.origin == "base" else "scientist"
+                for record in history_records
+            )[:100]
             self._emit(
                 "scientist.history_used",
                 run_id,
@@ -675,6 +681,9 @@ class ExperimentRunner:
                     else f"Iteration {index} has no prior tests"
                 ),
                 related_case_ids=history_case_ids,
+                metadata_extra={
+                    "historyOrigins": ",".join(history_origins),
+                },
             )
             declared = ", ".join(f"{{{name}}}" for name in sorted(dataset.manifest.spec.variables))
             prompt = (
@@ -949,6 +958,7 @@ class ExperimentRunner:
                 rendered_success=scenario.spec.success_criteria or "",
                 case=case,
                 transcript=[],
+                origin="scientist" if phase == "scientist" else "base",
             )
             return record, str(case.summary)
 
@@ -1003,6 +1013,7 @@ class ExperimentRunner:
                 rendered_success=success,
                 case=case,
                 transcript=result.transcript,
+                origin="scientist" if phase == "scientist" else "base",
             )
             return record, result.error
         self._emit("assessment.started", run_id, phase="assessment", case_id=case_id)
@@ -1069,6 +1080,7 @@ class ExperimentRunner:
             rendered_success=success,
             case=case,
             transcript=result.transcript,
+            origin="scientist" if phase == "scientist" else "base",
         )
         return record, None
 
@@ -1645,6 +1657,7 @@ class ExperimentRunner:
         detail: str | None = None,
         fields: tuple[tuple[str, str], ...] | None = None,
         related_case_ids: tuple[str, ...] = (),
+        metadata_extra: dict[str, str] | None = None,
     ) -> None:
         sink = self._activity_sink
         if sink is not None:
@@ -1664,6 +1677,8 @@ class ExperimentRunner:
                     else {"eventType": event_type}
                 )
                 metadata.update(participant_meta)
+                if metadata_extra:
+                    metadata.update(metadata_extra)
                 activity_fields: dict[str, Any] = dict(
                     id=new_id(),
                     runId=run_id,

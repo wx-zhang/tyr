@@ -208,6 +208,15 @@ beforeEach(() => {
           }),
         });
       }
+      if (url.includes("/api/v1/datasets/") && url.endsWith("/cases")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => [
+            { metadata: { id: "case-alpha", title: "Alpha" } },
+            { metadata: { id: "case-beta", title: "Beta" } },
+          ],
+        });
+      }
       return Promise.resolve({
         ok: true,
         json: async () => ({ items: [], latestSequence: 0 }),
@@ -532,9 +541,22 @@ it("shows ready scientist generation turns as iteration cards", async () => {
               caseId: "scientist-2",
               status: "ready",
               agentMessage: "New delivery path scenario ready",
-              historyCaseIds: ["case-alpha", "case-beta"],
+              historyCaseIds: ["case-alpha", "case-beta", "scientist-1"],
               tyrMessage: null,
               occurredAt: "2026-08-08T10:06:00Z",
+              repliedAt: null,
+            },
+            {
+              id: "sci-1-ready",
+              sequence: 3,
+              number: 1,
+              stage: "scientist",
+              caseId: "scientist-1",
+              status: "ready",
+              agentMessage: "Earlier scientist scenario ready",
+              historyCaseIds: ["case-alpha", "case-beta"],
+              tyrMessage: null,
+              occurredAt: "2026-08-08T10:05:00Z",
               repliedAt: null,
             },
             ...turns.items,
@@ -559,6 +581,7 @@ it("shows ready scientist generation turns as iteration cards", async () => {
             model: "test",
             maxTurns: 10,
             discoveryTurns: 1,
+            caseIds: ["case-alpha", "case-beta"],
             scientistIterations: 2,
           },
         }),
@@ -578,22 +601,51 @@ it("shows ready scientist generation turns as iteration cards", async () => {
   expect(
     screen.getByText("New delivery path scenario ready"),
   ).toBeInTheDocument();
+  const iteration2 = screen
+    .getByRole("heading", { name: "Scientist - Iteration 2" })
+    .closest(".turn") as HTMLElement;
+  expect(
+    within(iteration2).getByLabelText("New scientist scenario"),
+  ).toBeInTheDocument();
+  expect(within(iteration2).getByText("New scenario")).toBeInTheDocument();
+  expect(
+    within(iteration2).getAllByText("scientist-2").length,
+  ).toBeGreaterThan(0);
   const history = container.querySelector(".scientist-history");
   expect(history).not.toBeNull();
+  const iteration2History = within(iteration2).getByLabelText(
+    "Tests used from history",
+  );
   expect(
-    within(history as HTMLElement).getByText("case-alpha"),
+    within(iteration2History).getByText("case-alpha"),
+  ).toBeInTheDocument();
+  expect(within(iteration2History).getByText("case-beta")).toBeInTheDocument();
+  expect(
+    within(iteration2History).getByText("scientist-1"),
   ).toBeInTheDocument();
   expect(
-    within(history as HTMLElement).getByText("case-beta"),
+    within(iteration2History).getByText(/3 prior tests/),
   ).toBeInTheDocument();
   expect(
-    within(history as HTMLElement).getByText("Tests used from history"),
+    within(iteration2History).getByLabelText("Base scenarios"),
   ).toBeInTheDocument();
-  expect(screen.getByText("Ready")).toBeInTheDocument();
+  expect(
+    within(iteration2History).getByLabelText("Scientist scenarios"),
+  ).toBeInTheDocument();
+  expect(
+    within(iteration2History).getAllByText("Base").length,
+  ).toBeGreaterThan(0);
+  expect(
+    within(iteration2History).getAllByText("Scientist").length,
+  ).toBeGreaterThan(0);
+  expect(screen.getAllByText("Ready").length).toBeGreaterThan(0);
   expect(container.querySelector(".turn-scientist")).not.toBeNull();
   expect(container.querySelector(".turn-messages-single")).not.toBeNull();
-  expect(await screen.findByText("Scientist iterations")).toBeInTheDocument();
-  expect(screen.getByText("2")).toBeInTheDocument();
+  const iterationsLabel = await screen.findByText("Scientist iterations");
+  expect(iterationsLabel).toBeInTheDocument();
+  expect(iterationsLabel.closest("div")?.querySelector("dd")?.textContent).toBe(
+    "2",
+  );
 });
 
 it("distinguishes turns from different scientist scenarios instead of repeating Turn 1", async () => {
