@@ -374,6 +374,15 @@ export function RunPage() {
     const byId = new Map([...olderTurns, ...visibleLatestTurns].map((turn) => [turn.id, turn]));
     return [...byId.values()].sort((left, right) => right.sequence - left.sequence);
   }, [olderTurns, visibleLatestTurns]);
+  const scientistIterationByCaseId = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const turn of allTurns) {
+      if (isScientistGeneration(turn) && turn.caseId) {
+        map.set(turn.caseId, turn.number);
+      }
+    }
+    return map;
+  }, [allTurns]);
   const hasOpenTurnWork = Boolean(
     visibleLatestTurns.some(turnHasOpenWork) || latestTurns?.some(turnHasOpenWork),
   );
@@ -574,6 +583,9 @@ export function RunPage() {
               newest={index === 0 && !awaitingNextTurn}
               flash={flashIds.has(turn.id)}
               now={now}
+              scientistIteration={
+                turn.caseId ? scientistIterationByCaseId.get(turn.caseId) : undefined
+              }
             />
           ))}
         </ol>
@@ -601,11 +613,13 @@ function Turn({
   newest,
   flash,
   now,
+  scientistIteration,
 }: {
   turn: RunTurn;
   newest: boolean;
   flash: boolean;
   now: number;
+  scientistIteration?: number;
 }) {
   const waiting = turn.status === "waiting_for_tyr" && !turn.tyrMessage;
   const scientistGeneration = isScientistGeneration(turn);
@@ -620,7 +634,9 @@ function Turn({
         : "Discovery complete"
       : scientistGeneration
         ? `Scientist - Iteration ${turn.number}`
-        : `${label(turn.stage)} - Turn ${turn.number}`;
+        : turn.stage === "scientist" && scientistIteration != null
+          ? `Scientist ${scientistIteration} - Turn ${turn.number}`
+          : `${label(turn.stage)} - Turn ${turn.number}`;
   const evaluationResult = evaluation
     ? resultDisplay(turn.verdict, turn.objectiveStatus, turn.outcome)
     : null;
