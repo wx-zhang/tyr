@@ -593,6 +593,8 @@ class ExperimentRunner:
             records.append(record)
             if case_error:
                 errors.append(case_error)
+            elif self._scenario_succeeded(record.case):
+                break
         self._emit(
             "scientist.completed",
             run_id,
@@ -1671,6 +1673,13 @@ class ExperimentRunner:
                 "occurredAt": occurred_at,
             }
         artifacts.write_json(f"runs/{run_id}/discovery-result.json", payload)
+
+    @staticmethod
+    def _scenario_succeeded(case: CaseResult) -> bool:
+        return (
+            case.outcome is ExecutionOutcome.COMPLETED
+            and case.objective_status is ObjectiveStatus.ACHIEVED
+        )
 
     @staticmethod
     def _write_case_result(
