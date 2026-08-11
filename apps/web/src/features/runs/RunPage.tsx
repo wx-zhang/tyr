@@ -635,7 +635,7 @@ function Turn({
       : scientistGeneration
         ? `Scientist - Iteration ${turn.number}`
         : turn.stage === "scientist" && scientistIteration != null
-          ? `Scientist ${scientistIteration} - Turn ${turn.number}`
+          ? `Scientist Scenario ${scientistIteration} - Turn ${turn.number}`
           : `${label(turn.stage)} - Turn ${turn.number}`;
   const evaluationResult = evaluation
     ? resultDisplay(turn.verdict, turn.objectiveStatus, turn.outcome)

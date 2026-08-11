@@ -318,19 +318,11 @@ def _case_completion_context(root: Path) -> dict[str, tuple[str, datetime | None
 
 
 def _turn_phase_rank(turn: NormalizedTurn) -> int:
-    if turn.update_type == "discovery":
-        return 1
-    if turn.stage == "discovery":
+    if turn.update_type == "discovery" or turn.stage == "discovery":
         return 0
-    if turn.stage == "case" or turn.stage == "assessment":
-        return 3 if turn.update_type == "evaluation" else 2
-    if turn.update_type == "scientist":
-        return 4
-    if turn.stage == "scientist":
-        return 6 if turn.update_type == "evaluation" else 5
-    if turn.update_type == "evaluation":
-        return 3
-    return 2
+    if turn.stage == "scientist" or turn.update_type == "scientist":
+        return 2
+    return 1
 
 
 def _stamp_discovery_after_chatter(

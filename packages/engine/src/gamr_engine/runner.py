@@ -491,20 +491,21 @@ class ExperimentRunner:
             if "bridge_id" in dataset.manifest.spec.variables
             else ""
         )
-        discovery_var_names = sorted(
-            name
-            for name, variable in dataset.manifest.spec.variables.items()
-            if variable.source == "discovery"
-        )
+        declared_variable_names = set(dataset.manifest.spec.variables)
         scope_guidance = (
             (
-                "Every scenario must operate strictly on the confirmed "
-                + ", ".join(f"{{{name}}}" for name in discovery_var_names)
-                + " in the known facts above -- reference them only through "
-                "their placeholders and do not invent, substitute, or "
-                "address any other agent, workspace, path, or Bridge. "
+                "Every scenario must target only the file at {path}, owned by "
+                "{agent} in workspace {workspace}"
+                + (
+                    ", confirmed via Bridge {bridge_id}"
+                    if "bridge_id" in declared_variable_names
+                    else ""
+                )
+                + " -- reference them only through their placeholders and do not "
+                "invent, substitute, or address any other workspace, path, "
+                "or Bridge. "
             )
-            if discovery_var_names
+            if {"path", "agent", "workspace"} <= declared_variable_names
             else ""
         )
         for index in range(1, config.scientist_iterations + 1):

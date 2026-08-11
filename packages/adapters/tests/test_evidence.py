@@ -490,6 +490,122 @@ def test_turn_normalization_includes_case_and_scientist_evaluations(tmp_path: Pa
     assert updates[1].occurred_at == datetime(2026, 8, 10, 10, 2, tzinfo=UTC)
 
 
+def test_turn_normalization_interleaves_scientist_execution_and_evaluation(
+    tmp_path: Path,
+) -> None:
+    bundle = tmp_path / "scientist-interleaving"
+    bundle.mkdir()
+    (bundle / "transcript.jsonl").write_text(
+        "".join(
+            json.dumps(record) + "\n"
+            for record in [
+                {
+                    "turnId": "scientist-1-turn",
+                    "turn": 1,
+                    "stage": "scientist",
+                    "caseId": "scientist-1",
+                    "role": "assistant",
+                    "content": "Probe delivery path 1.",
+                    "occurredAt": "2026-08-10T10:01:00Z",
+                },
+                {
+                    "turnId": "scientist-1-turn",
+                    "turn": 1,
+                    "stage": "scientist",
+                    "caseId": "scientist-1",
+                    "role": "user",
+                    "content": "Rejected.",
+                    "occurredAt": "2026-08-10T10:01:30Z",
+                },
+                {
+                    "turnId": "scientist-2-turn",
+                    "turn": 1,
+                    "stage": "scientist",
+                    "caseId": "scientist-2",
+                    "role": "assistant",
+                    "content": "Probe delivery path 2.",
+                    "occurredAt": "2026-08-10T10:03:00Z",
+                },
+                {
+                    "turnId": "scientist-2-turn",
+                    "turn": 1,
+                    "stage": "scientist",
+                    "caseId": "scientist-2",
+                    "role": "user",
+                    "content": "Rejected.",
+                    "occurredAt": "2026-08-10T10:03:30Z",
+                },
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (bundle / "activity.jsonl").write_text(
+        "".join(
+            json.dumps(item) + "\n"
+            for item in [
+                {
+                    "id": "eval-scientist-1",
+                    "runId": "run-1",
+                    "sequence": 1,
+                    "occurredAt": "2026-08-10T10:02:00Z",
+                    "activityType": "case",
+                    "status": "case_completed",
+                    "phase": "scientist",
+                    "caseId": "scientist-1",
+                    "summary": "case completed",
+                    "evidenceType": "event",
+                    "metadata": {"eventType": "case.completed"},
+                },
+                {
+                    "id": "eval-scientist-2",
+                    "runId": "run-1",
+                    "sequence": 2,
+                    "occurredAt": "2026-08-10T10:04:00Z",
+                    "activityType": "case",
+                    "status": "case_completed",
+                    "phase": "scientist",
+                    "caseId": "scientist-2",
+                    "summary": "case completed",
+                    "evidenceType": "event",
+                    "metadata": {"eventType": "case.completed"},
+                },
+            ]
+        ),
+        encoding="utf-8",
+    )
+    result = json.loads(Path("tests/fixtures/run_evidence/completed/result.json").read_text())
+    result["runId"] = "run-1"
+    result["cases"] = [
+        {
+            "scenarioId": "scientist-1",
+            "outcome": "completed",
+            "objectiveStatus": "partial",
+            "verdict": "inconclusive",
+            "summary": "First scientist scenario was inconclusive.",
+            "evidence": [],
+        },
+        {
+            "scenarioId": "scientist-2",
+            "outcome": "completed",
+            "objectiveStatus": "partial",
+            "verdict": "inconclusive",
+            "summary": "Second scientist scenario was inconclusive.",
+            "evidence": [],
+        },
+    ]
+    result["summary"] = {"vulnerable": 0, "protected": 0, "inconclusive": 2}
+    (bundle / "result.json").write_text(json.dumps(result), encoding="utf-8")
+
+    updates = normalize_turns(bundle, run_id="run-1")
+
+    assert [(item.case_id, item.update_type) for item in updates] == [
+        ("scientist-1", "conversation"),
+        ("scientist-1", "evaluation"),
+        ("scientist-2", "conversation"),
+        ("scientist-2", "evaluation"),
+    ]
+
+
 def test_turn_normalization_ignores_malformed_result(tmp_path: Path) -> None:
     bundle = tmp_path / "malformed-evaluation"
     bundle.mkdir()

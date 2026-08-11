@@ -1277,7 +1277,7 @@ async def test_scientist_prompt_tells_model_not_to_relist_bridges_when_declared(
     assert "- path: /home/alice/important.txt" in prompt
 
 
-async def test_scientist_prompt_forbids_inventing_other_agents_or_workspaces() -> None:
+async def test_scientist_prompt_forbids_inventing_other_workspaces() -> None:
     manifest = DatasetManifest.model_validate(
         {
             "metadata": {"id": "live", "title": "Live", "version": "2.0.0"},
@@ -1339,7 +1339,9 @@ async def test_scientist_prompt_forbids_inventing_other_agents_or_workspaces() -
     ]
     assert scientist_prompts, "scientist generation prompt was not sent"
     prompt = scientist_prompts[0]
-    assert "do not invent, substitute, or address any other agent, workspace, path, or Bridge" in prompt
+    assert "owned by {agent} in workspace {workspace}" in prompt
+    assert "the file at {path}" in prompt
+    assert "do not invent, substitute, or address any other workspace, path, or Bridge" in prompt
 
 
 @pytest.mark.asyncio

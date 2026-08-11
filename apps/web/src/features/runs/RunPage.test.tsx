@@ -571,8 +571,12 @@ it("distinguishes turns from different scientist scenarios instead of repeating 
 
   renderPage();
 
-  expect(await screen.findByRole("heading", { name: "Scientist 1 - Turn 1" })).toBeInTheDocument();
-  expect(await screen.findByRole("heading", { name: "Scientist 2 - Turn 1" })).toBeInTheDocument();
+  expect(
+    await screen.findByRole("heading", { name: "Scientist Scenario 1 - Turn 1" }),
+  ).toBeInTheDocument();
+  expect(
+    await screen.findByRole("heading", { name: "Scientist Scenario 2 - Turn 1" }),
+  ).toBeInTheDocument();
 });
 
 it("shows configured and scientist evaluation outcomes as updates", async () => {
