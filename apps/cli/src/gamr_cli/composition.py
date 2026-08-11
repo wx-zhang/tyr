@@ -18,9 +18,9 @@ def build_chat_session(
         raise ValueError("TYR_MCP_TOKEN is required for live chat")
     if not settings.model_api_key:
         raise ValueError("OPENROUTER_API_KEY is required for live chat")
-    selected_model = model_name or settings.model_name
+    selected_model = model_name or settings.chat_model_name
     if not selected_model:
-        raise ValueError("TYR_LOOP_MODEL is required for live chat")
+        raise ValueError("TYR_LOOP_CHAT_MODEL is required for live chat")
     target = TyrMcpClient(settings.tyr_mcp_url, settings.tyr_mcp_token)
     model = OpenAICompatibleModel(
         base_url=base_url or settings.model_base_url,

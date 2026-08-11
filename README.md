@@ -7,9 +7,9 @@
 **GAMR** (Generative Adversarial Risk Mapper) is the red-team experiment runner for
 [Tyr](https://tyr.ai/) — the security and governance layer for AI agents.
 
-GAMR runs and reviews adversarial experiments against Tyr. The CLI is the primary interface. The
-optional API and web app use the same engine to start read-only runs and visualize every run stored
-under the shared `.gamr` root, including CLI runs.
+GAMR runs adversarial experiments against Tyr and lets you review the results. The CLI is the
+primary interface. The optional API and web app share the same engine, so they can start read-only
+runs and visualize every run under the shared `.gamr` root, including runs started from the CLI.
 
 ## Quick start
 
@@ -18,14 +18,44 @@ uv sync --all-packages --dev
 uv run gamr doctor
 uv run gamr dataset validate datasets/first-plan
 uv run gamr experiment run datasets/first-plan
-uv run gamr experiment run datasets/first-plan --all-cases
 uv run gamr result validate .gamr/runs/<run-id>/result.json
+```
+
+Live commands need `TYR_MCP_TOKEN`, `OPENROUTER_API_KEY`, and `TYR_LOOP_MODEL` set (see
+`.env.example`).
+
+By default, experiments are **read-only**. To let an experiment take real actions through Tyr, run
+with Actions Allowed (`--action-mode approval_required --allow-actions`); each action still needs an
+explicit human approval on the Tyr side. GAMR never auto-approves an action. Use `--all-cases` to run
+every case in a dataset instead of one.
+
+## Interactive chat
+
+`gamr chat` opens a live chat session with Tyr through the same engine:
+
+```bash
 uv run gamr chat
 ```
 
-Live commands require `TYR_MCP_TOKEN`, `OPENROUTER_API_KEY`, and `TYR_LOOP_MODEL`.
-Experiments may run read-only or with Actions Allowed (`approval_required`). Action-enabled runs require explicit
-confirmation; GAMR never approves actions automatically.
+This starts in **read-only** mode: Tyr's action-capable tools are hidden entirely, so nothing can be
+executed. To let the chat see and call action-capable tools, add `--allow-actions`:
+
+```bash
+uv run gamr chat --allow-actions
+```
+
+`--allow-actions` only exposes the tools — it does not skip approval. Every action Tyr's tools take
+still requires a recorded human decision on the Tyr side. Because this mode is more sensitive, the
+CLI asks you to confirm it interactively before the session starts. If you're running non-interactively
+(e.g. from a script), add `--confirm-actions` to skip that prompt:
+
+```bash
+uv run gamr chat --allow-actions --confirm-actions
+```
+
+Other chat options: `--prompt "<text>"` to send an initial message, `--model` to override
+`TYR_LOOP_CHAT_MODEL` (defaults to `x-ai/grok-4.5`), and `--base-url` to override
+`OPENROUTER_BASE_URL`.
 
 ## Optional web interface
 

@@ -34,6 +34,30 @@ def test_settings_load_provider_env_names(
     assert settings.model_name == "example/model"
 
 
+def test_chat_model_defaults_independently_of_loop_model(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("TYR_LOOP_CHAT_MODEL", raising=False)
+    monkeypatch.setenv("TYR_LOOP_MODEL", "anthropic/claude-sonnet-5")
+
+    settings = Settings()
+
+    assert settings.model_name == "anthropic/claude-sonnet-5"
+    assert settings.chat_model_name == "x-ai/grok-4.5"
+
+
+def test_chat_model_can_be_overridden(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("TYR_LOOP_CHAT_MODEL", "example/other-model")
+
+    settings = Settings()
+
+    assert settings.chat_model_name == "example/other-model"
+
+
 def test_settings_ignore_removed_gamr_provider_names(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

@@ -505,7 +505,7 @@ def chat(
         "--confirm-actions",
         help="Confirm action-capable chat without an interactive prompt.",
     ),
-    model: str = typer.Option("", "--model", help="Override TYR_LOOP_MODEL."),
+    model: str = typer.Option("", "--model", help="Override TYR_LOOP_CHAT_MODEL."),
     base_url: str = typer.Option("", "--base-url", help="Override OPENROUTER_BASE_URL."),
 ) -> None:
     """Connect to Tyr through a read-only interactive chat session."""
