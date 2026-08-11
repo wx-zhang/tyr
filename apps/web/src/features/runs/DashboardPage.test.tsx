@@ -103,9 +103,7 @@ it("disables delete but offers Stop for a run that is still live", async () => {
 
   expect(within(liveRow).getByRole("button", { name: "Delete" })).toBeDisabled();
   expect(within(liveRow).getByRole("button", { name: "Stop" })).toBeEnabled();
-  expect(
-    within(liveRow).getByRole("checkbox", { name: /Select session/ }),
-  ).toBeDisabled();
+  expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
 });
 
 it("stops a live run from the dashboard after confirmation", async () => {
@@ -146,6 +144,25 @@ it("allows deleting a queued run directly without stopping it first", async () =
   confirm.mockRestore();
 });
 
+it("hides selection checkboxes until Select is chosen", async () => {
+  renderPage();
+  await screen.findByText("first-plan");
+
+  expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Select" }));
+
+  expect(
+    screen.getByRole("checkbox", { name: "Select all deletable sessions" }),
+  ).toBeInTheDocument();
+  expect(screen.getAllByRole("checkbox", { name: /Select session/ }).length).toBeGreaterThan(0);
+  expect(screen.getByRole("button", { name: "Delete selected" })).toBeDisabled();
+
+  const liveRow = findRow("second-plan");
+  expect(
+    within(liveRow).getByRole("checkbox", { name: /Select session/ }),
+  ).toBeDisabled();
+});
+
 it("bulk-deletes selected sessions from the toolbar", async () => {
   runs = [
     run({ id: "run-1111", dataset: "datasets/first-plan" }),
@@ -156,6 +173,7 @@ it("bulk-deletes selected sessions from the toolbar", async () => {
 
   await screen.findByText("first-plan");
   await screen.findByText("third-plan");
+  fireEvent.click(screen.getByRole("button", { name: "Select" }));
   const selectAll = screen.getByRole("checkbox", { name: "Select all deletable sessions" });
   fireEvent.click(selectAll);
 
@@ -165,9 +183,10 @@ it("bulk-deletes selected sessions from the toolbar", async () => {
   expect(confirm).toHaveBeenCalled();
   await waitFor(() => {
     expect(
-      screen.queryByRole("button", { name: /Delete \d+ selected/ }),
+      screen.queryByRole("button", { name: /Delete \d+ selected|Delete selected/ }),
     ).not.toBeInTheDocument();
   });
+  expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
   const deleteCalls = vi.mocked(fetch).mock.calls.filter(([, init]) => {
     return (init as RequestInit | undefined)?.method === "DELETE";
   });

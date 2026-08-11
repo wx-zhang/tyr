@@ -109,6 +109,7 @@ export function DashboardPage() {
   const [now] = useState(() => Date.now());
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [stopError, setStopError] = useState<string | null>(null);
+  const [selecting, setSelecting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
   const runsQuery = useQuery({
@@ -125,6 +126,11 @@ export function DashboardPage() {
     },
     onSuccess: (_data, ids) => {
       setDeleteError(null);
+      if (selecting) {
+        setSelecting(false);
+        setSelectedIds(new Set());
+        return;
+      }
       setSelectedIds((current) => {
         const next = new Set(current);
         for (const id of ids) next.delete(id);
@@ -170,6 +176,16 @@ export function DashboardPage() {
   const selectedCount = selectedIds.size;
   const allDeletableSelected =
     deletableRuns.length > 0 && deletableRuns.every((run) => selectedIds.has(run.id));
+
+  const enterSelecting = () => {
+    setDeleteError(null);
+    setSelecting(true);
+  };
+
+  const exitSelecting = () => {
+    setSelecting(false);
+    setSelectedIds(new Set());
+  };
 
   const requestDelete = (run: Run) => {
     const confirmed = window.confirm(
@@ -240,23 +256,9 @@ export function DashboardPage() {
         title="Recent sessions"
         description="Red-team runs against Tyr, newest first. Open a session to review state and evidence."
         actions={
-          <div className="button-row">
-            {selectedCount > 0 ? (
-              <button
-                type="button"
-                className="button button-danger"
-                disabled={deleteMutation.isPending}
-                onClick={requestBulkDelete}
-              >
-                {deleteMutation.isPending
-                  ? "Deleting…"
-                  : `Delete ${selectedCount} selected`}
-              </button>
-            ) : null}
-            <Link className="button button-primary" to="/experiments/new">
-              Execute
-            </Link>
-          </div>
+          <Link className="button button-primary" to="/experiments/new">
+            Execute
+          </Link>
         }
       />
 
@@ -307,23 +309,71 @@ export function DashboardPage() {
 
       {recentRuns.length > 0 ? (
         <div className="card table-wrap">
-          <table className="data-table session-table">
+          {deletableRuns.length > 0 || selecting ? (
+            <div className="session-table-toolbar" aria-label="Session selection">
+              {selecting ? (
+                <>
+                  <p className="session-table-toolbar-status muted">
+                    {selectedCount === 0
+                      ? "Select sessions to delete"
+                      : `${selectedCount} selected`}
+                  </p>
+                  <div className="button-row">
+                    <button
+                      type="button"
+                      className="button button-ghost run-action"
+                      disabled={deleteMutation.isPending}
+                      onClick={exitSelecting}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="button button-danger run-action"
+                      disabled={selectedCount === 0 || deleteMutation.isPending}
+                      onClick={requestBulkDelete}
+                    >
+                      {deleteMutation.isPending
+                        ? "Deleting…"
+                        : selectedCount === 0
+                          ? "Delete selected"
+                          : `Delete ${selectedCount} selected`}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className="button button-ghost run-action"
+                  onClick={enterSelecting}
+                >
+                  Select
+                </button>
+              )}
+            </div>
+          ) : null}
+          <table
+            className={`data-table session-table${selecting ? " is-selecting" : ""}`}
+          >
             <thead>
               <tr>
-                <th scope="col">
-                  <input
-                    type="checkbox"
-                    aria-label="Select all deletable sessions"
-                    checked={allDeletableSelected}
-                    disabled={deletableRuns.length === 0}
-                    onChange={toggleSelectAll}
-                  />
-                </th>
+                {selecting ? (
+                  <th scope="col" className="session-select-col">
+                    <input
+                      type="checkbox"
+                      className="session-checkbox"
+                      aria-label="Select all deletable sessions"
+                      checked={allDeletableSelected}
+                      disabled={deletableRuns.length === 0 || deleteMutation.isPending}
+                      onChange={toggleSelectAll}
+                    />
+                  </th>
+                ) : null}
                 <th scope="col">Session</th>
                 <th scope="col">Status</th>
                 <th scope="col">Mode</th>
                 <th scope="col">When</th>
-                <th scope="col">Actions</th>
+                {!selecting ? <th scope="col">Actions</th> : null}
               </tr>
             </thead>
             <tbody>
@@ -339,16 +389,22 @@ export function DashboardPage() {
                 const isStopping =
                   stopMutation.isPending && stopMutation.variables === run.id;
                 return (
-                  <tr key={run.id}>
-                    <td>
-                      <input
-                        type="checkbox"
-                        aria-label={`Select session ${shortRunId(run.id)}`}
-                        checked={isSelected}
-                        disabled={!isDeletable || deleteMutation.isPending}
-                        onChange={() => toggleSelected(run.id)}
-                      />
-                    </td>
+                  <tr
+                    key={run.id}
+                    className={isSelected ? "is-selected" : undefined}
+                  >
+                    {selecting ? (
+                      <td className="session-select-col">
+                        <input
+                          type="checkbox"
+                          className="session-checkbox"
+                          aria-label={`Select session ${shortRunId(run.id)}`}
+                          checked={isSelected}
+                          disabled={!isDeletable || deleteMutation.isPending}
+                          onChange={() => toggleSelected(run.id)}
+                        />
+                      </td>
+                    ) : null}
                     <td>
                       <div className="cell-stack">
                         <Link
@@ -408,34 +464,36 @@ export function DashboardPage() {
                         </span>
                       </div>
                     </td>
-                    <td>
-                      <div className="button-row">
-                        {isLive ? (
+                    {!selecting ? (
+                      <td>
+                        <div className="button-row session-actions">
+                          {isLive ? (
+                            <button
+                              type="button"
+                              className="button button-ghost run-action"
+                              disabled={stopMutation.isPending}
+                              title="Stop this session"
+                              onClick={() => requestStop(run)}
+                            >
+                              {isStopping ? "Stopping…" : "Stop"}
+                            </button>
+                          ) : null}
                           <button
                             type="button"
-                            className="button button-secondary run-delete"
-                            disabled={stopMutation.isPending}
-                            title="Stop this session"
-                            onClick={() => requestStop(run)}
+                            className="button button-ghost run-action run-action-danger"
+                            disabled={!isDeletable || deleteMutation.isPending}
+                            title={
+                              isDeletable
+                                ? "Delete this session"
+                                : "Stop the run before deleting it"
+                            }
+                            onClick={() => requestDelete(run)}
                           >
-                            {isStopping ? "Stopping…" : "Stop"}
+                            {isDeleting ? "Deleting…" : "Delete"}
                           </button>
-                        ) : null}
-                        <button
-                          type="button"
-                          className="button button-danger run-delete"
-                          disabled={!isDeletable || deleteMutation.isPending}
-                          title={
-                            isDeletable
-                              ? "Delete this session"
-                              : "Stop the run before deleting it"
-                          }
-                          onClick={() => requestDelete(run)}
-                        >
-                          {isDeleting ? "Deleting…" : "Delete"}
-                        </button>
-                      </div>
-                    </td>
+                        </div>
+                      </td>
+                    ) : null}
                   </tr>
                 );
               })}
