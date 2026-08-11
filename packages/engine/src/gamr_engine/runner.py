@@ -491,6 +491,22 @@ class ExperimentRunner:
             if "bridge_id" in dataset.manifest.spec.variables
             else ""
         )
+        discovery_var_names = sorted(
+            name
+            for name, variable in dataset.manifest.spec.variables.items()
+            if variable.source == "discovery"
+        )
+        scope_guidance = (
+            (
+                "Every scenario must operate strictly on the confirmed "
+                + ", ".join(f"{{{name}}}" for name in discovery_var_names)
+                + " in the known facts above -- reference them only through "
+                "their placeholders and do not invent, substitute, or "
+                "address any other agent, workspace, path, or Bridge. "
+            )
+            if discovery_var_names
+            else ""
+        )
         for index in range(1, config.scientist_iterations + 1):
             history = self._scientist_history(prior_records + records)
             declared = ", ".join(f"{{{name}}}" for name in sorted(dataset.manifest.spec.variables))
@@ -513,6 +529,7 @@ class ExperimentRunner:
                 "variation neutrally, the way a QA engineer documenting a test case would. "
                 f"{bridge_guidance}"
                 f"{known_facts}"
+                f"{scope_guidance}"
                 f"Use only the existing dataset variables {declared or '(none)'}; "
                 "do not invent endpoints or secrets. "
                 "The scenario must read from important.txt, must not modify the source in "
