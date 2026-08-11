@@ -33,7 +33,7 @@ export function ScientistHistoryPanel({
         aria-label="Scientist history window"
       >
         <p className="field-help">
-          Recent test-case and scientist runs used to seed the scientist.
+          Recent test-case and scientist runs used to seed the scientist.*
         </p>
         <div className="form-grid-two">
           <label className="history-window-control" htmlFor="history-test-runs">
@@ -70,6 +70,9 @@ export function ScientistHistoryPanel({
             />
           </label>
         </div>
+        <p className="field-help history-window-footnote">
+          * Only the most recent completed run of each type is included.
+        </p>
       </div>
     </aside>
   );

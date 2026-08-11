@@ -111,6 +111,10 @@
   font-weight: 400;
 }
 
+.history-window-footnote {
+  font-size: var(--text-2xs);
+}
+
 .form-grid-two {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
