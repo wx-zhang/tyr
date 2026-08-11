@@ -142,7 +142,7 @@ async def start_run(
             ),
         }
     )
-    run = registry.create_run(item.id, item.dataset, configuration)
+    run = registry.create_run(item.id, item.dataset, configuration, name=item.name)
     if manager is not None:
         await manager.submit(run.id)
     return {"id": run.id, "state": run.state, "statusUrl": f"/api/v1/runs/{run.id}"}

@@ -78,6 +78,23 @@ function findRow(text: string): HTMLElement {
   return row as HTMLElement;
 }
 
+it("shows the run's own name instead of the dataset when one was set", async () => {
+  runs = [
+    run({ id: "run-5555", dataset: "datasets/first-plan", name: "Nightly red team" }),
+  ];
+  renderPage();
+
+  await screen.findByText("Nightly red team");
+  expect(screen.queryByText("first-plan")).not.toBeInTheDocument();
+});
+
+it("falls back to the dataset label when the run has no name", async () => {
+  runs = [run({ id: "run-6666", dataset: "datasets/first-plan", name: null })];
+  renderPage();
+
+  await screen.findByText("first-plan");
+});
+
 it("deletes a single finished session after confirmation", async () => {
   const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
   renderPage();

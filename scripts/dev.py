@@ -45,6 +45,7 @@ def main() -> None:
     signal.signal(signal.SIGTERM, stop_all)
     try:
         processes.extend(subprocess.Popen(command) for command in _commands(args.watch))
+        print("Visit http://localhost:6688 (API on http://127.0.0.1:6687)", flush=True)
         for process in processes:
             process.wait()
     finally:

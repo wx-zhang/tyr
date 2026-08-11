@@ -68,6 +68,40 @@ def test_service_accepts_approval_required_experiment() -> None:
         app.dependency_overrides.clear()
 
 
+def test_starting_a_run_carries_the_experiment_name() -> None:
+    registry = InMemoryRegistry()
+    experiment = registry.create_experiment("Nightly red team", "first-plan")
+    app.dependency_overrides[get_registry] = lambda: registry
+    try:
+        client = TestClient(app)
+        response = client.post(f"/api/v1/experiments/{experiment.id}/runs", json={})
+        assert response.status_code == 202
+        run_id = response.json()["id"]
+        run_payload = client.get(f"/api/v1/runs/{run_id}").json()
+        assert run_payload["name"] == "Nightly red team"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_retrying_a_run_keeps_its_name() -> None:
+    registry = InMemoryRegistry()
+    failed = registry.create_run(
+        None,
+        "datasets/first-plan",
+        source=RunSource.SERVICE,
+        name="Nightly red team",
+    )
+    registry.set_state(failed, RunState.PREPARING)
+    registry.set_state(failed, RunState.FAILED)
+    app.dependency_overrides[get_registry] = lambda: registry
+    try:
+        response = TestClient(app).post(f"/api/v1/runs/{failed.id}/retry")
+        assert response.status_code == 202
+        assert response.json()["name"] == "Nightly red team"
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_create_experiment_accepts_dataset_id_and_case_ids() -> None:
     registry = InMemoryRegistry()
     app.dependency_overrides[get_registry] = lambda: registry

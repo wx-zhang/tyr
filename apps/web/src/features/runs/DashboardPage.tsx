@@ -412,7 +412,7 @@ export function DashboardPage() {
                           className="table-primary session-title"
                           title={run.id}
                         >
-                          {datasetLabel(run.dataset)}
+                          {run.name?.trim() || datasetLabel(run.dataset)}
                         </Link>
                         <p className="session-meta muted">
                           <span className="mono" title={run.id}>

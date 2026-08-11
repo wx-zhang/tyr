@@ -93,6 +93,7 @@ export type Run = {
   experimentId: string | null;
   source: "cli" | "service";
   retryOf?: string | null;
+  name?: string | null;
   state: RunState;
   dataset: string;
   configuration: {

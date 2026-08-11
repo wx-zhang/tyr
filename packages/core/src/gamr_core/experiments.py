@@ -55,6 +55,7 @@ class RunRecord(BaseModel):
     source: RunSource
     experiment_id: str | None = Field(default=None, alias="experimentId")
     retry_of: str | None = Field(default=None, alias="retryOf")
+    name: str | None = Field(default=None)
     dataset: str = Field(min_length=1)
     state: RunState
     configuration: ExperimentConfig = Field(default_factory=ExperimentConfig)

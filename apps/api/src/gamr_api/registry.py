@@ -53,6 +53,7 @@ class RunRecord:
     source: RunSource = RunSource.SERVICE
     retry_of: str | None = None
     error_summary: str | None = None
+    name: str | None = None
 
 
 @dataclass
@@ -77,6 +78,7 @@ class InMemoryRegistry:
         *,
         source: RunSource = RunSource.SERVICE,
         retry_of: str | None = None,
+        name: str | None = None,
     ) -> RunRecord:
         now = datetime.now(UTC)
         item = RunRecord(
@@ -88,6 +90,7 @@ class InMemoryRegistry:
             updated_at=now,
             source=source,
             retry_of=retry_of,
+            name=name,
         )
         self.runs[item.id] = item
         self.append_event(item, "run.queued", {"dataset": dataset})
@@ -392,9 +395,15 @@ class JsonRegistry(InMemoryRegistry):
         *,
         source: RunSource = RunSource.SERVICE,
         retry_of: str | None = None,
+        name: str | None = None,
     ) -> RunRecord:
         item = super().create_run(
-            experiment_id, dataset, configuration, source=source, retry_of=retry_of
+            experiment_id,
+            dataset,
+            configuration,
+            source=source,
+            retry_of=retry_of,
+            name=name,
         )
         self._persist_run(item)
         self._persist_event(item.events[-1])
@@ -479,6 +488,7 @@ class JsonRegistry(InMemoryRegistry):
             source=run.source,
             experimentId=run.experiment_id,
             retryOf=run.retry_of,
+            name=run.name,
             dataset=run.dataset,
             state=run.state,
             configuration=run.configuration,
@@ -530,6 +540,7 @@ class JsonRegistry(InMemoryRegistry):
         return RunRecord(
             id=document.id,
             experiment_id=document.experiment_id,
+            name=document.name,
             dataset=document.dataset,
             state=document.state,
             configuration=document.configuration,

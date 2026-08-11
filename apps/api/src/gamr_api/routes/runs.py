@@ -142,6 +142,7 @@ def _run_payload(run: RunRecord) -> dict[str, object]:
         "experimentId": run.experiment_id,
         "source": run.source,
         "retryOf": run.retry_of,
+        "name": run.name,
         "state": run.state,
         "dataset": run.dataset,
         "configuration": run.configuration.model_dump(by_alias=True),
@@ -227,6 +228,7 @@ async def retry_run(
         previous.configuration,
         source=previous.source,
         retry_of=previous.id,
+        name=previous.name,
     )
     if manager is not None:
         await manager.submit(run.id)
