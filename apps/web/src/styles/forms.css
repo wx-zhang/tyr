@@ -94,6 +94,29 @@
   line-height: var(--leading-xs);
 }
 
+.history-window-fields {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.history-window-control {
+  display: grid;
+  gap: var(--space-2);
+  color: var(--text);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.history-window-control .field-help {
+  font-weight: 400;
+}
+
+.form-grid-two {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
 input,
 select,
 textarea {
@@ -142,6 +165,12 @@ textarea {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-2);
+}
+
+@media (max-width: 560px) {
+  .form-grid-two {
+    grid-template-columns: 1fr;
+  }
 }
 
 .choice-card {

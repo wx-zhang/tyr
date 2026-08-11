@@ -49,6 +49,7 @@ def test_browser_activity_is_an_allowlist_and_drops_server_only_metadata() -> No
             "evidenceType": "error",
             "summary": "A redacted error",
             "evidenceRefs": ["evidence-1"],
+            "relatedCaseIds": ["case-alpha"],
             "detailAvailability": "redacted",
             "metadata": {
                 "apiKey": "super-secret",
@@ -74,6 +75,7 @@ def test_browser_activity_is_an_allowlist_and_drops_server_only_metadata() -> No
         "evidenceType": "error",
         "summary": "A redacted error",
         "evidenceIds": ["evidence-1"],
+        "relatedCaseIds": ["case-alpha"],
         "detailAvailability": "redacted",
     }
 

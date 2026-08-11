@@ -30,6 +30,8 @@ class ExperimentCreate(BaseModel):
     discovery_turns: int = Field(default=20, alias="discoveryTurns", ge=1)
     case_ids: list[str] | None = Field(default=None, alias="caseIds")
     scientist_iterations: int = Field(default=0, alias="scientistIterations", ge=0)
+    history_test_runs: int = Field(default=10, alias="historyTestRuns", ge=0, le=100)
+    history_scientist_runs: int = Field(default=5, alias="historyScientistRuns", ge=0, le=100)
 
     model_config = {"populate_by_name": True, "extra": "forbid"}
 
@@ -41,6 +43,8 @@ class ExperimentCreate(BaseModel):
             discoveryTurns=self.discovery_turns,
             caseIds=self.case_ids,
             scientistIterations=self.scientist_iterations,
+            historyTestRuns=self.history_test_runs,
+            historyScientistRuns=self.history_scientist_runs,
         )
 
 
@@ -114,6 +118,10 @@ def get_experiment(
 class RunCreate(BaseModel):
     case_ids: list[str] | None = Field(default=None, alias="caseIds")
     scientist_iterations: int | None = Field(default=None, alias="scientistIterations", ge=0)
+    history_test_runs: int | None = Field(default=None, alias="historyTestRuns", ge=0, le=100)
+    history_scientist_runs: int | None = Field(
+        default=None, alias="historyScientistRuns", ge=0, le=100
+    )
 
     model_config = {"populate_by_name": True, "extra": "forbid"}
 
@@ -128,8 +136,9 @@ async def start_run(
     item = registry.experiments.get(experiment_id)
     if item is None:
         raise not_found("experiment")
-    configuration = item.configuration.model_copy(
-        update={
+    configuration_values = item.configuration.model_dump()
+    configuration_values.update(
+        {
             "case_ids": (
                 payload.case_ids
                 if payload and payload.case_ids is not None
@@ -140,8 +149,25 @@ async def start_run(
                 if payload and payload.scientist_iterations is not None
                 else item.configuration.scientist_iterations
             ),
+            "history_test_runs": (
+                payload.history_test_runs
+                if payload and payload.history_test_runs is not None
+                else item.configuration.history_test_runs
+            ),
+            "history_scientist_runs": (
+                payload.history_scientist_runs
+                if payload and payload.history_scientist_runs is not None
+                else item.configuration.history_scientist_runs
+            ),
         }
     )
+    try:
+        configuration = ExperimentConfig.model_validate(configuration_values)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "invalid_configuration", "detail": str(error)},
+        ) from error
     run = registry.create_run(item.id, item.dataset, configuration, name=item.name)
     if manager is not None:
         await manager.submit(run.id)

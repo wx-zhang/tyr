@@ -125,6 +125,29 @@ def test_create_experiment_accepts_dataset_id_and_case_ids() -> None:
         app.dependency_overrides.clear()
 
 
+def test_create_experiment_accepts_configured_scientist_history_windows() -> None:
+    registry = InMemoryRegistry()
+    app.dependency_overrides[get_registry] = lambda: registry
+    try:
+        response = TestClient(app).post(
+            "/api/v1/experiments",
+            json={
+                "name": "history windows",
+                "dataset": "first-plan",
+                "caseIds": [],
+                "scientistIterations": 1,
+                "historyTestRuns": 7,
+                "historyScientistRuns": 3,
+            },
+        )
+        assert response.status_code == 201
+        configuration = response.json()["configuration"]
+        assert configuration["historyTestRuns"] == 7
+        assert configuration["historyScientistRuns"] == 3
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_create_experiment_rejects_unknown_case_id() -> None:
     response = TestClient(app).post(
         "/api/v1/experiments",
@@ -137,6 +160,39 @@ def test_create_experiment_rejects_unknown_case_id() -> None:
     )
     assert response.status_code == 400
     assert response.json()["detail"]["code"] == "invalid_dataset"
+
+
+def test_start_run_supports_scientist_only_and_rejects_empty_disabled_runs() -> None:
+    registry = InMemoryRegistry()
+    app.dependency_overrides[get_registry] = lambda: registry
+    try:
+        client = TestClient(app)
+        experiment_id = _experiment(client)
+
+        scientist_only = client.post(
+            f"/api/v1/experiments/{experiment_id}/runs",
+            json={
+                "caseIds": [],
+                "scientistIterations": 1,
+                "historyTestRuns": 2,
+                "historyScientistRuns": 4,
+            },
+        )
+        assert scientist_only.status_code == 202
+        run = registry.runs[scientist_only.json()["id"]]
+        assert run.configuration.case_ids == []
+        assert run.configuration.scientist_iterations == 1
+        assert run.configuration.history_test_runs == 2
+        assert run.configuration.history_scientist_runs == 4
+
+        invalid = client.post(
+            f"/api/v1/experiments/{experiment_id}/runs",
+            json={"caseIds": [], "scientistIterations": 0},
+        )
+        assert invalid.status_code == 400
+        assert invalid.json()["detail"]["code"] == "invalid_configuration"
+    finally:
+        app.dependency_overrides.clear()
 
 
 def test_run_events_support_last_event_id() -> None:

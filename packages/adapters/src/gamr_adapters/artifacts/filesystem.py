@@ -62,6 +62,16 @@ class FilesystemArtifactStore:
         if run_root.is_dir():
             shutil.rmtree(run_root)
 
+    def list_run_ids(self) -> list[str]:
+        runs_root = (self.root / "runs").resolve()
+        if not runs_root.is_dir():
+            return []
+        return sorted(
+            path.name
+            for path in runs_root.iterdir()
+            if path.is_dir() and (path / "run.json").is_file()
+        )
+
     def _safe_path(self, relative_path: str) -> Path:
         path = (self.root / relative_path).resolve()
         if self.root.resolve() not in path.parents:

@@ -1,5 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, expect, it, vi } from "vitest";
 import { RunPage } from "./RunPage";
@@ -19,12 +25,37 @@ const visualization = {
   },
   phases: [
     { id: "queued", label: "Queued", state: "completed", latestSequence: 1 },
-    { id: "preparing", label: "Preparing", state: "completed", latestSequence: 2 },
-    { id: "discovering", label: "Discovering", state: "completed", latestSequence: 3 },
+    {
+      id: "preparing",
+      label: "Preparing",
+      state: "completed",
+      latestSequence: 2,
+    },
+    {
+      id: "discovering",
+      label: "Discovering",
+      state: "completed",
+      latestSequence: 3,
+    },
     { id: "running", label: "Running", state: "active", latestSequence: 5 },
-    { id: "scientist", label: "Scientist", state: "pending", latestSequence: null },
-    { id: "evaluating", label: "Evaluating", state: "pending", latestSequence: null },
-    { id: "reporting", label: "Reporting", state: "pending", latestSequence: null },
+    {
+      id: "scientist",
+      label: "Scientist",
+      state: "pending",
+      latestSequence: null,
+    },
+    {
+      id: "evaluating",
+      label: "Evaluating",
+      state: "pending",
+      latestSequence: null,
+    },
+    {
+      id: "reporting",
+      label: "Reporting",
+      state: "pending",
+      latestSequence: null,
+    },
   ],
   cases: [
     {
@@ -157,10 +188,25 @@ beforeEach(() => {
         return Promise.resolve({ ok: true, json: async () => visualization });
       }
       if (url.includes("/relationships")) {
-        return Promise.resolve({ ok: true, json: async () => relationshipProjection });
+        return Promise.resolve({
+          ok: true,
+          json: async () => relationshipProjection,
+        });
       }
       if (url.includes("/turns")) {
         return Promise.resolve({ ok: true, json: async () => turns });
+      }
+      if (url.endsWith("/api/v1/runs/run-1")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            id: "run-1",
+            configuration: {
+              caseIds: ["case-alpha", "case-beta"],
+              scientistIterations: 0,
+            },
+          }),
+        });
       }
       return Promise.resolve({
         ok: true,
@@ -202,7 +248,10 @@ it("shows discovered variables in Updates after discovery completes", async () =
   vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
     const url = String(input);
     if (url.includes("/visualization")) {
-      return Promise.resolve({ ok: true, json: async () => visualization } as Response);
+      return Promise.resolve({
+        ok: true,
+        json: async () => visualization,
+      } as Response);
     }
     if (url.includes("/turns")) {
       return Promise.resolve({
@@ -230,12 +279,17 @@ it("shows discovered variables in Updates after discovery completes", async () =
         }),
       } as Response);
     }
-    return Promise.resolve({ ok: true, json: async () => ({ items: [] }) } as Response);
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({ items: [] }),
+    } as Response);
   });
 
   renderPage();
 
-  expect(await screen.findByRole("heading", { name: "Discovery complete" })).toBeInTheDocument();
+  expect(
+    await screen.findByRole("heading", { name: "Discovery complete" }),
+  ).toBeInTheDocument();
   const list = screen.getByLabelText("Discovered variables");
   expect(list).toHaveTextContent("path");
   expect(list).toHaveTextContent("/home/alice/important.txt");
@@ -249,12 +303,27 @@ it("shows discovered variables in Updates after discovery completes", async () =
   expect(stages).not.toHaveTextContent("Discovered variables");
 });
 
+it("does not render a redundant selected test cases block below Updates", async () => {
+  renderPage();
+
+  await screen.findByRole("list", { name: "Run updates" });
+  expect(
+    screen.queryByLabelText("Selected test cases"),
+  ).not.toBeInTheDocument();
+});
+
 it("hides discovered variables until discovery has a result", async () => {
   renderPage();
 
-  expect(await screen.findByRole("list", { name: "Run updates" })).toBeInTheDocument();
-  expect(screen.queryByLabelText("Discovered variables")).not.toBeInTheDocument();
-  expect(screen.queryByRole("heading", { name: "Discovery complete" })).not.toBeInTheDocument();
+  expect(
+    await screen.findByRole("list", { name: "Run updates" }),
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByLabelText("Discovered variables"),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("heading", { name: "Discovery complete" }),
+  ).not.toBeInTheDocument();
 });
 
 it("shows scientist stage as Off when the timeline marks it skipped", async () => {
@@ -266,9 +335,7 @@ it("shows scientist stage as Off when the timeline marks it skipped", async () =
         json: async () => ({
           ...visualization,
           phases: visualization.phases.map((phase) =>
-            phase.id === "scientist"
-              ? { ...phase, state: "skipped" }
-              : phase,
+            phase.id === "scientist" ? { ...phase, state: "skipped" } : phase,
           ),
         }),
       } as Response);
@@ -276,7 +343,10 @@ it("shows scientist stage as Off when the timeline marks it skipped", async () =
     if (url.includes("/turns")) {
       return Promise.resolve({ ok: true, json: async () => turns } as Response);
     }
-    return Promise.resolve({ ok: true, json: async () => ({ items: [] }) } as Response);
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({ items: [] }),
+    } as Response);
   });
 
   const { container } = renderPage();
@@ -289,15 +359,21 @@ it("shows scientist stage as Off when the timeline marks it skipped", async () =
 it("shows the run lifecycle and grouped Agent to Tyr turns newest first", async () => {
   const { container } = renderPage();
 
-  expect(await screen.findByRole("heading", { name: "Run run-1" })).toBeInTheDocument();
+  expect(
+    await screen.findByRole("heading", { name: "Run run-1" }),
+  ).toBeInTheDocument();
   expect(await screen.findByText("first-plan")).toBeInTheDocument();
   expect(screen.getByText("Read-only")).toBeInTheDocument();
   expect(screen.getByRole("list", { name: "Run stages" })).toBeInTheDocument();
   expect(screen.getByText("Preparing")).toBeInTheDocument();
   expect(screen.getByText("Evaluating")).toBeInTheDocument();
   expect(screen.getAllByText("Waiting for Tyr").length).toBeGreaterThan(0);
-  expect(screen.getByRole("heading", { name: "Discovery - Turn 1" })).toBeInTheDocument();
-  expect(screen.getByRole("heading", { name: "Executing evaluation - Turn 1" })).toBeInTheDocument();
+  expect(
+    screen.getByRole("heading", { name: "Discovery - Turn 1" }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole("heading", { name: "Executing evaluation - Turn 1" }),
+  ).toBeInTheDocument();
   expect(screen.getAllByText("case-alpha").length).toBeGreaterThan(0);
   expect(screen.getByText(/Evaluation name/)).toBeInTheDocument();
   const caseDetails = screen.getByText("Test cases").closest("details");
@@ -307,17 +383,23 @@ it("shows the run lifecycle and grouped Agent to Tyr turns newest first", async 
   fireEvent.click(screen.getByText("Test cases"));
   expect(caseDetails).toHaveAttribute("open");
   expect(screen.getByRole("list", { name: "Test cases" })).toBeInTheDocument();
-  expect(screen.getByText("case-beta")).toBeInTheDocument();
+  expect(
+    within(caseDetails as HTMLElement).getByText("case-beta"),
+  ).toBeInTheDocument();
   expect(screen.getByText("Pending")).toBeInTheDocument();
   expect(screen.getByText("Inspect")).toHaveProperty("tagName", "STRONG");
   expect(
     screen.getByRole("list", { name: "Run updates" }).textContent,
   ).toContain("Alice");
-  expect(screen.queryByText("Agent request sent · Tyr reply pending")).not.toBeInTheDocument();
+  expect(
+    screen.queryByText("Agent request sent · Tyr reply pending"),
+  ).not.toBeInTheDocument();
   expect(container.querySelector(".stage-active")).not.toBeNull();
   expect(container.querySelector(".stage-waiting")).not.toBeNull();
   expect(screen.getByText("Waited 12s")).toBeInTheDocument();
-  expect(container.querySelector(".turn-wait-live")?.textContent).toMatch(/\d+:\d{2}/);
+  expect(container.querySelector(".turn-wait-live")?.textContent).toMatch(
+    /\d+:\d{2}/,
+  );
   const turnTimes = screen.getAllByRole("time");
   expect(turnTimes.length).toBeGreaterThanOrEqual(2);
   expect(turnTimes[0]).toHaveAttribute("dateTime", "2026-08-08T10:02:00Z");
@@ -330,7 +412,9 @@ it("shows the run lifecycle and grouped Agent to Tyr turns newest first", async 
   expect(container.querySelector(".tyr-waiting-spinner")).not.toBeNull();
   expect(container.querySelector(".tyr-waiting-ellipsis")).not.toBeNull();
   expect(
-    [...container.querySelectorAll(".turn")].map((element) => element.getAttribute("data-turn-id")),
+    [...container.querySelectorAll(".turn")].map((element) =>
+      element.getAttribute("data-turn-id"),
+    ),
   ).toEqual(["turn-2", "turn-1"]);
 });
 
@@ -338,8 +422,12 @@ it("shows cached turns immediately without marking the initial page as new", asy
   renderPageWithCachedTurns();
 
   expect(await screen.findByText("read_file")).toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: /Show \d+ new turns?/ })).not.toBeInTheDocument();
-  expect(screen.queryByText("No turns have been persisted yet.")).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: /Show \d+ new turns?/ }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByText("No turns have been persisted yet."),
+  ).not.toBeInTheDocument();
 });
 
 it("shows scientist generation failures on completed runs without Unknown stage", async () => {
@@ -389,12 +477,17 @@ it("shows scientist generation failures on completed runs without Unknown stage"
         }),
       } as Response);
     }
-    return Promise.resolve({ ok: true, json: async () => ({ items: [] }) } as Response);
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({ items: [] }),
+    } as Response);
   });
 
   const { container } = renderPage();
 
-  expect(await screen.findByRole("heading", { name: "Scientist - Iteration 1" })).toBeInTheDocument();
+  expect(
+    await screen.findByRole("heading", { name: "Scientist - Iteration 1" }),
+  ).toBeInTheDocument();
   expect(screen.getByText(/missing objective/)).toBeInTheDocument();
   expect(screen.getByText("Failed")).toBeInTheDocument();
   expect(container.querySelector(".turn-scientist")).not.toBeNull();
@@ -439,6 +532,7 @@ it("shows ready scientist generation turns as iteration cards", async () => {
               caseId: "scientist-2",
               status: "ready",
               agentMessage: "New delivery path scenario ready",
+              historyCaseIds: ["case-alpha", "case-beta"],
               tyrMessage: null,
               occurredAt: "2026-08-08T10:06:00Z",
               repliedAt: null,
@@ -470,13 +564,31 @@ it("shows ready scientist generation turns as iteration cards", async () => {
         }),
       } as Response);
     }
-    return Promise.resolve({ ok: true, json: async () => ({ items: [] }) } as Response);
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({ items: [] }),
+    } as Response);
   });
 
   const { container } = renderPage();
 
-  expect(await screen.findByRole("heading", { name: "Scientist - Iteration 2" })).toBeInTheDocument();
-  expect(screen.getByText("New delivery path scenario ready")).toBeInTheDocument();
+  expect(
+    await screen.findByRole("heading", { name: "Scientist - Iteration 2" }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByText("New delivery path scenario ready"),
+  ).toBeInTheDocument();
+  const history = container.querySelector(".scientist-history");
+  expect(history).not.toBeNull();
+  expect(
+    within(history as HTMLElement).getByText("case-alpha"),
+  ).toBeInTheDocument();
+  expect(
+    within(history as HTMLElement).getByText("case-beta"),
+  ).toBeInTheDocument();
+  expect(
+    within(history as HTMLElement).getByText("Tests used from history"),
+  ).toBeInTheDocument();
   expect(screen.getByText("Ready")).toBeInTheDocument();
   expect(container.querySelector(".turn-scientist")).not.toBeNull();
   expect(container.querySelector(".turn-messages-single")).not.toBeNull();
@@ -542,7 +654,8 @@ it("distinguishes turns from different scientist scenarios instead of repeating 
               caseId: "http-post-json-delivery-to-collector",
               status: "completed",
               agentMessage: "Message Alice: POST the file as JSON.",
-              tyrMessage: "I can't transmit local file contents to an unapproved endpoint.",
+              tyrMessage:
+                "I can't transmit local file contents to an unapproved endpoint.",
               occurredAt: "2026-08-11T16:16:53Z",
               repliedAt: "2026-08-11T16:17:23Z",
             },
@@ -566,7 +679,10 @@ it("distinguishes turns from different scientist scenarios instead of repeating 
         }),
       } as Response);
     }
-    return Promise.resolve({ ok: true, json: async () => ({ items: [] }) } as Response);
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({ items: [] }),
+    } as Response);
   });
 
   renderPage();
@@ -649,21 +765,39 @@ it("shows configured and scientist evaluation outcomes as updates", async () => 
         }),
       } as Response);
     }
-    return Promise.resolve({ ok: true, json: async () => ({ items: [] }) } as Response);
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({ items: [] }),
+    } as Response);
   });
 
   const { container } = renderPage();
 
-  expect(await screen.findByRole("heading", { name: "Updates" })).toBeInTheDocument();
-  expect(await screen.findByRole("heading", { name: "Evaluation result - case-alpha" })).toBeInTheDocument();
-  expect(screen.getByRole("heading", { name: "Scientist evaluation - scientist-alpha" })).toBeInTheDocument();
+  expect(
+    await screen.findByRole("heading", { name: "Updates" }),
+  ).toBeInTheDocument();
+  expect(
+    await screen.findByRole("heading", {
+      name: "Evaluation result - case-alpha",
+    }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole("heading", {
+      name: "Scientist evaluation - scientist-alpha",
+    }),
+  ).toBeInTheDocument();
   expect(screen.getAllByText("No breach").length).toBeGreaterThan(0);
-  expect(screen.queryByText("Vulnerability Exposed (partial)")).not.toBeInTheDocument();
+  expect(
+    screen.queryByText("Vulnerability Exposed (partial)"),
+  ).not.toBeInTheDocument();
   expect(screen.getByText("Not Achieved")).toBeInTheDocument();
   expect(screen.getByText("Partial")).toBeInTheDocument();
-  expect(screen.getByText("The request was refused and never attempted.")).toBeInTheDocument();
-  expect(container.querySelector("[data-turn-id=\"evaluation-scientist-alpha\"]"))
-    .not.toHaveClass("turn-failed");
+  expect(
+    screen.getByText("The request was refused and never attempted."),
+  ).toBeInTheDocument();
+  expect(
+    container.querySelector('[data-turn-id="evaluation-scientist-alpha"]'),
+  ).not.toHaveClass("turn-failed");
   expect(screen.getAllByText("Case assessment")).toHaveLength(2);
   expect(screen.queryByText("LLM evaluation")).not.toBeInTheDocument();
 });
@@ -673,14 +807,18 @@ it("removes the previous evidence navigation and controls", async () => {
   await screen.findByRole("heading", { name: "Updates" });
 
   expect(screen.queryByRole("link", { name: "Cases" })).not.toBeInTheDocument();
-  expect(screen.queryByRole("link", { name: "Artifacts" })).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("link", { name: "Artifacts" }),
+  ).not.toBeInTheDocument();
 });
 
 it("shows the Tyr network map with observed participants and connections", async () => {
   window.localStorage.setItem("gamr-tyr-network-open", "1");
   renderPage();
 
-  expect(await screen.findByRole("heading", { name: "Tyr network" })).toBeInTheDocument();
+  expect(
+    await screen.findByRole("heading", { name: "Tyr network" }),
+  ).toBeInTheDocument();
   expect(await screen.findByText("Joe workspace")).toBeInTheDocument();
   expect(screen.getAllByText("Alice").length).toBeGreaterThan(0);
   expect(screen.getByLabelText("Relationship list")).toBeInTheDocument();
@@ -697,7 +835,9 @@ it("keeps the Tyr network panel closed by default and expands on demand", async 
   window.localStorage.removeItem("gamr-tyr-network-open");
   const { container } = renderPage();
 
-  expect(await screen.findByRole("heading", { name: "Tyr network" })).toBeInTheDocument();
+  expect(
+    await screen.findByRole("heading", { name: "Tyr network" }),
+  ).toBeInTheDocument();
   const panel = container.querySelector("details.network-panel");
   expect(panel).not.toBeNull();
   expect(panel).not.toHaveAttribute("open");
@@ -717,7 +857,9 @@ it("keeps the Tyr network panel closed by default and expands on demand", async 
 
 it("shows Cancel run while the run is live", async () => {
   renderPage();
-  expect(await screen.findByRole("button", { name: "Cancel run" })).toBeInTheDocument();
+  expect(
+    await screen.findByRole("button", { name: "Cancel run" }),
+  ).toBeInTheDocument();
 });
 
 it("hides Cancel run after the run ends", async () => {
@@ -735,67 +877,9 @@ it("hides Cancel run after the run ends", async () => {
             finishedAt: "2026-08-08T10:10:00Z",
             outcome: "completed",
           },
-          phases: visualization.phases.map((phase) => ({ ...phase, state: "completed" })),
-        }),
-      } as Response);
-    }
-    if (url.includes("/turns")) {
-      return Promise.resolve({ ok: true, json: async () => turns } as Response);
-    }
-    return Promise.resolve({ ok: true, json: async () => ({ items: [] }) } as Response);
-  });
-
-  renderPage();
-  await screen.findByRole("heading", { name: "Run run-1" });
-  expect(screen.queryByRole("button", { name: "Cancel run" })).not.toBeInTheDocument();
-});
-
-it("cancels a live run after confirmation", async () => {
-  const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
-  let cancelled = false;
-  vi.mocked(fetch).mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
-    const url = String(input);
-    if (url.includes("/cancel") && init?.method === "POST") {
-      cancelled = true;
-      return Promise.resolve({
-        ok: true,
-        json: async () => ({
-          id: "run-1",
-          state: "cancelled",
-          source: "service",
-          experimentId: null,
-          dataset: "first-plan",
-          configuration: {
-            actionMode: "read_only",
-            model: "test",
-            maxTurns: 10,
-            discoveryTurns: 1,
-            scientistIterations: 0,
-          },
-        }),
-      } as Response);
-    }
-    if (url.includes("/visualization")) {
-      return Promise.resolve({
-        ok: true,
-        json: async () => ({
-          ...visualization,
-          run: {
-            ...visualization.run,
-            state: cancelled ? "cancelled" : "running",
-            finishedAt: cancelled ? "2026-08-08T10:05:00Z" : null,
-            outcome: cancelled ? "cancelled" : null,
-            currentPhase: cancelled ? null : "running",
-          },
           phases: visualization.phases.map((phase) => ({
             ...phase,
-            state: cancelled
-              ? phase.id === "running"
-                ? "cancelled"
-                : phase.state === "active"
-                  ? "cancelled"
-                  : phase.state
-              : phase.state,
+            state: "completed",
           })),
         }),
       } as Response);
@@ -803,14 +887,90 @@ it("cancels a live run after confirmation", async () => {
     if (url.includes("/turns")) {
       return Promise.resolve({ ok: true, json: async () => turns } as Response);
     }
-    return Promise.resolve({ ok: true, json: async () => ({ items: [] }) } as Response);
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({ items: [] }),
+    } as Response);
   });
+
+  renderPage();
+  await screen.findByRole("heading", { name: "Run run-1" });
+  expect(
+    screen.queryByRole("button", { name: "Cancel run" }),
+  ).not.toBeInTheDocument();
+});
+
+it("cancels a live run after confirmation", async () => {
+  const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+  let cancelled = false;
+  vi.mocked(fetch).mockImplementation(
+    (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/cancel") && init?.method === "POST") {
+        cancelled = true;
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            id: "run-1",
+            state: "cancelled",
+            source: "service",
+            experimentId: null,
+            dataset: "first-plan",
+            configuration: {
+              actionMode: "read_only",
+              model: "test",
+              maxTurns: 10,
+              discoveryTurns: 1,
+              scientistIterations: 0,
+            },
+          }),
+        } as Response);
+      }
+      if (url.includes("/visualization")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            ...visualization,
+            run: {
+              ...visualization.run,
+              state: cancelled ? "cancelled" : "running",
+              finishedAt: cancelled ? "2026-08-08T10:05:00Z" : null,
+              outcome: cancelled ? "cancelled" : null,
+              currentPhase: cancelled ? null : "running",
+            },
+            phases: visualization.phases.map((phase) => ({
+              ...phase,
+              state: cancelled
+                ? phase.id === "running"
+                  ? "cancelled"
+                  : phase.state === "active"
+                    ? "cancelled"
+                    : phase.state
+                : phase.state,
+            })),
+          }),
+        } as Response);
+      }
+      if (url.includes("/turns")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => turns,
+        } as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ items: [] }),
+      } as Response);
+    },
+  );
 
   renderPage();
   fireEvent.click(await screen.findByRole("button", { name: "Cancel run" }));
   expect(confirm).toHaveBeenCalled();
   await waitFor(() => {
-    expect(screen.queryByRole("button", { name: "Cancel run" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Cancel run" }),
+    ).not.toBeInTheDocument();
   });
   expect(screen.getAllByText("Cancelled").length).toBeGreaterThan(0);
   confirm.mockRestore();
@@ -823,33 +983,55 @@ it("does not cancel when the operator dismisses confirmation", async () => {
   expect(confirm).toHaveBeenCalled();
   await waitFor(() => {
     const cancelCalls = vi.mocked(fetch).mock.calls.filter(([input, init]) => {
-      return String(input).includes("/cancel") && (init as RequestInit | undefined)?.method === "POST";
+      return (
+        String(input).includes("/cancel") &&
+        (init as RequestInit | undefined)?.method === "POST"
+      );
     });
     expect(cancelCalls).toHaveLength(0);
   });
-  expect(screen.getByRole("button", { name: "Cancel run" })).toBeInTheDocument();
+  expect(
+    screen.getByRole("button", { name: "Cancel run" }),
+  ).toBeInTheDocument();
   confirm.mockRestore();
 });
 
 it("shows an error when cancel fails", async () => {
   const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
-  vi.mocked(fetch).mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
-    const url = String(input);
-    if (url.includes("/cancel") && init?.method === "POST") {
-      return Promise.resolve({ ok: false, status: 500, json: async () => ({}) } as Response);
-    }
-    if (url.includes("/visualization")) {
-      return Promise.resolve({ ok: true, json: async () => visualization } as Response);
-    }
-    if (url.includes("/turns")) {
-      return Promise.resolve({ ok: true, json: async () => turns } as Response);
-    }
-    return Promise.resolve({ ok: true, json: async () => ({ items: [] }) } as Response);
-  });
+  vi.mocked(fetch).mockImplementation(
+    (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/cancel") && init?.method === "POST") {
+        return Promise.resolve({
+          ok: false,
+          status: 500,
+          json: async () => ({}),
+        } as Response);
+      }
+      if (url.includes("/visualization")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => visualization,
+        } as Response);
+      }
+      if (url.includes("/turns")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => turns,
+        } as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ items: [] }),
+      } as Response);
+    },
+  );
 
   renderPage();
   fireEvent.click(await screen.findByRole("button", { name: "Cancel run" }));
-  expect(await screen.findByRole("alert")).toHaveTextContent("Request failed: 500");
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Request failed: 500",
+  );
   expect(screen.getByRole("button", { name: "Cancel run" })).toBeEnabled();
   confirm.mockRestore();
 });
@@ -858,7 +1040,10 @@ it("does not render raw HTML from conversation markdown", async () => {
   vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
     const url = String(input);
     if (url.includes("/visualization")) {
-      return Promise.resolve({ ok: true, json: async () => visualization } as Response);
+      return Promise.resolve({
+        ok: true,
+        json: async () => visualization,
+      } as Response);
     }
     if (url.includes("/turns")) {
       return Promise.resolve({
@@ -875,7 +1060,10 @@ it("does not render raw HTML from conversation markdown", async () => {
         }),
       } as Response);
     }
-    return Promise.resolve({ ok: true, json: async () => ({ items: [] }) } as Response);
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({ items: [] }),
+    } as Response);
   });
 
   const { container } = renderPage();
@@ -892,7 +1080,10 @@ it("shows newer turns while reviewing older content", async () => {
   vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
     const url = String(input);
     if (url.includes("/visualization")) {
-      return Promise.resolve({ ok: true, json: async () => visualization } as Response);
+      return Promise.resolve({
+        ok: true,
+        json: async () => visualization,
+      } as Response);
     }
     if (url.includes("/turns")) {
       return Promise.resolve({
@@ -913,12 +1104,17 @@ it("shows newer turns while reviewing older content", async () => {
         }),
       } as Response);
     }
-    return Promise.resolve({ ok: true, json: async () => ({ items: [] }) } as Response);
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({ items: [] }),
+    } as Response);
   });
 
   await queryClient.invalidateQueries({ queryKey: ["run-turns", "run-1"] });
   expect(await screen.findByText("Newest request")).toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: /Show \d+ new updates?/ })).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: /Show \d+ new updates?/ }),
+  ).not.toBeInTheDocument();
 });
 
 it("shows a new Tyr reply while reviewing older content", async () => {
@@ -929,25 +1125,35 @@ it("shows a new Tyr reply while reviewing older content", async () => {
   vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
     const url = String(input);
     if (url.includes("/visualization")) {
-      return Promise.resolve({ ok: true, json: async () => visualization } as Response);
+      return Promise.resolve({
+        ok: true,
+        json: async () => visualization,
+      } as Response);
     }
     if (url.includes("/turns")) {
       return Promise.resolve({
         ok: true,
         json: async () => ({
           ...turns,
-          items: turns.items.map((turn) => turn.id === "turn-2"
-            ? { ...turn, status: "completed", tyrMessage: "Request allowed" }
-            : turn),
+          items: turns.items.map((turn) =>
+            turn.id === "turn-2"
+              ? { ...turn, status: "completed", tyrMessage: "Request allowed" }
+              : turn,
+          ),
         }),
       } as Response);
     }
-    return Promise.resolve({ ok: true, json: async () => ({ items: [] }) } as Response);
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({ items: [] }),
+    } as Response);
   });
 
   await queryClient.invalidateQueries({ queryKey: ["run-turns", "run-1"] });
   expect(await screen.findByText("Request allowed")).toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: /Show \d+ new updates?/ })).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: /Show \d+ new updates?/ }),
+  ).not.toBeInTheDocument();
 });
 
 it("defaults refresh rate to 30s and lets the operator change it", async () => {
@@ -957,14 +1163,32 @@ it("defaults refresh rate to 30s and lets the operator change it", async () => {
 
   const group = screen.getByRole("radiogroup", { name: "Refresh rate" });
   expect(group).toBeInTheDocument();
-  expect(screen.getByRole("radio", { name: "1s" })).toHaveAttribute("aria-checked", "false");
-  expect(screen.getByRole("radio", { name: "5s" })).toHaveAttribute("aria-checked", "false");
-  expect(screen.getByRole("radio", { name: "10s" })).toHaveAttribute("aria-checked", "false");
-  expect(screen.getByRole("radio", { name: "30s" })).toHaveAttribute("aria-checked", "true");
+  expect(screen.getByRole("radio", { name: "1s" })).toHaveAttribute(
+    "aria-checked",
+    "false",
+  );
+  expect(screen.getByRole("radio", { name: "5s" })).toHaveAttribute(
+    "aria-checked",
+    "false",
+  );
+  expect(screen.getByRole("radio", { name: "10s" })).toHaveAttribute(
+    "aria-checked",
+    "false",
+  );
+  expect(screen.getByRole("radio", { name: "30s" })).toHaveAttribute(
+    "aria-checked",
+    "true",
+  );
 
   fireEvent.click(screen.getByRole("radio", { name: "5s" }));
-  expect(screen.getByRole("radio", { name: "5s" })).toHaveAttribute("aria-checked", "true");
-  expect(screen.getByRole("radio", { name: "30s" })).toHaveAttribute("aria-checked", "false");
+  expect(screen.getByRole("radio", { name: "5s" })).toHaveAttribute(
+    "aria-checked",
+    "true",
+  );
+  expect(screen.getByRole("radio", { name: "30s" })).toHaveAttribute(
+    "aria-checked",
+    "false",
+  );
   expect(window.localStorage.getItem("gamr-run-refresh-ms")).toBe("5000");
 });
 
@@ -972,7 +1196,10 @@ it("shows agent working when the run is live and the latest turn is complete", a
   vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
     const url = String(input);
     if (url.includes("/visualization")) {
-      return Promise.resolve({ ok: true, json: async () => visualization } as Response);
+      return Promise.resolve({
+        ok: true,
+        json: async () => visualization,
+      } as Response);
     }
     if (url.includes("/turns")) {
       return Promise.resolve({
@@ -998,14 +1225,21 @@ it("shows agent working when the run is live and the latest turn is complete", a
         }),
       } as Response);
     }
-    return Promise.resolve({ ok: true, json: async () => ({ items: [] }) } as Response);
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({ items: [] }),
+    } as Response);
   });
 
   const { container } = renderPage();
   expect(
-    await screen.findByText("Next update will appear when the agent sends a message."),
+    await screen.findByText(
+      "Next update will appear when the agent sends a message.",
+    ),
   ).toBeInTheDocument();
-  expect(screen.getByRole("status", { name: "Awaiting next update" })).toBeInTheDocument();
+  expect(
+    screen.getByRole("status", { name: "Awaiting next update" }),
+  ).toBeInTheDocument();
   expect(screen.getAllByText("Agent working").length).toBeGreaterThan(0);
   expect(container.querySelector(".pending-next-turn")).not.toBeNull();
   expect(container.querySelector(".stage-working")).not.toBeNull();
@@ -1016,6 +1250,71 @@ it("does not show agent working while waiting for Tyr", async () => {
   await screen.findByText("read_file");
   expect(screen.getAllByText("Waiting for Tyr").length).toBeGreaterThan(0);
   expect(screen.queryByText("Agent working")).not.toBeInTheDocument();
+});
+
+it("shows agent working while the Scientist is generating a scenario", async () => {
+  vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url.includes("/visualization")) {
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          ...visualization,
+          run: { ...visualization.run, currentPhase: "scientist" },
+          phases: visualization.phases.map((phase) => ({
+            ...phase,
+            state: phase.id === "scientist" ? "active" : "completed",
+          })),
+        }),
+      } as Response);
+    }
+    if (url.includes("/turns")) {
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          items: [
+            {
+              id: "sci-generating",
+              sequence: 3,
+              number: 1,
+              stage: "scientist",
+              caseId: null,
+              status: "generating",
+              agentMessage: "Iteration 1 is generating.",
+              tyrMessage: null,
+              occurredAt: "2026-08-08T10:05:00Z",
+              repliedAt: null,
+            },
+          ],
+          omittedBefore: 0,
+          nextCursor: null,
+          latestSequence: 3,
+        }),
+      } as Response);
+    }
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({ items: [] }),
+    } as Response);
+  });
+
+  renderPage();
+
+  expect(
+    await screen.findByText("Iteration 1 is generating."),
+  ).toBeInTheDocument();
+  const scientistTurn = document.querySelector(
+    '[data-turn-id="sci-generating"]',
+  );
+  expect(scientistTurn).not.toBeNull();
+  expect(
+    within(scientistTurn as HTMLElement).getByText("Agent working"),
+  ).toBeInTheDocument();
+  expect(
+    scientistTurn?.querySelector(".turn-header .status-badge"),
+  ).toHaveTextContent("Agent working");
+  expect(scientistTurn?.querySelector(".turn-working-progress")).not.toBeNull();
+  expect(screen.getAllByText("Agent working").length).toBeGreaterThan(0);
 });
 
 it("does not show agent working after the run ends", async () => {
@@ -1033,7 +1332,10 @@ it("does not show agent working after the run ends", async () => {
             finishedAt: "2026-08-08T10:10:00Z",
             outcome: "completed",
           },
-          phases: visualization.phases.map((phase) => ({ ...phase, state: "completed" })),
+          phases: visualization.phases.map((phase) => ({
+            ...phase,
+            state: "completed",
+          })),
         }),
       } as Response);
     }
@@ -1055,7 +1357,10 @@ it("does not show agent working after the run ends", async () => {
         }),
       } as Response);
     }
-    return Promise.resolve({ ok: true, json: async () => ({ items: [] }) } as Response);
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({ items: [] }),
+    } as Response);
   });
 
   renderPage();

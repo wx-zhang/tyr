@@ -81,6 +81,11 @@ Verify with mocked typed API and SSE fixtures:
    copied and assistive output.
 7. Loading, empty, stale, disconnected, terminal, unavailable, and narrow-screen states retain
    meaningful text and navigation.
+8. Runs with selected cases are labeled Test cases; runs with an explicit empty case selection and
+   enabled scientist iterations are labeled Scientist only. Scientist entries identify the case IDs
+   used from history, including the empty-history state. Configure the scientist history window with
+   `historyTestRuns` (default 10) and `historyScientistRuns` (default 5); only matching persisted
+   terminal runs with result bundles are used.
 
 ## Scale budget
 

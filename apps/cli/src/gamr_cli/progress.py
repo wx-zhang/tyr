@@ -35,6 +35,13 @@ def render_progress(console: Console, event: ProgressEvent) -> None:
         console.print(
             f"[bold blue]▸[/] Scientist [dim]· {escape(event.detail or '')}[/]"
         )
+    elif event.event_type == "scientist.history_used":
+        console.print(
+            f"[cyan]↳[/] Scientist history [dim]· {escape(event.detail or '')}[/]"
+        )
+        if event.history_case_ids:
+            for case_id in event.history_case_ids:
+                console.print(f"  [cyan]•[/] {escape(case_id)}")
     elif event.event_type == "scientist.scenario_ready":
         console.print(
             f"[green]✓[/] Scientist scenario ready "
@@ -119,6 +126,7 @@ class ConsoleActivitySink:
                 turn=metadata_turn if isinstance(metadata_turn, int) else None,
                 detail=activity.summary,
                 fields=None,
+                history_case_ids=tuple(activity.related_case_ids),
             ),
         )
         return activity

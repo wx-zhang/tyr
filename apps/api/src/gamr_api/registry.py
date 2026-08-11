@@ -306,6 +306,12 @@ class InMemoryRegistry:
                 "outcome": run.state.value if run.finished_at else None,
                 "currentPhase": current_phase,
                 "currentCaseIds": current_cases,
+                "executionMode": (
+                    "scientist_only"
+                    if run.configuration.case_ids == []
+                    and run.configuration.scientist_iterations > 0
+                    else "cases"
+                ),
             },
             "phases": phases,
             "cases": sorted(cases.values(), key=lambda item: int(str(item["order"]))),

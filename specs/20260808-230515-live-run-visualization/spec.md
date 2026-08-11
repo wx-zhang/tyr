@@ -146,10 +146,15 @@ As a reviewer, I can pause automatic following, filter or select activity, inspe
 - **FR-030**: The agent/Tyr relationship graph MUST aggregate repeated observed relationships that match the current search and filters, show the number and types of contributing interactions, and expose every contributing permitted evidence item on selection.
 - **FR-031**: The evidence inspector MUST show a readable summary by default and MUST allow the reviewer to deliberately reveal the complete permitted redacted content of a retained diagnostic evidence item on demand.
 - **FR-032**: The Updates timeline MUST show each canonical case evaluation, including scientist-generated cases, with security verdict as the primary result and objective status, execution outcome, and redacted assessment summary as supporting evidence.
+- **FR-033**: An execution with selected case IDs MUST run those cases and MAY run scientist iterations; an execution with an explicitly empty case-ID list MUST run scientist iterations only when iterations are enabled. Discovery MUST precede either mode, and an empty case-ID list with scientist disabled MUST be rejected.
+- **FR-034**: Each scientist iteration MUST persist a bounded, redacted progress update identifying the case IDs used as history, or explicitly state that no prior tests were available. The history indicator MUST be available to live, API, and historical run views without exposing prompts, transcripts, credentials, or server paths.
+- **FR-035**: Scientist-enabled executions MUST support configurable history windows for prior test-case runs and prior scientist runs, defaulting to the latest 10 and 5 runs respectively. Only completed or terminal persisted runs for the same dataset with available results MAY be used, and the selected records MUST be combined with the current run's records using the existing scientist history rebuild process.
 
 ### Key Entities
 
 - **Run progress**: The run's current and terminal state, action mode, known phases, selected case totals, completed work, active work, blockers, and timestamps.
+- **Execution mode**: The derived case or scientist-only mode determined from the selected case IDs and scientist iteration count.
+- **Scientist history window**: The bounded configuration of recent test-case and scientist run bundles whose redacted case records and transcripts seed each scientist iteration.
 - **Case progress**: One selected test case's order, current phase, status, security verdict, objective status, execution outcome, assessment summary, and relationship to its activity and approvals.
 - **Activity item**: One ordered, persisted occurrence with an identity, timestamp, type, status, summary, permitted details, and related run, phase, case, participants, operation, or approval.
 - **Participant**: An observed human, GAMR component, model agent, Tyr agent, delegated agent, bridge, or tool endpoint, identified only to the extent supported by permitted evidence.

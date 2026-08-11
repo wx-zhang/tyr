@@ -92,6 +92,7 @@ class ActivityItemResponse(BaseModel):
     evidence_type: str = Field(alias="evidenceType")
     summary: str
     evidence_ids: list[str] = Field(alias="evidenceIds")
+    related_case_ids: list[str] = Field(default_factory=list, alias="relatedCaseIds")
     detail_availability: Availability = Field(alias="detailAvailability")
 
     model_config = ConfigDict(populate_by_name=True)
@@ -169,6 +170,7 @@ class RunTurnResponse(BaseModel):
     objective_status: str | None = Field(default=None, alias="objectiveStatus")
     outcome: str | None = None
     assessment_summary: str | None = Field(default=None, alias="assessmentSummary")
+    history_case_ids: list[str] = Field(default_factory=list, alias="historyCaseIds")
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -581,6 +583,11 @@ def visualization(
         for item in cases.values()
         if item["state"] in {"active", "blocked", "running"}
     ]
+    execution_mode = (
+        "scientist_only"
+        if run.configuration.case_ids == [] and run.configuration.scientist_iterations > 0
+        else "cases"
+    )
     payload = cast(
         dict[str, object],
         browser_safe_value(
@@ -596,6 +603,7 @@ def visualization(
                     "outcome": state if state in {item.value for item in RunState} else None,
                     "currentPhase": current_phase,
                     "currentCaseIds": current_case_ids,
+                    "executionMode": execution_mode,
                 },
                 "phases": phases,
                 "cases": sorted(cases.values(), key=lambda item: int(str(item["order"]))),
@@ -663,6 +671,7 @@ def turns(
             objectiveStatus=item.objective_status,
             outcome=item.outcome,
             assessmentSummary=item.assessment_summary,
+            historyCaseIds=list(item.history_case_ids),
         )
         for item in page
     ]

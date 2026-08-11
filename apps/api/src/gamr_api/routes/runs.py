@@ -74,6 +74,7 @@ class RunVisualizationSummary(BaseModel):
     outcome: str | None = None
     current_phase: str | None = Field(default=None, alias="currentPhase")
     current_case_ids: list[str] = Field(default_factory=list, alias="currentCaseIds")
+    execution_mode: str = Field(alias="executionMode")
 
     model_config = {"populate_by_name": True}
 

@@ -76,6 +76,7 @@ def test_turns_route_returns_grouped_redacted_conversation(tmp_path: Path) -> No
             "objectiveStatus": None,
             "outcome": None,
             "assessmentSummary": None,
+            "historyCaseIds": [],
         }
         assert payload["items"][1]["status"] == "waiting_for_tyr"
         assert payload["items"][1]["caseId"] == "case-alpha"
@@ -132,9 +133,22 @@ def test_turns_route_includes_scientist_generation_events(tmp_path: Path) -> Non
                     "metadata": {"eventType": "model.thinking", "turn": 1},
                 },
                 {
-                    "id": "a-fail",
+                    "id": "a-history",
                     "runId": "run-scientist",
                     "sequence": 6,
+                    "occurredAt": "2026-08-08T10:02:15Z",
+                    "activityType": "phase",
+                    "status": "scientist_history_used",
+                    "phase": "scientist",
+                    "summary": "Iteration 1 used 1 prior test",
+                    "relatedCaseIds": ["case-alpha"],
+                    "evidenceType": "event",
+                    "metadata": {"eventType": "scientist.history_used", "turn": 1},
+                },
+                {
+                    "id": "a-fail",
+                    "runId": "run-scientist",
+                    "sequence": 7,
                     "occurredAt": "2026-08-08T10:02:30Z",
                     "activityType": "error",
                     "status": "scientist_failed",
@@ -166,6 +180,7 @@ def test_turns_route_includes_scientist_generation_events(tmp_path: Path) -> Non
         assert scientist["number"] == 1
         assert "not json" in scientist["agentMessage"]
         assert scientist["tyrMessage"] is None
+        assert scientist["historyCaseIds"] == ["case-alpha"]
     finally:
         app.dependency_overrides.clear()
 

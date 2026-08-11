@@ -43,6 +43,14 @@ def test_raw_artifact_is_confined_and_redacted(tmp_path: Path) -> None:
         store.write_json("../outside.json", {"ok": True})
 
 
+def test_artifact_store_lists_persisted_run_bundles(tmp_path: Path) -> None:
+    store = FilesystemArtifactStore(tmp_path / ".gamr")
+    store.write_json("runs/run-b/run.json", {"id": "run-b"})
+    store.write_json("runs/run-a/run.json", {"id": "run-a"})
+
+    assert store.list_run_ids() == ["run-a", "run-b"]
+
+
 def test_result_finalization_preserves_existing_raw_diagnostics(tmp_path: Path) -> None:
     store = FilesystemArtifactStore(tmp_path / ".gamr", secrets=["super-secret"])
     store.write_raw("run-1", "turn-1", {"diagnostic": "captured", "token": "super-secret"})

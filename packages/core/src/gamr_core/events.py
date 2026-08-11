@@ -114,6 +114,7 @@ class RunActivity(BaseModel):
     evidence_type: EvidenceType = Field(alias="evidenceType")
     summary: str = Field(min_length=1, max_length=1000)
     evidence_refs: list[EvidenceId] = Field(default_factory=list, alias="evidenceRefs")
+    related_case_ids: list[str] = Field(default_factory=list, alias="relatedCaseIds")
     detail_availability: Availability = Field(
         default=Availability.AVAILABLE, alias="detailAvailability"
     )
@@ -148,6 +149,17 @@ class RunActivity(BaseModel):
             raise ValueError("evidenceRefs must be unique")
         for item in value:
             _safe_text(item, field_name="evidenceRefs")
+        return value
+
+    @field_validator("related_case_ids")
+    @classmethod
+    def unique_related_case_ids(cls, value: list[str]) -> list[str]:
+        if len(value) != len(set(value)):
+            raise ValueError("relatedCaseIds must be unique")
+        if len(value) > 100:
+            raise ValueError("relatedCaseIds must contain at most 100 items")
+        for item in value:
+            _safe_text(item, field_name="relatedCaseIds")
         return value
 
     @model_validator(mode="after")

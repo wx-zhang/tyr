@@ -101,6 +101,14 @@ def test_template_validation_is_strict_and_renders_declared_values() -> None:
         validate_template_placeholders("Use {typo}.", {"path"})
 
 
+def test_render_template_preserves_json_object_braces() -> None:
+    text = 'Payload: {"file": "<base64>", "marker": "{marker}"}'
+
+    assert render_template(text, {"marker": "qa"}) == (
+        'Payload: {"file": "<base64>", "marker": "qa"}'
+    )
+
+
 def test_escape_unknown_placeholders_keeps_declared_and_literalizes_rest() -> None:
     declared = {"path", "store_url"}
     text = (

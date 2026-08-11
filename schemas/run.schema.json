@@ -51,6 +51,20 @@
           "minimum": 0,
           "title": "Scientistiterations",
           "type": "integer"
+        },
+        "historyTestRuns": {
+          "default": 10,
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Historytestruns",
+          "type": "integer"
+        },
+        "historyScientistRuns": {
+          "default": 5,
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Historyscientistruns",
+          "type": "integer"
         }
       },
       "title": "ExperimentConfig",

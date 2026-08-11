@@ -10,6 +10,7 @@ import {
 } from "../../api/client";
 import { PageHeader } from "../../components/PageHeader";
 import { CaseChecklist } from "./CaseChecklist";
+import { ScientistHistoryPanel } from "./ScientistHistoryPanel";
 
 function defaultCaseSelection(
   dataset: Dataset | undefined,
@@ -31,17 +32,35 @@ function defaultExperimentName(datasetTitle: string): string {
   return `${datasetTitle} · ${stamp}`;
 }
 
+function boundedCount(value: string): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.min(100, Math.max(0, Math.floor(parsed)));
+}
+
 export function ExperimentPage() {
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [datasetId, setDatasetId] = useState("");
+  const [executeTestCases, setExecuteTestCases] = useState(true);
   const [selectedCaseIds, setSelectedCaseIds] = useState<string[]>([]);
   const [allowActions, setAllowActions] = useState(true);
   const [scientistIterationsInput, setScientistIterationsInput] = useState("0");
+  const [historyTestRunsInput, setHistoryTestRunsInput] = useState("10");
+  const [historyScientistRunsInput, setHistoryScientistRunsInput] =
+    useState("5");
   const scientistIterations = useMemo(() => {
     const parsed = Number(scientistIterationsInput);
     return Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)) : 0;
   }, [scientistIterationsInput]);
+  const historyTestRuns = useMemo(
+    () => boundedCount(historyTestRunsInput),
+    [historyTestRunsInput],
+  );
+  const historyScientistRuns = useMemo(
+    () => boundedCount(historyScientistRunsInput),
+    [historyScientistRunsInput],
+  );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [casesOpen, setCasesOpen] = useState(true);
@@ -66,18 +85,18 @@ export function ExperimentPage() {
   const cases = useQuery({
     queryKey: ["dataset-cases", datasetId],
     queryFn: () => fetchDatasetCases(datasetId),
-    enabled: Boolean(datasetId),
+    enabled: Boolean(datasetId) && executeTestCases,
   });
 
   useEffect(() => {
-    if (!cases.data) return;
+    if (!cases.data || !executeTestCases) return;
     setSelectedCaseIds(
       defaultCaseSelection(
         selectedDataset,
         cases.data.map((item) => item.metadata.id),
       ),
     );
-  }, [cases.data, selectedDataset]);
+  }, [cases.data, executeTestCases, selectedDataset]);
 
   const toggleCase = (caseId: string) => {
     setSelectedCaseIds((current) =>
@@ -94,9 +113,13 @@ export function ExperimentPage() {
       setError("Select a dataset.");
       return;
     }
-    if (selectedCaseIds.length === 0 && scientistIterations === 0) {
+    if (executeTestCases && selectedCaseIds.length === 0) {
+      setError("Select at least one test case or turn off Execute Test Cases.");
+      return;
+    }
+    if (!executeTestCases && scientistIterations === 0) {
       setError(
-        "Select at least one case, or set scientist iterations above 0 to skip seed cases.",
+        "Set scientist iterations above 0 for scientist-only execution.",
       );
       return;
     }
@@ -108,14 +131,18 @@ export function ExperimentPage() {
         name: experimentName,
         dataset: datasetId,
         actionMode: allowActions ? "approval_required" : "read_only",
-        caseIds: selectedCaseIds,
+        caseIds: executeTestCases ? selectedCaseIds : [],
         scientistIterations,
+        historyTestRuns,
+        historyScientistRuns,
       });
       if (!experiment.id) throw new Error("Experiment was not created");
       navigate(`/experiments/${experiment.id}`);
     } catch (reason) {
       setError(
-        reason instanceof Error ? reason.message : "Could not create experiment",
+        reason instanceof Error
+          ? reason.message
+          : "Could not create experiment",
       );
     } finally {
       setSubmitting(false);
@@ -125,7 +152,7 @@ export function ExperimentPage() {
   const caseList = (cases.data ?? []).map(scenarioToCase);
   const canSubmit =
     Boolean(datasetId) &&
-    (selectedCaseIds.length > 0 || scientistIterations > 0) &&
+    (executeTestCases ? selectedCaseIds.length > 0 : scientistIterations > 0) &&
     !submitting &&
     !cases.isLoading;
 
@@ -134,7 +161,7 @@ export function ExperimentPage() {
       <PageHeader
         eyebrow="Experiment execution"
         title="Execute experiment"
-        description="Choose a dataset and cases, then start a live red-team run against Tyr."
+        description="Choose a dataset and execution mode, then start a live red-team run against Tyr."
         actions={
           <Link className="button button-secondary" to="/datasets">
             Browse datasets
@@ -143,7 +170,7 @@ export function ExperimentPage() {
       />
 
       <div
-        className={`execute-layout${casesOpen ? "" : " execute-layout-collapsed"}`}
+        className={`execute-layout${executeTestCases && !casesOpen ? " execute-layout-collapsed" : ""}`}
       >
         <form className="card form-card" onSubmit={submit}>
           <div className="field-group">
@@ -157,39 +184,73 @@ export function ExperimentPage() {
             />
           </div>
 
-          <div className="field-group">
-            <label htmlFor="experiment-dataset">Dataset</label>
-            <select
-              id="experiment-dataset"
-              name="dataset"
-              value={datasetId}
+          <label className="choice-card case-choice">
+            <input
+              type="checkbox"
+              checked={executeTestCases}
               onChange={(event) => {
-                setDatasetId(event.target.value);
-                setSelectedCaseIds([]);
+                const next = event.target.checked;
+                setExecuteTestCases(next);
                 setError(null);
+                setCasesOpen(true);
+                if (!next) {
+                  setSelectedCaseIds([]);
+                } else if (cases.data) {
+                  setSelectedCaseIds(
+                    defaultCaseSelection(
+                      selectedDataset,
+                      cases.data.map((item) => item.metadata.id),
+                    ),
+                  );
+                }
               }}
-              required
-              disabled={datasets.isLoading}
-            >
-              <option value="" disabled>
-                {datasets.isLoading
-                  ? "Loading datasets…"
-                  : "Select a validated dataset"}
-              </option>
-              {(datasets.data ?? []).map((dataset) => (
-                <option key={dataset.metadata.id} value={dataset.metadata.id}>
-                  {dataset.metadata.title} ({dataset.metadata.id})
-                </option>
-              ))}
-            </select>
-            {datasets.isError ? (
-              <p className="field-help" role="alert">
-                Could not load datasets. Check the API connection.
-              </p>
-            ) : null}
-          </div>
+              aria-label="Execute Test Cases"
+            />
+            <span>
+              <span className="choice-title" aria-hidden="true">
+                Execute Test Cases
+              </span>
+              <span className="choice-description">
+                Run the selected dataset cases before the scientist stage.
+              </span>
+            </span>
+          </label>
 
-          {!casesOpen ? (
+          {executeTestCases ? (
+            <div className="field-group">
+              <label htmlFor="experiment-dataset">Dataset</label>
+              <select
+                id="experiment-dataset"
+                name="dataset"
+                value={datasetId}
+                onChange={(event) => {
+                  setDatasetId(event.target.value);
+                  setSelectedCaseIds([]);
+                  setError(null);
+                }}
+                required
+                disabled={datasets.isLoading}
+              >
+                <option value="" disabled>
+                  {datasets.isLoading
+                    ? "Loading datasets…"
+                    : "Select a validated dataset"}
+                </option>
+                {(datasets.data ?? []).map((dataset) => (
+                  <option key={dataset.metadata.id} value={dataset.metadata.id}>
+                    {dataset.metadata.title} ({dataset.metadata.id})
+                  </option>
+                ))}
+              </select>
+              {datasets.isError ? (
+                <p className="field-help" role="alert">
+                  Could not load datasets. Check the API connection.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
+          {executeTestCases && !casesOpen ? (
             <div className="field-group">
               <span className="field-label">Test cases</span>
               <div className="case-explorer-actions">
@@ -227,21 +288,6 @@ export function ExperimentPage() {
             </span>
           </label>
 
-          {allowActions ? (
-            <div className="callout callout-warning">
-              <p>
-                <strong>Actions Allowed.</strong> Approvals happen in Tyr, not
-                automatically in GAMR.
-              </p>
-            </div>
-          ) : (
-            <div className="callout">
-              <p>
-                <strong>Read-only.</strong> Query-only Tyr access.
-              </p>
-            </div>
-          )}
-
           <div className="field-group">
             <div className="field-label-row">
               <label htmlFor="scientist-iterations">Scientist iterations</label>
@@ -257,11 +303,9 @@ export function ExperimentPage() {
                   role="tooltip"
                   className="info-tip-bubble"
                 >
-                  After selected cases finish, the scientist stage asks the model
-                  to invent new follow-up scenarios and runs each one. The number
-                  is how many generate-and-run cycles to allow. Zero skips the
-                  scientist stage. Clear all seed cases below to skip straight
-                  from discovery to the scientist stage.
+                  The number of generate-and-run cycles for the scientist stage.
+                  In scientist-only mode, recent runs from history provide the
+                  seed scenarios.
                 </span>
               </button>
             </div>
@@ -281,11 +325,15 @@ export function ExperimentPage() {
               }}
             />
             <p className="field-help">
-              {scientistIterations === 0
-                ? "Off. Selected cases run only."
-                : selectedCaseIds.length > 0
-                  ? `After selected cases finish, generate and run up to ${scientistIterations} follow-up scenario${scientistIterations === 1 ? "" : "s"}.`
-                  : `No seed cases selected — jumps straight from discovery to generate and run up to ${scientistIterations} follow-up scenario${scientistIterations === 1 ? "" : "s"}.`}
+              {!executeTestCases && scientistIterations === 0
+                ? "Set iterations above 0 for scientist-only execution."
+                : scientistIterations === 0
+                  ? "Off. Selected cases run only."
+                  : !executeTestCases
+                    ? `Scientist-only: use recent history to generate and run up to ${scientistIterations} scenario${scientistIterations === 1 ? "" : "s"}.`
+                    : selectedCaseIds.length > 0
+                      ? `After selected cases finish, generate and run up to ${scientistIterations} follow-up scenario${scientistIterations === 1 ? "" : "s"}.`
+                      : "Select test cases or switch to scientist-only mode."}
             </p>
           </div>
 
@@ -305,7 +353,22 @@ export function ExperimentPage() {
           </div>
         </form>
 
-        {casesOpen ? (
+        {!executeTestCases ? (
+          <ScientistHistoryPanel
+            testRunsInput={historyTestRunsInput}
+            scientistRunsInput={historyScientistRunsInput}
+            testRuns={historyTestRuns}
+            scientistRuns={historyScientistRuns}
+            onTestRunsChange={setHistoryTestRunsInput}
+            onTestRunsBlur={() =>
+              setHistoryTestRunsInput(String(historyTestRuns))
+            }
+            onScientistRunsChange={setHistoryScientistRunsInput}
+            onScientistRunsBlur={() =>
+              setHistoryScientistRunsInput(String(historyScientistRuns))
+            }
+          />
+        ) : casesOpen ? (
           <aside
             id="test-cases-panel"
             className="card form-card"

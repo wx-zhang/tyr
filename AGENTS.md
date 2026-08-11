@@ -101,7 +101,7 @@ gamr chat
 
 ## Coding standards
 
-- Keep source files under 300 lines when possible. This does not apply to dependency files, generated files, vendored code, migrations, snapshots, or other files that are better kept as one file. Split large files only when it makes the code easier to understand.
+- HARD GATE: Keep source files under 300 lines. This does not apply to dependency files, generated files, vendored code, migrations, snapshots, or other files that are better kept as one file.
 
 ### Occam Razor
 

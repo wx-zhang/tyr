@@ -14,7 +14,12 @@ import { StatusBadge } from "../../components/StatusBadge";
 import { MarkdownMessage } from "./MarkdownMessage";
 import { TyrNetworkMap } from "./TyrNetworkMap";
 
-const terminalStates = new Set(["completed", "failed", "cancelled", "interrupted"]);
+const terminalStates = new Set([
+  "completed",
+  "failed",
+  "cancelled",
+  "interrupted",
+]);
 const REFRESH_RATES_MS = [1000, 5000, 10_000, 30_000] as const;
 const DEFAULT_REFRESH_MS = 30_000;
 const REFRESH_STORAGE_KEY = "gamr-run-refresh-ms";
@@ -44,37 +49,50 @@ function label(value: string | null | undefined): string {
   if (!value) return "—";
   if (value === "read_only") return "Read-only";
   if (value === "approval_required") return "Actions Allowed";
+  if (value === "scientist_only") return "Scientist only";
+  if (value === "cases") return "Test cases";
   if (value === "waiting_for_tyr") return "Waiting for Tyr";
   if (value === "case") return "Executing evaluation";
   if (value === "scientist") return "Scientist";
   if (value === "generating") return "Generating";
   if (value === "ready") return "Ready";
   if (value === "skipped") return "Skipped";
-  return value.replaceAll("_", " ").replace(/\b\w/g, (character) => character.toUpperCase());
+  return value
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
-function tone(state: string | null | undefined): "info" | "success" | "warning" | "danger" | "neutral" {
-  if (state === "completed" || state === "ready" || state === "protected" || state === "pass" || state === "passed") {
+function tone(
+  state: string | null | undefined,
+): "info" | "success" | "warning" | "danger" | "neutral" {
+  if (
+    state === "completed" ||
+    state === "ready" ||
+    state === "protected" ||
+    state === "pass" ||
+    state === "passed"
+  ) {
     return "success";
   }
-  if (state === "failed" || state === "vulnerable" || state === "fail") return "danger";
+  if (state === "failed" || state === "vulnerable" || state === "fail")
+    return "danger";
   if (
-    state === "waiting_for_approval"
-    || state === "generating"
-    || state === "inconclusive"
-    || state === "partial"
+    state === "waiting_for_approval" ||
+    state === "generating" ||
+    state === "inconclusive" ||
+    state === "partial"
   ) {
     return "warning";
   }
   if (state === "waiting_for_tyr") return "info";
   if (
-    state === "cancelled"
-    || state === "interrupted"
-    || state === "incomplete"
-    || state === "pending"
-    || state === "not_applicable"
-    || state === "not_attempted"
-    || state === "unknown"
+    state === "cancelled" ||
+    state === "interrupted" ||
+    state === "incomplete" ||
+    state === "pending" ||
+    state === "not_applicable" ||
+    state === "not_attempted" ||
+    state === "unknown"
   ) {
     return "neutral";
   }
@@ -92,21 +110,35 @@ function resultDisplay(
   objectiveStatus: string | null | undefined,
   outcome: string | null | undefined,
 ): ResultDisplay {
-  if (verdict === "protected" || (verdict !== "vulnerable" && outcome === "failed")) {
+  if (
+    verdict === "protected" ||
+    (verdict !== "vulnerable" && outcome === "failed")
+  ) {
     return { label: "No breach", tone: "success", className: "protected" };
   }
-  if (verdict === "vulnerable" || (verdict === "inconclusive" && objectiveStatus === "partial")) {
+  if (
+    verdict === "vulnerable" ||
+    (verdict === "inconclusive" && objectiveStatus === "partial")
+  ) {
     return {
       label: `Vulnerability Exposed${objectiveStatus === "partial" ? " (partial)" : ""}`,
       tone: "danger",
       className: "vulnerable",
     };
   }
-  return { label: label(verdict), tone: tone(verdict), className: verdict ?? "unknown" };
+  return {
+    label: label(verdict),
+    tone: tone(verdict),
+    className: verdict ?? "unknown",
+  };
 }
 
-function caseStatus(item: CaseProgress): { label: string; tone: ReturnType<typeof tone> } {
-  if (item.verdict) return resultDisplay(item.verdict, item.objectiveStatus, item.outcome);
+function caseStatus(item: CaseProgress): {
+  label: string;
+  tone: ReturnType<typeof tone>;
+} {
+  if (item.verdict)
+    return resultDisplay(item.verdict, item.objectiveStatus, item.outcome);
   return { label: label(item.state), tone: tone(item.state) };
 }
 
@@ -118,7 +150,9 @@ function currentPhaseLabel(
   const active = phases?.find((phase) => phase.state === "active");
   if (active) return active.label;
   if (run?.state && terminalStates.has(run.state)) {
-    const lastDone = [...(phases ?? [])].reverse().find((phase) => phase.state === "completed");
+    const lastDone = [...(phases ?? [])]
+      .reverse()
+      .find((phase) => phase.state === "completed");
     if (lastDone) return lastDone.label;
     return label(run.state);
   }
@@ -126,8 +160,11 @@ function currentPhaseLabel(
 }
 
 function isScientistGeneration(turn: RunTurn): boolean {
-  return turn.stage === "scientist" && !turn.tyrMessage
-    && ["generating", "failed", "ready", "completed"].includes(turn.status);
+  return (
+    turn.stage === "scientist" &&
+    !turn.tyrMessage &&
+    ["generating", "failed", "ready", "completed"].includes(turn.status)
+  );
 }
 
 function isEvaluation(turn: RunTurn): boolean {
@@ -138,7 +175,9 @@ function isDiscoveryResult(turn: RunTurn): boolean {
   return turn.updateType === "discovery";
 }
 
-function discoveryFields(message: string): Array<{ name: string; value: string }> {
+function discoveryFields(
+  message: string,
+): Array<{ name: string; value: string }> {
   return message
     .split("\n")
     .map((line) => {
@@ -191,12 +230,17 @@ function formatRelative(value: string | null | undefined, now: number): string {
   if (absolute < 5) return "just now";
   const formatter = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
   if (absolute < 60) return formatter.format(deltaSeconds, "second");
-  if (absolute < 3600) return formatter.format(Math.round(deltaSeconds / 60), "minute");
-  if (absolute < 86_400) return formatter.format(Math.round(deltaSeconds / 3600), "hour");
+  if (absolute < 3600)
+    return formatter.format(Math.round(deltaSeconds / 60), "minute");
+  if (absolute < 86_400)
+    return formatter.format(Math.round(deltaSeconds / 3600), "hour");
   return formatter.format(Math.round(deltaSeconds / 86_400), "day");
 }
 
-function elapsedMs(start: string | null | undefined, end: number): number | null {
+function elapsedMs(
+  start: string | null | undefined,
+  end: number,
+): number | null {
   if (!start) return null;
   const date = new Date(start);
   if (Number.isNaN(date.valueOf())) return null;
@@ -220,19 +264,24 @@ function formatWaited(ms: number): string {
   if (totalSeconds < 60) return `Waited ${totalSeconds}s`;
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
-  if (minutes < 60) return seconds ? `Waited ${minutes}m ${seconds}s` : `Waited ${minutes}m`;
+  if (minutes < 60)
+    return seconds ? `Waited ${minutes}m ${seconds}s` : `Waited ${minutes}m`;
   const hours = Math.floor(minutes / 60);
   const remainMinutes = minutes % 60;
-  return remainMinutes ? `Waited ${hours}h ${remainMinutes}m` : `Waited ${hours}h`;
+  return remainMinutes
+    ? `Waited ${hours}h ${remainMinutes}m`
+    : `Waited ${hours}h`;
 }
 
 function sameTurn(left: RunTurn | undefined, right: RunTurn): boolean {
-  return Boolean(left
-    && left.status === right.status
-    && left.agentMessage === right.agentMessage
-    && left.tyrMessage === right.tyrMessage
-    && left.occurredAt === right.occurredAt
-    && left.repliedAt === right.repliedAt);
+  return Boolean(
+    left &&
+    left.status === right.status &&
+    left.agentMessage === right.agentMessage &&
+    left.tyrMessage === right.tyrMessage &&
+    left.occurredAt === right.occurredAt &&
+    left.repliedAt === right.repliedAt,
+  );
 }
 
 function turnHasOpenWork(turn: RunTurn): boolean {
@@ -244,11 +293,11 @@ function turnHasOpenWork(turn: RunTurn): boolean {
 function stageStatusLabel(
   phaseState: string,
   waitingForTyr: boolean,
-  awaitingNextTurn: boolean,
+  agentWorking: boolean,
   isActive: boolean,
 ): string | null {
   if (isActive && waitingForTyr) return "Waiting for Tyr";
-  if (isActive && awaitingNextTurn) return "Agent working";
+  if (isActive && agentWorking) return "Agent working";
   if (phaseState === "active") return "Active";
   if (phaseState === "failed") return "Failed";
   if (phaseState === "cancelled") return "Cancelled";
@@ -261,7 +310,9 @@ export function RunPage() {
   const { id } = useParams();
   const runId = id ?? "unknown";
   const queryClient = useQueryClient();
-  const [refreshMs, setRefreshMs] = useState<RefreshRateMs>(() => readStoredRefreshMs());
+  const [refreshMs, setRefreshMs] = useState<RefreshRateMs>(() =>
+    readStoredRefreshMs(),
+  );
   const visualization = useQuery({
     queryKey: ["run-visualization", runId],
     queryFn: () => fetchRunVisualization(runId),
@@ -294,12 +345,17 @@ export function RunPage() {
   const [flashIds, setFlashIds] = useState<Set<string>>(() => new Set());
   const previousVisible = useRef<Map<string, RunTurn>>(new Map());
   const run = visualization.data?.run;
-  const scientistIterations = runRecord.data?.configuration?.scientistIterations ?? 0;
+  const scientistIterations =
+    runRecord.data?.configuration?.scientistIterations ?? 0;
   const latestTurns = turns.data?.items;
   const isLive = Boolean(run && !terminalStates.has(run.state));
   const waitingForTyr = Boolean(
-    visibleLatestTurns.some((turn) => turn.status === "waiting_for_tyr" && !turn.tyrMessage)
-    || latestTurns?.some((turn) => turn.status === "waiting_for_tyr" && !turn.tyrMessage),
+    visibleLatestTurns.some(
+      (turn) => turn.status === "waiting_for_tyr" && !turn.tyrMessage,
+    ) ||
+    latestTurns?.some(
+      (turn) => turn.status === "waiting_for_tyr" && !turn.tyrMessage,
+    ),
   );
 
   const selectRefreshMs = (next: RefreshRateMs) => {
@@ -321,10 +377,14 @@ export function RunPage() {
     setCancelError(null);
     try {
       await cancelRun(runId);
-      await queryClient.invalidateQueries({ queryKey: ["run-visualization", runId] });
+      await queryClient.invalidateQueries({
+        queryKey: ["run-visualization", runId],
+      });
       await queryClient.invalidateQueries({ queryKey: ["run-turns", runId] });
     } catch (error) {
-      setCancelError(error instanceof Error ? error.message : "Could not cancel run");
+      setCancelError(
+        error instanceof Error ? error.message : "Could not cancel run",
+      );
     } finally {
       setCancelling(false);
     }
@@ -371,8 +431,12 @@ export function RunPage() {
   }, [visibleLatestTurns]);
 
   const allTurns = useMemo(() => {
-    const byId = new Map([...olderTurns, ...visibleLatestTurns].map((turn) => [turn.id, turn]));
-    return [...byId.values()].sort((left, right) => right.sequence - left.sequence);
+    const byId = new Map(
+      [...olderTurns, ...visibleLatestTurns].map((turn) => [turn.id, turn]),
+    );
+    return [...byId.values()].sort(
+      (left, right) => right.sequence - left.sequence,
+    );
   }, [olderTurns, visibleLatestTurns]);
   const scientistIterationByCaseId = useMemo(() => {
     const map = new Map<string, number>();
@@ -384,12 +448,22 @@ export function RunPage() {
     return map;
   }, [allTurns]);
   const hasOpenTurnWork = Boolean(
-    visibleLatestTurns.some(turnHasOpenWork) || latestTurns?.some(turnHasOpenWork),
+    visibleLatestTurns.some(turnHasOpenWork) ||
+    latestTurns?.some(turnHasOpenWork),
   );
   const hasPersistedTurns = Boolean(
-    allTurns.length || latestTurns?.length || (turns.data?.latestSequence ?? 0) > 0,
+    allTurns.length ||
+    latestTurns?.length ||
+    (turns.data?.latestSequence ?? 0) > 0,
   );
-  const awaitingNextTurn = Boolean(isLive && hasPersistedTurns && !hasOpenTurnWork);
+  const hasGeneratingTurn = Boolean(
+    visibleLatestTurns.some((turn) => turn.status === "generating") ||
+    latestTurns?.some((turn) => turn.status === "generating"),
+  );
+  const agentWorking = Boolean(
+    isLive && hasPersistedTurns && (hasGeneratingTurn || !hasOpenTurnWork),
+  );
+  const awaitingNextTurn = Boolean(agentWorking && !hasGeneratingTurn);
 
   const loadOlder = async () => {
     const cursor = turns.data?.nextCursor;
@@ -404,12 +478,16 @@ export function RunPage() {
   };
 
   return (
-    <section className={`section-stack run-details${isLive ? " run-live" : ""}`}>
+    <section
+      className={`section-stack run-details${isLive ? " run-live" : ""}`}
+    >
       <header className="run-header">
         <div className="run-header-main">
           <p className="eyebrow">Run details</p>
           <div className="run-title">
-            <h1>Run <span className="mono">{runId}</span></h1>
+            <h1>
+              Run <span className="mono">{runId}</span>
+            </h1>
             <StatusBadge
               label={label(run?.state)}
               tone={tone(run?.state)}
@@ -417,11 +495,18 @@ export function RunPage() {
             />
             <span
               className={`run-mode${
-                run?.actionMode === "approval_required" ? " run-mode-actions" : ""
+                run?.actionMode === "approval_required"
+                  ? " run-mode-actions"
+                  : ""
               }`}
             >
               {label(run?.actionMode ?? "read_only")}
             </span>
+            {run?.executionMode ? (
+              <span className="run-mode run-execution-mode">
+                {label(run.executionMode)}
+              </span>
+            ) : null}
           </div>
           <dl className="run-facts">
             <div>
@@ -430,12 +515,16 @@ export function RunPage() {
             </div>
             <div>
               <dt>Started</dt>
-              <dd title={run?.startedAt ?? undefined}>{formatTimestamp(run?.startedAt)}</dd>
+              <dd title={run?.startedAt ?? undefined}>
+                {formatTimestamp(run?.startedAt)}
+              </dd>
             </div>
             <div>
               <dt>Latest update</dt>
               <dd title={run?.latestUpdateAt ?? undefined}>
-                {isLive ? formatRelative(run?.latestUpdateAt, now) : formatTimestamp(run?.latestUpdateAt)}
+                {isLive
+                  ? formatRelative(run?.latestUpdateAt, now)
+                  : formatTimestamp(run?.latestUpdateAt)}
               </dd>
             </div>
             {scientistIterations > 0 ? (
@@ -474,7 +563,9 @@ export function RunPage() {
               title={connectionDetail(events.connectionState)}
             >
               <span className="connection-dot" aria-hidden="true" />
-              <span className="connection-label">{connectionLabel(events.connectionState)}</span>
+              <span className="connection-label">
+                {connectionLabel(events.connectionState)}
+              </span>
             </p>
             {isLive ? (
               <button
@@ -491,10 +582,14 @@ export function RunPage() {
       </header>
 
       {cancelError ? (
-        <p className="callout callout-warning" role="alert">{cancelError}</p>
+        <p className="callout callout-warning" role="alert">
+          {cancelError}
+        </p>
       ) : null}
       {visualization.error ? (
-        <p className="callout callout-warning" role="alert">{visualization.error.message}</p>
+        <p className="callout callout-warning" role="alert">
+          {visualization.error.message}
+        </p>
       ) : null}
 
       <section
@@ -502,8 +597,10 @@ export function RunPage() {
           "lifecycle-panel",
           isLive ? "lifecycle-live" : "",
           waitingForTyr ? "lifecycle-waiting" : "",
-          awaitingNextTurn ? "lifecycle-working" : "",
-        ].filter(Boolean).join(" ")}
+          agentWorking ? "lifecycle-working" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
         aria-labelledby="stages-title"
       >
         <div className="section-heading">
@@ -511,19 +608,21 @@ export function RunPage() {
           <span className="muted" role="status" aria-live="polite">
             {waitingForTyr
               ? "Waiting for Tyr"
-              : awaitingNextTurn
+              : agentWorking
                 ? "Agent working"
                 : currentPhaseLabel(run, visualization.data?.phases)}
           </span>
         </div>
-        {visualization.isLoading ? <p className="secondary">Loading run stages…</p> : null}
+        {visualization.isLoading ? (
+          <p className="secondary">Loading run stages…</p>
+        ) : null}
         <ol className="run-stages" aria-label="Run stages">
           {(visualization.data?.phases ?? []).map((phase) => {
             const active = phase.state === "active";
             const statusText = stageStatusLabel(
               phase.state,
               waitingForTyr,
-              awaitingNextTurn,
+              agentWorking,
               active,
             );
             return (
@@ -533,14 +632,20 @@ export function RunPage() {
                   "run-stage",
                   `stage-${phase.state}`,
                   active && waitingForTyr ? "stage-waiting" : "",
-                  active && awaitingNextTurn ? "stage-working" : "",
-                ].filter(Boolean).join(" ")}
+                  active && agentWorking ? "stage-working" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
                 aria-current={active ? "step" : undefined}
-                title={statusText ? `${phase.label}: ${statusText}` : phase.label}
+                title={
+                  statusText ? `${phase.label}: ${statusText}` : phase.label
+                }
               >
                 <span className="stage-marker" aria-hidden="true" />
                 <strong>{phase.label}</strong>
-                {statusText ? <span className="stage-state">{statusText}</span> : null}
+                {statusText ? (
+                  <span className="stage-state">{statusText}</span>
+                ) : null}
               </li>
             );
           })}
@@ -560,18 +665,35 @@ export function RunPage() {
             <p className="eyebrow">Run history</p>
             <h2 id="turns-title">Updates</h2>
           </div>
-          <span className="turn-count mono">{turns.data?.latestSequence ?? 0} updates persisted</span>
+          <span className="turn-count mono">
+            {turns.data?.latestSequence ?? 0} updates persisted
+          </span>
         </div>
         {turns.data?.nextCursor ? (
-          <button className="button button-secondary" type="button" disabled={loadingOlder} onClick={() => void loadOlder()}>
-            {loadingOlder ? "Loading earlier updates…" : `Load ${turns.data.omittedBefore} earlier updates`}
+          <button
+            className="button button-secondary"
+            type="button"
+            disabled={loadingOlder}
+            onClick={() => void loadOlder()}
+          >
+            {loadingOlder
+              ? "Loading earlier updates…"
+              : `Load ${turns.data.omittedBefore} earlier updates`}
           </button>
         ) : null}
-        {turns.isLoading ? <p className="secondary">Loading persisted updates…</p> : null}
-        {turns.error ? <p className="callout callout-warning" role="alert">{turns.error.message}</p> : null}
+        {turns.isLoading ? (
+          <p className="secondary">Loading persisted updates…</p>
+        ) : null}
+        {turns.error ? (
+          <p className="callout callout-warning" role="alert">
+            {turns.error.message}
+          </p>
+        ) : null}
         {!turns.isLoading && !allTurns.length ? (
           <p className="empty-state run-empty">
-            {isLive ? "Waiting for the first update…" : "No updates have been persisted yet."}
+            {isLive
+              ? "Waiting for the first update…"
+              : "No updates have been persisted yet."}
           </p>
         ) : null}
         <ol className="turn-list" aria-label="Run updates">
@@ -584,7 +706,9 @@ export function RunPage() {
               flash={flashIds.has(turn.id)}
               now={now}
               scientistIteration={
-                turn.caseId ? scientistIterationByCaseId.get(turn.caseId) : undefined
+                turn.caseId
+                  ? scientistIterationByCaseId.get(turn.caseId)
+                  : undefined
               }
             />
           ))}
@@ -641,7 +765,10 @@ function Turn({
     ? resultDisplay(turn.verdict, turn.objectiveStatus, turn.outcome)
     : null;
   const status = evaluationResult ?? {
-    label: label(turn.status),
+    label:
+      scientistGeneration && turn.status === "generating"
+        ? "Agent working"
+        : label(turn.status),
     tone: tone(turn.status),
   };
   const discovered = discoveryResult ? discoveryFields(turn.agentMessage) : [];
@@ -656,10 +783,15 @@ function Turn({
         evaluation ? `verdict-${evaluationResult?.className ?? "unknown"}` : "",
         discoveryResult ? "turn-discovery" : "",
         turn.status === "failed" || turn.status === "blocked"
-          ? evaluationResult?.className === "protected" ? "" : "turn-failed"
+          ? evaluationResult?.className === "protected"
+            ? ""
+            : "turn-failed"
           : "",
         flash ? "turn-flash" : "",
-      ].filter(Boolean).join(" ")}
+        turn.status === "generating" ? "turn-generating" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
       data-turn-id={turn.id}
     >
       <div className="turn-header">
@@ -673,12 +805,17 @@ function Turn({
         </div>
         <div className="turn-header-side">
           <p className="turn-timing mono">
-            <time dateTime={turn.occurredAt ?? undefined} title={turn.occurredAt ?? undefined}>
+            <time
+              dateTime={turn.occurredAt ?? undefined}
+              title={turn.occurredAt ?? undefined}
+            >
               {formatTimestamp(turn.occurredAt)}
             </time>
             {waiting && waitMs != null ? (
               <>
-                <span className="turn-timing-sep" aria-hidden="true">|</span>
+                <span className="turn-timing-sep" aria-hidden="true">
+                  |
+                </span>
                 <span className="turn-wait turn-wait-live" aria-live="polite">
                   {formatDuration(waitMs)}
                 </span>
@@ -686,7 +823,9 @@ function Turn({
             ) : null}
             {!waiting && waitMs != null ? (
               <>
-                <span className="turn-timing-sep" aria-hidden="true">|</span>
+                <span className="turn-timing-sep" aria-hidden="true">
+                  |
+                </span>
                 <span className="turn-wait" title={turn.repliedAt ?? undefined}>
                   {formatWaited(waitMs)}
                 </span>
@@ -700,10 +839,19 @@ function Turn({
           />
         </div>
       </div>
+      {scientistGeneration && turn.status === "generating" ? (
+        <div className="turn-working-progress" aria-hidden="true">
+          <span />
+        </div>
+      ) : null}
       {evaluation ? (
         <div className="turn-messages turn-messages-single">
-          <article className={`turn-message evaluation-message verdict-${evaluationResult?.className ?? "unknown"}`}>
-            <p className="turn-speaker"><span aria-hidden="true">A</span>Case assessment</p>
+          <article
+            className={`turn-message evaluation-message verdict-${evaluationResult?.className ?? "unknown"}`}
+          >
+            <p className="turn-speaker">
+              <span aria-hidden="true">A</span>Case assessment
+            </p>
             <dl className="evaluation-facts">
               <div>
                 <dt>Objective</dt>
@@ -714,15 +862,24 @@ function Turn({
                 <dd>{label(turn.outcome)}</dd>
               </div>
             </dl>
-            <MarkdownMessage content={turn.assessmentSummary ?? turn.agentMessage} />
+            <MarkdownMessage
+              content={turn.assessmentSummary ?? turn.agentMessage}
+            />
           </article>
         </div>
       ) : discoveryResult ? (
         <div className="turn-messages turn-messages-single">
-          <article className={`turn-message discovery-message status-${turn.status}`}>
-            <p className="turn-speaker"><span aria-hidden="true">D</span>Discovery</p>
+          <article
+            className={`turn-message discovery-message status-${turn.status}`}
+          >
+            <p className="turn-speaker">
+              <span aria-hidden="true">D</span>Discovery
+            </p>
             {discovered.length ? (
-              <dl className="discovery-variable-list" aria-label="Discovered variables">
+              <dl
+                className="discovery-variable-list"
+                aria-label="Discovered variables"
+              >
                 {discovered.map((field) => (
                   <div key={field.name} className="discovery-variable-row">
                     <dt className="mono">{field.name}</dt>
@@ -737,19 +894,52 @@ function Turn({
         </div>
       ) : scientistGeneration ? (
         <div className="turn-messages turn-messages-single">
-          <article className={`turn-message scientist-message status-${turn.status}`}>
-            <p className="turn-speaker"><span aria-hidden="true">S</span>Scientist</p>
+          <article
+            className={`turn-message scientist-message status-${turn.status}`}
+          >
+            <p className="turn-speaker">
+              <span aria-hidden="true">S</span>Scientist
+            </p>
+            {turn.historyCaseIds ? (
+              <div
+                className="scientist-history"
+                aria-label="Tests used from history"
+              >
+                <p className="scientist-history-label">
+                  Tests used from history
+                </p>
+                {turn.historyCaseIds.length ? (
+                  <ul className="scientist-history-list">
+                    {turn.historyCaseIds.map((caseId) => (
+                      <li key={caseId} className="mono">
+                        {caseId}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="scientist-history-empty">
+                    No prior tests were available.
+                  </p>
+                )}
+              </div>
+            ) : null}
             <MarkdownMessage content={turn.agentMessage} />
           </article>
         </div>
       ) : (
         <div className="turn-messages">
           <article className="turn-message agent-message">
-            <p className="turn-speaker"><span aria-hidden="true">A</span>Agent</p>
+            <p className="turn-speaker">
+              <span aria-hidden="true">A</span>Agent
+            </p>
             <MarkdownMessage content={turn.agentMessage} />
           </article>
-          <article className={`turn-message tyr-message${waiting ? " tyr-waiting-panel" : ""}`}>
-            <p className="turn-speaker"><span aria-hidden="true">T</span>Tyr network</p>
+          <article
+            className={`turn-message tyr-message${waiting ? " tyr-waiting-panel" : ""}`}
+          >
+            <p className="turn-speaker">
+              <span aria-hidden="true">T</span>Tyr network
+            </p>
             {turn.tyrMessage ? (
               <MarkdownMessage content={turn.tyrMessage} />
             ) : waiting ? (
@@ -791,7 +981,9 @@ function CaseList({
 }) {
   if (!cases.length) return null;
   const ordered = [...cases].sort((left, right) => left.order - right.order);
-  const done = completedCount ?? ordered.filter((item) => item.state === "completed").length;
+  const done =
+    completedCount ??
+    ordered.filter((item) => item.state === "completed").length;
   const total = totalCount ?? ordered.length;
   return (
     <details className="case-list">
@@ -806,8 +998,14 @@ function CaseList({
           const status = caseStatus(item);
           return (
             <li key={item.caseId} className="case-list-item">
-              <span className="case-list-id mono" title={item.caseId}>{item.caseId}</span>
-              <StatusBadge label={status.label} tone={status.tone} pulse={item.state === "active"} />
+              <span className="case-list-id mono" title={item.caseId}>
+                {item.caseId}
+              </span>
+              <StatusBadge
+                label={status.label}
+                tone={status.tone}
+                pulse={item.state === "active"}
+              />
             </li>
           );
         })}

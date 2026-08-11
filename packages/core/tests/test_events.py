@@ -39,6 +39,21 @@ def test_activity_accepts_safe_camel_case_contract_and_explicit_utc() -> None:
     assert item.model_dump(by_alias=True)["detailAvailability"] == Availability.AVAILABLE
 
 
+def test_activity_related_case_ids_are_unique_bounded_and_safe() -> None:
+    item = RunActivity.model_validate(activity(relatedCaseIds=["case-alpha", "case-beta"]))
+
+    assert item.related_case_ids == ["case-alpha", "case-beta"]
+
+    with pytest.raises(ValidationError):
+        RunActivity.model_validate(activity(relatedCaseIds=["case-alpha", "case-alpha"]))
+    with pytest.raises(ValidationError):
+        RunActivity.model_validate(
+            activity(relatedCaseIds=[f"case-{index}" for index in range(101)])
+        )
+    with pytest.raises(ValidationError):
+        RunActivity.model_validate(activity(relatedCaseIds=["/srv/gamr/raw.json"]))
+
+
 @pytest.mark.parametrize(
     "field,value",
     [

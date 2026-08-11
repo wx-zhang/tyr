@@ -453,6 +453,8 @@ export interface components {
             summary: string;
             /** Evidenceids */
             evidenceIds: string[];
+            /** Relatedcaseids */
+            relatedCaseIds?: string[];
             detailAvailability: components["schemas"]["Availability"];
         };
         /** ActivityPageResponse */
@@ -599,6 +601,16 @@ export interface components {
              * @default 0
              */
             scientistIterations: number;
+            /**
+             * Historytestruns
+             * @default 10
+             */
+            historyTestRuns: number;
+            /**
+             * Historyscientistruns
+             * @default 5
+             */
+            historyScientistRuns: number;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -683,6 +695,10 @@ export interface components {
             caseIds?: string[] | null;
             /** Scientistiterations */
             scientistIterations?: number | null;
+            /** Historytestruns */
+            historyTestRuns?: number | null;
+            /** Historyscientistruns */
+            historyScientistRuns?: number | null;
         };
         /** RunTurnPageResponse */
         RunTurnPageResponse: {
@@ -730,6 +746,8 @@ export interface components {
             outcome?: string | null;
             /** Assessmentsummary */
             assessmentSummary?: string | null;
+            /** Historycaseids */
+            historyCaseIds?: string[];
         };
         /** RunVisualization */
         RunVisualization: {
@@ -773,6 +791,8 @@ export interface components {
             currentPhase?: string | null;
             /** Currentcaseids */
             currentCaseIds?: string[];
+            /** Executionmode */
+            executionMode: string;
         };
         /** ValidationError */
         ValidationError: {

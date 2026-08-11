@@ -28,6 +28,7 @@ from gamr_core import (
     PromptBundle,
     ResultSummary,
     RunActivity,
+    RunRecord,
     RunResult,
     RunState,
     Scenario,
@@ -178,6 +179,14 @@ class CaseRecord:
 
 
 @dataclass(frozen=True)
+class _HistorySource:
+    run_id: str
+    configuration: ExperimentConfig
+    created_at: datetime
+    result: RunResult
+
+
+@dataclass(frozen=True)
 class ProgressEvent:
     event_type: str
     run_id: str
@@ -186,6 +195,7 @@ class ProgressEvent:
     turn: int | None = None
     detail: str | None = None
     fields: tuple[tuple[str, str], ...] | None = None
+    history_case_ids: tuple[str, ...] = ()
 
 
 ProgressCallback = Callable[[ProgressEvent], None]
@@ -220,10 +230,11 @@ class ExperimentRunner:
         scenarios = self._select_scenarios(dataset, config)
         if target is None or model is None:
             raise ValueError("target and model providers are required")
+        execution_detail = "scientist-only" if not scenarios else f"{len(scenarios)} case(s)"
         self._emit(
             "run.started",
             identifier,
-            detail=f"{dataset.manifest.metadata.id} · {len(scenarios)} case(s)",
+            detail=f"{dataset.manifest.metadata.id} · {execution_detail}",
         )
 
         self._emit("tyr.connecting", identifier)
@@ -297,6 +308,13 @@ class ExperimentRunner:
             if case_error:
                 errors.append(case_error)
         if config.scientist_iterations:
+            history_records = (
+                self._load_configured_history(
+                    dataset, target_candidate, config, artifacts, identifier
+                )
+                if not scenarios
+                else []
+            )
             scientist_records, scientist_errors = await self._run_scientist(
                 dataset,
                 target_candidate,
@@ -306,7 +324,7 @@ class ExperimentRunner:
                 identifier,
                 artifacts,
                 conversation,
-                case_records,
+                history_records + case_records,
             )
             case_records.extend(scientist_records)
             errors.extend(scientist_errors)
@@ -406,8 +424,137 @@ class ExperimentRunner:
     ) -> list[CaseRecord]:
         payload = artifacts.read_json(source_run_id, "result.json")
         source_result = RunResult.model_validate(payload)
+        return ExperimentRunner._records_from_result(
+            dataset,
+            candidate,
+            artifacts,
+            source_run_id,
+            source_result,
+            source_result.configuration,
+            include_base=True,
+            include_scientist=True,
+        )
+
+    @staticmethod
+    def _load_configured_history(
+        dataset: LoadedDataset,
+        candidate: DiscoveryCandidate,
+        config: ExperimentConfig,
+        artifacts: ArtifactStore | None,
+        current_run_id: str,
+    ) -> list[CaseRecord]:
+        if artifacts is None or not (
+            config.history_test_runs or config.history_scientist_runs
+        ):
+            return []
+        list_run_ids = getattr(artifacts, "list_run_ids", None)
+        if not callable(list_run_ids):
+            return []
+        sources: list[_HistorySource] = []
+        terminal_states = {
+            RunState.COMPLETED,
+            RunState.FAILED,
+            RunState.CANCELLED,
+            RunState.INTERRUPTED,
+        }
+        for source_run_id in list_run_ids():
+            if source_run_id == current_run_id:
+                continue
+            try:
+                source_run = RunRecord.model_validate(
+                    artifacts.read_json(source_run_id, "run.json")
+                )
+                if source_run.state not in terminal_states:
+                    continue
+                source_result = RunResult.model_validate(
+                    artifacts.read_json(source_run_id, "result.json")
+                )
+            except (FileNotFoundError, TypeError, ValueError):
+                continue
+            if source_result.dataset.id != dataset.manifest.metadata.id:
+                continue
+            try:
+                base_case_ids = {
+                    scenario.metadata.id
+                    for scenario in ExperimentRunner._select_scenarios(
+                        dataset, source_run.configuration
+                    )
+                }
+            except ValueError:
+                continue
+            if not base_case_ids and not source_run.configuration.scientist_iterations:
+                continue
+            sources.append(
+                _HistorySource(
+                    source_run_id,
+                    source_run.configuration,
+                    source_run.created_at,
+                    source_result,
+                )
+            )
+
+        def latest_sources(
+            candidates: list[_HistorySource], count: int
+        ) -> set[str]:
+            return {
+                source.run_id
+                for source in sorted(
+                    candidates,
+                    key=lambda item: (item.created_at, item.run_id),
+                    reverse=True,
+                )[:count]
+            }
+
+        test_run_ids = latest_sources(
+            [
+                source
+                for source in sources
+                if ExperimentRunner._select_scenarios(dataset, source.configuration)
+            ],
+            config.history_test_runs,
+        )
+        scientist_run_ids = latest_sources(
+            [source for source in sources if source.configuration.scientist_iterations],
+            config.history_scientist_runs,
+        )
+        selected_sources = sorted(
+            [source for source in sources if source.run_id in test_run_ids | scientist_run_ids],
+            key=lambda item: (item.created_at, item.run_id),
+        )
+        records: list[CaseRecord] = []
+        for source in selected_sources:
+            records.extend(
+                ExperimentRunner._records_from_result(
+                    dataset,
+                    candidate,
+                    artifacts,
+                    source.run_id,
+                    source.result,
+                    source.configuration,
+                    include_base=source.run_id in test_run_ids,
+                    include_scientist=source.run_id in scientist_run_ids,
+                )
+            )
+        return records
+
+    @staticmethod
+    def _records_from_result(
+        dataset: LoadedDataset,
+        candidate: DiscoveryCandidate,
+        artifacts: ArtifactStore,
+        source_run_id: str,
+        source_result: RunResult,
+        source_configuration: ExperimentConfig,
+        *,
+        include_base: bool,
+        include_scientist: bool,
+    ) -> list[CaseRecord]:
         scenario_by_id: dict[str, Scenario] = {
             scenario.metadata.id: scenario for scenario in dataset.scenarios
+        }
+        base_case_ids = {
+            scenario.metadata.id
+            for scenario in ExperimentRunner._select_scenarios(dataset, source_configuration)
         }
         transcript_by_case: dict[str, list[dict[str, str]]] = {}
         for entry in artifacts.read_transcript(source_run_id):
@@ -428,6 +575,9 @@ class ExperimentRunner:
         values = ExperimentRunner._variables(dataset, candidate)
         records: list[CaseRecord] = []
         for case in source_result.cases:
+            is_base = case.scenario_id in base_case_ids
+            if (is_base and not include_base) or (not is_base and not include_scientist):
+                continue
             scenario = scenario_by_id.get(case.scenario_id)
             if scenario is None:
                 safe_id = _UNSAFE_ID_CHAR.sub("-", case.scenario_id)[:128] or "scenario"
@@ -509,7 +659,23 @@ class ExperimentRunner:
             else ""
         )
         for index in range(1, config.scientist_iterations + 1):
-            history = self._scientist_history(prior_records + records)
+            history_records = self._newest_history_records(prior_records + records)
+            history = self._scientist_history(history_records)
+            history_case_ids = tuple(
+                record.case.scenario_id for record in history_records
+            )[:100]
+            self._emit(
+                "scientist.history_used",
+                run_id,
+                phase="scientist",
+                turn=index,
+                detail=(
+                    f"Iteration {index} uses {len(history_records)} prior test(s)"
+                    if history_records
+                    else f"Iteration {index} has no prior tests"
+                ),
+                related_case_ids=history_case_ids,
+            )
             declared = ", ".join(f"{{{name}}}" for name in sorted(dataset.manifest.spec.variables))
             prompt = (
                 "Design one new QATestSearch scenario to probe a previously untested way "
@@ -966,7 +1132,9 @@ class ExperimentRunner:
                         phase=phase,
                         case_id=case_id,
                         turn=turn,
-                        detail=f"empty response ({diagnostics})" if diagnostics else "empty response",
+                        detail=(
+                            f"empty response ({diagnostics})" if diagnostics else "empty response"
+                        ),
                     )
                     self._write_raw(
                         artifacts,
@@ -1371,6 +1539,17 @@ class ExperimentRunner:
         )
 
     @staticmethod
+    def _newest_history_records(records: list[CaseRecord]) -> list[CaseRecord]:
+        newest: dict[str, CaseRecord] = {}
+        order: list[str] = []
+        for record in records:
+            scenario_id = record.case.scenario_id
+            if scenario_id not in newest:
+                order.append(scenario_id)
+            newest[scenario_id] = record
+        return [newest[scenario_id] for scenario_id in order]
+
+    @staticmethod
     def _scientist_history(records: list[CaseRecord]) -> str:
         if not records:
             return "none"
@@ -1465,6 +1644,7 @@ class ExperimentRunner:
         turn_id: str | None = None,
         detail: str | None = None,
         fields: tuple[tuple[str, str], ...] | None = None,
+        related_case_ids: tuple[str, ...] = (),
     ) -> None:
         sink = self._activity_sink
         if sink is not None:
@@ -1501,6 +1681,7 @@ class ExperimentRunner:
                         if event_type.startswith("assessment.")
                         else EvidenceType.EVENT
                     ),
+                    relatedCaseIds=list(related_case_ids),
                     metadata=metadata,
                 )
                 try:
@@ -1532,6 +1713,7 @@ class ExperimentRunner:
                     turn=turn,
                     detail=detail,
                     fields=fields,
+                    history_case_ids=related_case_ids,
                 )
             )
 

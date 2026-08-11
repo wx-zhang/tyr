@@ -164,7 +164,13 @@ def escape_unknown_template_placeholders(text: str, declared: set[str]) -> str:
 
 
 def render_template(text: str, values: dict[str, str]) -> str:
-    return text.format_map(values)
+    def replace(match: re.Match[str]) -> str:
+        name = match.group(1)
+        if name not in values:
+            raise KeyError(name)
+        return values[name]
+
+    return _PLACEHOLDER_RE.sub(replace, text).replace("{{", "{").replace("}}", "}")
 
 
 def validate_document(payload: dict[str, Any]) -> DatasetDocument:

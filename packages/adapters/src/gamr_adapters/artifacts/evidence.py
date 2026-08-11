@@ -78,6 +78,7 @@ class NormalizedTurn:
     objective_status: str | None = None
     outcome: str | None = None
     assessment_summary: str | None = None
+    history_case_ids: tuple[str, ...] = ()
 
 
 def _parse_occurred_at(value: object) -> datetime | None:
@@ -87,6 +88,16 @@ def _parse_occurred_at(value: object) -> datetime | None:
         return datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
         return None
+
+
+def _related_case_ids(value: dict[str, object]) -> tuple[str, ...]:
+    return _stored_case_ids(value.get("relatedCaseIds"))
+
+
+def _stored_case_ids(value: object) -> tuple[str, ...]:
+    if not isinstance(value, (list, tuple)):
+        return ()
+    return tuple(item for item in value if isinstance(item, str) and item.strip())
 
 
 def _activity_turn_times(bundle: Path) -> dict[str, dict[str, datetime]]:
@@ -184,10 +195,26 @@ def _scientist_turns_from_activity(
                     open_iteration = turn_meta
                     next_index = max(next_index, turn_meta + 1)
                 continue
+            history_case_ids = _related_case_ids(value)
+            if status == "scientist_history_used" or event_type == "scientist.history_used":
+                index = turn_meta or open_iteration or next_index
+                open_iteration = index
+                next_index = max(next_index, index + 1)
+                iterations[index] = {
+                    "id": str(value.get("id") or f"{run_id}-scientist-{index}"),
+                    "number": index,
+                    "status": "generating",
+                    "agent_message": message or "No prior tests were available.",
+                    "case_id": None,
+                    "occurred_at": occurred_at,
+                    "history_case_ids": history_case_ids,
+                }
+                continue
             if status == "scientist_failed" or event_type == "scientist.failed":
                 index = turn_meta or open_iteration or next_index
                 open_iteration = None
                 next_index = max(next_index, index + 1)
+                previous = iterations.get(index, {})
                 iterations[index] = {
                     "id": str(value.get("id") or f"{run_id}-scientist-{index}"),
                     "number": index,
@@ -195,12 +222,14 @@ def _scientist_turns_from_activity(
                     "agent_message": message or f"Scientist scenario {index} failed",
                     "case_id": None,
                     "occurred_at": occurred_at,
+                    "history_case_ids": previous.get("history_case_ids", ()),
                 }
                 continue
             if status == "scientist_scenario_ready" or event_type == "scientist.scenario_ready":
                 index = turn_meta or open_iteration or next_index
                 open_iteration = None
                 next_index = max(next_index, index + 1)
+                previous = iterations.get(index, {})
                 iterations[index] = {
                     "id": str(value.get("id") or f"{run_id}-scientist-{index}"),
                     "number": index,
@@ -208,6 +237,7 @@ def _scientist_turns_from_activity(
                     "agent_message": message or f"Scientist scenario {index} ready",
                     "case_id": activity_case_id,
                     "occurred_at": occurred_at,
+                    "history_case_ids": previous.get("history_case_ids", ()),
                 }
                 continue
     result_errors = _scientist_errors_from_result(root, secrets)
@@ -238,6 +268,7 @@ def _scientist_turns_from_activity(
                 tyr_message=None,
                 occurred_at=occurred_raw if isinstance(occurred_raw, datetime) else None,
                 replied_at=None,
+                history_case_ids=_stored_case_ids(item.get("history_case_ids", ())),
             )
         )
     return turns
@@ -336,12 +367,13 @@ def _stamp_discovery_after_chatter(
         if turn.occurred_at is not None:
             stamped.append(turn)
             continue
-        moments = [
-            item.replied_at or item.occurred_at
-            for item in conversation
-            if item.stage == "discovery" and (item.replied_at or item.occurred_at)
-        ]
-        moments = [moment for moment in moments if moment is not None]
+        moments: list[datetime] = []
+        for item in conversation:
+            if item.stage != "discovery":
+                continue
+            moment = item.replied_at or item.occurred_at
+            if moment is not None:
+                moments.append(moment)
         stamped.append(
             replace(turn, occurred_at=max(moments)) if moments else turn
         )
@@ -627,17 +659,6 @@ def normalize_turns(
     scientist = [replace(turn, update_type="scientist") for turn in scientist]
     evaluations = _evaluation_turns(root, run_id=run_id, secrets=secrets)
     discovery = _discovery_turn_from_artifact(root, run_id=run_id, secrets=secrets)
-    executed_scientist_cases = {
-        turn.case_id for turn in conversation if turn.stage == "scientist" and turn.case_id
-    }
-    executed_scientist_cases.update(
-        turn.case_id for turn in evaluations if turn.stage == "scientist" and turn.case_id
-    )
-    scientist = [
-        turn
-        for turn in scientist
-        if turn.status != "ready" or turn.case_id not in executed_scientist_cases
-    ]
     discovery = _stamp_discovery_after_chatter(discovery, conversation)
     combined = [*conversation, *scientist, *evaluations, *discovery]
     minimum = datetime.min.replace(tzinfo=UTC)
@@ -668,6 +689,7 @@ def normalize_turns(
             objective_status=turn.objective_status,
             outcome=turn.outcome,
             assessment_summary=turn.assessment_summary,
+            history_case_ids=turn.history_case_ids,
         )
         for index, turn in enumerate(ordered, 1)
     ]

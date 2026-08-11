@@ -270,6 +270,19 @@ def test_turn_normalization_includes_scientist_generation_events(tmp_path: Path)
             "runId": "run-1",
             "sequence": 11,
             "occurredAt": "2026-08-08T10:05:30Z",
+            "activityType": "phase",
+            "status": "scientist_history_used",
+            "phase": "scientist",
+            "summary": "Iteration 1 used 1 prior test",
+            "relatedCaseIds": ["case-alpha"],
+            "evidenceType": "event",
+            "metadata": {"eventType": "scientist.history_used", "turn": 1},
+        },
+        {
+            "id": "a-3",
+            "runId": "run-1",
+            "sequence": 12,
+            "occurredAt": "2026-08-08T10:05:45Z",
             "activityType": "error",
             "status": "scientist_failed",
             "phase": "scientist",
@@ -290,7 +303,8 @@ def test_turn_normalization_includes_scientist_generation_events(tmp_path: Path)
     assert scientist.status == "failed"
     assert "missing objective" in scientist.agent_message
     assert scientist.tyr_message is None
-    assert scientist.occurred_at == datetime(2026, 8, 8, 10, 5, 30, tzinfo=UTC)
+    assert scientist.occurred_at == datetime(2026, 8, 8, 10, 5, 45, tzinfo=UTC)
+    assert scientist.history_case_ids == ("case-alpha",)
     assert not any(turn.status == "generating" for turn in turns)
 
 
@@ -321,7 +335,9 @@ def test_turn_normalization_ignores_scientist_model_thinking(tmp_path: Path) -> 
     assert turns == []
 
 
-def test_turn_normalization_ignores_scientist_case_model_thinking(tmp_path: Path) -> None:
+def test_turn_normalization_keeps_scientist_generation_after_case_starts(
+    tmp_path: Path,
+) -> None:
     bundle = tmp_path / "scientist-case-thinking"
     bundle.mkdir()
     (bundle / "transcript.jsonl").write_text(
@@ -410,12 +426,14 @@ def test_turn_normalization_ignores_scientist_case_model_thinking(tmp_path: Path
 
     turns = normalize_turns(bundle, run_id="run-1")
 
-    assert len(turns) == 1
+    assert len(turns) == 2
     assert turns[0].stage == "scientist"
-    assert turns[0].status == "completed"
+    assert turns[0].update_type == "scientist"
+    assert turns[0].status == "ready"
     assert turns[0].case_id == "put-delivery-of-important-txt"
-    assert turns[0].agent_message == "Confirm that the source file exists."
-    assert not any(turn.status == "generating" for turn in turns)
+    assert turns[1].status == "completed"
+    assert turns[1].case_id == "put-delivery-of-important-txt"
+    assert turns[1].agent_message == "Confirm that the source file exists."
 
 
 def test_turn_normalization_includes_case_and_scientist_evaluations(tmp_path: Path) -> None:

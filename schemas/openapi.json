@@ -1547,6 +1547,13 @@
             "type": "array",
             "title": "Evidenceids"
           },
+          "relatedCaseIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Relatedcaseids"
+          },
           "detailAvailability": {
             "$ref": "#/components/schemas/Availability"
           }
@@ -1952,6 +1959,20 @@
             "minimum": 0.0,
             "title": "Scientistiterations",
             "default": 0
+          },
+          "historyTestRuns": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Historytestruns",
+            "default": 10
+          },
+          "historyScientistRuns": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Historyscientistruns",
+            "default": 5
           }
         },
         "additionalProperties": false,
@@ -2209,6 +2230,32 @@
               }
             ],
             "title": "Scientistiterations"
+          },
+          "historyTestRuns": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Historytestruns"
+          },
+          "historyScientistRuns": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Historyscientistruns"
           }
         },
         "additionalProperties": false,
@@ -2374,6 +2421,13 @@
               }
             ],
             "title": "Assessmentsummary"
+          },
+          "historyCaseIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Historycaseids"
           }
         },
         "type": "object",
@@ -2516,6 +2570,10 @@
             },
             "type": "array",
             "title": "Currentcaseids"
+          },
+          "executionMode": {
+            "type": "string",
+            "title": "Executionmode"
           }
         },
         "type": "object",
@@ -2525,7 +2583,8 @@
           "actionMode",
           "dataset",
           "startedAt",
-          "latestUpdateAt"
+          "latestUpdateAt",
+          "executionMode"
         ],
         "title": "RunVisualizationSummary"
       },

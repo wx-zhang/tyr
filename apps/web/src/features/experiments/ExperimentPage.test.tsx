@@ -7,9 +7,10 @@ import { ExperimentPage } from "./ExperimentPage";
 const navigate = vi.fn();
 
 vi.mock("react-router-dom", async () => {
-  const actual = await vi.importActual<typeof import("react-router-dom")>(
-    "react-router-dom",
-  );
+  const actual =
+    await vi.importActual<typeof import("react-router-dom")>(
+      "react-router-dom",
+    );
   return {
     ...actual,
     useNavigate: () => navigate,
@@ -69,28 +70,30 @@ function renderPage() {
 }
 
 function installFetch(onCreate?: (body: Record<string, unknown>) => void) {
-  const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = String(input);
-    if (url.includes("/api/v1/datasets/") && url.endsWith("/cases")) {
-      return { ok: true, json: async () => cases };
-    }
-    if (url.includes("/api/v1/datasets")) {
-      return { ok: true, json: async () => datasets };
-    }
-    if (url.includes("/api/v1/experiments") && init?.method === "POST") {
-      const body = JSON.parse(String(init.body)) as Record<string, unknown>;
-      onCreate?.(body);
-      return {
-        ok: true,
-        json: async () => ({
-          id: "exp-1",
-          name: body.name,
-          dataset: "first-plan",
-        }),
-      };
-    }
-    return { ok: false, status: 404, json: async () => ({}) };
-  });
+  const fetchMock = vi.fn(
+    async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/api/v1/datasets/") && url.endsWith("/cases")) {
+        return { ok: true, json: async () => cases };
+      }
+      if (url.includes("/api/v1/datasets")) {
+        return { ok: true, json: async () => datasets };
+      }
+      if (url.includes("/api/v1/experiments") && init?.method === "POST") {
+        const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+        onCreate?.(body);
+        return {
+          ok: true,
+          json: async () => ({
+            id: "exp-1",
+            name: body.name,
+            dataset: "first-plan",
+          }),
+        };
+      }
+      return { ok: false, status: 404, json: async () => ({}) };
+    },
+  );
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;
 }
@@ -114,6 +117,13 @@ it("creates the experiment via the API then redirects to details", async () => {
 
   expect(await screen.findByLabelText(/Case Alpha/)).toBeChecked();
   expect(screen.getByLabelText(/Case Beta/)).not.toBeChecked();
+  expect(screen.getByLabelText("Execute Test Cases")).toBeChecked();
+  expect(
+    screen
+      .getByLabelText("Execute Test Cases")
+      .compareDocumentPosition(screen.getByLabelText("Dataset")) &
+      Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
   expect(screen.getByLabelText("Actions Allowed")).toBeChecked();
 
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
@@ -128,6 +138,8 @@ it("creates the experiment via the API then redirects to details", async () => {
     actionMode: "approval_required",
     caseIds: ["case-a"],
     scientistIterations: 0,
+    historyTestRuns: 10,
+    historyScientistRuns: 5,
   });
 
   expect(
@@ -154,7 +166,7 @@ it("sends scientist iterations when the operator sets them", async () => {
   ).toBeInTheDocument();
   expect(
     screen.getByRole("tooltip", {
-      name: /scientist stage asks the model to invent new follow-up scenarios/i,
+      name: /generate-and-run cycles for the scientist stage/i,
     }),
   ).toBeInTheDocument();
   fireEvent.change(screen.getByLabelText("Scientist iterations"), {
@@ -170,6 +182,45 @@ it("sends scientist iterations when the operator sets them", async () => {
   expect(createBodies[0]).toMatchObject({
     scientistIterations: 2,
     caseIds: ["case-a"],
+  });
+});
+
+it("sends configured scientist history windows", async () => {
+  const createBodies: Record<string, unknown>[] = [];
+  installFetch((body) => {
+    createBodies.push(body);
+  });
+
+  renderPage();
+  expect(await screen.findByLabelText(/Case Alpha/)).toBeChecked();
+  fireEvent.click(screen.getByLabelText("Execute Test Cases"));
+  expect(
+    screen.getByRole("heading", { name: "Scientist history" }),
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByRole("heading", { name: "Test cases" }),
+  ).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("Dataset")).not.toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("Scientist iterations"), {
+    target: { value: "1" },
+  });
+  fireEvent.change(screen.getByLabelText("Test-case runs"), {
+    target: { value: "7" },
+  });
+  fireEvent.change(screen.getByLabelText("Scientist runs"), {
+    target: { value: "3" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+  await waitFor(() => {
+    expect(navigate).toHaveBeenCalledWith("/experiments/exp-1");
+  });
+
+  expect(createBodies[0]).toMatchObject({
+    caseIds: [],
+    scientistIterations: 1,
+    historyTestRuns: 7,
+    historyScientistRuns: 3,
   });
 });
 
@@ -220,7 +271,10 @@ it("allows skipping seed cases to jump straight to the scientist stage", async (
   renderPage();
 
   expect(await screen.findByLabelText(/Case Alpha/)).toBeChecked();
-  fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+  fireEvent.click(screen.getByLabelText("Execute Test Cases"));
+  expect(
+    screen.getByRole("heading", { name: "Scientist history" }),
+  ).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
 
   fireEvent.change(screen.getByLabelText("Scientist iterations"), {
@@ -244,7 +298,9 @@ it("hides and shows the test case explorer", async () => {
   renderPage();
 
   expect(await screen.findByLabelText(/Case Alpha/)).toBeChecked();
-  expect(screen.getByRole("heading", { name: "Test cases" })).toBeInTheDocument();
+  expect(
+    screen.getByRole("heading", { name: "Test cases" }),
+  ).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole("button", { name: "Hide" }));
 
@@ -259,6 +315,8 @@ it("hides and shows the test case explorer", async () => {
 
   fireEvent.click(screen.getByRole("button", { name: "Show test cases" }));
 
-  expect(screen.getByRole("heading", { name: "Test cases" })).toBeInTheDocument();
+  expect(
+    screen.getByRole("heading", { name: "Test cases" }),
+  ).toBeInTheDocument();
   expect(screen.getByLabelText(/Case Alpha/)).toBeChecked();
 });

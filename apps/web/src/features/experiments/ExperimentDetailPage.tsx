@@ -24,8 +24,12 @@ export function ExperimentDetailPage() {
 
   const config = experiment.data?.configuration;
   const actionMode = config?.actionMode ?? "read_only";
-  const caseIds = config?.caseIds ?? [];
+  const configuredCaseIds = config?.caseIds;
+  const caseIds = configuredCaseIds ?? [];
   const scientistIterations = config?.scientistIterations ?? 0;
+  const historyTestRuns = config?.historyTestRuns ?? 10;
+  const historyScientistRuns = config?.historyScientistRuns ?? 5;
+  const scientistOnly = configuredCaseIds?.length === 0 && scientistIterations > 0;
 
   return (
     <section className="section-stack">
@@ -74,6 +78,10 @@ export function ExperimentDetailPage() {
                 <dd>{modeLabel(actionMode)}</dd>
               </div>
               <div className="detail-row">
+                <dt>Execution mode</dt>
+                <dd>{scientistOnly ? "Scientist only" : "Test cases"}</dd>
+              </div>
+              <div className="detail-row">
                 <dt>Cases</dt>
                 <dd className="mono">
                   {caseIds.length > 0 ? caseIds.join(", ") : "Dataset defaults"}
@@ -84,6 +92,14 @@ export function ExperimentDetailPage() {
                 <dd className="mono tabular">
                   {scientistIterations > 0 ? scientistIterations : "0 (off)"}
                 </dd>
+              </div>
+              <div className="detail-row">
+                <dt>Test-case history runs</dt>
+                <dd className="mono tabular">{historyTestRuns}</dd>
+              </div>
+              <div className="detail-row">
+                <dt>Scientist history runs</dt>
+                <dd className="mono tabular">{historyScientistRuns}</dd>
               </div>
             </dl>
           )}

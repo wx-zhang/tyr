@@ -104,6 +104,8 @@ export type Run = {
     discoveryTurns: number;
     caseIds?: string[] | null;
     scientistIterations: number;
+    historyTestRuns: number;
+    historyScientistRuns: number;
   };
   resultPath?: string | null;
   createdAt?: string | null;
@@ -197,6 +199,8 @@ export async function createExperiment(payload: {
   actionMode: "read_only" | "approval_required";
   caseIds: string[];
   scientistIterations?: number;
+  historyTestRuns?: number;
+  historyScientistRuns?: number;
 }): Promise<Experiment> {
   const response = await fetch(`${apiOrigin}/api/v1/experiments`, {
     method: "POST",

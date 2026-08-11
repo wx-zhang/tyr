@@ -75,7 +75,7 @@ def browser_safe_activity(
         if isinstance(activity, RunActivity)
         else activity
     )
-    return {
+    safe = {
         "id": browser_safe_value(value.get("id"), secrets),
         "sequence": browser_safe_value(value.get("sequence"), secrets),
         "occurredAt": browser_safe_value(value.get("occurredAt"), secrets),
@@ -93,6 +93,10 @@ def browser_safe_activity(
         "evidenceIds": browser_safe_value(value.get("evidenceRefs", []), secrets),
         "detailAvailability": browser_safe_value(value.get("detailAvailability"), secrets),
     }
+    related_case_ids = value.get("relatedCaseIds")
+    if isinstance(related_case_ids, list) and related_case_ids:
+        safe["relatedCaseIds"] = browser_safe_value(related_case_ids, secrets)
+    return safe
 
 
 def browser_safe_evidence(evidence: Any, *, secrets: Iterable[str] = ()) -> dict[str, object]:

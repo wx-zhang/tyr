@@ -5,7 +5,7 @@
 The selected run route presents four synchronized views:
 
 1. Progress overview with exact run/action state, phase and case progress, timestamps, blockers,
-   unsettled Tyr work, and pending approval count.
+   unsettled Tyr work, pending approval count, and the derived Test cases or Scientist only mode.
 2. Cursor-bounded chronological Updates timeline with authoritative sequence retained separately
    from the rendered or filtered order.
 3. Native SVG observed-relationship graph plus a complete semantic relationship list.
@@ -40,6 +40,10 @@ stable IDs. Overall run state and approval attention remain visible regardless o
 - Merge snapshots and SSE notifications by stable activity ID and sequence. Never display duplicates.
 - Connected, reconnecting, stale, and disconnected states use visible text. Known persisted state
   remains visible during interruption.
+- Scientist generation entries show the case IDs used from run history. Scientist-only entries show
+  an explicit “No prior tests were available” state when the history is empty.
+- The Updates section keeps the selected test-case list visible as persistent run context while new
+  timeline messages arrive or replace the bounded latest page.
 - A resync-required signal fetches the persisted REST snapshot/page after the last known sequence;
   it does not discard known state or request an unbounded SSE backlog.
 

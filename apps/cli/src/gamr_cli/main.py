@@ -116,6 +116,20 @@ def run_experiment(
     scientist_iterations: int = typer.Option(
         0, "--scientist-iterations", min=0, help="Generate and run bounded follow-up scenarios."
     ),
+    history_test_runs: int = typer.Option(
+        10,
+        "--history-test-runs",
+        min=0,
+        max=100,
+        help="Use this many recent test-case runs as history.",
+    ),
+    history_scientist_runs: int = typer.Option(
+        5,
+        "--history-scientist-runs",
+        min=0,
+        max=100,
+        help="Use this many recent scientist runs as history.",
+    ),
 ) -> None:
     """Run a dataset through the shared engine and write a JSON bundle."""
 
@@ -184,6 +198,8 @@ def run_experiment(
         discoveryTurns=20,
         caseIds=selected_case_ids,
         scientistIterations=scientist_iterations,
+        historyTestRuns=history_test_runs,
+        historyScientistRuns=history_scientist_runs,
     )
     run_id = new_id()
     started_at = datetime.now(UTC)

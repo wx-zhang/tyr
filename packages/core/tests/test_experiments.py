@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 
 import pytest
-from gamr_core import ExperimentRecord, RunRecord, RunSource, RunState
+from gamr_core import ExperimentConfig, ExperimentRecord, RunRecord, RunSource, RunState
 from pydantic import ValidationError
 
 
@@ -40,3 +40,25 @@ def test_run_record_rejects_unsafe_result_path() -> None:
             updatedAt=datetime.now(UTC),
             resultPath="/tmp/result.json",
         )
+
+
+def test_scientist_only_configuration_requires_iterations() -> None:
+    with pytest.raises(ValidationError, match="scientist iterations"):
+        ExperimentConfig(caseIds=[])
+
+    configuration = ExperimentConfig(caseIds=[], scientistIterations=1)
+    assert configuration.case_ids == []
+
+
+def test_history_run_windows_have_bounded_defaults() -> None:
+    configuration = ExperimentConfig()
+
+    assert configuration.history_test_runs == 10
+    assert configuration.history_scientist_runs == 5
+
+
+def test_history_run_windows_reject_values_above_the_bound() -> None:
+    with pytest.raises(ValidationError):
+        ExperimentConfig(historyTestRuns=101)
+    with pytest.raises(ValidationError):
+        ExperimentConfig(historyScientistRuns=101)

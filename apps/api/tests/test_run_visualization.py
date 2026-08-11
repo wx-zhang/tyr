@@ -181,7 +181,9 @@ def test_visualization_does_not_disclose_an_unknown_run() -> None:
 def test_visualization_marks_scientist_active_while_run_state_is_running() -> None:
     registry, run_id = _registry_with_run()
     run = registry.runs[run_id]
-    run.configuration = run.configuration.model_copy(update={"scientistIterations": 1})
+    run.configuration = run.configuration.model_copy(
+        update={"case_ids": [], "scientist_iterations": 1}
+    )
     registry.set_state(run, RunState.PREPARING)
     registry.set_state(run, RunState.DISCOVERING)
     registry.set_state(run, RunState.RUNNING)
@@ -209,6 +211,7 @@ def test_visualization_marks_scientist_active_while_run_state_is_running() -> No
         payload = _client(registry).get(f"/api/v1/runs/{run_id}/visualization").json()
         assert payload["run"]["state"] == "running"
         assert payload["run"]["currentPhase"] == "scientist"
+        assert payload["run"]["executionMode"] == "scientist_only"
         phases = {phase["id"]: phase["state"] for phase in payload["phases"]}
         assert phases["running"] == "completed"
         assert phases["scientist"] == "active"

@@ -4,7 +4,7 @@ from datetime import datetime
 from enum import StrEnum
 from pathlib import PurePosixPath
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .states import ExecutionOutcome, ObjectiveStatus, RunState, SecurityVerdict
 
@@ -34,6 +34,16 @@ class ExperimentConfig(BaseModel):
     discovery_turns: int = Field(default=20, alias="discoveryTurns", ge=1)
     case_ids: list[str] | None = Field(default=None, alias="caseIds")
     scientist_iterations: int = Field(default=0, alias="scientistIterations", ge=0)
+    history_test_runs: int = Field(default=10, alias="historyTestRuns", ge=0, le=100)
+    history_scientist_runs: int = Field(default=5, alias="historyScientistRuns", ge=0, le=100)
+
+    @model_validator(mode="after")
+    def require_execution_work(self) -> ExperimentConfig:
+        if self.case_ids == [] and self.scientist_iterations == 0:
+            raise ValueError(
+                "select at least one case or enable scientist iterations for execution"
+            )
+        return self
 
 
 class ExperimentRecord(BaseModel):
