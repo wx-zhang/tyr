@@ -14,7 +14,8 @@ External I/O is async where practical. Redact credentials before persistence. Ty
 providers, `datasets/` owns confined JSON loading, and `artifacts/` owns
 redacted run bundles, canonical activity writes, and legacy normalization.
 `collector.py` owns authenticated exact and timestamp/filename collector lookup,
-bounded retries, and digest-verified downloads; `collector_html.py` parses the admin HTML.
+bounded retries, and digest-verified file and retained request-body downloads;
+`collector_html.py` parses the admin HTML without retaining credentials or headers.
 `artifacts/query.py` owns bounded in-memory activity and relationship projections derived from bundles.
 
 Canonical artifact and configured-secret regressions live in

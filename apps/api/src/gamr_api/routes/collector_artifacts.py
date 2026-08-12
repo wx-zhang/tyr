@@ -3,13 +3,13 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Response
 from gamr_adapters.collector import CollectorClient, CollectorError
 from gamr_adapters.config import Settings
-from gamr_engine.collector_verification import CollectorFile
+from gamr_engine.collector_verification import CollectorFile, CollectorRequirement
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..dependencies import get_registry, get_settings, require_run_evidence_access
@@ -22,10 +22,13 @@ _MAX_PREVIEW_BYTES = 5 * 1024 * 1024
 _IMAGE_PREVIEW_TYPES = {"image/gif", "image/jpeg", "image/png", "image/webp"}
 _TEXT_PREVIEW_TYPES = {
     "application/json",
+    "application/xml",
     "text/csv",
     "text/markdown",
     "text/plain",
+    "text/xml",
 }
+_REMOTE_FILES_CACHE: dict[tuple[str, str, str], list[CollectorFile]] = {}
 
 
 class CollectorFileResponse(BaseModel):
@@ -91,32 +94,37 @@ def _files(manifest: dict[str, Any]) -> list[dict[str, object]]:
     "/{run_id}/collector-verifications",
     response_model=list[CollectorVerificationResponse],
 )
-def collector_verifications(
+async def collector_verifications(
     run_id: str,
     registry: InMemoryRegistry = Depends(get_registry),
     settings: Settings = Depends(get_settings),
 ) -> list[dict[str, object]]:
     require_run_evidence_access(run_id, registry)
-    return [
-        {
-            "caseId": value.get("caseId"),
-            "requirement": value.get("requirement"),
-            "status": value.get("status"),
-            "requestIds": [
-                item.get("request_id")
-                for item in value.get("requests", [])
-                if isinstance(item, dict) and item.get("request_id")
-            ],
-            "files": _files(value),
-            "verifiedAt": value.get("verifiedAt"),
-        }
-        for value in _manifests(run_id, settings)
-    ]
+    results: list[dict[str, object]] = []
+    for value in _manifests(run_id, settings):
+        files = _files(value)
+        files.extend(await _remote_files(value, settings))
+        results.append(
+            {
+                "caseId": value.get("caseId"),
+                "requirement": value.get("requirement"),
+                "status": value.get("status"),
+                "requestIds": [
+                    item.get("request_id")
+                    for item in value.get("requests", [])
+                    if isinstance(item, dict) and item.get("request_id")
+                ],
+                "files": files,
+                "verifiedAt": value.get("verifiedAt"),
+            }
+        )
+    return results
 
 
-def _find_file(run_id: str, file_id: str, settings: Settings) -> CollectorFile:
+async def _find_file(run_id: str, file_id: str, settings: Settings) -> CollectorFile:
     for manifest in _manifests(run_id, settings):
-        for item in _files(manifest):
+        items = [*_files(manifest), *(await _remote_files(manifest, settings))]
+        for item in items:
             if item.get("fileId") == file_id and item.get("downloadAvailable"):
                 size = item.get("size")
                 if not isinstance(size, int):
@@ -129,6 +137,65 @@ def _find_file(run_id: str, file_id: str, settings: Settings) -> CollectorFile:
                     str(item["sha256"]),
                 )
     raise not_found("collector file")
+
+
+async def _remote_files(
+    manifest: dict[str, Any], settings: Settings
+) -> list[dict[str, object]]:
+    existing_ids = {item.get("fileId") for item in _files(manifest)}
+    requests: list[tuple[str, CollectorRequirement]] = []
+    for item in manifest.get("requests", []):
+        if not isinstance(item, dict) or item.get("files"):
+            continue
+        request_id = item.get("request_id")
+        requirement = item.get("requirement") or manifest.get("requirement")
+        if not isinstance(request_id, str) or not re.fullmatch(r"[0-9a-f]{32}", request_id):
+            continue
+        if requirement not in {"request", "file"}:
+            continue
+        requests.append((request_id, cast(CollectorRequirement, requirement)))
+    files: list[dict[str, object]] = []
+    for request_id, requirement in requests:
+        for file in await _verified_remote_files(request_id, requirement, settings):
+            if file.file_id not in existing_ids:
+                files.append(_file_response(file))
+                existing_ids.add(file.file_id)
+    return files
+
+
+async def _verified_remote_files(
+    request_id: str, requirement: CollectorRequirement, settings: Settings
+) -> list[CollectorFile]:
+    cache_key = (settings.collector_base_url, request_id, requirement)
+    if cache_key in _REMOTE_FILES_CACHE:
+        return _REMOTE_FILES_CACHE[cache_key]
+    if not settings.collector_username or not settings.collector_password:
+        return []
+    client = CollectorClient(
+        settings.collector_base_url,
+        settings.collector_username,
+        settings.collector_password,
+    )
+    try:
+        try:
+            verified = await client.verify(request_id, requirement)
+        except (CollectorError, httpx.HTTPError, OSError):
+            return []
+    finally:
+        await client.aclose()
+    _REMOTE_FILES_CACHE[cache_key] = verified.files
+    return verified.files
+
+
+def _file_response(file: CollectorFile) -> dict[str, object]:
+    return {
+        "fileId": file.file_id,
+        "filename": file.filename,
+        "contentType": file.content_type,
+        "size": file.size,
+        "sha256": file.sha256,
+        "downloadAvailable": True,
+    }
 
 
 async def _download_file(file: CollectorFile, settings: Settings) -> bytes:
@@ -173,7 +240,7 @@ async def collector_file_preview(
     settings: Settings = Depends(get_settings),
 ) -> Response:
     require_run_evidence_access(run_id, registry)
-    file = _find_file(run_id, file_id, settings)
+    file = await _find_file(run_id, file_id, settings)
     media_type = _preview_media_type(file)
     if media_type is None:
         raise HTTPException(status_code=415, detail="Collector artifact preview is unsupported")
@@ -200,7 +267,7 @@ async def collector_file_download(
     settings: Settings = Depends(get_settings),
 ) -> Response:
     require_run_evidence_access(run_id, registry)
-    file = _find_file(run_id, file_id, settings)
+    file = await _find_file(run_id, file_id, settings)
     content = await _download_file(file, settings)
     filename = _SAFE_FILENAME.sub("-", Path(file.filename).name)[:180] or "artifact"
     return Response(

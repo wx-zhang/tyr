@@ -54,6 +54,9 @@ function previewKind(file: CollectorFile): "image" | "markdown" | "text" | null 
     contentType === "text/plain" ||
     contentType === "text/csv" ||
     contentType === "application/json" ||
+    contentType === "application/xml" ||
+    contentType === "text/xml" ||
+    extension === "xml" ||
     extension === "txt"
   ) {
     return "text";

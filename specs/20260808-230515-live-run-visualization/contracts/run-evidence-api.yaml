@@ -113,12 +113,12 @@ paths:
         - $ref: '#/components/parameters/RunId'
       responses:
         '200':
-          description: Collector verification and file metadata without credentials or bytes
+          description: Collector file and verified retained request-body metadata without credentials or bytes
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/runs/{run_id}/collector-files/{file_id}/preview:
     get:
-      summary: Preview one bounded supported collector file after remote verification
+      summary: Preview one bounded supported collector file or request body after remote verification
       parameters:
         - $ref: '#/components/parameters/RunId'
         - $ref: '#/components/parameters/FileId'
@@ -131,7 +131,7 @@ paths:
         '415': { description: Verified collector file type is not previewable }
   /api/v1/runs/{run_id}/collector-files/{file_id}/download:
     get:
-      summary: Download one run-confined collector file after remote verification
+      summary: Download one run-confined collector file or request body after remote verification
       parameters:
         - $ref: '#/components/parameters/RunId'
         - $ref: '#/components/parameters/FileId'

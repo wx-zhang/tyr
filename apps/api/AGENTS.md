@@ -24,6 +24,9 @@ filtered activity and observed relationship projections, and
 `routes/collector_artifacts.py` serves run-confined remote-backed previews and downloads. `dependencies.py`
 owns run-scoped evidence authorization and browser allowlists, and `registry.py`
 is the JSON-backed filesystem registry. `execution.py` owns the bounded in-process queue.
+Verified request-only manifests may hydrate immutable collector request-body metadata in memory;
+failed manifests with exact request IDs may recover verified remote files the same way. The route
+never rewrites historical run bundles.
 
 Security and cross-representation regressions live in
 `apps/api/tests/test_run_evidence_security.py`; SSE recovery remains covered by

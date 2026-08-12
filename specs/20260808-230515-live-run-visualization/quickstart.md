@@ -87,7 +87,10 @@ Verify with mocked typed API and SSE fixtures:
    `historyTestRuns` (default 10) and `historyScientistRuns` (default 5); only matching persisted
    terminal runs with result bundles are used.
 9. Collector evidence appears chronologically in Updates without a manual page refresh. Verified
-   text, Markdown, JSON, CSV, and raster images open in a bounded keyboard-accessible preview;
+   text, Markdown, JSON, XML, CSV, and raster images open in a bounded keyboard-accessible preview;
+   retained UTF-8 request bodies appear as request-body artifacts only when their reconstructed byte
+   length matches collector metadata and their digest is verified; decoded multipart summaries do
+   not invalidate quarantined files, and exact IDs recover files from historical failed manifests;
    unsupported and oversized files remain available only through the run-scoped download. A
    collector redirect, transient transport, 408, 425, 429, or 5xx failure is retried twice;
    redirected reads authenticate again, and exhaustion states the safe operation, attempt count,

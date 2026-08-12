@@ -32,7 +32,10 @@ omits it, GAMR accepts only one exact filename match captured during the origina
 Collector reads retry redirects, transient transport, 408, 425, 429, and 5xx failures twice before
 recording safe failure diagnostics. Each redirected retry authenticates again before reading.
 The live run page refreshes collector evidence automatically and places verified files in Updates,
-with bounded previews for common text, Markdown, JSON, CSV, and raster-image files.
+with bounded previews for common text, Markdown, JSON, XML, CSV, and raster-image files. Retained
+UTF-8 request bodies are verified by recorded byte length and SHA-256, then exposed as request-body
+artifacts through the same run-scoped preview and download controls. Decoded multipart summaries
+are not raw bodies; their independently verified quarantined files remain downloadable.
 
 By default, experiments are **read-only**. To let an experiment take real actions through Tyr, run
 with Actions Allowed (`--action-mode approval_required --allow-actions`); each action still needs an

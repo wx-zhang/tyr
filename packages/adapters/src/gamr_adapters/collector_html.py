@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import re
 from dataclasses import dataclass
 from datetime import datetime
@@ -83,6 +84,58 @@ class RequestsParser(HTMLParser):
         self.captured_at = None
 
 
+@dataclass(frozen=True)
+class ParsedRequestBody:
+    file: CollectorFile
+    content: bytes
+
+
+class RequestBodyParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.metadata: dict[str, str] = {}
+        self.label = ""
+        self.value = ""
+        self.capture: str | None = None
+        self.heading = ""
+        self.body_section = False
+        self.body_kind = ""
+        self.body_parts: list[str] = []
+
+    def handle_starttag(self, tag: str, _attrs: list[tuple[str, str | None]]) -> None:
+        if tag in {"dt", "dd", "h2"}:
+            self.capture = tag
+        elif tag == "span" and self.body_section:
+            self.capture = "span"
+        elif tag == "pre" and self.body_section:
+            self.capture = "pre"
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "dt":
+            self.label = self.value.strip()
+            self.value = ""
+        elif tag == "dd":
+            if self.label:
+                self.metadata[self.label] = self.value.strip()
+            self.label = ""
+            self.value = ""
+        elif tag == "h2":
+            self.body_section = self.heading.strip() == "Request body"
+            self.heading = ""
+        if self.capture == tag or self.capture == "pre" and tag == "pre":
+            self.capture = None
+
+    def handle_data(self, data: str) -> None:
+        if self.capture in {"dt", "dd"}:
+            self.value += data
+        elif self.capture == "h2":
+            self.heading += data
+        elif self.capture == "span":
+            self.body_kind += data
+        elif self.capture == "pre":
+            self.body_parts.append(data)
+
+
 def parse_files(html: str) -> list[CollectorFile]:
     parser = FilesParser()
     parser.feed(html)
@@ -103,3 +156,48 @@ def parse_files(html: str) -> list[CollectorFile]:
             )
         )
     return files
+
+
+def parse_request_body(html: str, request_id: str) -> ParsedRequestBody | None:
+    parser = RequestBodyParser()
+    parser.feed(html)
+    if parser.body_kind.strip().lower() == "multipart":
+        return None
+    length_text = parser.metadata.get("Content length")
+    if length_text is None or not parser.body_parts:
+        return None
+    try:
+        expected_size = int(length_text)
+    except ValueError as error:
+        raise ValueError("Collector request body size is malformed") from error
+    if expected_size == 0:
+        return None
+    body_text = "".join(parser.body_parts)
+    if "\ufffd" in body_text:
+        raise ValueError("Collector request body cannot be reconstructed losslessly")
+    content = body_text.encode("utf-8")
+    if len(content) != expected_size:
+        raise ValueError("Collector request body size mismatch")
+    content_type = parser.metadata.get("Content type", "application/octet-stream")
+    extension = _body_extension(content_type)
+    return ParsedRequestBody(
+        CollectorFile(
+            f"body-{request_id}",
+            f"request-body.{extension}",
+            content_type,
+            len(content),
+            hashlib.sha256(content).hexdigest(),
+        ),
+        content,
+    )
+
+
+def _body_extension(content_type: str) -> str:
+    media_type = content_type.split(";", 1)[0].strip().lower()
+    return {
+        "application/json": "json",
+        "application/xml": "xml",
+        "text/csv": "csv",
+        "text/markdown": "md",
+        "text/xml": "xml",
+    }.get(media_type, "txt")

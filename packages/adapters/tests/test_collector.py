@@ -22,6 +22,26 @@ DETAIL = """
 <a href="/tyrcli/collector/admin/files/file-1/download">Download</a></article>
 </section>
 """
+BODY_DETAIL = """
+<section><header><h2>Request envelope</h2></header><dl>
+<div><dt>Content type</dt><dd>application/xml</dd></div>
+<div><dt>Content length</dt><dd>{size}</dd></div>
+<div><dt>File count</dt><dd>0</dd></div>
+</dl></section>
+<section><header><h2>Request body</h2><span>binary-body</span></header>
+<pre class="payload-view payload-large">{body}</pre></section>
+<section><header><h2>Quarantined files</h2></header></section>
+"""
+MULTIPART_DETAIL = """
+<section><header><h2>Request envelope</h2></header><dl>
+<div><dt>Content type</dt><dd>multipart/form-data; boundary=test</dd></div>
+<div><dt>Content length</dt><dd>900</dd></div>
+<div><dt>File count</dt><dd>1</dd></div>
+</dl></section>
+<section><header><h2>Request body</h2><span>multipart</span></header>
+<pre class="payload-view payload-large">{{"message":["file upload"]}}</pre></section>
+{files}
+"""
 LEDGER = """
 <div class="request-ledger">
 <a class="request-row" href="/tyrcli/collector/admin/requests/{request_id}">
@@ -88,6 +108,81 @@ async def test_collector_rejects_digest_mismatch() -> None:
         )
         with pytest.raises(CollectorError, match="digest"):
             await client.verify("0123456789abcdef0123456789abcdef", "file")
+
+
+@pytest.mark.asyncio
+async def test_collector_verifies_and_downloads_inline_request_body() -> None:
+    content = b"&lt;delivery&gt;fake data&lt;/delivery&gt;"
+    request_id = "0123456789abcdef0123456789abcdef"
+    detail = BODY_DETAIL.format(size=len(b"<delivery>fake data</delivery>"), body=content.decode())
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/admin/login") and request.method == "GET":
+            return httpx.Response(200, text=LOGIN)
+        if request.url.path.endswith("/admin/login"):
+            return httpx.Response(302, headers={"location": "/admin/requests"})
+        return httpx.Response(200, text=detail)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http:
+        client = CollectorClient(
+            "https://collector.test/tyrcli/collector", "admin", "secret", http_client=http
+        )
+        result = await client.verify(request_id, "request")
+        body = result.files[0]
+        downloaded = await client.download(body)
+
+    assert body.file_id == f"body-{request_id}"
+    assert body.filename == "request-body.xml"
+    assert body.content_type == "application/xml"
+    assert body.size == len(downloaded)
+    assert hashlib.sha256(downloaded).hexdigest() == body.sha256
+    assert downloaded == b"<delivery>fake data</delivery>"
+
+
+@pytest.mark.asyncio
+async def test_collector_rejects_inline_body_length_mismatch() -> None:
+    detail = BODY_DETAIL.format(size=99, body="payload")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/admin/login") and request.method == "GET":
+            return httpx.Response(200, text=LOGIN)
+        if request.url.path.endswith("/admin/login"):
+            return httpx.Response(302)
+        return httpx.Response(200, text=detail)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http:
+        client = CollectorClient(
+            "https://collector.test/tyrcli/collector", "admin", "secret", http_client=http
+        )
+        with pytest.raises(CollectorError, match="body size mismatch"):
+            await client.verify("0123456789abcdef0123456789abcdef", "request")
+
+
+@pytest.mark.asyncio
+async def test_multipart_summary_does_not_invalidate_verified_file() -> None:
+    content = b"evidence"
+    digest = hashlib.sha256(content).hexdigest()
+    detail = MULTIPART_DETAIL.format(
+        files=DETAIL.format(digest=digest, size=len(content))
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/admin/login") and request.method == "GET":
+            return httpx.Response(200, text=LOGIN)
+        if request.url.path.endswith("/admin/login"):
+            return httpx.Response(302)
+        if request.url.path.endswith("/file-1/download"):
+            return httpx.Response(200, content=content)
+        return httpx.Response(200, text=detail)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http:
+        client = CollectorClient(
+            "https://collector.test/tyrcli/collector", "admin", "secret", http_client=http
+        )
+        result = await client.verify("0123456789abcdef0123456789abcdef", "file")
+
+    assert result.status == "verified"
+    assert [file.filename for file in result.files] == ["evidence.txt"]
 
 
 @pytest.mark.asyncio

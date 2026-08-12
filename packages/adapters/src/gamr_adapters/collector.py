@@ -14,7 +14,13 @@ from gamr_engine.collector_verification import (
     DeliveryUnavailableError,
 )
 
-from .collector_html import CsrfParser, RequestsParser, parse_files
+from .collector_html import (
+    CsrfParser,
+    ParsedRequestBody,
+    RequestsParser,
+    parse_files,
+    parse_request_body,
+)
 
 MAX_COLLECTOR_FILE_BYTES = 50 * 1024 * 1024
 COLLECTOR_RETRY_DELAYS = (0.25, 0.75)
@@ -141,11 +147,13 @@ class CollectorClient:
         if response.status_code == 404:
             raise CollectorError("Collector request was not found")
         response.raise_for_status()
-        files = self._parse_files(response.text)
-        if requirement == "file" and not files:
+        uploaded_files = self._parse_files(response.text)
+        if requirement == "file" and not uploaded_files:
             raise CollectorError("Collector request has no files")
-        for file in files:
+        for file in uploaded_files:
             await self._download(file, retain=False)
+        body = self._parse_body(response.text, request_id) if requirement == "request" else None
+        files = [*uploaded_files, *([body.file] if body else [])]
         return CollectorVerification(request_id, requirement, "verified", files)
 
     async def download(self, file: CollectorFile) -> bytes:
@@ -153,7 +161,18 @@ class CollectorClient:
 
     async def _download_file(self, file: CollectorFile) -> bytes:
         await self._login()
+        if file.file_id.startswith("body-"):
+            return await self._download_body(file)
         return await self._download(file, retain=True)
+
+    async def _download_body(self, file: CollectorFile) -> bytes:
+        request_id = file.file_id.removeprefix("body-")
+        response = await self._http.get(f"{self.base_url}/admin/requests/{request_id}")
+        response.raise_for_status()
+        body = self._parse_body(response.text, request_id)
+        if body is None or body.file != file:
+            raise CollectorError("Collector request body metadata changed")
+        return body.content
 
     async def _with_http_retries(
         self, operation: str, action: Callable[[], Awaitable[T]]
@@ -193,6 +212,12 @@ class CollectorClient:
     def _parse_files(self, html: str) -> list[CollectorFile]:
         try:
             return parse_files(html)
+        except ValueError as error:
+            raise CollectorError(str(error)) from error
+
+    def _parse_body(self, html: str, request_id: str) -> ParsedRequestBody | None:
+        try:
+            return parse_request_body(html, request_id)
         except ValueError as error:
             raise CollectorError(str(error)) from error
 

@@ -121,3 +121,24 @@ it("shows image previews without rendering unsupported file types", async () => 
   );
   expect(screen.queryByRole("button", { name: "Preview evidence.zip" })).toBeNull();
 });
+
+it("offers a text preview for an XML request body", async () => {
+  const bodyArtifact = {
+    ...artifacts[0],
+    requirement: "request",
+    files: [
+      {
+        ...artifacts[0].files[0],
+        fileId: "body-0123456789abcdef0123456789abcdef",
+        filename: "request-body.xml",
+        contentType: "application/xml",
+      },
+    ],
+  };
+  render(<ol><CollectorArtifactUpdate runId="run-1" artifact={bodyArtifact} /></ol>);
+
+  expect(
+    await screen.findByRole("button", { name: "Preview request-body.xml" }),
+  ).toBeVisible();
+  expect(screen.getByRole("link", { name: "Download request-body.xml" })).toBeVisible();
+});

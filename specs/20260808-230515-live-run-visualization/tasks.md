@@ -12,3 +12,6 @@
 - [X] Add regression coverage for transient collector lookup failures and safe diagnostics.
 - [X] Retry transient collector HTTP failures and preserve actionable failure context.
 - [X] Reauthenticate and retry collector reads redirected to login.
+- [X] Verify retained request bodies as digest-checked collector artifacts.
+- [X] Expose request bodies through run-scoped download and preview controls.
+- [X] Keep multipart summaries separate and recover files from failed exact-request manifests.

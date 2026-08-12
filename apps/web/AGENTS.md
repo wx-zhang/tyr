@@ -28,7 +28,7 @@ Dataset review uses `GET /api/v1/datasets/{id}`, `…/cases` (full scenarios), a
 The run review screens consume API run, case, activity, and artifact endpoints;
 Tyr and model calls remain server-side.
 `features/runs/CollectorArtifacts.tsx` renders verified collector files as chronological
-Updates entries with bounded text, Markdown, and image previews plus run-scoped downloads,
+Updates entries with bounded text, Markdown, XML, and image previews plus run-scoped downloads,
 without receiving collector credentials.
 
 Run-evidence behavior tests are split across `RunEvidence.test.tsx`,
