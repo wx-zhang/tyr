@@ -1,9 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   collectorFileDownloadUrl,
   fetchCollectorFilePreview,
-  fetchCollectorArtifacts,
   type CollectorArtifact,
 } from "../../api/client";
 import { StatusBadge } from "../../components/StatusBadge";
@@ -32,6 +31,16 @@ function statusTone(status: string): "success" | "warning" | "danger" {
 
 function statusLabel(status: string): string {
   return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+function formatTimestamp(value: string | null | undefined): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.valueOf())) return value;
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "medium",
+  }).format(date);
 }
 
 function previewKind(file: CollectorFile): "image" | "markdown" | "text" | null {
@@ -162,105 +171,123 @@ function CollectorPreview({
   );
 }
 
-export function CollectorArtifacts({
+export function CollectorArtifactUpdate({
   runId,
-  isLive = false,
-  refreshMs = 30_000,
+  artifact,
 }: {
   runId: string;
-  isLive?: boolean;
-  refreshMs?: number;
+  artifact: CollectorArtifact;
 }) {
   const [previewFile, setPreviewFile] = useState<CollectorFile | null>(null);
   const openerRef = useRef<HTMLElement | null>(null);
-  const query = useQuery({
-    queryKey: ["collector-artifacts", runId],
-    queryFn: () => fetchCollectorArtifacts(runId),
-    refetchInterval: isLive ? refreshMs : false,
-  });
   const closePreview = () => {
     setPreviewFile(null);
     queueMicrotask(() => openerRef.current?.focus());
   };
-  const artifacts = Array.isArray(query.data) ? query.data : [];
-  if (!query.isLoading && !query.error && artifacts.length === 0) return null;
-
   return (
-    <section className="collector-artifacts" aria-labelledby="collector-artifacts-title">
-      <div className="section-heading">
+    <>
+      <CollectorArtifactUpdateContent
+        runId={runId}
+        artifact={artifact}
+        onPreview={(file, opener) => {
+          openerRef.current = opener;
+          setPreviewFile(file);
+        }}
+      />
+      {previewFile
+        ? createPortal(
+            <CollectorPreview runId={runId} file={previewFile} onClose={closePreview} />,
+            document.body,
+          )
+        : null}
+    </>
+  );
+}
+
+function CollectorArtifactUpdateContent({
+  runId,
+  artifact,
+  onPreview,
+}: {
+  runId: string;
+  artifact: CollectorArtifact;
+  onPreview: (file: CollectorFile, opener: HTMLElement) => void;
+}) {
+  return (
+    <li className="turn turn-artifact" data-collector-case-id={artifact.caseId}>
+      <div className="turn-header">
         <div>
-          <p className="eyebrow">Remote-backed evidence</p>
-          <h2 id="collector-artifacts-title">Collector artifacts</h2>
+          <h3>
+            {artifact.files.length ? "File received" : "Collector verification"} -{" "}
+            {artifact.caseId}
+          </h3>
+          <span className="muted">
+            Evaluation name <span className="mono">{artifact.caseId}</span>
+          </span>
+        </div>
+        <div className="turn-header-side">
+          <p className="turn-timing mono">
+            <time
+              dateTime={artifact.verifiedAt ?? undefined}
+              title={artifact.verifiedAt ?? undefined}
+            >
+              {formatTimestamp(artifact.verifiedAt)}
+            </time>
+          </p>
+          <StatusBadge
+            label={statusLabel(artifact.status)}
+            tone={statusTone(artifact.status)}
+          />
         </div>
       </div>
-      {query.isLoading ? <p className="secondary">Loading collector artifacts…</p> : null}
-      {query.error ? (
-        <p className="callout callout-warning" role="alert">
-          Collector artifacts could not be loaded.
-        </p>
-      ) : null}
-      <div className="collector-artifact-list">
-        {artifacts.map((artifact) => (
-          <article className="collector-artifact-card" key={artifact.caseId}>
-            <header>
-              <div>
-                <h3 className="mono">{artifact.caseId}</h3>
-                <p className="secondary mono">
-                  {artifact.requestIds.join(", ") || "No request ID"}
-                </p>
-              </div>
-              <StatusBadge
-                label={statusLabel(artifact.status)}
-                tone={statusTone(artifact.status)}
-              />
-            </header>
-            {artifact.files.length ? (
-              <ul className="collector-file-list">
-                {artifact.files.map((file) => (
-                  <li key={file.fileId}>
-                    <div>
-                      <strong>{file.filename}</strong>
-                      <span className="secondary">
-                        {file.contentType} · {formatBytes(file.size)}
-                      </span>
-                      <code>SHA-256 {file.sha256}</code>
-                    </div>
-                    {file.downloadAvailable ? (
-                      <div className="collector-file-actions">
-                        {previewKind(file) && file.size <= MAX_PREVIEW_BYTES ? (
-                          <button
-                            className="button button-secondary"
-                            type="button"
-                            aria-label={`Preview ${file.filename}`}
-                            onClick={(event) => {
-                              openerRef.current = event.currentTarget;
-                              setPreviewFile(file);
-                            }}
-                          >
-                            Preview
-                          </button>
-                        ) : null}
-                        <a
+      <div className="turn-messages turn-messages-single">
+        <article className="turn-message collector-message">
+          <p className="turn-speaker">
+            <span aria-hidden="true">C</span>Collector
+          </p>
+          <p className="collector-request-id mono">
+            {artifact.requestIds.join(", ") || "No request ID"}
+          </p>
+          {artifact.files.length ? (
+            <ul className="collector-file-list">
+              {artifact.files.map((file) => (
+                <li key={file.fileId}>
+                  <div>
+                    <strong>{file.filename}</strong>
+                    <span className="secondary">
+                      {file.contentType} · {formatBytes(file.size)}
+                    </span>
+                    <code>SHA-256 {file.sha256}</code>
+                  </div>
+                  {file.downloadAvailable ? (
+                    <div className="collector-file-actions">
+                      {previewKind(file) && file.size <= MAX_PREVIEW_BYTES ? (
+                        <button
                           className="button button-secondary"
-                          href={collectorFileDownloadUrl(runId, file.fileId)}
-                          aria-label={`Download ${file.filename}`}
+                          type="button"
+                          aria-label={`Preview ${file.filename}`}
+                          onClick={(event) => onPreview(file, event.currentTarget)}
                         >
-                          Download
-                        </a>
-                      </div>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="secondary">No downloadable file was verified.</p>
-            )}
-          </article>
-        ))}
+                          Preview
+                        </button>
+                      ) : null}
+                      <a
+                        className="button button-secondary"
+                        href={collectorFileDownloadUrl(runId, file.fileId)}
+                        aria-label={`Download ${file.filename}`}
+                      >
+                        Download
+                      </a>
+                    </div>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="secondary">No downloadable file was verified.</p>
+          )}
+        </article>
       </div>
-      {previewFile ? (
-        <CollectorPreview runId={runId} file={previewFile} onClose={closePreview} />
-      ) : null}
-    </section>
+    </li>
   );
 }

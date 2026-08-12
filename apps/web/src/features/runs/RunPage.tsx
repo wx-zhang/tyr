@@ -3,16 +3,18 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
   cancelRun,
+  fetchCollectorArtifacts,
   fetchDatasetCases,
   fetchRun,
   fetchRunTurns,
   fetchRunVisualization,
   type CaseProgress,
+  type CollectorArtifact,
   type RunTurn,
 } from "../../api/client";
 import { useRunEvents, type RunConnectionState } from "../../api/useRunEvents";
 import { StatusBadge } from "../../components/StatusBadge";
-import { CollectorArtifacts } from "./CollectorArtifacts";
+import { CollectorArtifactUpdate } from "./CollectorArtifacts";
 import { MarkdownMessage } from "./MarkdownMessage";
 import {
   buildCaseOriginMap,
@@ -351,6 +353,15 @@ export function RunPage() {
       return refreshMs;
     },
   });
+  const collectorArtifacts = useQuery({
+    queryKey: ["collector-artifacts", runId],
+    queryFn: () => fetchCollectorArtifacts(runId),
+    refetchInterval: () => {
+      const state = visualization.data?.run?.state;
+      if (state && terminalStates.has(state)) return false;
+      return refreshMs;
+    },
+  });
   const events = useRunEvents(runId);
   const [olderTurns, setOlderTurns] = useState<RunTurn[]>([]);
   const [visibleLatestTurns, setVisibleLatestTurns] = useState<RunTurn[]>([]);
@@ -454,6 +465,27 @@ export function RunPage() {
       (left, right) => right.sequence - left.sequence,
     );
   }, [olderTurns, visibleLatestTurns]);
+  const timelineEntries = useMemo(() => {
+    const entries: Array<
+      | { kind: "turn"; timestamp: number; turn: RunTurn }
+      | { kind: "artifact"; timestamp: number; artifact: CollectorArtifact }
+    > = allTurns.map((turn) => ({
+      kind: "turn",
+      timestamp: Date.parse(turn.occurredAt ?? "") || 0,
+      turn,
+    }));
+    const artifacts = Array.isArray(collectorArtifacts.data)
+      ? collectorArtifacts.data
+      : [];
+    for (const artifact of artifacts) {
+      entries.push({
+        kind: "artifact",
+        timestamp: Date.parse(artifact.verifiedAt ?? "") || 0,
+        artifact,
+      });
+    }
+    return entries.sort((left, right) => right.timestamp - left.timestamp);
+  }, [allTurns, collectorArtifacts.data]);
   const scientistIterationByCaseId = useMemo(() => {
     const map = new Map<string, number>();
     for (const turn of allTurns) {
@@ -692,8 +724,6 @@ export function RunPage() {
 
       <TyrNetworkMap runId={runId} isLive={isLive} refreshMs={refreshMs} />
 
-      <CollectorArtifacts runId={runId} isLive={isLive} refreshMs={refreshMs} />
-
       <section className="turns-section" aria-labelledby="turns-title">
         <div className="section-heading">
           <div>
@@ -724,7 +754,7 @@ export function RunPage() {
             {turns.error.message}
           </p>
         ) : null}
-        {!turns.isLoading && !allTurns.length ? (
+        {!turns.isLoading && !collectorArtifacts.isLoading && !timelineEntries.length ? (
           <p className="empty-state run-empty">
             {isLive
               ? "Waiting for the first update…"
@@ -733,22 +763,30 @@ export function RunPage() {
         ) : null}
         <ol className="turn-list" aria-label="Run updates">
           {awaitingNextTurn ? <PendingNextTurn /> : null}
-          {allTurns.map((turn, index) => (
-            <Turn
-              key={turn.id}
-              turn={turn}
-              newest={index === 0 && !awaitingNextTurn}
-              flash={flashIds.has(turn.id)}
-              now={now}
-              scientistIteration={
-                turn.caseId
-                  ? scientistIterationByCaseId.get(turn.caseId)
-                  : undefined
-              }
-              caseOriginById={caseOriginById}
-              datasetCaseIds={datasetCaseIds}
-            />
-          ))}
+          {timelineEntries.map((entry, index) =>
+            entry.kind === "artifact" ? (
+              <CollectorArtifactUpdate
+                key={`collector-${entry.artifact.caseId}`}
+                runId={runId}
+                artifact={entry.artifact}
+              />
+            ) : (
+              <Turn
+                key={entry.turn.id}
+                turn={entry.turn}
+                newest={index === 0 && !awaitingNextTurn}
+                flash={flashIds.has(entry.turn.id)}
+                now={now}
+                scientistIteration={
+                  entry.turn.caseId
+                    ? scientistIterationByCaseId.get(entry.turn.caseId)
+                    : undefined
+                }
+                caseOriginById={caseOriginById}
+                datasetCaseIds={datasetCaseIds}
+              />
+            ),
+          )}
         </ol>
       </section>
     </section>

@@ -8,3 +8,4 @@
 - [X] Build accessible progress, relationship, activity, and evidence views in the optional web UI.
 - [X] Validate bundle immutability, redaction, reconnect behavior, and the 10,000-item budget.
 - [X] Live-refresh collector evidence and add bounded text, Markdown, and image previews.
+- [X] Integrate collector files into the chronological Updates feed.

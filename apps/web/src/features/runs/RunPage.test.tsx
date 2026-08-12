@@ -321,6 +321,52 @@ it("does not render a redundant selected test cases block below Updates", async 
   ).not.toBeInTheDocument();
 });
 
+it("renders collector files as messages inside Updates", async () => {
+  const baseFetch = vi.mocked(fetch).getMockImplementation();
+  vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url.includes("/collector-verifications")) {
+      return Promise.resolve({
+        ok: true,
+        json: async () => [
+          {
+            caseId: "case-alpha",
+            requirement: "file",
+            status: "verified",
+            requestIds: ["0123456789abcdef0123456789abcdef"],
+            verifiedAt: "2026-08-08T10:02:30Z",
+            files: [
+              {
+                fileId: "file-1",
+                filename: "evidence.txt",
+                contentType: "text/plain",
+                size: 8,
+                sha256: "a".repeat(64),
+                downloadAvailable: true,
+              },
+            ],
+          },
+        ],
+      } as Response);
+    }
+    return baseFetch!(input) as Promise<Response>;
+  });
+
+  renderPage();
+
+  const updates = await screen.findByRole("list", { name: "Run updates" });
+  expect(
+    await within(updates).findByRole("heading", {
+      name: "File received - case-alpha",
+    }),
+  ).toBeVisible();
+  expect(within(updates).getByText("evidence.txt")).toBeVisible();
+  expect(
+    within(updates).getByRole("link", { name: "Download evidence.txt" }),
+  ).toBeVisible();
+  expect(screen.queryByRole("heading", { name: "Collector artifacts" })).toBeNull();
+});
+
 it("hides discovered variables until discovery has a result", async () => {
   renderPage();
 

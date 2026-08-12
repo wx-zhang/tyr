@@ -29,8 +29,8 @@ Collector-marked scenarios can independently verify delivered requests and files
 metadata and SHA-256 values. The run page downloads original files from the collector on demand;
 uploaded bytes are never retained in `.gamr`. An exact collector `request_id` is preferred. If Tyr
 omits it, GAMR accepts only one exact filename match captured during the originating upload turn.
-The live run page refreshes collector evidence automatically and offers bounded previews for common
-text, Markdown, JSON, CSV, and raster-image files.
+The live run page refreshes collector evidence automatically and places verified files in Updates,
+with bounded previews for common text, Markdown, JSON, CSV, and raster-image files.
 
 By default, experiments are **read-only**. To let an experiment take real actions through Tyr, run
 with Actions Allowed (`--action-mode approval_required --allow-actions`); each action still needs an

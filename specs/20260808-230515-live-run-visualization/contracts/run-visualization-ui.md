@@ -66,9 +66,10 @@ stable IDs. Overall run state and approval attention remain visible regardless o
   accessible forms.
 - Missing, withheld, omitted, malformed, oversized, and entirely redacted states remain distinct.
 - Oversized permitted content uses a safe run-scoped download action without exposing a server path.
-- Collector artifacts refresh with live run activity and polling recovery. Verified common text,
-  Markdown, and raster-image files open in a bounded modal with initial focus, focus containment,
-  Escape handling, and focus restoration. Unsupported and oversized files remain download-only.
+- Collector artifacts refresh with live run activity and polling recovery, then appear by timestamp
+  as messages in Updates rather than a separate section. Verified common text, Markdown, and
+  raster-image files open in a bounded modal with initial focus, focus containment, Escape handling,
+  and focus restoration. Unsupported and oversized files remain download-only.
 - The inspector never renders or copies server paths, credentials, authorization values,
   idempotency keys, or server-only diagnostic fields.
 
