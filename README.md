@@ -29,6 +29,8 @@ Collector-marked scenarios can independently verify delivered requests and files
 metadata and SHA-256 values. The run page downloads original files from the collector on demand;
 uploaded bytes are never retained in `.gamr`. An exact collector `request_id` is preferred. If Tyr
 omits it, GAMR accepts only one exact filename match captured during the originating upload turn.
+Collector reads retry redirects, transient transport, 408, 425, 429, and 5xx failures twice before
+recording safe failure diagnostics. Each redirected retry authenticates again before reading.
 The live run page refreshes collector evidence automatically and places verified files in Updates,
 with bounded previews for common text, Markdown, JSON, CSV, and raster-image files.
 

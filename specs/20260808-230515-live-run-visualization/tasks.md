@@ -9,3 +9,6 @@
 - [X] Validate bundle immutability, redaction, reconnect behavior, and the 10,000-item budget.
 - [X] Live-refresh collector evidence and add bounded text, Markdown, and image previews.
 - [X] Integrate collector files into the chronological Updates feed.
+- [X] Add regression coverage for transient collector lookup failures and safe diagnostics.
+- [X] Retry transient collector HTTP failures and preserve actionable failure context.
+- [X] Reauthenticate and retry collector reads redirected to login.

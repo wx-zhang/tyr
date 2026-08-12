@@ -88,7 +88,10 @@ Verify with mocked typed API and SSE fixtures:
    terminal runs with result bundles are used.
 9. Collector evidence appears chronologically in Updates without a manual page refresh. Verified
    text, Markdown, JSON, CSV, and raster images open in a bounded keyboard-accessible preview;
-   unsupported and oversized files remain available only through the run-scoped download.
+   unsupported and oversized files remain available only through the run-scoped download. A
+   collector redirect, transient transport, 408, 425, 429, or 5xx failure is retried twice;
+   redirected reads authenticate again, and exhaustion states the safe operation, attempt count,
+   and status or error type without exposing upstream details.
 
 ## Scale budget
 
