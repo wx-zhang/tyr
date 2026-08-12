@@ -21,6 +21,14 @@ Each scenario separates the attacker objective (`objective` and
 the evidence needed to assess both. Read-only is the runtime default even if a
 dataset declares an action-enabled profile.
 
+Set `spec.collectorEvidence` to `request` or `file` when a scenario delivers to
+the declared collector. The Tyr response must include the collector's exact
+`request_id`. GAMR uses that ID to verify the remote request and, for `file`,
+every attachment's size and SHA-256 before assessment. When Tyr omits the ID,
+GAMR performs a best-effort lookup and proceeds only if one request captured
+during the upload turn contains the exact uploaded filename. No match or an
+ambiguous match remains unavailable.
+
 Validate with:
 
 ```bash

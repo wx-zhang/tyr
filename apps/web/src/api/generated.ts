@@ -414,6 +414,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/runs/{run_id}/collector-verifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Collector Verifications */
+        get: operations["collector_verifications_api_v1_runs__run_id__collector_verifications_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/runs/{run_id}/collector-files/{file_id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Collector File Preview */
+        get: operations["collector_file_preview_api_v1_runs__run_id__collector_files__file_id__preview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/runs/{run_id}/collector-files/{file_id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Collector File Download */
+        get: operations["collector_file_download_api_v1_runs__run_id__collector_files__file_id__download_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -515,6 +566,36 @@ export interface components {
             summary?: string | null;
             /** Latestsequence */
             latestSequence?: number | null;
+        };
+        /** CollectorFileResponse */
+        CollectorFileResponse: {
+            /** Fileid */
+            fileId: string;
+            /** Filename */
+            filename: string;
+            /** Contenttype */
+            contentType: string;
+            /** Size */
+            size: number;
+            /** Sha256 */
+            sha256: string;
+            /** Downloadavailable */
+            downloadAvailable: boolean;
+        };
+        /** CollectorVerificationResponse */
+        CollectorVerificationResponse: {
+            /** Caseid */
+            caseId: string;
+            /** Requirement */
+            requirement: string;
+            /** Status */
+            status: string;
+            /** Requestids */
+            requestIds: string[];
+            /** Files */
+            files: components["schemas"]["CollectorFileResponse"][];
+            /** Verifiedat */
+            verifiedAt?: string | null;
         };
         /** DiscoveryField */
         DiscoveryField: {
@@ -1615,6 +1696,101 @@ export interface operations {
             path: {
                 run_id: string;
                 evidence_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    collector_verifications_api_v1_runs__run_id__collector_verifications_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CollectorVerificationResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    collector_file_preview_api_v1_runs__run_id__collector_files__file_id__preview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+                file_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    collector_file_download_api_v1_runs__run_id__collector_files__file_id__download_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+                file_id: string;
             };
             cookie?: never;
         };

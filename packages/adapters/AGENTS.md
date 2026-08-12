@@ -13,6 +13,8 @@ External I/O is async where practical. Redact credentials before persistence. Ty
 `tyr/` owns MCP transport and settling, `models/` owns OpenAI-compatible
 providers, `datasets/` owns confined JSON loading, and `artifacts/` owns
 redacted run bundles, canonical activity writes, and legacy normalization.
+`collector.py` owns authenticated exact and timestamp/filename collector lookup,
+file parsing, and bounded digest-verified downloads.
 `artifacts/query.py` owns bounded in-memory activity and relationship projections derived from bundles.
 
 Canonical artifact and configured-secret regressions live in

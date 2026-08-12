@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from gamr_adapters.artifacts.evidence import FilesystemActivitySink
 from gamr_adapters.artifacts.filesystem import FilesystemArtifactStore
+from gamr_adapters.collector import CollectorClient
 from gamr_adapters.config import Settings
 from gamr_adapters.datasets.filesystem import load_dataset, resolve_dataset_directory
 from gamr_adapters.models.openai_compatible import OpenAICompatibleModel
@@ -42,7 +43,21 @@ def build_run_executor(settings: Settings, registry: JsonRegistry) -> RunExecuto
         dataset = load_dataset(dataset_path)
         artifacts = FilesystemArtifactStore(
             settings.artifact_root,
-            secrets=(settings.tyr_mcp_token, settings.model_api_key),
+            secrets=(
+                settings.tyr_mcp_token,
+                settings.model_api_key,
+                settings.collector_username,
+                settings.collector_password,
+            ),
+        )
+        collector = (
+            CollectorClient(
+                settings.collector_base_url,
+                settings.collector_username,
+                settings.collector_password,
+            )
+            if settings.collector_username and settings.collector_password
+            else None
         )
         target = TyrMcpClient(settings.tyr_mcp_url, settings.tyr_mcp_token)
         model = OpenAICompatibleModel(
@@ -70,9 +85,12 @@ def build_run_executor(settings: Settings, registry: JsonRegistry) -> RunExecuto
                 artifacts=artifacts,
                 activity_sink=FilesystemActivitySink(artifacts),
                 progress=lambda event: _advance_run_state(registry, run_id, event),
+                delivery_verifier=collector,
             )
         finally:
             await target.aclose()
+            if collector is not None:
+                await collector.aclose()
         return output.result_path
 
     return execute

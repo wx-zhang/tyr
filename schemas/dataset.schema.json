@@ -423,6 +423,22 @@
           "minItems": 1,
           "title": "Evidencerequirements",
           "type": "array"
+        },
+        "collectorEvidence": {
+          "anyOf": [
+            {
+              "enum": [
+                "request",
+                "file"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Collectorevidence"
         }
       },
       "required": [

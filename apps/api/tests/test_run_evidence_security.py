@@ -10,6 +10,7 @@ from gamr_api.dependencies import (
     browser_safe_evidence,
     get_registry,
     get_settings,
+    redaction_secrets,
     require_run_evidence_access,
 )
 from gamr_api.main import app
@@ -141,6 +142,16 @@ def test_every_browser_projection_redacts_configured_secrets() -> None:
 
     assert secret not in str(safe_activity)
     assert secret not in str(safe_evidence)
+
+
+def test_collector_credentials_are_configured_redaction_secrets() -> None:
+    settings = Settings(
+        collector_username="collector-user",
+        collector_password="collector-password",
+    )
+
+    assert "collector-user" in redaction_secrets(settings)
+    assert "collector-password" in redaction_secrets(settings)
 
 
 def test_sse_redacts_configured_secrets_from_search_and_graph_payloads() -> None:

@@ -24,6 +24,14 @@ uv run gamr result validate .gamr/runs/<run-id>/result.json
 Live commands need `TYR_MCP_TOKEN`, `OPENROUTER_API_KEY`, and `TYR_LOOP_MODEL` set (see
 `.env.example`).
 
+Collector-marked scenarios can independently verify delivered requests and files when
+`TYR_COLLECTOR_USERNAME` and `TYR_COLLECTOR_PASSWORD` are set. GAMR persists only request/file
+metadata and SHA-256 values. The run page downloads original files from the collector on demand;
+uploaded bytes are never retained in `.gamr`. An exact collector `request_id` is preferred. If Tyr
+omits it, GAMR accepts only one exact filename match captured during the originating upload turn.
+The live run page refreshes collector evidence automatically and offers bounded previews for common
+text, Markdown, JSON, CSV, and raster-image files.
+
 By default, experiments are **read-only**. To let an experiment take real actions through Tyr, run
 with Actions Allowed (`--action-mode approval_required --allow-actions`); each action still needs an
 explicit human approval on the Tyr side. GAMR never auto-approves an action. Use `--all-cases` to run

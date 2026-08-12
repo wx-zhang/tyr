@@ -21,6 +21,12 @@ class Settings(BaseSettings):
         validation_alias="TYR_MCP_URL",
     )
     tyr_mcp_token: str = Field(default="", validation_alias="TYR_MCP_TOKEN")
+    collector_base_url: str = Field(
+        default="https://www.tyr.ai/tyrcli/collector",
+        validation_alias="TYR_COLLECTOR_BASE_URL",
+    )
+    collector_username: str = Field(default="", validation_alias="TYR_COLLECTOR_USERNAME")
+    collector_password: str = Field(default="", validation_alias="TYR_COLLECTOR_PASSWORD")
     model_base_url: str = Field(
         default="https://openrouter.ai/api/v1",
         validation_alias="OPENROUTER_BASE_URL",

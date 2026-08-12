@@ -35,6 +35,7 @@ export type DatasetScenario = {
     successCriteria?: string | null;
     expectedControl: string;
     evidenceRequirements: string[];
+    collectorEvidence?: "request" | "file" | null;
   };
 };
 
@@ -71,7 +72,8 @@ export function scenarioToCase(scenario: DatasetScenario): DatasetCase {
   };
 }
 export type RunVisualization = components["schemas"]["RunVisualization"];
-export type RunTurn = components["schemas"]["RunTurnResponse"] & {
+export type RunTurn = Omit<components["schemas"]["RunTurnResponse"], "updateType"> & {
+  updateType?: string;
   historyCaseOrigins?: string[];
 };
 export type RunTurnPage = components["schemas"]["RunTurnPageResponse"];
@@ -124,6 +126,8 @@ export type Experiment = {
 
 export type ActivityItem = components["schemas"]["ActivityItemResponse"];
 export type ActivityPage = components["schemas"]["ActivityPageResponse"];
+
+export type CollectorArtifact = components["schemas"]["CollectorVerificationResponse"];
 
 export type EvidenceFilters = {
   q?: string;
@@ -265,6 +269,30 @@ export function fetchRunTurns(runId: string, cursor?: string): Promise<RunTurnPa
   return get<RunTurnPage>(
     `/api/v1/runs/${encodeURIComponent(runId)}/turns?${params.toString()}`,
   );
+}
+
+export function fetchCollectorArtifacts(runId: string): Promise<CollectorArtifact[]> {
+  return get<CollectorArtifact[]>(
+    `/api/v1/runs/${encodeURIComponent(runId)}/collector-verifications`,
+  );
+}
+
+export function collectorFileDownloadUrl(runId: string, fileId: string): string {
+  return `${apiOrigin}/api/v1/runs/${encodeURIComponent(runId)}/collector-files/${encodeURIComponent(fileId)}/download`;
+}
+
+export function collectorFilePreviewUrl(runId: string, fileId: string): string {
+  return `${apiOrigin}/api/v1/runs/${encodeURIComponent(runId)}/collector-files/${encodeURIComponent(fileId)}/preview`;
+}
+
+export async function fetchCollectorFilePreview(
+  runId: string,
+  fileId: string,
+  signal?: AbortSignal,
+): Promise<Response> {
+  const response = await fetch(collectorFilePreviewUrl(runId, fileId), { signal });
+  if (!response.ok) throw new Error(`Preview failed: ${response.status}`);
+  return response;
 }
 
 export type RelationshipParticipant = components["schemas"]["ParticipantResponse"];

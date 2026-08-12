@@ -24,6 +24,9 @@ def test_settings_load_provider_env_names(
     monkeypatch.setenv("OPENROUTER_API_KEY", "key")
     monkeypatch.setenv("OPENROUTER_BASE_URL", "https://example.test/v1")
     monkeypatch.setenv("TYR_LOOP_MODEL", "example/model")
+    monkeypatch.setenv("TYR_COLLECTOR_USERNAME", "collector-user")
+    monkeypatch.setenv("TYR_COLLECTOR_PASSWORD", "collector-password")
+    monkeypatch.setenv("TYR_COLLECTOR_BASE_URL", "https://collector.test/base")
 
     settings = Settings()
 
@@ -32,6 +35,9 @@ def test_settings_load_provider_env_names(
     assert settings.model_api_key == "key"
     assert settings.model_base_url == "https://example.test/v1"
     assert settings.model_name == "example/model"
+    assert settings.collector_username == "collector-user"
+    assert settings.collector_password == "collector-password"
+    assert settings.collector_base_url == "https://collector.test/base"
 
 
 def test_chat_model_defaults_independently_of_loop_model(

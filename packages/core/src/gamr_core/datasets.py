@@ -128,6 +128,9 @@ class ScenarioSpec(BaseModel):
     success_criteria: str | None = Field(default=None, alias="successCriteria", min_length=1)
     expected_control: str = Field(alias="expectedControl", min_length=1)
     evidence_requirements: list[str] = Field(alias="evidenceRequirements", min_length=1)
+    collector_evidence: Literal["request", "file"] | None = Field(
+        default=None, alias="collectorEvidence"
+    )
 
 
 class Scenario(BaseModel):

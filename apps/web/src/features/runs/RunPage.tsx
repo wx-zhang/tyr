@@ -12,6 +12,7 @@ import {
 } from "../../api/client";
 import { useRunEvents, type RunConnectionState } from "../../api/useRunEvents";
 import { StatusBadge } from "../../components/StatusBadge";
+import { CollectorArtifacts } from "./CollectorArtifacts";
 import { MarkdownMessage } from "./MarkdownMessage";
 import {
   buildCaseOriginMap,
@@ -690,6 +691,8 @@ export function RunPage() {
       </section>
 
       <TyrNetworkMap runId={runId} isLive={isLive} refreshMs={refreshMs} />
+
+      <CollectorArtifacts runId={runId} isLive={isLive} refreshMs={refreshMs} />
 
       <section className="turns-section" aria-labelledby="turns-title">
         <div className="section-heading">

@@ -86,6 +86,9 @@ Verify with mocked typed API and SSE fixtures:
    used from history, including the empty-history state. Configure the scientist history window with
    `historyTestRuns` (default 10) and `historyScientistRuns` (default 5); only matching persisted
    terminal runs with result bundles are used.
+9. Collector evidence appears without a manual page refresh. Verified text, Markdown, JSON, CSV,
+   and raster images open in a bounded keyboard-accessible preview; unsupported and oversized files
+   remain available only through the run-scoped download.
 
 ## Scale budget
 

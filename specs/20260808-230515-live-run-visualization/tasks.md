@@ -7,3 +7,4 @@
 - [X] Add run-scoped API authorization, SSE replay, evidence reveal, and download confinement.
 - [X] Build accessible progress, relationship, activity, and evidence views in the optional web UI.
 - [X] Validate bundle immutability, redaction, reconnect behavior, and the 10,000-item budget.
+- [X] Live-refresh collector evidence and add bounded text, Markdown, and image previews.

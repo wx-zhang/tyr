@@ -1428,6 +1428,150 @@
           }
         }
       }
+    },
+    "/api/v1/runs/{run_id}/collector-verifications": {
+      "get": {
+        "tags": [
+          "collector-artifacts"
+        ],
+        "summary": "Collector Verifications",
+        "operationId": "collector_verifications_api_v1_runs__run_id__collector_verifications_get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CollectorVerificationResponse"
+                  },
+                  "title": "Response Collector Verifications Api V1 Runs  Run Id  Collector Verifications Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/runs/{run_id}/collector-files/{file_id}/preview": {
+      "get": {
+        "tags": [
+          "collector-artifacts"
+        ],
+        "summary": "Collector File Preview",
+        "operationId": "collector_file_preview_api_v1_runs__run_id__collector_files__file_id__preview_get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "File Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/runs/{run_id}/collector-files/{file_id}/download": {
+      "get": {
+        "tags": [
+          "collector-artifacts"
+        ],
+        "summary": "Collector File Download",
+        "operationId": "collector_file_download_api_v1_runs__run_id__collector_files__file_id__download_get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "File Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1767,6 +1911,94 @@
           "state"
         ],
         "title": "CaseProgress"
+      },
+      "CollectorFileResponse": {
+        "properties": {
+          "fileId": {
+            "type": "string",
+            "title": "Fileid"
+          },
+          "filename": {
+            "type": "string",
+            "title": "Filename"
+          },
+          "contentType": {
+            "type": "string",
+            "title": "Contenttype"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size"
+          },
+          "sha256": {
+            "type": "string",
+            "title": "Sha256"
+          },
+          "downloadAvailable": {
+            "type": "boolean",
+            "title": "Downloadavailable"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fileId",
+          "filename",
+          "contentType",
+          "size",
+          "sha256",
+          "downloadAvailable"
+        ],
+        "title": "CollectorFileResponse"
+      },
+      "CollectorVerificationResponse": {
+        "properties": {
+          "caseId": {
+            "type": "string",
+            "title": "Caseid"
+          },
+          "requirement": {
+            "type": "string",
+            "title": "Requirement"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "requestIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Requestids"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/CollectorFileResponse"
+            },
+            "type": "array",
+            "title": "Files"
+          },
+          "verifiedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verifiedat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "caseId",
+          "requirement",
+          "status",
+          "requestIds",
+          "files"
+        ],
+        "title": "CollectorVerificationResponse"
       },
       "DiscoveryField": {
         "properties": {

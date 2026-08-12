@@ -52,6 +52,7 @@
   --surface: #ffffff;
   --surface-hover: #f2f5f8;
   --surface-elevated: #ffffff;
+  --backdrop: rgb(23 32 42 / 56%);
   --border: #d8e0e8;
   --border-strong: #b9c5d1;
   --border-focus: #1d4ed8;
@@ -98,6 +99,7 @@
   --surface: #151c24;
   --surface-hover: #1b2530;
   --surface-elevated: #202a36;
+  --backdrop: rgb(0 0 0 / 72%);
   --border: #2a3542;
   --border-strong: #3a4858;
   --border-focus: #60a5fa;
@@ -132,6 +134,7 @@
     --surface: #151c24;
     --surface-hover: #1b2530;
     --surface-elevated: #202a36;
+    --backdrop: rgb(0 0 0 / 72%);
     --border: #2a3542;
     --border-strong: #3a4858;
     --border-focus: #60a5fa;

@@ -106,6 +106,40 @@ paths:
               schema: { type: string, format: binary }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/runs/{run_id}/collector-verifications:
+    get:
+      summary: List safe remote-backed collector metadata for one run
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+      responses:
+        '200':
+          description: Collector verification and file metadata without credentials or bytes
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /api/v1/runs/{run_id}/collector-files/{file_id}/preview:
+    get:
+      summary: Preview one bounded supported collector file after remote verification
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+        - $ref: '#/components/parameters/FileId'
+      responses:
+        '200':
+          description: Inline text or raster-image preview with no-store and nosniff headers
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '413': { description: Verified collector file exceeds the preview limit }
+        '415': { description: Verified collector file type is not previewable }
+  /api/v1/runs/{run_id}/collector-files/{file_id}/download:
+    get:
+      summary: Download one run-confined collector file after remote verification
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+        - $ref: '#/components/parameters/FileId'
+      responses:
+        '200':
+          description: Original verified collector file as an attachment
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /api/v1/runs/{run_id}/events:
     get:
       summary: Stream bounded run activity notifications with resumable sequence IDs
@@ -131,6 +165,11 @@ components:
       schema: { type: string, minLength: 1 }
     EvidenceId:
       name: evidence_id
+      in: path
+      required: true
+      schema: { type: string, minLength: 1 }
+    FileId:
+      name: file_id
       in: path
       required: true
       schema: { type: string, minLength: 1 }

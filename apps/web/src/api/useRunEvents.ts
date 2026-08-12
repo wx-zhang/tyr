@@ -140,6 +140,7 @@ export function useRunEvents(
               "run-visualization",
               "run-turns",
               "run-relationships",
+              "collector-artifacts",
             ].includes(String(key))
           );
         },

@@ -1,4 +1,4 @@
 """HTTP route modules."""
-from . import run_evidence
+from . import collector_artifacts, run_evidence
 
-__all__ = ["run_evidence"]
+__all__ = ["collector_artifacts", "run_evidence"]

@@ -133,6 +133,7 @@ The palette is deliberately neutral. Signal blue is the interaction accent so re
   --surface: #ffffff;
   --surface-hover: #f2f5f8;
   --surface-elevated: #ffffff;
+  --backdrop: rgb(23 32 42 / 56%);
 
   --border: #d8e0e8;
   --border-strong: #b9c5d1;
@@ -176,6 +177,7 @@ The palette is deliberately neutral. Signal blue is the interaction accent so re
   --surface: #151c24;
   --surface-hover: #1b2530;
   --surface-elevated: #202a36;
+  --backdrop: rgb(0 0 0 / 72%);
 
   --border: #2a3542;
   --border-strong: #3a4858;

@@ -19,7 +19,16 @@ def get_settings() -> Settings:
 
 
 def redaction_secrets(settings: Settings) -> tuple[str, ...]:
-    return tuple(secret for secret in (settings.tyr_mcp_token, settings.model_api_key) if secret)
+    return tuple(
+        secret
+        for secret in (
+            settings.tyr_mcp_token,
+            settings.model_api_key,
+            settings.collector_username,
+            settings.collector_password,
+        )
+        if secret
+    )
 
 
 registry: InMemoryRegistry | None = None

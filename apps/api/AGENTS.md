@@ -20,7 +20,8 @@ Use local development auth only in the scaffold. Never expose Tyr/model credenti
 
 `routes/experiments.py` queues validated read-only configurations, `routes/runs.py`
 serves redacted run review and SSE events, `routes/run_evidence.py` serves
-filtered activity and observed relationship projections, `dependencies.py`
+filtered activity and observed relationship projections, and
+`routes/collector_artifacts.py` serves run-confined remote-backed previews and downloads. `dependencies.py`
 owns run-scoped evidence authorization and browser allowlists, and `registry.py`
 is the JSON-backed filesystem registry. `execution.py` owns the bounded in-process queue.
 

@@ -9,6 +9,7 @@ from pathlib import Path
 import typer
 from gamr_adapters.artifacts.evidence import FilesystemActivitySink
 from gamr_adapters.artifacts.filesystem import FilesystemArtifactStore
+from gamr_adapters.collector import CollectorClient
 from gamr_adapters.config import Settings
 from gamr_adapters.datasets.filesystem import (
     FilesystemDatasetRepository,
@@ -43,6 +44,31 @@ app = typer.Typer(
 dataset_app = typer.Typer(help="Inspect and validate JSON datasets")
 experiment_app = typer.Typer(help="Create and inspect experiment runs")
 result_app = typer.Typer(help="Validate canonical run results")
+
+
+def _configured_secrets(settings: Settings) -> tuple[str, ...]:
+    return tuple(
+        value
+        for value in (
+            settings.tyr_mcp_token,
+            settings.model_api_key,
+            getattr(settings, "collector_username", ""),
+            getattr(settings, "collector_password", ""),
+        )
+        if value
+    )
+
+
+def _collector_client(settings: Settings) -> CollectorClient | None:
+    username = getattr(settings, "collector_username", "")
+    password = getattr(settings, "collector_password", "")
+    if not username or not password:
+        return None
+    return CollectorClient(
+        getattr(settings, "collector_base_url", "https://www.tyr.ai/tyrcli/collector"),
+        username,
+        password,
+    )
 app.add_typer(dataset_app, name="dataset")
 app.add_typer(experiment_app, name="experiment")
 app.add_typer(result_app, name="result")
@@ -172,8 +198,9 @@ def run_experiment(
         raise typer.BadParameter("TYR_LOOP_MODEL is required")
     artifact_store = FilesystemArtifactStore(
         settings.artifact_root,
-        secrets=(settings.tyr_mcp_token, settings.model_api_key),
+        secrets=_configured_secrets(settings),
     )
+    collector = _collector_client(settings)
     target = TyrMcpClient(settings.tyr_mcp_url, settings.tyr_mcp_token)
     model_gateway = OpenAICompatibleModel(
         settings.model_base_url,
@@ -229,9 +256,12 @@ def run_experiment(
                 artifacts=artifact_store,
                 activity_sink=FilesystemActivitySink(artifact_store),
                 progress=_render_progress,
+                delivery_verifier=collector,
             )
         finally:
             await target.aclose()
+            if collector is not None:
+                await collector.aclose()
 
     try:
         output = asyncio.run(run_live())
@@ -320,7 +350,7 @@ def resume_scientist_experiment(
         raise typer.BadParameter("OPENROUTER_API_KEY is required")
     artifact_store = FilesystemArtifactStore(
         settings.artifact_root,
-        secrets=(settings.tyr_mcp_token, settings.model_api_key),
+        secrets=_configured_secrets(settings),
     )
     try:
         source_record = RunRecord.model_validate(artifact_store.read_json(run_id, "run.json"))
@@ -359,6 +389,7 @@ def resume_scientist_experiment(
     if not selected_model:
         raise typer.BadParameter("TYR_LOOP_MODEL is required")
     target = TyrMcpClient(settings.tyr_mcp_url, settings.tyr_mcp_token)
+    collector = _collector_client(settings)
     model_gateway = OpenAICompatibleModel(
         settings.model_base_url,
         settings.model_api_key,
@@ -407,9 +438,12 @@ def resume_scientist_experiment(
                 artifacts=artifact_store,
                 activity_sink=FilesystemActivitySink(artifact_store),
                 progress=_render_progress,
+                delivery_verifier=collector,
             )
         finally:
             await target.aclose()
+            if collector is not None:
+                await collector.aclose()
 
     try:
         output = asyncio.run(run_live())

@@ -607,7 +607,7 @@ it("shows ready scientist generation turns as iteration cards", async () => {
   expect(
     within(iteration2).getByLabelText("New scientist scenario"),
   ).toBeInTheDocument();
-  expect(within(iteration2).getByText("New scenario")).toBeInTheDocument();
+  expect(within(iteration2).getAllByText("New scenario").length).toBeGreaterThan(0);
   expect(
     within(iteration2).getAllByText("scientist-2").length,
   ).toBeGreaterThan(0);

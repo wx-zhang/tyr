@@ -14,6 +14,7 @@ from gamr_core import (
 )
 from gamr_core.identifiers import new_id
 
+from .collector_verification import DeliveryVerifier
 from .ports.artifacts import ActivitySink, ArtifactStore
 from .ports.models import ModelGateway
 from .ports.targets import TargetGateway
@@ -40,10 +41,12 @@ class ExperimentExecutionService:
         run_id: str | None = None,
         activity_sink: ActivitySink | None = None,
         progress: ProgressCallback | None = None,
+        delivery_verifier: DeliveryVerifier | None = None,
     ) -> ExecutionOutput:
         result = await ExperimentRunner(
             progress=progress,
             activity_sink=activity_sink,
+            delivery_verifier=delivery_verifier,
         ).run(
             dataset,
             configuration,
@@ -76,10 +79,12 @@ class ExperimentExecutionService:
         run_id: str | None = None,
         activity_sink: ActivitySink | None = None,
         progress: ProgressCallback | None = None,
+        delivery_verifier: DeliveryVerifier | None = None,
     ) -> ExecutionOutput:
         result = await ExperimentRunner(
             progress=progress,
             activity_sink=activity_sink,
+            delivery_verifier=delivery_verifier,
         ).resume_scientist(
             dataset,
             configuration,

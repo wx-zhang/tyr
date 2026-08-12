@@ -67,6 +67,10 @@ it("deduplicates sequence notifications and batches query invalidation", async (
   expect(result.current.lastSequence).toBe(3);
   await act(async () => Promise.resolve());
   expect(invalidate).toHaveBeenCalledTimes(1);
+  const predicate = invalidate.mock.calls[0][0]?.predicate;
+  expect(predicate?.({ queryKey: ["collector-artifacts", "run-1"] } as never)).toBe(
+    true,
+  );
 });
 
 it("marks the stream stale without heartbeat, then recovers on heartbeat", () => {
