@@ -10,7 +10,9 @@ from gamr_core.identifiers import new_id
 
 CollectorRequirement = Literal["request", "file"]
 CollectorStatus = Literal["verified", "unavailable", "failed"]
-_REQUEST_ID = re.compile(r'["\']request_id["\']\s*:\s*["\']([0-9a-f]{32})["\']')
+_REQUEST_ID = re.compile(
+    r'["\'`]?request[ _-]?id["\'`]?\s*:?\s*["\'`]?([0-9a-f]{32})["\'`]?', re.IGNORECASE
+)
 
 
 @dataclass(frozen=True)
