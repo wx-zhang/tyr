@@ -94,6 +94,45 @@ async def test_mcp_errors_are_typed() -> None:
 
 
 @pytest.mark.asyncio
+async def test_http_timeout_error_includes_type_and_timeout() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ReadTimeout("")
+
+    client = TyrMcpClient(
+        "https://tyr.invalid/mcp",
+        "secret-token",
+        http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+    )
+    try:
+        with pytest.raises(TyrMcpError, match=r"tools/call.*ReadTimeout after 60s") as raised:
+            await client.call_tool("tyr_assistant_query", {"message": "hi"})
+    finally:
+        await client.aclose()
+
+    assert str(raised.value).rstrip(": ").endswith("ReadTimeout after 60s")
+    assert not str(raised.value).endswith(": ")
+
+
+@pytest.mark.asyncio
+async def test_http_status_error_keeps_status_detail() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(503, text="upstream unavailable")
+
+    client = TyrMcpClient(
+        "https://tyr.invalid/mcp",
+        "secret-token",
+        http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+    )
+    try:
+        with pytest.raises(TyrMcpError, match=r"tools/list.*503") as raised:
+            await client.list_tools()
+    finally:
+        await client.aclose()
+
+    assert "HTTPStatusError" in str(raised.value) or "503" in str(raised.value)
+
+
+@pytest.mark.asyncio
 async def test_request_adds_idempotency_key_and_operation_id() -> None:
     captured: dict[str, object] = {}
 

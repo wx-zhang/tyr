@@ -72,7 +72,13 @@ class TyrMcpClient:
             )
             response.raise_for_status()
         except httpx.HTTPError as exc:
-            raise TyrMcpError(f"HTTP error calling Tyr ({method}): {exc}") from exc
+            name = type(exc).__name__
+            detail = str(exc).strip()
+            if isinstance(exc, httpx.TimeoutException):
+                body = f"{name} after {timeout:g}s" + (f": {detail}" if detail else "")
+            else:
+                body = f"{name}: {detail}" if detail else name
+            raise TyrMcpError(f"HTTP error calling Tyr ({method}): {body}") from exc
 
         session_id = response.headers.get("Mcp-Session-Id")
         if session_id:
