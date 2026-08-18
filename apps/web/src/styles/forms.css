@@ -87,6 +87,45 @@
   }
 }
 
+.info-tip-lead {
+  display: block;
+  color: var(--text-secondary);
+}
+
+.info-tip-statuses {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--text);
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+}
+
+.info-tip-statuses li {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--space-1) var(--space-2);
+  align-items: baseline;
+}
+
+.info-tip-status-name {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.info-tip-status-name::after {
+  content: " —";
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.info-tip-status-detail {
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
 .field-help {
   margin: 0;
   color: var(--text-muted);
