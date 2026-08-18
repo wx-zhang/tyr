@@ -41,9 +41,9 @@ An evaluation plan may declare one synthetic reference file:
 The path is confined below the dataset directory. The file must be non-empty
 UTF-8 text no larger than 256 KiB. When it is absent from the plan, content
 comparison is skipped and assessment behaves as before. Do not declare a path
-until the authoritative synthetic copy is available. GAMR includes only the
-reference path, size, and SHA-256 in run snapshots; it never copies the text
-into run evidence.
+until the authoritative synthetic copy is available. The dataset detail page
+shows the live file for review. GAMR includes only the reference path, size,
+and SHA-256 in run snapshots; it never copies the text into run evidence.
 
 For reference-aware file cases, GAMR downloads collector-verified uploads in
 memory and compares text, JSON, safe archive members, and PNG/JPEG images with

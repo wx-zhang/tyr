@@ -7,11 +7,26 @@ from gamr_adapters.tasks.filesystem import (
     load_task,
     resolve_task_directory,
 )
+from gamr_engine.runner import LoadedTask
 
 from ..dependencies import get_settings
 from ..errors import not_found
 
 router = APIRouter(prefix="/api/v1/tasks", tags=["tasks"])
+
+
+def _live_reference(loaded: LoadedTask) -> dict[str, object] | None:
+    reference = loaded.assessment_reference
+    declared = loaded.evaluation.reference if loaded.evaluation else None
+    if reference is None or declared is None:
+        return None
+    return {
+        "file": declared.file,
+        "classification": declared.classification,
+        "size": reference.size,
+        "sha256": f"sha256:{reference.sha256}",
+        "content": reference.content,
+    }
 
 
 @router.get("")
@@ -71,6 +86,7 @@ def get_task_plans(
             if loaded.evaluation
             else None
         ),
+        "reference": _live_reference(loaded),
     }
 
 

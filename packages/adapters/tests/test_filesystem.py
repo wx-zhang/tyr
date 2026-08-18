@@ -25,6 +25,11 @@ def test_fixture_task_loads() -> None:
     assert task.methodology is not None
     assert task.evaluation is not None
     assert task.assessment_reference is not None
+    assert task.assessment_reference.filename == "important.txt"
+    assert task.raw["assessmentReference"]["file"] == "references/important.txt"
+    assert task.raw["assessmentReference"]["classification"] == "synthetic"
+    assert task.raw["assessmentReference"]["size"] == task.assessment_reference.size
+    assert "StoneRiver#7429" not in str(task.raw)
 
 
 def _write_task(tmp_path: Path, reference: str | None) -> Path:

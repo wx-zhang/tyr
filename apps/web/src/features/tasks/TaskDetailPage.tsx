@@ -1,14 +1,11 @@
 import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import {
-  fetchTask,
-  fetchTaskCases,
-  fetchTaskPlans,
-  type TaskPlans,
-  type TaskScenario,
-} from "../../api/client";
+import { fetchTask, fetchTaskCases, fetchTaskPlans } from "../../api/client";
 import { PageHeader } from "../../components/PageHeader";
 import { StatusBadge } from "../../components/StatusBadge";
+import { TaskCaseDetail } from "./TaskCaseDetail";
+import { TaskPlansSection } from "./TaskPlansSection";
+import { TaskReferenceCard } from "./TaskReferenceCard";
 
 function modeLabel(mode: string | undefined): string {
   if (mode === "approval_required") return "Actions Allowed";
@@ -31,136 +28,6 @@ function variableSummary(variable: {
     return `default: ${variable.default}`;
   }
   return variable.source;
-}
-
-function PlansSection({
-  plans,
-  isLoading,
-  isError,
-}: {
-  plans: TaskPlans | undefined;
-  isLoading: boolean;
-  isError: boolean;
-}) {
-  if (isLoading) {
-    return (
-      <p className="secondary" role="status">
-        Loading supporting plans…
-      </p>
-    );
-  }
-  if (isError) {
-    return (
-      <p className="secondary" role="alert">
-        Could not load supporting plans.
-      </p>
-    );
-  }
-  if (!plans) return null;
-
-  const hasAny = plans.discovery || plans.methodology || plans.evaluation;
-  if (!hasAny) {
-    return <p className="secondary">No discovery, methodology, or evaluation plans.</p>;
-  }
-
-  return (
-    <div className="plan-accordion">
-      {plans.discovery ? (
-        <details className="plan-details">
-          <summary>Discovery</summary>
-          <div className="plan-body reading-width">
-            <p className="plan-prose">{plans.discovery.prompt}</p>
-            {plans.discovery.outputFields?.length ? (
-              <p className="secondary mono">
-                Output fields: {plans.discovery.outputFields.join(", ")}
-              </p>
-            ) : null}
-          </div>
-        </details>
-      ) : null}
-      {plans.methodology ? (
-        <details className="plan-details">
-          <summary>Methodology</summary>
-          <div className="plan-body reading-width">
-            <h3>System brief</h3>
-            <p className="plan-prose">{plans.methodology.systemBrief}</p>
-            <h3>Unsticking guidance</h3>
-            <p className="plan-prose">{plans.methodology.unstickingGuidance}</p>
-            <h3>Testing methodology</h3>
-            <p className="plan-prose">{plans.methodology.testingMethodology}</p>
-          </div>
-        </details>
-      ) : null}
-      {plans.evaluation ? (
-        <details className="plan-details">
-          <summary>Evaluation</summary>
-          <div className="plan-body reading-width">
-            <p className="plan-prose">{plans.evaluation.prompt}</p>
-          </div>
-        </details>
-      ) : null}
-    </div>
-  );
-}
-
-function CaseDetail({ scenario }: { scenario: TaskScenario }) {
-  return (
-    <div className="case-detail">
-      <div className="case-detail-header">
-        <div>
-          <h3>{scenario.metadata.title}</h3>
-          <p className="session-meta">
-            <span className="mono">{scenario.metadata.id}</span>
-            {scenario.metadata.category ? (
-              <span className="secondary">{scenario.metadata.category}</span>
-            ) : null}
-          </p>
-        </div>
-        {scenario.metadata.tags?.length ? (
-          <div className="tag-row">
-            {scenario.metadata.tags.map((tag) => (
-              <StatusBadge key={tag} label={tag} tone="neutral" />
-            ))}
-          </div>
-        ) : null}
-      </div>
-
-      <section className="case-section">
-        <h4>Objective</h4>
-        <p className="plan-prose reading-width">{scenario.spec.objective}</p>
-      </section>
-
-      <section className="case-section">
-        <h4>Steps</h4>
-        <ol className="case-steps reading-width">
-          {scenario.spec.steps.map((step, index) => (
-            <li key={`${index}-${step.slice(0, 24)}`}>{step}</li>
-          ))}
-        </ol>
-      </section>
-
-      {scenario.spec.successCriteria ? (
-        <section className="case-section">
-          <h4>Success criteria</h4>
-          <p className="plan-prose reading-width">{scenario.spec.successCriteria}</p>
-        </section>
-      ) : null}
-
-      <section className="case-section">
-        <h4>Expected control</h4>
-        <p className="plan-prose reading-width">{scenario.spec.expectedControl}</p>
-      </section>
-
-      <section className="case-section">
-        <h4>Evidence requirements</h4>
-        <ul className="case-evidence reading-width">
-          {scenario.spec.evidenceRequirements.map((item, index) => (
-            <li key={`${index}-${item.slice(0, 24)}`}>{item}</li>
-          ))}
-        </ul>
-      </section>
-    </div>
-  );
 }
 
 export function TaskDetailPage() {
@@ -191,8 +58,7 @@ export function TaskDetailPage() {
     scenarios.find((item) => defaultCaseIds.has(item.metadata.id)) ??
     scenarios[0];
   const actionMode = task.data?.spec.defaults.actionMode;
-  const variables = task.data?.spec.variables ?? {};
-  const variableEntries = Object.entries(variables);
+  const variableEntries = Object.entries(task.data?.spec.variables ?? {});
 
   return (
     <section className="section-stack">
@@ -316,12 +182,14 @@ export function TaskDetailPage() {
                 <h2>Discovery, methodology, evaluation</h2>
               </div>
             </div>
-            <PlansSection
+            <TaskPlansSection
               plans={plans.data}
               isLoading={plans.isLoading}
               isError={plans.isError}
             />
           </article>
+
+          <TaskReferenceCard reference={plans.data?.reference} />
 
           <article className="card">
             <div className="card-header">
@@ -377,7 +245,7 @@ export function TaskDetailPage() {
                 </nav>
                 <div className="case-panel">
                   {selected ? (
-                    <CaseDetail scenario={selected} />
+                    <TaskCaseDetail scenario={selected} />
                   ) : caseId ? (
                     <p className="secondary" role="alert">
                       Case <span className="mono">{caseId}</span> was not found in

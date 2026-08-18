@@ -462,6 +462,19 @@ tbody tr:last-child td {
   max-width: var(--reading-max, 840px);
 }
 
+.dataset-reference-content {
+  margin: var(--space-4) 0 0;
+  max-height: 24rem;
+  overflow: auto;
+  border: var(--border-w) solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-hover);
+  padding: var(--space-4);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: var(--text-code) / var(--leading-code) var(--font-mono);
+}
+
 .tag-row {
   display: flex;
   flex-wrap: wrap;

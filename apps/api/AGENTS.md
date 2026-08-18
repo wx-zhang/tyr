@@ -18,6 +18,9 @@ Use local development auth only in the scaffold. Never expose Tyr/model credenti
 
 ## Source map
 
+`routes/datasets.py` lists manifests and serves cases plus `/plans`, including
+live evaluation-reference metadata and content for dataset review. That content
+is read from the dataset tree and is not a run artifact.
 `routes/experiments.py` queues validated read-only configurations, `routes/runs.py`
 serves redacted run review and SSE events, `routes/run_evidence.py` serves
 filtered activity and observed relationship projections, and
