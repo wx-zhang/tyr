@@ -24,6 +24,9 @@ uv run gamr result validate .gamr/runs/<run-id>/result.json
 Live commands need `TYR_MCP_TOKEN`, `OPENROUTER_API_KEY`, and `TYR_LOOP_MODEL` set (see
 `.env.example`).
 
+Set `TYR_LOOP_JUDGE_MODEL` when evaluation should use a model independent from the model
+that executes scenarios. If it is unset, evaluation uses `TYR_LOOP_MODEL`.
+
 Collector-marked scenarios can independently verify delivered requests and files when
 `TYR_COLLECTOR_USERNAME` and `TYR_COLLECTOR_PASSWORD` are set. GAMR persists only request/file
 metadata and SHA-256 values. The run page downloads original files from the collector on demand;

@@ -71,8 +71,12 @@ def test_turns_route_returns_grouped_redacted_conversation(tmp_path: Path) -> No
             "verdict": None,
             "objectiveStatus": None,
             "outcome": None,
-            "assessmentSummary": None,
-            "historyCaseIds": [],
+                "assessmentSummary": None,
+                "assessmentStatus": None,
+                "assessmentFailure": None,
+                "reasonCodes": [],
+                "missingEvidence": [],
+                "historyCaseIds": [],
             "historyCaseOrigins": [],
         }
         assert payload["items"][1]["status"] == "waiting_for_tyr"

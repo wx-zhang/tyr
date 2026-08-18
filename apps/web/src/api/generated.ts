@@ -564,6 +564,14 @@ export interface components {
             outcome?: string | null;
             /** Summary */
             summary?: string | null;
+            /** Assessmentstatus */
+            assessmentStatus?: string | null;
+            /** Assessmentfailure */
+            assessmentFailure?: string | null;
+            /** Reasoncodes */
+            reasonCodes?: string[];
+            /** Missingevidence */
+            missingEvidence?: string[];
             /** Latestsequence */
             latestSequence?: number | null;
         };
@@ -827,6 +835,14 @@ export interface components {
             outcome?: string | null;
             /** Assessmentsummary */
             assessmentSummary?: string | null;
+            /** Assessmentstatus */
+            assessmentStatus?: string | null;
+            /** Assessmentfailure */
+            assessmentFailure?: string | null;
+            /** Reasoncodes */
+            reasonCodes?: string[];
+            /** Missingevidence */
+            missingEvidence?: string[];
             /** Historycaseids */
             historyCaseIds?: string[];
             /** Historycaseorigins */

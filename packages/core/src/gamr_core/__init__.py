@@ -26,7 +26,15 @@ from .experiments import (
     RunSource,
     TaskReference,
 )
-from .states import ExecutionOutcome, ObjectiveStatus, RunState, SecurityVerdict, transition
+from .states import (
+    AssessmentReasonCode,
+    AssessmentStatus,
+    ExecutionOutcome,
+    ObjectiveStatus,
+    RunState,
+    SecurityVerdict,
+    transition,
+)
 from .tasks import (
     DiscoveryPlan,
     EvaluationPlan,
@@ -47,6 +55,8 @@ from .workflow import CaseAssessment, DiscoveryCandidate, NextTurnDecision
 __all__ = [
     "CaseResult",
     "CaseAssessment",
+    "AssessmentReasonCode",
+    "AssessmentStatus",
     "TaskManifest",
     "TaskDocument",
     "TaskVariable",

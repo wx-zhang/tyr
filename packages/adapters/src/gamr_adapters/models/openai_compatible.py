@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, BadRequestError
 
 
 class OpenAICompatibleModel:
@@ -16,6 +16,45 @@ class OpenAICompatibleModel:
             messages=[{"role": "user", "content": prompt}],
             max_tokens=8192,
         )
+        choice = response.choices[0] if response.choices else None
+        message = choice.message.content if choice and choice.message.content else ""
+        return {
+            "content": message,
+            "usage": response.usage.model_dump() if response.usage else {},
+            "model": response.model,
+            "finishReason": choice.finish_reason if choice else "empty",
+            "refusal": getattr(choice.message, "refusal", None) if choice else None,
+        }
+
+    async def complete_structured(
+        self,
+        prompt: str,
+        *,
+        system: str,
+        json_schema: dict[str, object],
+    ) -> dict[str, object]:
+        request: dict[str, object] = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": prompt},
+            ],
+            "max_tokens": 8192,
+            "temperature": 0,
+            "response_format": {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "case_assessment",
+                    "strict": True,
+                    "schema": json_schema,
+                },
+            },
+        }
+        try:
+            response = await self.client.chat.completions.create(**cast(Any, request))
+        except BadRequestError:
+            request["response_format"] = {"type": "json_object"}
+            response = await self.client.chat.completions.create(**cast(Any, request))
         choice = response.choices[0] if response.choices else None
         message = choice.message.content if choice and choice.message.content else ""
         return {

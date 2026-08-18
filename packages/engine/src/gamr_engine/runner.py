@@ -12,6 +12,8 @@ from uuid import uuid4
 
 from gamr_core import (
     ActivityType,
+    AssessmentReasonCode,
+    AssessmentStatus,
     CaseAssessment,
     CaseResult,
     DiscoveryCandidate,
@@ -40,13 +42,14 @@ from gamr_core import (
 from gamr_core.identifiers import new_id
 from pydantic import ValidationError
 
+from .assessment import AssessmentOutcome, AssessmentService, build_assessment_prompt
 from .collector_verification import (
     CollectorVerification,
     CollectorVerificationBatch,
     CollectorVerificationService,
     DeliveryVerifier,
-    apply_collector_verification,
     attach_verification_evidence,
+    collector_assessment_context,
 )
 from .ports.artifacts import ActivitySink, ArtifactStore
 from .ports.models import ModelGateway
@@ -224,6 +227,7 @@ class ExperimentRunner:
         self._activity_sink = activity_sink
         self._activity_sequences: dict[str, int] = {}
         self._collector_verification = CollectorVerificationService(delivery_verifier)
+        self._assessment = AssessmentService()
 
     async def run(
         self,
@@ -234,6 +238,7 @@ class ExperimentRunner:
         target: TargetGateway | None = None,
         model: ModelGateway | None = None,
         scientist_model: ModelGateway | None = None,
+        judge_model: ModelGateway | None = None,
         artifacts: ArtifactStore | None = None,
         activity_sink: ActivitySink | None = None,
     ) -> RunResult:
@@ -314,6 +319,7 @@ class ExperimentRunner:
                 config,
                 target,
                 model,
+                judge_model or model,
                 identifier,
                 artifacts,
                 conversation,
@@ -333,6 +339,7 @@ class ExperimentRunner:
                 config,
                 target,
                 scientist_model or model,
+                judge_model or scientist_model or model,
                 identifier,
                 artifacts,
                 conversation,
@@ -353,6 +360,7 @@ class ExperimentRunner:
         target: TargetGateway | None = None,
         model: ModelGateway | None = None,
         scientist_model: ModelGateway | None = None,
+        judge_model: ModelGateway | None = None,
         artifacts: ArtifactStore | None = None,
         activity_sink: ActivitySink | None = None,
     ) -> RunResult:
@@ -417,6 +425,7 @@ class ExperimentRunner:
             config,
             target,
             scientist_model or model,
+            judge_model or scientist_model or model,
             identifier,
             artifacts,
             conversation,
@@ -624,6 +633,7 @@ class ExperimentRunner:
         config: ExperimentConfig,
         target: TargetGateway,
         model: ModelGateway,
+        judge_model: ModelGateway,
         run_id: str,
         artifacts: ArtifactStore | None,
         conversation: TargetConversation,
@@ -780,6 +790,7 @@ class ExperimentRunner:
                 config,
                 target,
                 model,
+                judge_model,
                 run_id,
                 artifacts,
                 conversation,
@@ -909,6 +920,7 @@ class ExperimentRunner:
         config: ExperimentConfig,
         target: TargetGateway,
         model: ModelGateway,
+        judge_model: ModelGateway,
         run_id: str,
         artifacts: ArtifactStore | None,
         conversation: TargetConversation,
@@ -929,6 +941,7 @@ class ExperimentRunner:
             objective = render_template(scenario.spec.objective, values)
             steps = [render_template(step, values) for step in scenario.spec.steps]
             success = render_template(scenario.spec.success_criteria or "", values)
+            expected_control = render_template(scenario.spec.expected_control, values)
         except KeyError as exc:
             case = self._case_result(
                 scenario,
@@ -1018,31 +1031,39 @@ class ExperimentRunner:
             )
             return record, result.error
         self._emit("assessment.started", run_id, phase="assessment", case_id=case_id)
-        assessment = await self._assess(task, scenario, result.transcript, model, verifications)
-        if assessment is not None:
-            valid_evidence = [
-                turn_id for turn_id in assessment.evidence_turn_ids if turn_id in turn_ids
-            ]
-            if not valid_evidence:
-                assessment = assessment.model_copy(
-                    update={"evidenceTurnIds": turn_ids or [new_id()]}
-                )
-            else:
-                assessment = assessment.model_copy(update={"evidenceTurnIds": valid_evidence})
+        assessment_outcome = await self._assess(
+            task,
+            result.transcript,
+            judge_model,
+            title=title,
+            expected_control=expected_control,
+            success_criteria=success,
+            verifications=verifications,
+            run_id=run_id,
+            case_id=case_id,
+            artifacts=artifacts,
+        )
+        assessment = assessment_outcome.assessment
         if assessment is None:
             assessment = CaseAssessment(
-                objectiveStatus=(
-                    ObjectiveStatus.PARTIAL if turn_ids else ObjectiveStatus.NOT_ATTEMPTED
-                ),
+                objectiveStatus=ObjectiveStatus.UNKNOWN,
                 verdict=SecurityVerdict.INCONCLUSIVE,
                 summary=(
-                    result.decision.reason
-                    if result.decision and result.decision.reason
-                    else "No assessment was returned."
+                    "Judge assessment needs review "
+                    f"({assessment_outcome.failure or 'skipped'})."
                 ),
-                evidenceTurnIds=turn_ids or [new_id()],
+                evidenceTurnIds=turn_ids,
+                missingEvidence=["A valid structured judge assessment is unavailable."],
             )
-        assessment = apply_collector_verification(assessment, verifications)
+        collector_reasons, collector_missing = collector_assessment_context(verifications)
+        assessment = assessment.model_copy(
+            update={
+                "reason_codes": list(dict.fromkeys([*assessment.reason_codes, *collector_reasons])),
+                "missing_evidence": list(
+                    dict.fromkeys([*assessment.missing_evidence, *collector_missing])
+                ),
+            }
+        )
         self._emit(
             "assessment.completed",
             run_id,
@@ -1055,6 +1076,7 @@ class ExperimentRunner:
             fields=(
                 ("verdict", assessment.verdict.value),
                 ("objective", assessment.objective_status.value),
+                ("judgeStatus", assessment_outcome.status.value),
                 ("summary", assessment.summary),
             ),
         )
@@ -1065,6 +1087,10 @@ class ExperimentRunner:
             verdict=assessment.verdict,
             summary=assessment.summary,
             turn_ids=assessment.evidence_turn_ids,
+            assessment_status=assessment_outcome.status,
+            assessment_failure=assessment_outcome.failure,
+            reason_codes=assessment.reason_codes,
+            missing_evidence=assessment.missing_evidence,
         )
         case = attach_verification_evidence(case, verification, turn_ids)
         self._write_case_result(artifacts, run_id, case, stage=phase)
@@ -1404,6 +1430,9 @@ class ExperimentRunner:
                     "content": reply,
                     "turnId": turn_id,
                     "occurredAt": replied_at,
+                    "observedFacts": json.dumps(
+                        self._judge_observed_facts(result), separators=(",", ":")
+                    ),
                 }
             )
             self._write_raw(
@@ -1487,34 +1516,74 @@ class ExperimentRunner:
     async def _assess(
         self,
         task: LoadedTask,
-        scenario: Scenario,
         transcript: list[dict[str, str]],
         model: ModelGateway,
-        verifications: list[CollectorVerification] | None = None,
-    ) -> CaseAssessment | None:
+        *,
+        title: str,
+        expected_control: str,
+        success_criteria: str,
+        verifications: list[CollectorVerification],
+        run_id: str,
+        case_id: str,
+        artifacts: ArtifactStore | None,
+    ) -> AssessmentOutcome:
         if task.evaluation is None:
-            return None
-        prompt = (
-            f"{task.evaluation.prompt}\nScenario: {scenario.metadata.title}\n"
-            f"Expected control: {scenario.spec.expected_control}\n"
-            f"Success criteria: {scenario.spec.success_criteria or 'not supplied'}\n"
-            f"Transcript:\n{self._render_transcript(transcript)}\n"
-            f"Independent collector verification:\n"
-            f"{json.dumps([item.to_dict() for item in verifications or []])}\n"
-            "Return only a JSON CaseAssessment object."
+            return AssessmentOutcome(
+                None,
+                AssessmentStatus.SKIPPED,
+                "evaluation_not_configured",
+                {"status": AssessmentStatus.SKIPPED.value, "attempts": []},
+            )
+        prompt = build_assessment_prompt(
+            evaluation_prompt=task.evaluation.prompt,
+            title=title,
+            expected_control=expected_control,
+            success_criteria=success_criteria or "not supplied",
+            transcript=transcript,
+            verifications=verifications,
         )
-        try:
-            completion = await model.complete(prompt)
-        except Exception:
-            return None
-        content = completion.get("content")
-        if not isinstance(content, str):
-            return None
-        try:
-            payload = json.loads(self._strip_code_fence(content))
-            return CaseAssessment.model_validate(payload)
-        except json.JSONDecodeError, ValidationError:
-            return None
+        outcome = await self._assessment.assess(
+            model=model,
+            prompt=prompt,
+            valid_turn_ids=set(self._turn_ids(transcript)),
+        )
+        if artifacts is not None:
+            safe_id = _UNSAFE_ID_CHAR.sub("-", case_id)[:128] or "case"
+            artifacts.write_json(
+                f"runs/{run_id}/judge-assessments/{safe_id}.json",
+                outcome.diagnostic,
+            )
+        return outcome
+
+    @staticmethod
+    def _judge_observed_facts(result: dict[str, object]) -> dict[str, object]:
+        facts: dict[str, object] = {}
+        state = result.get("state")
+        if isinstance(state, str):
+            facts["targetState"] = state
+        settlement = result.get("gamrSettlement")
+        if isinstance(settlement, dict):
+            settlement_state = settlement.get("state")
+            if isinstance(settlement_state, str):
+                facts["settlementState"] = settlement_state
+            pending = settlement.get("pendingApprovals")
+            if isinstance(pending, list):
+                facts["pendingApprovalCount"] = len(pending)
+        pending = result.get("pendingApprovals")
+        if isinstance(pending, list):
+            facts["pendingApprovalCount"] = len(pending)
+        executions = result.get("executions")
+        if isinstance(executions, list):
+            states = [
+                value
+                for item in executions
+                if isinstance(item, dict)
+                for value in (item.get("state") or item.get("status"),)
+                if isinstance(value, str)
+            ]
+            facts["executionCount"] = len(executions)
+            facts["executionStates"] = states
+        return facts
 
     async def _verify_collector(
         self,
@@ -1974,16 +2043,23 @@ class ExperimentRunner:
         verdict: SecurityVerdict,
         summary: str,
         turn_ids: list[str],
+        assessment_status: AssessmentStatus = AssessmentStatus.UNKNOWN,
+        assessment_failure: str | None = None,
+        reason_codes: list[AssessmentReasonCode] | None = None,
+        missing_evidence: list[str] | None = None,
     ) -> CaseResult:
-        evidence_ids = turn_ids or [new_id()]
         return CaseResult(
             scenarioId=scenario.metadata.id,
             outcome=outcome,
             objectiveStatus=objective_status,
             verdict=verdict,
             summary=summary,
+            assessmentStatus=assessment_status,
+            assessmentFailure=assessment_failure,
+            reasonCodes=reason_codes or [],
+            missingEvidence=missing_evidence or [],
             evidence=[
-                Evidence(turnId=turn_id, artifact=f"raw/{turn_id}.json") for turn_id in evidence_ids
+                Evidence(turnId=turn_id, artifact=f"raw/{turn_id}.json") for turn_id in turn_ids
             ],
         )
 

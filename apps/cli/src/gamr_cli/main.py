@@ -125,6 +125,9 @@ def run_experiment(
     scientist_model: str = typer.Option(
         "", "--scientist-model", help="Override TYR_LOOP_SCIENTIST_MODEL."
     ),
+    judge_model: str = typer.Option(
+        "", "--judge-model", help="Override TYR_LOOP_JUDGE_MODEL."
+    ),
     allow_actions: bool = typer.Option(
         False,
         "--allow-actions",
@@ -190,6 +193,9 @@ def run_experiment(
     settings = Settings()
     selected_model = model or settings.model_name
     selected_scientist_model = scientist_model or settings.scientist_model_name or selected_model
+    selected_judge_model = (
+        judge_model or getattr(settings, "judge_model_name", "") or selected_model
+    )
     if not settings.tyr_mcp_token:
         raise typer.BadParameter("TYR_MCP_TOKEN is required")
     if not settings.model_api_key:
@@ -216,11 +222,21 @@ def run_experiment(
             selected_scientist_model,
         )
     )
+    judge_model_gateway = (
+        model_gateway
+        if selected_judge_model == selected_model
+        else OpenAICompatibleModel(
+            settings.model_base_url,
+            settings.model_api_key,
+            selected_judge_model,
+        )
+    )
 
     configuration = ExperimentConfig(
         actionMode=action_mode,
         model=selected_model,
         scientistModel=selected_scientist_model,
+        judgeModel=selected_judge_model,
         maxTurns=task.manifest.spec.defaults.max_turns,
         discoveryTurns=20,
         caseIds=selected_case_ids,
@@ -253,6 +269,7 @@ def run_experiment(
                 target=target,
                 model=model_gateway,
                 scientist_model=scientist_model_gateway,
+                judge_model=judge_model_gateway,
                 artifacts=artifact_store,
                 activity_sink=FilesystemActivitySink(artifact_store),
                 progress=_render_progress,
@@ -333,6 +350,9 @@ def resume_scientist_experiment(
     scientist_model: str = typer.Option(
         "", "--scientist-model", help="Override TYR_LOOP_SCIENTIST_MODEL."
     ),
+    judge_model: str = typer.Option(
+        "", "--judge-model", help="Override TYR_LOOP_JUDGE_MODEL."
+    ),
     confirm_actions: bool = typer.Option(
         False,
         "--confirm-actions",
@@ -381,7 +401,12 @@ def resume_scientist_experiment(
     task = load_task(task_directory)
 
     selected_model = model or configuration.model or settings.model_name
-    selected_scientist_model = scientist_model or settings.scientist_model_name or selected_model
+    selected_scientist_model = (
+        scientist_model or settings.scientist_model_name or selected_model
+    )
+    selected_judge_model = (
+        judge_model or getattr(settings, "judge_model_name", "") or selected_model
+    )
     if not selected_model:
         raise typer.BadParameter("TYR_LOOP_MODEL is required")
     target = TyrMcpClient(settings.tyr_mcp_url, settings.tyr_mcp_token)
@@ -400,8 +425,21 @@ def resume_scientist_experiment(
             selected_scientist_model,
         )
     )
+    judge_model_gateway = (
+        model_gateway
+        if selected_judge_model == selected_model
+        else OpenAICompatibleModel(
+            settings.model_base_url,
+            settings.model_api_key,
+            selected_judge_model,
+        )
+    )
     configuration = configuration.model_copy(
-        update={"model": selected_model, "scientist_model": selected_scientist_model}
+        update={
+            "model": selected_model,
+            "scientist_model": selected_scientist_model,
+            "judge_model": selected_judge_model,
+        }
     )
 
     new_run_id = new_id()
@@ -431,6 +469,7 @@ def resume_scientist_experiment(
                 target=target,
                 model=model_gateway,
                 scientist_model=scientist_model_gateway,
+                judge_model=judge_model_gateway,
                 artifacts=artifact_store,
                 activity_sink=FilesystemActivitySink(artifact_store),
                 progress=_render_progress,

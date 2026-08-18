@@ -104,6 +104,7 @@ export type Run = {
     actionMode: "read_only" | "approval_required";
     model: string;
     scientistModel: string;
+    judgeModel: string;
     maxTurns: number;
     discoveryTurns: number;
     caseIds?: string[] | null;

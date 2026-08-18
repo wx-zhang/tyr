@@ -1892,6 +1892,42 @@
             ],
             "title": "Summary"
           },
+          "assessmentStatus": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assessmentstatus"
+          },
+          "assessmentFailure": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assessmentfailure"
+          },
+          "reasonCodes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasoncodes"
+          },
+          "missingEvidence": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missingevidence"
+          },
           "latestSequence": {
             "anyOf": [
               {
@@ -2653,6 +2689,42 @@
               }
             ],
             "title": "Assessmentsummary"
+          },
+          "assessmentStatus": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assessmentstatus"
+          },
+          "assessmentFailure": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assessmentfailure"
+          },
+          "reasonCodes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasoncodes"
+          },
+          "missingEvidence": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missingevidence"
           },
           "historyCaseIds": {
             "items": {

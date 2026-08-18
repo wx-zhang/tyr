@@ -856,10 +856,30 @@ it("shows configured and scientist evaluation outcomes as updates", async () => 
               outcome: "failed",
               assessmentSummary: "The request was refused and never attempted.",
             },
+            {
+              id: "evaluation-scientist-beta",
+              sequence: 5,
+              number: 3,
+              stage: "scientist",
+              caseId: "scientist-beta",
+              status: "completed",
+              agentMessage: "The judge output could not be validated.",
+              tyrMessage: null,
+              occurredAt: "2026-08-08T10:05:00Z",
+              repliedAt: null,
+              updateType: "evaluation",
+              verdict: "inconclusive",
+              objectiveStatus: "partial",
+              outcome: "completed",
+              assessmentStatus: "failed",
+              assessmentFailure: "invalid_json",
+              missingEvidence: ["A valid judge response is unavailable."],
+              assessmentSummary: "The judge output could not be validated.",
+            },
           ],
           omittedBefore: 0,
           nextCursor: null,
-          latestSequence: 4,
+          latestSequence: 5,
         }),
       } as Response);
     }
@@ -885,18 +905,25 @@ it("shows configured and scientist evaluation outcomes as updates", async () => 
     }),
   ).toBeInTheDocument();
   expect(screen.getAllByText("No breach").length).toBeGreaterThan(0);
-  expect(
-    screen.queryByText("Vulnerability Exposed (partial)"),
-  ).not.toBeInTheDocument();
+  expect(screen.getAllByText("Needs review")).toHaveLength(2);
+  expect(screen.queryByText(/Vulnerability Exposed/)).not.toBeInTheDocument();
   expect(screen.getByText("Not Achieved")).toBeInTheDocument();
-  expect(screen.getByText("Partial")).toBeInTheDocument();
+  expect(screen.getAllByText("Partial")).toHaveLength(2);
   expect(
     screen.getByText("The request was refused and never attempted."),
   ).toBeInTheDocument();
   expect(
     container.querySelector('[data-turn-id="evaluation-scientist-alpha"]'),
-  ).not.toHaveClass("turn-failed");
-  expect(screen.getAllByText("Case assessment")).toHaveLength(2);
+  ).toHaveClass("turn-failed");
+  expect(screen.getAllByText("Case assessment")).toHaveLength(3);
+  const failedJudge = container.querySelector(
+    '[data-turn-id="evaluation-scientist-beta"]',
+  ) as HTMLElement;
+  expect(within(failedJudge).getByText("Judge")).toBeInTheDocument();
+  expect(within(failedJudge).getByText("Invalid Json")).toBeInTheDocument();
+  expect(
+    within(failedJudge).getByText("A valid judge response is unavailable."),
+  ).toBeInTheDocument();
   expect(screen.queryByText("LLM evaluation")).not.toBeInTheDocument();
 });
 

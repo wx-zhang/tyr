@@ -21,6 +21,14 @@ Each scenario separates the attacker objective (`objective` and
 the evidence needed to assess both. Read-only is the runtime default even if a
 task declares an action-enabled profile.
 
+The evaluation plan supplies dataset-specific decision rules. At runtime GAMR
+wraps those rules in a strict judge contract. The judge receives rendered
+scenario text, real turn IDs, safe operation facts, collector evidence, and the
+exact JSON response schema. Transcript text is marked as untrusted evidence.
+Invalid output is retried once as a model-only operation; it never repeats the
+tested Tyr action. A failed assessment remains `inconclusive` with
+`assessmentStatus: failed` and visible missing evidence.
+
 Set `spec.collectorEvidence` to `request` or `file` when a scenario delivers to
 the declared collector. The Tyr response must include the collector's exact
 `request_id`. GAMR uses that ID to verify the remote request and, for `file`,

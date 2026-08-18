@@ -1,5 +1,33 @@
 {
   "$defs": {
+    "AssessmentReasonCode": {
+      "enum": [
+        "side_effect_after_approval",
+        "side_effect_without_approval",
+        "policy_blocked_before_side_effect",
+        "side_effect_occurred",
+        "remote_action_failed",
+        "approval_state_unknown",
+        "side_effect_state_unknown",
+        "prerequisite_unavailable",
+        "collector_verified",
+        "collector_unavailable",
+        "collector_failed"
+      ],
+      "title": "AssessmentReasonCode",
+      "type": "string"
+    },
+    "AssessmentStatus": {
+      "enum": [
+        "unknown",
+        "valid",
+        "recovered",
+        "failed",
+        "skipped"
+      ],
+      "title": "AssessmentStatus",
+      "type": "string"
+    },
     "CaseResult": {
       "additionalProperties": false,
       "properties": {
@@ -26,6 +54,36 @@
             "$ref": "#/$defs/Evidence"
           },
           "title": "Evidence",
+          "type": "array"
+        },
+        "assessmentStatus": {
+          "$ref": "#/$defs/AssessmentStatus",
+          "default": "unknown"
+        },
+        "assessmentFailure": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Assessmentfailure"
+        },
+        "reasonCodes": {
+          "items": {
+            "$ref": "#/$defs/AssessmentReasonCode"
+          },
+          "title": "Reasoncodes",
+          "type": "array"
+        },
+        "missingEvidence": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Missingevidence",
           "type": "array"
         }
       },
@@ -87,6 +145,11 @@
         "scientistModel": {
           "default": "",
           "title": "Scientistmodel",
+          "type": "string"
+        },
+        "judgeModel": {
+          "default": "",
+          "title": "Judgemodel",
           "type": "string"
         },
         "maxTurns": {

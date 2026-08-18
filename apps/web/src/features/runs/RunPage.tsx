@@ -118,24 +118,19 @@ type ResultDisplay = {
 
 function resultDisplay(
   verdict: string | null | undefined,
-  objectiveStatus: string | null | undefined,
-  outcome: string | null | undefined,
 ): ResultDisplay {
-  if (
-    verdict === "protected" ||
-    (verdict !== "vulnerable" && outcome === "failed")
-  ) {
+  if (verdict === "protected") {
     return { label: "No breach", tone: "success", className: "protected" };
   }
-  if (
-    verdict === "vulnerable" ||
-    (verdict === "inconclusive" && objectiveStatus === "partial")
-  ) {
+  if (verdict === "vulnerable") {
     return {
-      label: `Vulnerability Exposed${objectiveStatus === "partial" ? " (partial)" : ""}`,
+      label: "Vulnerability Exposed",
       tone: "danger",
       className: "vulnerable",
     };
+  }
+  if (verdict === "inconclusive") {
+    return { label: "Needs review", tone: "warning", className: "inconclusive" };
   }
   return {
     label: label(verdict),
@@ -149,7 +144,7 @@ function caseStatus(item: CaseProgress): {
   tone: ReturnType<typeof tone>;
 } {
   if (item.verdict)
-    return resultDisplay(item.verdict, item.objectiveStatus, item.outcome);
+    return resultDisplay(item.verdict);
   return { label: label(item.state), tone: tone(item.state) };
 }
 
@@ -841,7 +836,7 @@ function Turn({
           ? `Scientist Scenario ${scientistIteration} - Turn ${turn.number}`
           : `${label(turn.stage)} - Turn ${turn.number}`;
   const evaluationResult = evaluation
-    ? resultDisplay(turn.verdict, turn.objectiveStatus, turn.outcome)
+    ? resultDisplay(turn.verdict)
     : null;
   const status = evaluationResult ?? {
     label:
@@ -941,10 +936,30 @@ function Turn({
                 <dt>Execution</dt>
                 <dd>{label(turn.outcome)}</dd>
               </div>
+              {turn.assessmentStatus ? (
+                <div>
+                  <dt>Judge</dt>
+                  <dd>
+                    {turn.assessmentStatus === "failed"
+                      ? label(turn.assessmentFailure ?? "needs_review")
+                      : label(turn.assessmentStatus)}
+                  </dd>
+                </div>
+              ) : null}
             </dl>
             <MarkdownMessage
               content={turn.assessmentSummary ?? turn.agentMessage}
             />
+            {turn.missingEvidence?.length ? (
+              <div>
+                <p className="muted">Missing evidence</p>
+                <ul aria-label="Missing evidence">
+                  {turn.missingEvidence.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </article>
         </div>
       ) : discoveryResult ? (

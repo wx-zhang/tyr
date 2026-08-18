@@ -58,6 +58,10 @@ class CaseProgress(BaseModel):
     objective_status: str | None = Field(default=None, alias="objectiveStatus")
     outcome: str | None = None
     summary: str | None = None
+    assessment_status: str | None = Field(default=None, alias="assessmentStatus")
+    assessment_failure: str | None = Field(default=None, alias="assessmentFailure")
+    reason_codes: list[str] = Field(default_factory=list, alias="reasonCodes")
+    missing_evidence: list[str] = Field(default_factory=list, alias="missingEvidence")
     latest_sequence: int | None = Field(default=None, alias="latestSequence")
 
     model_config = {"populate_by_name": True}

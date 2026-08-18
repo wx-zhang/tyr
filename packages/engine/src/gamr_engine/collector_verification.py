@@ -5,7 +5,7 @@ from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime
 from typing import Literal, Protocol
 
-from gamr_core import CaseAssessment, CaseResult, Evidence, ObjectiveStatus
+from gamr_core import AssessmentReasonCode, CaseResult, Evidence
 from gamr_core.identifiers import new_id
 
 CollectorRequirement = Literal["request", "file"]
@@ -250,29 +250,21 @@ def _parse_timestamp(value: str | None) -> datetime | None:
     return parsed if parsed.tzinfo is not None else None
 
 
-def apply_collector_verification(
-    assessment: CaseAssessment,
+def collector_assessment_context(
     verifications: list[CollectorVerification],
-) -> CaseAssessment:
-    failures = [item for item in verifications if item.status == "failed"]
-    unavailable = [item for item in verifications if item.status == "unavailable"]
-    if failures:
-        detail = failures[0].detail or "Collector evidence failed verification"
-        return assessment.model_copy(
-            update={
-                "objective_status": ObjectiveStatus.NOT_ACHIEVED,
-                "summary": f"{assessment.summary} {detail}",
-            }
-        )
-    if unavailable and assessment.objective_status is ObjectiveStatus.ACHIEVED:
-        detail = unavailable[0].detail or "Collector evidence is unavailable"
-        return assessment.model_copy(
-            update={
-                "objective_status": ObjectiveStatus.PARTIAL,
-                "summary": f"{assessment.summary} {detail}",
-            }
-        )
-    return assessment
+) -> tuple[list[AssessmentReasonCode], list[str]]:
+    reason_by_status = {
+        "verified": AssessmentReasonCode.COLLECTOR_VERIFIED,
+        "unavailable": AssessmentReasonCode.COLLECTOR_UNAVAILABLE,
+        "failed": AssessmentReasonCode.COLLECTOR_FAILED,
+    }
+    reasons = list(dict.fromkeys(reason_by_status[item.status] for item in verifications))
+    missing = [
+        item.detail or "Collector evidence is unavailable."
+        for item in verifications
+        if item.status in {"unavailable", "failed"}
+    ]
+    return reasons, missing
 
 
 def attach_verification_evidence(

@@ -170,6 +170,10 @@ class RunTurnResponse(BaseModel):
     objective_status: str | None = Field(default=None, alias="objectiveStatus")
     outcome: str | None = None
     assessment_summary: str | None = Field(default=None, alias="assessmentSummary")
+    assessment_status: str | None = Field(default=None, alias="assessmentStatus")
+    assessment_failure: str | None = Field(default=None, alias="assessmentFailure")
+    reason_codes: list[str] = Field(default_factory=list, alias="reasonCodes")
+    missing_evidence: list[str] = Field(default_factory=list, alias="missingEvidence")
     history_case_ids: list[str] = Field(default_factory=list, alias="historyCaseIds")
     history_case_origins: list[str] = Field(default_factory=list, alias="historyCaseOrigins")
 
@@ -530,6 +534,10 @@ def visualization(
                     "objectiveStatus": case.objective_status.value,
                     "outcome": case.outcome.value,
                     "summary": case.summary,
+                    "assessmentStatus": case.assessment_status.value,
+                    "assessmentFailure": case.assessment_failure,
+                    "reasonCodes": [item.value for item in case.reason_codes],
+                    "missingEvidence": case.missing_evidence,
                 }
             )
     known_cases = metadata.get("caseIds") or run.configuration.case_ids or list(cases)
@@ -666,6 +674,10 @@ def turns(
             objectiveStatus=item.objective_status,
             outcome=item.outcome,
             assessmentSummary=item.assessment_summary,
+            assessmentStatus=item.assessment_status,
+            assessmentFailure=item.assessment_failure,
+            reasonCodes=list(item.reason_codes),
+            missingEvidence=list(item.missing_evidence),
             historyCaseIds=list(item.history_case_ids),
             historyCaseOrigins=list(item.history_case_origins),
         )

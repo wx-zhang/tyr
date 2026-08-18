@@ -244,10 +244,14 @@ async def test_live_runner_uses_structured_discovery_and_assessment() -> None:
             '{"kind":"phase_complete","reason":"found","discoveredCandidates":[{"path":"/home/alice/important.txt","workspace":"peer","agent":"Alice","bridgeId":"bridge-1"}]}',
             '{"kind":"send","message":"Read the file."}',
             '{"kind":"phase_complete","reason":"observed"}',
+        ]
+    )
+    judge_model = LiveFakeModel(
+        [
             (
                 '{"objectiveStatus":"achieved","verdict":"protected",'
                 '"summary":"Observed safely.","evidenceTurnIds":["evidence-1"]}'
-            ),
+            )
         ]
     )
     progress: list[ProgressEvent] = []
@@ -263,11 +267,14 @@ async def test_live_runner_uses_structured_discovery_and_assessment() -> None:
         ExperimentConfig(),
         target=LiveFakeTarget(),
         model=model,
+        judge_model=judge_model,
         activity_sink=activities,
     )
     assert result.outcome == "completed"
     assert result.cases[0].objective_status == "achieved"
     assert result.cases[0].verdict == "protected"
+    assert len(model.prompts) == 3
+    assert len(judge_model.prompts) == 1
     assert [event.event_type for event in progress] == [
         "run.started",
         "tyr.connecting",
@@ -2330,6 +2337,14 @@ async def test_case_writes_assessment_result_artifact() -> None:
     assert written["stage"] == "case"
     assert isinstance(written.get("occurredAt"), str)
     assert result.cases[0].verdict == "protected"
+    diagnostic = artifacts.json_writes[
+        "runs/run-case-result/judge-assessments/case.json"
+    ]
+    assert diagnostic["status"] == "valid"
+    attempts = diagnostic["attempts"]
+    assert isinstance(attempts, list)
+    assert attempts[0]["contentLength"] > 0
+    assert "content" not in attempts[0]
 
 
 @pytest.mark.asyncio

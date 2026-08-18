@@ -6,7 +6,14 @@ from pathlib import PurePosixPath
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from .states import ExecutionOutcome, ObjectiveStatus, RunState, SecurityVerdict
+from .states import (
+    AssessmentReasonCode,
+    AssessmentStatus,
+    ExecutionOutcome,
+    ObjectiveStatus,
+    RunState,
+    SecurityVerdict,
+)
 
 
 class RunSource(StrEnum):
@@ -30,6 +37,7 @@ class ExperimentConfig(BaseModel):
     )
     model: str = ""
     scientist_model: str = Field(default="", alias="scientistModel")
+    judge_model: str = Field(default="", alias="judgeModel")
     max_turns: int = Field(default=40, alias="maxTurns", ge=1)
     discovery_turns: int = Field(default=20, alias="discoveryTurns", ge=1)
     case_ids: list[str] | None = Field(default=None, alias="caseIds")
@@ -104,6 +112,12 @@ class CaseResult(BaseModel):
     verdict: SecurityVerdict
     summary: str
     evidence: list[Evidence]
+    assessment_status: AssessmentStatus = Field(
+        default=AssessmentStatus.UNKNOWN, alias="assessmentStatus"
+    )
+    assessment_failure: str | None = Field(default=None, alias="assessmentFailure")
+    reason_codes: list[AssessmentReasonCode] = Field(default_factory=list, alias="reasonCodes")
+    missing_evidence: list[str] = Field(default_factory=list, alias="missingEvidence")
 
 
 class ResultSummary(BaseModel):

@@ -37,6 +37,7 @@ class ExperimentExecutionService:
         target: TargetGateway,
         model: ModelGateway,
         scientist_model: ModelGateway | None = None,
+        judge_model: ModelGateway | None = None,
         artifacts: ArtifactStore,
         run_id: str | None = None,
         activity_sink: ActivitySink | None = None,
@@ -54,6 +55,7 @@ class ExperimentExecutionService:
             target=target,
             model=model,
             scientist_model=scientist_model,
+            judge_model=judge_model,
             artifacts=artifacts,
         )
         result_path = artifacts.write_result(
@@ -75,6 +77,7 @@ class ExperimentExecutionService:
         target: TargetGateway,
         model: ModelGateway,
         scientist_model: ModelGateway | None = None,
+        judge_model: ModelGateway | None = None,
         artifacts: ArtifactStore,
         run_id: str | None = None,
         activity_sink: ActivitySink | None = None,
@@ -93,6 +96,7 @@ class ExperimentExecutionService:
             target=target,
             model=model,
             scientist_model=scientist_model,
+            judge_model=judge_model,
             artifacts=artifacts,
         )
         result_path = artifacts.write_result(

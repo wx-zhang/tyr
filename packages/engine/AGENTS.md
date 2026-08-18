@@ -11,6 +11,7 @@ Keep all provider and persistence access behind protocols. CLI and API use the s
 ## Source map
 
 `runner.py` is the shared discovery/case engine and emits typed activities,
+`assessment.py` builds and validates the evidence judge contract,
 `execution.py` finalizes the shared JSON result and report,
 `chat.py` is the interactive tool loop, `reporting.py` derives Markdown, and
 `ports/` contains provider, artifact, and activity-sink interfaces.

@@ -7,6 +7,16 @@ class ModelGateway(Protocol):
     async def complete(self, prompt: str) -> dict[str, object]: ...
 
 
+class StructuredModelGateway(ModelGateway, Protocol):
+    async def complete_structured(
+        self,
+        prompt: str,
+        *,
+        system: str,
+        json_schema: dict[str, object],
+    ) -> dict[str, object]: ...
+
+
 class ChatModelGateway(Protocol):
     async def chat(
         self,
