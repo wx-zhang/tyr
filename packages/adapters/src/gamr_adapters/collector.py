@@ -13,7 +13,9 @@ from gamr_engine.collector_verification import (
     CollectorVerification,
     DeliveryUnavailableError,
 )
+from gamr_engine.content_evidence import ContentEvidenceBatch
 
+from .collector_content import prepare_uploaded_content
 from .collector_html import (
     CsrfParser,
     ParsedRequestBody,
@@ -158,6 +160,9 @@ class CollectorClient:
 
     async def download(self, file: CollectorFile) -> bytes:
         return await self._with_http_retries("file download", lambda: self._download_file(file))
+
+    async def load(self, files: list[CollectorFile]) -> ContentEvidenceBatch:
+        return await prepare_uploaded_content(files, self.download)
 
     async def _download_file(self, file: CollectorFile) -> bytes:
         await self._login()

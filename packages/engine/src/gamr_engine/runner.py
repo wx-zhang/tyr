@@ -16,6 +16,7 @@ from gamr_core import (
     AssessmentStatus,
     CaseAssessment,
     CaseResult,
+    ContentOverlapResult,
     DiscoveryCandidate,
     DiscoveryPlan,
     EvaluationPlan,
@@ -51,6 +52,8 @@ from .collector_verification import (
     attach_verification_evidence,
     collector_assessment_context,
 )
+from .content_evidence import AssessmentReference, ContentEvidenceProvider
+from .content_pipeline import ContentAssessmentPipeline, content_assessment_context
 from .ports.artifacts import ActivitySink, ArtifactStore
 from .ports.models import ModelGateway
 from .ports.targets import TargetGateway
@@ -159,6 +162,7 @@ class LoadedTask:
     discovery: DiscoveryPlan | None = None
     methodology: PromptBundle | None = None
     evaluation: EvaluationPlan | None = None
+    assessment_reference: AssessmentReference | None = None
 
     @property
     def digest(self) -> str:
@@ -222,12 +226,14 @@ class ExperimentRunner:
         progress: ProgressCallback | None = None,
         activity_sink: ActivitySink | None = None,
         delivery_verifier: DeliveryVerifier | None = None,
+        content_evidence_provider: ContentEvidenceProvider | None = None,
     ) -> None:
         self._progress = progress
         self._activity_sink = activity_sink
         self._activity_sequences: dict[str, int] = {}
         self._collector_verification = CollectorVerificationService(delivery_verifier)
         self._assessment = AssessmentService()
+        self._content_pipeline = ContentAssessmentPipeline(content_evidence_provider)
 
     async def run(
         self,
@@ -999,7 +1005,17 @@ class ExperimentRunner:
             scenario, result.transcript, run_id, artifacts, phase
         )
         verifications = verification.items
-        if result.error:
+        content_overlap = await self._assess_content(
+            dataset,
+            scenario,
+            verifications,
+            judge_model,
+            run_id,
+            case_id,
+            artifacts,
+        )
+        verified_content = bool(content_overlap and content_overlap.checked_files)
+        if result.error and not verified_content:
             case = self._case_result(
                 scenario,
                 outcome=ExecutionOutcome.FAILED,
@@ -1039,6 +1055,7 @@ class ExperimentRunner:
             expected_control=expected_control,
             success_criteria=success,
             verifications=verifications,
+            content_overlap=content_overlap,
             run_id=run_id,
             case_id=case_id,
             artifacts=artifacts,
@@ -1056,11 +1073,18 @@ class ExperimentRunner:
                 missingEvidence=["A valid structured judge assessment is unavailable."],
             )
         collector_reasons, collector_missing = collector_assessment_context(verifications)
+        content_reasons, content_missing = content_assessment_context(content_overlap)
         assessment = assessment.model_copy(
             update={
-                "reason_codes": list(dict.fromkeys([*assessment.reason_codes, *collector_reasons])),
+                "reason_codes": list(
+                    dict.fromkeys(
+                        [*assessment.reason_codes, *collector_reasons, *content_reasons]
+                    )
+                ),
                 "missing_evidence": list(
-                    dict.fromkeys([*assessment.missing_evidence, *collector_missing])
+                    dict.fromkeys(
+                        [*assessment.missing_evidence, *collector_missing, *content_missing]
+                    )
                 ),
             }
         )
@@ -1082,7 +1106,7 @@ class ExperimentRunner:
         )
         case = self._case_result(
             scenario,
-            outcome=ExecutionOutcome.COMPLETED,
+            outcome=ExecutionOutcome.FAILED if result.error else ExecutionOutcome.COMPLETED,
             objective_status=assessment.objective_status,
             verdict=assessment.verdict,
             summary=assessment.summary,
@@ -1091,6 +1115,7 @@ class ExperimentRunner:
             assessment_failure=assessment_outcome.failure,
             reason_codes=assessment.reason_codes,
             missing_evidence=assessment.missing_evidence,
+            content_overlap=content_overlap,
         )
         case = attach_verification_evidence(case, verification, turn_ids)
         self._write_case_result(artifacts, run_id, case, stage=phase)
@@ -1099,7 +1124,7 @@ class ExperimentRunner:
             run_id,
             phase=phase,
             case_id=case_id,
-            detail=f"completed · {assessment.verdict.value}",
+            detail=f"{'failed' if result.error else 'completed'} · {assessment.verdict.value}",
         )
         record = CaseRecord(
             scenario=scenario,
@@ -1111,7 +1136,7 @@ class ExperimentRunner:
             transcript=result.transcript,
             origin="scientist" if phase == "scientist" else "base",
         )
-        return record, None
+        return record, result.error
 
     async def _converse(
         self,
@@ -1523,6 +1548,7 @@ class ExperimentRunner:
         expected_control: str,
         success_criteria: str,
         verifications: list[CollectorVerification],
+        content_overlap: ContentOverlapResult | None,
         run_id: str,
         case_id: str,
         artifacts: ArtifactStore | None,
@@ -1541,11 +1567,13 @@ class ExperimentRunner:
             success_criteria=success_criteria or "not supplied",
             transcript=transcript,
             verifications=verifications,
+            content_overlap=content_overlap,
         )
         outcome = await self._assessment.assess(
             model=model,
             prompt=prompt,
             valid_turn_ids=set(self._turn_ids(transcript)),
+            content_overlap=content_overlap,
         )
         if artifacts is not None:
             safe_id = _UNSAFE_ID_CHAR.sub("-", case_id)[:128] or "case"
@@ -1554,6 +1582,27 @@ class ExperimentRunner:
                 outcome.diagnostic,
             )
         return outcome
+
+    async def _assess_content(
+        self,
+        task: LoadedTask,
+        scenario: Scenario,
+        verifications: list[CollectorVerification],
+        model: ModelGateway,
+        run_id: str,
+        case_id: str,
+        artifacts: ArtifactStore | None,
+    ) -> ContentOverlapResult | None:
+        reference = task.assessment_reference
+        if reference is None or scenario.spec.collector_evidence != "file":
+            return None
+        outcome = await self._content_pipeline.assess(reference, verifications, model)
+        if artifacts is not None:
+            safe_id = _UNSAFE_ID_CHAR.sub("-", case_id)[:128] or "case"
+            artifacts.write_json(
+                f"runs/{run_id}/content-assessments/{safe_id}.json", outcome.diagnostic
+            )
+        return outcome.result
 
     @staticmethod
     def _judge_observed_facts(result: dict[str, object]) -> dict[str, object]:
@@ -2047,6 +2096,7 @@ class ExperimentRunner:
         assessment_failure: str | None = None,
         reason_codes: list[AssessmentReasonCode] | None = None,
         missing_evidence: list[str] | None = None,
+        content_overlap: ContentOverlapResult | None = None,
     ) -> CaseResult:
         return CaseResult(
             scenarioId=scenario.metadata.id,
@@ -2058,6 +2108,7 @@ class ExperimentRunner:
             assessmentFailure=assessment_failure,
             reasonCodes=reason_codes or [],
             missingEvidence=missing_evidence or [],
+            contentOverlap=content_overlap,
             evidence=[
                 Evidence(turnId=turn_id, artifact=f"raw/{turn_id}.json") for turn_id in turn_ids
             ],

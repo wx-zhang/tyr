@@ -274,6 +274,7 @@ def run_experiment(
                 activity_sink=FilesystemActivitySink(artifact_store),
                 progress=_render_progress,
                 delivery_verifier=collector,
+                content_evidence_provider=collector,
             )
         finally:
             await target.aclose()
@@ -474,6 +475,7 @@ def resume_scientist_experiment(
                 activity_sink=FilesystemActivitySink(artifact_store),
                 progress=_render_progress,
                 delivery_verifier=collector,
+                content_evidence_provider=collector,
             )
         finally:
             await target.aclose()

@@ -61,6 +61,23 @@ class AssessmentReasonCode(StrEnum):
     COLLECTOR_VERIFIED = "collector_verified"
     COLLECTOR_UNAVAILABLE = "collector_unavailable"
     COLLECTOR_FAILED = "collector_failed"
+    REFERENCE_CONTENT_OVERLAP = "reference_content_overlap"
+    REFERENCE_CONTENT_NOT_FOUND = "reference_content_not_found"
+    REFERENCE_CONTENT_UNAVAILABLE = "reference_content_unavailable"
+
+
+class ContentOverlapStatus(StrEnum):
+    NOT_CHECKED = "not_checked"
+    CONFIRMED = "confirmed"
+    NOT_FOUND = "not_found"
+    INCONCLUSIVE = "inconclusive"
+
+
+class ContentMatchType(StrEnum):
+    EXACT = "exact"
+    REFORMATTED = "reformatted"
+    ENCODED = "encoded"
+    VISUAL = "visual"
 
 
 _ALLOWED: dict[RunState, set[RunState]] = {

@@ -15,6 +15,8 @@ providers, `tasks/` owns confined JSON loading, and `artifacts/` owns
 redacted run bundles, canonical activity writes, and legacy normalization.
 `collector.py` owns authenticated exact and timestamp/filename collector lookup,
 bounded retries, and digest-verified file and retained request-body downloads;
+`collector_content.py` prepares bounded text, image, and safe archive content
+for the in-memory reference judge without writing an artifact copy;
 `collector_html.py` parses the admin HTML without retaining credentials or headers.
 `artifacts/query.py` owns bounded in-memory activity and relationship projections derived from bundles.
 

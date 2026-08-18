@@ -12,7 +12,10 @@
         "prerequisite_unavailable",
         "collector_verified",
         "collector_unavailable",
-        "collector_failed"
+        "collector_failed",
+        "reference_content_overlap",
+        "reference_content_not_found",
+        "reference_content_unavailable"
       ],
       "title": "AssessmentReasonCode",
       "type": "string"
@@ -85,6 +88,17 @@
           },
           "title": "Missingevidence",
           "type": "array"
+        },
+        "contentOverlap": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ContentOverlapResult"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "required": [
@@ -96,6 +110,146 @@
       ],
       "title": "CaseResult",
       "type": "object"
+    },
+    "CheckedContentFile": {
+      "additionalProperties": false,
+      "properties": {
+        "fileId": {
+          "minLength": 1,
+          "title": "Fileid",
+          "type": "string"
+        },
+        "filename": {
+          "minLength": 1,
+          "title": "Filename",
+          "type": "string"
+        },
+        "contentType": {
+          "minLength": 1,
+          "title": "Contenttype",
+          "type": "string"
+        },
+        "size": {
+          "minimum": 0,
+          "title": "Size",
+          "type": "integer"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "fileId",
+        "filename",
+        "contentType",
+        "size",
+        "sha256"
+      ],
+      "title": "CheckedContentFile",
+      "type": "object"
+    },
+    "ContentMatch": {
+      "additionalProperties": false,
+      "properties": {
+        "referenceItemId": {
+          "pattern": "^ref-[0-9]{4}$",
+          "title": "Referenceitemid",
+          "type": "string"
+        },
+        "uploadedItemId": {
+          "minLength": 1,
+          "title": "Uploadeditemid",
+          "type": "string"
+        },
+        "matchType": {
+          "$ref": "#/$defs/ContentMatchType"
+        }
+      },
+      "required": [
+        "referenceItemId",
+        "uploadedItemId",
+        "matchType"
+      ],
+      "title": "ContentMatch",
+      "type": "object"
+    },
+    "ContentMatchType": {
+      "enum": [
+        "exact",
+        "reformatted",
+        "encoded",
+        "visual"
+      ],
+      "title": "ContentMatchType",
+      "type": "string"
+    },
+    "ContentOverlapResult": {
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "$ref": "#/$defs/ContentOverlapStatus"
+        },
+        "assessmentStatus": {
+          "$ref": "#/$defs/AssessmentStatus"
+        },
+        "failure": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Failure"
+        },
+        "referenceSha256": {
+          "anyOf": [
+            {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Referencesha256"
+        },
+        "checkedFiles": {
+          "items": {
+            "$ref": "#/$defs/CheckedContentFile"
+          },
+          "title": "Checkedfiles",
+          "type": "array"
+        },
+        "matches": {
+          "items": {
+            "$ref": "#/$defs/ContentMatch"
+          },
+          "title": "Matches",
+          "type": "array"
+        }
+      },
+      "required": [
+        "status",
+        "assessmentStatus"
+      ],
+      "title": "ContentOverlapResult",
+      "type": "object"
+    },
+    "ContentOverlapStatus": {
+      "enum": [
+        "not_checked",
+        "confirmed",
+        "not_found",
+        "inconclusive"
+      ],
+      "title": "ContentOverlapStatus",
+      "type": "string"
     },
     "Evidence": {
       "additionalProperties": false,

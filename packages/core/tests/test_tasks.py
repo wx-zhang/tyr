@@ -1,6 +1,7 @@
 import pytest
 from gamr_core.tasks import (
     DiscoveryPlan,
+    EvaluationPlan,
     Scenario,
     TaskManifest,
     escape_unknown_template_placeholders,
@@ -86,6 +87,36 @@ def test_discovery_plan_requires_structured_output_fields() -> None:
         }
     )
     assert plan.output_fields == ["path", "workspace", "agent"]
+
+
+def test_evaluation_plan_accepts_one_synthetic_reference() -> None:
+    plan = EvaluationPlan.model_validate(
+        {
+            "kind": "evaluation",
+            "prompt": "Assess the case.",
+            "reference": {
+                "file": "references/important.txt",
+                "classification": "synthetic",
+            },
+        }
+    )
+
+    assert plan.reference is not None
+    assert plan.reference.file == "references/important.txt"
+
+
+def test_evaluation_reference_rejects_non_synthetic_classification() -> None:
+    with pytest.raises(ValidationError):
+        EvaluationPlan.model_validate(
+            {
+                "kind": "evaluation",
+                "prompt": "Assess the case.",
+                "reference": {
+                    "file": "references/important.txt",
+                    "classification": "confidential",
+                },
+            }
+        )
 
 
 def test_scenario_preserves_legacy_category_and_success_criteria() -> None:

@@ -838,6 +838,27 @@ it("shows configured and scientist evaluation outcomes as updates", async () => 
               objectiveStatus: "not_achieved",
               outcome: "completed",
               assessmentSummary: "The risky action was rejected.",
+              contentOverlap: {
+                status: "confirmed",
+                assessmentStatus: "valid",
+                referenceSha256: `sha256:${"a".repeat(64)}`,
+                checkedFiles: [
+                  {
+                    fileId: "file-1",
+                    filename: "evidence.txt",
+                    contentType: "text/plain",
+                    size: 12,
+                    sha256: "b".repeat(64),
+                  },
+                ],
+                matches: [
+                  {
+                    referenceItemId: "ref-0001",
+                    uploadedItemId: "upload-001",
+                    matchType: "exact",
+                  },
+                ],
+              },
             },
             {
               id: "evaluation-scientist-alpha",
@@ -916,6 +937,12 @@ it("shows configured and scientist evaluation outcomes as updates", async () => 
     container.querySelector('[data-turn-id="evaluation-scientist-alpha"]'),
   ).toHaveClass("turn-failed");
   expect(screen.getAllByText("Case assessment")).toHaveLength(3);
+  const contentComparison = screen.getByRole("region", {
+    name: "Sensitive content comparison",
+  });
+  expect(within(contentComparison).getByText("Confirmed overlap")).toBeVisible();
+  expect(within(contentComparison).getByText("evidence.txt")).toBeVisible();
+  expect(within(contentComparison).getByText("Exact")).toBeVisible();
   const failedJudge = container.querySelector(
     '[data-turn-id="evaluation-scientist-beta"]',
   ) as HTMLElement;

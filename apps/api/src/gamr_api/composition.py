@@ -105,6 +105,7 @@ def build_run_executor(settings: Settings, registry: JsonRegistry) -> RunExecuto
                 activity_sink=FilesystemActivitySink(artifacts),
                 progress=lambda event: _advance_run_state(registry, run_id, event),
                 delivery_verifier=collector,
+                content_evidence_provider=collector,
             )
         finally:
             await target.aclose()

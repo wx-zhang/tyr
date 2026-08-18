@@ -1,6 +1,14 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Protocol
+
+
+@dataclass(frozen=True)
+class ModelImage:
+    uploaded_item_id: str
+    content_type: str
+    content: bytes
 
 
 class ModelGateway(Protocol):
@@ -14,6 +22,18 @@ class StructuredModelGateway(ModelGateway, Protocol):
         *,
         system: str,
         json_schema: dict[str, object],
+    ) -> dict[str, object]: ...
+
+
+class MultimodalStructuredModelGateway(StructuredModelGateway, Protocol):
+    async def complete_multimodal_structured(
+        self,
+        prompt: str,
+        *,
+        images: list[ModelImage],
+        system: str,
+        json_schema: dict[str, object],
+        schema_name: str,
     ) -> dict[str, object]: ...
 
 

@@ -1,7 +1,16 @@
 from datetime import UTC, datetime
 
 import pytest
-from gamr_core import ExperimentConfig, ExperimentRecord, RunRecord, RunSource, RunState
+from gamr_core import (
+    ContentMatchType,
+    ContentOverlapResult,
+    ContentOverlapStatus,
+    ExperimentConfig,
+    ExperimentRecord,
+    RunRecord,
+    RunSource,
+    RunState,
+)
 from pydantic import ValidationError
 
 
@@ -64,3 +73,62 @@ def test_history_run_windows_reject_values_above_the_bound() -> None:
         ExperimentConfig(historyTestRuns=101)
     with pytest.raises(ValidationError):
         ExperimentConfig(historyScientistRuns=101)
+
+
+def test_content_overlap_result_contains_only_safe_provenance() -> None:
+    result = ContentOverlapResult.model_validate(
+        {
+            "status": "confirmed",
+            "assessmentStatus": "valid",
+            "referenceSha256": "sha256:" + "a" * 64,
+            "checkedFiles": [
+                {
+                    "fileId": "file-1",
+                    "filename": "evidence.txt",
+                    "contentType": "text/plain",
+                    "size": 12,
+                    "sha256": "b" * 64,
+                }
+            ],
+            "matches": [
+                {
+                    "referenceItemId": "ref-0001",
+                    "uploadedItemId": "upload-001",
+                    "matchType": "exact",
+                }
+            ],
+        }
+    )
+
+    assert result.status is ContentOverlapStatus.CONFIRMED
+    assert result.matches[0].match_type is ContentMatchType.EXACT
+    assert "content" not in result.model_dump(by_alias=True)
+
+
+@pytest.mark.parametrize(
+    ("status", "matches"),
+    [
+        ("confirmed", []),
+        (
+            "not_found",
+            [
+                {
+                    "referenceItemId": "ref-0001",
+                    "uploadedItemId": "upload-001",
+                    "matchType": "exact",
+                }
+            ],
+        ),
+    ],
+)
+def test_content_overlap_status_and_matches_cannot_disagree(
+    status: str, matches: list[dict[str, str]]
+) -> None:
+    with pytest.raises(ValidationError):
+        ContentOverlapResult.model_validate(
+            {
+                "status": status,
+                "assessmentStatus": "valid",
+                "matches": matches,
+            }
+        )

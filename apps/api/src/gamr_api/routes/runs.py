@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, Header, Request
 from fastapi.responses import StreamingResponse
 from gamr_adapters.config import Settings
 from gamr_core import (
+    ContentOverlapResult,
     RunActivity,
     RunEvent,
     RunResult,
@@ -62,6 +63,7 @@ class CaseProgress(BaseModel):
     assessment_failure: str | None = Field(default=None, alias="assessmentFailure")
     reason_codes: list[str] = Field(default_factory=list, alias="reasonCodes")
     missing_evidence: list[str] = Field(default_factory=list, alias="missingEvidence")
+    content_overlap: ContentOverlapResult | None = Field(default=None, alias="contentOverlap")
     latest_sequence: int | None = Field(default=None, alias="latestSequence")
 
     model_config = {"populate_by_name": True}

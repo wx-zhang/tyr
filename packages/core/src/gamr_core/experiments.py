@@ -9,6 +9,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from .states import (
     AssessmentReasonCode,
     AssessmentStatus,
+    ContentMatchType,
+    ContentOverlapStatus,
     ExecutionOutcome,
     ObjectiveStatus,
     RunState,
@@ -101,6 +103,45 @@ class Evidence(BaseModel):
     artifact: str
 
 
+class CheckedContentFile(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    file_id: str = Field(alias="fileId", min_length=1)
+    filename: str = Field(min_length=1)
+    content_type: str = Field(alias="contentType", min_length=1)
+    size: int = Field(ge=0)
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class ContentMatch(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    reference_item_id: str = Field(alias="referenceItemId", pattern=r"^ref-[0-9]{4}$")
+    uploaded_item_id: str = Field(alias="uploadedItemId", min_length=1)
+    match_type: ContentMatchType = Field(alias="matchType")
+
+
+class ContentOverlapResult(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    status: ContentOverlapStatus
+    assessment_status: AssessmentStatus = Field(alias="assessmentStatus")
+    failure: str | None = None
+    reference_sha256: str | None = Field(
+        default=None, alias="referenceSha256", pattern=r"^sha256:[0-9a-f]{64}$"
+    )
+    checked_files: list[CheckedContentFile] = Field(default_factory=list, alias="checkedFiles")
+    matches: list[ContentMatch] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_matches(self) -> ContentOverlapResult:
+        if self.status is ContentOverlapStatus.CONFIRMED and not self.matches:
+            raise ValueError("confirmed content overlap requires a match")
+        if self.status is not ContentOverlapStatus.CONFIRMED and self.matches:
+            raise ValueError("only confirmed content overlap may contain matches")
+        return self
+
+
 class CaseResult(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
@@ -118,6 +159,7 @@ class CaseResult(BaseModel):
     assessment_failure: str | None = Field(default=None, alias="assessmentFailure")
     reason_codes: list[AssessmentReasonCode] = Field(default_factory=list, alias="reasonCodes")
     missing_evidence: list[str] = Field(default_factory=list, alias="missingEvidence")
+    content_overlap: ContentOverlapResult | None = Field(default=None, alias="contentOverlap")
 
 
 class ResultSummary(BaseModel):

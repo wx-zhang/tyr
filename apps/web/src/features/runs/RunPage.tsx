@@ -139,6 +139,13 @@ function resultDisplay(
   };
 }
 
+function contentOverlapLabel(status: string): string {
+  if (status === "confirmed") return "Confirmed overlap";
+  if (status === "not_found") return "No overlap found";
+  if (status === "inconclusive") return "Needs review";
+  return "Not checked";
+}
+
 function caseStatus(item: CaseProgress): {
   label: string;
   tone: ReturnType<typeof tone>;
@@ -947,6 +954,44 @@ function Turn({
                 </div>
               ) : null}
             </dl>
+            {turn.contentOverlap ? (
+              <section aria-label="Sensitive content comparison">
+                <p className="muted">Sensitive content comparison</p>
+                <dl className="evaluation-facts">
+                  <div>
+                    <dt>Result</dt>
+                    <dd>{contentOverlapLabel(turn.contentOverlap.status)}</dd>
+                  </div>
+                  <div>
+                    <dt>Files checked</dt>
+                    <dd>{turn.contentOverlap.checkedFiles?.length ?? 0}</dd>
+                  </div>
+                  <div>
+                    <dt>Match types</dt>
+                    <dd>
+                      {turn.contentOverlap.matches?.length
+                        ? [
+                            ...new Set(
+                              turn.contentOverlap.matches.map(
+                                (match) => match.matchType,
+                              ),
+                            ),
+                          ]
+                            .map(label)
+                            .join(", ")
+                        : "—"}
+                    </dd>
+                  </div>
+                </dl>
+                {turn.contentOverlap.checkedFiles?.length ? (
+                  <ul aria-label="Files checked for sensitive content">
+                    {turn.contentOverlap.checkedFiles.map((file) => (
+                      <li key={`${file.fileId}-${file.sha256}`}>{file.filename}</li>
+                    ))}
+                  </ul>
+                ) : null}
+              </section>
+            ) : null}
             <MarkdownMessage
               content={turn.assessmentSummary ?? turn.agentMessage}
             />

@@ -27,6 +27,12 @@ Live commands need `TYR_MCP_TOKEN`, `OPENROUTER_API_KEY`, and `TYR_LOOP_MODEL` s
 Set `TYR_LOOP_JUDGE_MODEL` when evaluation should use a model independent from the model
 that executes scenarios. If it is unset, evaluation uses `TYR_LOOP_MODEL`.
 
+Evaluation plans may associate one synthetic UTF-8 reference file with a dataset. For
+collector-verified file cases, GAMR compares uploaded text, JSON, safe archives, and PNG/JPEG
+images with that reference before the breach judge runs. Raw contents are sent only to the
+configured judge provider and are never stored in run artifacts. If no reference is declared,
+the content check is skipped.
+
 Collector-marked scenarios can independently verify delivered requests and files when
 `TYR_COLLECTOR_USERNAME` and `TYR_COLLECTOR_PASSWORD` are set. GAMR persists only request/file
 metadata and SHA-256 values. The run page downloads original files from the collector on demand;

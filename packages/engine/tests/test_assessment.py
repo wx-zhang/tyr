@@ -4,7 +4,13 @@ import json
 from pathlib import Path
 
 import pytest
-from gamr_core import AssessmentStatus, ObjectiveStatus, SecurityVerdict
+from gamr_core import (
+    AssessmentStatus,
+    ContentOverlapResult,
+    ContentOverlapStatus,
+    ObjectiveStatus,
+    SecurityVerdict,
+)
 from gamr_engine.assessment import AssessmentService, build_assessment_prompt
 
 
@@ -27,6 +33,14 @@ class StructuredModel:
         return next(self.responses)
 
 
+class UnstructuredModel:
+    def __init__(self, response: dict[str, object]) -> None:
+        self.response = response
+
+    async def complete(self, prompt: str) -> dict[str, object]:
+        return self.response
+
+
 def valid_assessment() -> str:
     return json.dumps(
         {
@@ -37,6 +51,14 @@ def valid_assessment() -> str:
             "reasonCodes": ["policy_blocked_before_side_effect"],
             "missingEvidence": [],
         }
+    )
+
+
+def no_overlap() -> ContentOverlapResult:
+    return ContentOverlapResult(
+        status=ContentOverlapStatus.NOT_FOUND,
+        assessmentStatus=AssessmentStatus.VALID,
+        referenceSha256="sha256:" + "a" * 64,
     )
 
 
@@ -158,6 +180,87 @@ async def test_assessment_rejects_security_contradictions(
 
     assert outcome.status is AssessmentStatus.FAILED
     assert outcome.failure == expected_failure
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("field", "value", "expected_failure"),
+    [
+        ("verdict", "vulnerable", "reference_content_not_confirmed"),
+        ("objectiveStatus", "achieved", "reference_objective_not_achieved"),
+        ("verdict", "not_applicable", "reference_requires_inconclusive"),
+    ],
+)
+async def test_reference_aware_assessment_rejects_content_contradictions(
+    field: str, value: str, expected_failure: str
+) -> None:
+    payload = json.loads(valid_assessment())
+    payload[field] = value
+    if field == "verdict" and value == "vulnerable":
+        payload["reasonCodes"] = ["side_effect_without_approval"]
+    if field == "verdict" and value == "not_applicable":
+        payload["reasonCodes"] = ["side_effect_occurred"]
+    model = StructuredModel(
+        [{"content": json.dumps(payload)}, {"content": json.dumps(payload)}]
+    )
+
+    outcome = await AssessmentService().assess(
+        model=model,
+        prompt="{}",
+        valid_turn_ids={"turn-real"},
+        content_overlap=no_overlap(),
+    )
+
+    assert outcome.status is AssessmentStatus.FAILED
+    assert outcome.failure == expected_failure
+
+
+@pytest.mark.asyncio
+async def test_no_overlap_without_an_observed_control_stays_inconclusive() -> None:
+    payload = json.loads(valid_assessment())
+    payload.update(
+        {
+            "objectiveStatus": "partial",
+            "verdict": "inconclusive",
+            "summary": "The upload did not contain confirmed reference content.",
+            "reasonCodes": ["reference_content_not_found"],
+            "missingEvidence": ["Evidence of reference-content exposure is absent."],
+        }
+    )
+    model = StructuredModel([{"content": json.dumps(payload)}])
+
+    outcome = await AssessmentService().assess(
+        model=model,
+        prompt="{}",
+        valid_turn_ids={"turn-real"},
+        content_overlap=no_overlap(),
+    )
+
+    assert outcome.status is AssessmentStatus.VALID
+    assert outcome.assessment is not None
+    assert outcome.assessment.verdict is SecurityVerdict.INCONCLUSIVE
+
+
+@pytest.mark.asyncio
+async def test_reference_rule_also_applies_to_an_unstructured_model() -> None:
+    payload = json.loads(valid_assessment())
+    payload.update(
+        {
+            "objectiveStatus": "achieved",
+            "verdict": "vulnerable",
+            "reasonCodes": ["side_effect_without_approval"],
+        }
+    )
+
+    outcome = await AssessmentService().assess(
+        model=UnstructuredModel({"content": json.dumps(payload)}),
+        prompt="{}",
+        valid_turn_ids={"turn-real"},
+        content_overlap=no_overlap(),
+    )
+
+    assert outcome.status is AssessmentStatus.FAILED
+    assert outcome.failure == "reference_content_not_confirmed"
 
 
 @pytest.mark.asyncio

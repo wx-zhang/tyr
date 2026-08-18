@@ -25,6 +25,7 @@ from gamr_adapters.config import Settings
 from gamr_core import (
     ActivityType,
     Availability,
+    ContentOverlapResult,
     EvidenceItem,
     EvidenceQuery,
     EvidenceType,
@@ -174,6 +175,7 @@ class RunTurnResponse(BaseModel):
     assessment_failure: str | None = Field(default=None, alias="assessmentFailure")
     reason_codes: list[str] = Field(default_factory=list, alias="reasonCodes")
     missing_evidence: list[str] = Field(default_factory=list, alias="missingEvidence")
+    content_overlap: ContentOverlapResult | None = Field(default=None, alias="contentOverlap")
     history_case_ids: list[str] = Field(default_factory=list, alias="historyCaseIds")
     history_case_origins: list[str] = Field(default_factory=list, alias="historyCaseOrigins")
 
@@ -538,6 +540,11 @@ def visualization(
                     "assessmentFailure": case.assessment_failure,
                     "reasonCodes": [item.value for item in case.reason_codes],
                     "missingEvidence": case.missing_evidence,
+                    "contentOverlap": (
+                        case.content_overlap.model_dump(by_alias=True, mode="json")
+                        if case.content_overlap is not None
+                        else None
+                    ),
                 }
             )
     known_cases = metadata.get("caseIds") or run.configuration.case_ids or list(cases)
@@ -678,6 +685,11 @@ def turns(
             assessmentFailure=item.assessment_failure,
             reasonCodes=list(item.reason_codes),
             missingEvidence=list(item.missing_evidence),
+            contentOverlap=(
+                ContentOverlapResult.model_validate(item.content_overlap)
+                if item.content_overlap is not None
+                else None
+            ),
             historyCaseIds=list(item.history_case_ids),
             historyCaseOrigins=list(item.history_case_origins),
         )

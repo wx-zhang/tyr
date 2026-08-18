@@ -76,6 +76,7 @@ def test_turns_route_returns_grouped_redacted_conversation(tmp_path: Path) -> No
                 "assessmentFailure": None,
                 "reasonCodes": [],
                 "missingEvidence": [],
+                "contentOverlap": None,
                 "historyCaseIds": [],
             "historyCaseOrigins": [],
         }
@@ -280,6 +281,27 @@ def test_turns_route_exposes_evaluation_fields(tmp_path: Path) -> None:
     result = json.loads(Path("tests/fixtures/run_evidence/completed/result.json").read_text())
     result["runId"] = "run-evaluation"
     result["cases"][0]["summary"] = "Protected despite top-secret"
+    result["cases"][0]["contentOverlap"] = {
+        "status": "confirmed",
+        "assessmentStatus": "valid",
+        "referenceSha256": "sha256:" + "a" * 64,
+        "checkedFiles": [
+            {
+                "fileId": "file-1",
+                "filename": "evidence.txt",
+                "contentType": "text/plain",
+                "size": 12,
+                "sha256": "b" * 64,
+            }
+        ],
+        "matches": [
+            {
+                "referenceItemId": "ref-0001",
+                "uploadedItemId": "upload-001",
+                "matchType": "exact",
+            }
+        ],
+    }
     (bundle / "result.json").write_text(json.dumps(result), encoding="utf-8")
     registry = InMemoryRegistry(
         runs={
@@ -299,6 +321,10 @@ def test_turns_route_exposes_evaluation_fields(tmp_path: Path) -> None:
         assert evaluation["objectiveStatus"] == "not_achieved"
         assert evaluation["outcome"] == "completed"
         assert evaluation["assessmentSummary"] == "Protected despite [REDACTED]"
+        assert evaluation["contentOverlap"]["status"] == "confirmed"
+        assert evaluation["contentOverlap"]["checkedFiles"][0]["filename"] == (
+            "evidence.txt"
+        )
     finally:
         app.dependency_overrides.clear()
 
