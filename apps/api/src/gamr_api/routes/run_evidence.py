@@ -71,9 +71,12 @@ _CASE_STATE = {
     "completed": "completed",
     "active": "active",
     "running": "active",
+    "assessing": "assessing",
+    "assessment": "assessing",
     "failed": "failed",
     "blocked": "blocked",
     "pending": "pending",
+    "cancelled": "cancelled",
 }
 
 
@@ -595,7 +598,7 @@ def visualization(
     current_case_ids = [
         str(item["caseId"])
         for item in cases.values()
-        if item["state"] in {"active", "blocked", "running"}
+        if item["state"] in {"active", "blocked", "running", "assessing"}
     ]
     execution_mode = (
         "scientist_only"

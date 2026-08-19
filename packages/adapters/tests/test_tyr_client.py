@@ -222,3 +222,38 @@ async def test_settle_returns_reply_unchanged_without_any_operation_id() -> None
         await client.aclose()
 
     assert settled == reply
+
+
+@pytest.mark.live_tyr
+@pytest.mark.asyncio
+async def test_live_tyr_concurrent_operations_in_single_mcp_session() -> None:
+    import asyncio
+    import os
+
+    from gamr_adapters.config import Settings
+
+    settings = Settings()
+    tyr_url = os.environ.get("TYR_MCP_URL") or settings.tyr_mcp_url
+    tyr_token = os.environ.get("TYR_MCP_TOKEN") or settings.tyr_mcp_token
+
+    if not tyr_token:
+        pytest.skip("TYR_MCP_TOKEN not configured for live Tyr test")
+
+    client = TyrMcpClient(tyr_url, tyr_token)
+    try:
+        init_result = await client.initialize()
+        assert init_result is not None
+
+        # Execute read-only queries concurrently in one MCP session
+        results = await asyncio.gather(
+            client.query("What tools are available?"),
+            client.query("List current workspace files."),
+            client.query("Show security policies."),
+        )
+
+        assert len(results) == 3
+        for result in results:
+            assert isinstance(result, dict)
+            assert "error" not in result or result.get("error") is None
+    finally:
+        await client.aclose()

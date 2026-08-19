@@ -1,40 +1,29 @@
 from __future__ import annotations
 
 import asyncio
-import json
-import sys
-from datetime import UTC, datetime
 from pathlib import Path
 
 import typer
-from gamr_adapters.artifacts.evidence import FilesystemActivitySink
-from gamr_adapters.artifacts.filesystem import FilesystemArtifactStore
-from gamr_adapters.collector import CollectorClient
 from gamr_adapters.config import Settings
-from gamr_adapters.models.openai_compatible import OpenAICompatibleModel
-from gamr_adapters.tasks.filesystem import (
-    FilesystemTaskRepository,
-    load_task,
-    resolve_task_directory,
-)
-from gamr_adapters.tyr.client import TyrMcpClient
+from gamr_adapters.tasks.filesystem import FilesystemTaskRepository, load_task
 from gamr_core import (
-    ExecutionOutcome,
     ExperimentConfig,
-    RunRecord,
     RunResult,
-    RunSource,
-    RunState,
 )
-from gamr_core.identifiers import new_id
-from gamr_engine import ExecutionOutput, ExperimentExecutionService
 from gamr_engine.runner import ProgressEvent
 from rich.console import Console
-from rich.markdown import Markdown
 from rich.table import Table
 
-from .composition import build_chat_session
+from .chat_cli import run_chat_loop
+from .composition import configured_secrets
+from .experiment_cli import (
+    resume_scientist_command,
+    run_experiment_command,
+)
 from .progress import render_progress
+from .runner_cli import (
+    validate_action_mode,
+)
 
 console = Console()
 app = typer.Typer(
@@ -45,35 +34,13 @@ task_app = typer.Typer(help="Inspect and validate JSON tasks")
 experiment_app = typer.Typer(help="Create and inspect experiment runs")
 result_app = typer.Typer(help="Validate canonical run results")
 
-
-def _configured_secrets(settings: Settings) -> tuple[str, ...]:
-    return tuple(
-        value
-        for value in (
-            settings.tyr_mcp_token,
-            settings.model_api_key,
-            getattr(settings, "collector_username", ""),
-            getattr(settings, "collector_password", ""),
-        )
-        if value
-    )
-
-
-def _collector_client(settings: Settings) -> CollectorClient | None:
-    username = getattr(settings, "collector_username", "")
-    password = getattr(settings, "collector_password", "")
-    if not username or not password:
-        return None
-    return CollectorClient(
-        getattr(settings, "collector_base_url", "https://www.tyr.ai/tyrcli/collector"),
-        username,
-        password,
-    )
-
-
 app.add_typer(task_app, name="task")
 app.add_typer(experiment_app, name="experiment")
 app.add_typer(result_app, name="result")
+
+
+def _configured_secrets(settings: Settings) -> tuple[str, ...]:
+    return configured_secrets(settings)
 
 
 def _render_progress(event: ProgressEvent) -> None:
@@ -142,6 +109,13 @@ def run_experiment(
         [], "--case-id", help="Select a case; repeat to run multiple cases in manifest order."
     ),
     all_cases: bool = typer.Option(False, "--all-cases", help="Run every case in the task."),
+    max_concurrent_cases: int = typer.Option(
+        5,
+        "--max-concurrent-cases",
+        min=1,
+        max=5,
+        help="Maximum concurrent base cases to run.",
+    ),
     scientist_iterations: int = typer.Option(
         0, "--scientist-iterations", min=0, help="Generate and run bounded follow-up scenarios."
     ),
@@ -162,180 +136,23 @@ def run_experiment(
 ) -> None:
     """Run a task through the shared engine and write a JSON bundle."""
 
-    if action_mode not in {"read_only", "approval_required"}:
-        raise typer.BadParameter(
-            "must be read_only or approval_required", param_hint="--action-mode"
-        )
-    if allow_actions:
-        action_mode = "approval_required"
-    if action_mode == "approval_required":
-        if not allow_actions:
-            raise typer.BadParameter(
-                "pass --allow-actions to start an approval_required run",
-                param_hint="--allow-actions",
-            )
-        if not confirm_actions and not sys.stdin.isatty():
-            raise typer.BadParameter(
-                "non-interactive action runs require --confirm-actions",
-                param_hint="--confirm-actions",
-            )
-        if not confirm_actions and not typer.confirm(
-            "Enable action-capable experiment requests? Every Tyr action still requires approval",
-            default=False,
-        ):
-            raise typer.Abort()
-    task = load_task(directory)
-    if case_id and all_cases:
-        raise typer.BadParameter("use --case-id or --all-cases, not both")
-    selected_case_ids = (
-        [scenario.metadata.id for scenario in task.scenarios] if all_cases else case_id or None
+    run_experiment_command(
+        console=console,
+        directory=directory,
+        action_mode=action_mode,
+        model=model,
+        scientist_model=scientist_model,
+        judge_model=judge_model,
+        allow_actions=allow_actions,
+        confirm_actions=confirm_actions,
+        case_id=case_id,
+        all_cases=all_cases,
+        max_concurrent_cases=max_concurrent_cases,
+        scientist_iterations=scientist_iterations,
+        history_test_runs=history_test_runs,
+        history_scientist_runs=history_scientist_runs,
+        render_progress_cb=_render_progress,
     )
-    settings = Settings()
-    selected_model = model or settings.model_name
-    selected_scientist_model = scientist_model or settings.scientist_model_name or selected_model
-    selected_judge_model = (
-        judge_model or getattr(settings, "judge_model_name", "") or selected_model
-    )
-    if not settings.tyr_mcp_token:
-        raise typer.BadParameter("TYR_MCP_TOKEN is required")
-    if not settings.model_api_key:
-        raise typer.BadParameter("OPENROUTER_API_KEY is required")
-    if not selected_model:
-        raise typer.BadParameter("TYR_LOOP_MODEL is required")
-    artifact_store = FilesystemArtifactStore(
-        settings.artifact_root,
-        secrets=_configured_secrets(settings),
-    )
-    collector = _collector_client(settings)
-    target = TyrMcpClient(settings.tyr_mcp_url, settings.tyr_mcp_token)
-    model_gateway = OpenAICompatibleModel(
-        settings.model_base_url,
-        settings.model_api_key,
-        selected_model,
-    )
-    scientist_model_gateway = (
-        model_gateway
-        if selected_scientist_model == selected_model
-        else OpenAICompatibleModel(
-            settings.model_base_url,
-            settings.model_api_key,
-            selected_scientist_model,
-        )
-    )
-    judge_model_gateway = (
-        model_gateway
-        if selected_judge_model == selected_model
-        else OpenAICompatibleModel(
-            settings.model_base_url,
-            settings.model_api_key,
-            selected_judge_model,
-        )
-    )
-
-    configuration = ExperimentConfig(
-        actionMode=action_mode,
-        model=selected_model,
-        scientistModel=selected_scientist_model,
-        judgeModel=selected_judge_model,
-        maxTurns=task.manifest.spec.defaults.max_turns,
-        discoveryTurns=20,
-        caseIds=selected_case_ids,
-        scientistIterations=scientist_iterations,
-        historyTestRuns=history_test_runs,
-        historyScientistRuns=history_scientist_runs,
-    )
-    run_id = new_id()
-    started_at = datetime.now(UTC)
-    run_document = RunRecord(
-        id=run_id,
-        source=RunSource.CLI,
-        task=str(directory),
-        state=RunState.RUNNING,
-        configuration=configuration,
-        createdAt=started_at,
-        updatedAt=started_at,
-    )
-    artifact_store.write_json(
-        f"runs/{run_id}/run.json",
-        run_document.model_dump(by_alias=True, mode="json"),
-    )
-
-    async def run_live() -> ExecutionOutput:
-        try:
-            return await ExperimentExecutionService().execute(
-                task,
-                configuration,
-                run_id=run_id,
-                target=target,
-                model=model_gateway,
-                scientist_model=scientist_model_gateway,
-                judge_model=judge_model_gateway,
-                artifacts=artifact_store,
-                activity_sink=FilesystemActivitySink(artifact_store),
-                progress=_render_progress,
-                delivery_verifier=collector,
-                content_evidence_provider=collector,
-            )
-        finally:
-            await target.aclose()
-            if collector is not None:
-                await collector.aclose()
-
-    try:
-        output = asyncio.run(run_live())
-    except KeyboardInterrupt, asyncio.CancelledError:
-        cancelled_at = datetime.now(UTC)
-        artifact_store.write_json(
-            f"runs/{run_id}/run.json",
-            run_document.model_copy(
-                update={
-                    "state": RunState.CANCELLED,
-                    "error_summary": "Cancelled by operator (Ctrl+C)",
-                    "updated_at": cancelled_at,
-                    "finished_at": cancelled_at,
-                }
-            ).model_dump(by_alias=True, mode="json"),
-        )
-        console.print(f"[yellow]Cancelled[/] run [cyan]{run_id}[/] [dim]· Ctrl+C[/]")
-        raise typer.Exit(code=130) from None
-    except Exception as error:
-        failed_at = datetime.now(UTC)
-        artifact_store.write_json(
-            f"runs/{run_id}/run.json",
-            run_document.model_copy(
-                update={
-                    "state": RunState.FAILED,
-                    "error_summary": f"{type(error).__name__}: {error}",
-                    "updated_at": failed_at,
-                    "finished_at": failed_at,
-                }
-            ).model_dump(by_alias=True, mode="json"),
-        )
-        raise
-    finished_at = datetime.now(UTC)
-    terminal_state = (
-        RunState.FAILED
-        if output.result.outcome
-        in {ExecutionOutcome.FAILED, ExecutionOutcome.ERROR, ExecutionOutcome.INTERRUPTED}
-        else RunState.CANCELLED
-        if output.result.outcome is ExecutionOutcome.CANCELLED
-        else RunState.COMPLETED
-    )
-    artifact_store.write_json(
-        f"runs/{run_id}/run.json",
-        run_document.model_copy(
-            update={
-                "state": terminal_state,
-                "result_path": "result.json",
-                "updated_at": finished_at,
-                "finished_at": finished_at,
-            }
-        ).model_dump(by_alias=True, mode="json"),
-    )
-    console.print(f"Run [cyan]{output.result.run_id}[/cyan] {terminal_state.value}")
-    for result_error in output.result.errors:
-        console.print(f"[red]✗[/] {result_error}")
-    console.print(output.result_path)
 
 
 @experiment_app.command("resume-scientist")
@@ -362,181 +179,16 @@ def resume_scientist_experiment(
 ) -> None:
     """Resume only the scientist phase of a prior run, seeded with its case history."""
 
-    settings = Settings()
-    if not settings.tyr_mcp_token:
-        raise typer.BadParameter("TYR_MCP_TOKEN is required")
-    if not settings.model_api_key:
-        raise typer.BadParameter("OPENROUTER_API_KEY is required")
-    artifact_store = FilesystemArtifactStore(
-        settings.artifact_root,
-        secrets=_configured_secrets(settings),
+    resume_scientist_command(
+        console=console,
+        run_id=run_id,
+        scientist_iterations=scientist_iterations,
+        model=model,
+        scientist_model=scientist_model,
+        judge_model=judge_model,
+        confirm_actions=confirm_actions,
+        render_progress_cb=_render_progress,
     )
-    try:
-        source_record = RunRecord.model_validate(artifact_store.read_json(run_id, "run.json"))
-    except FileNotFoundError:
-        raise typer.BadParameter(f"run does not exist: {run_id}", param_hint="run_id") from None
-
-    configuration = source_record.configuration
-    if scientist_iterations:
-        configuration = configuration.model_copy(
-            update={"scientist_iterations": scientist_iterations}
-        )
-    if not configuration.scientist_iterations:
-        raise typer.BadParameter(
-            "source run has scientist_iterations=0; pass --scientist-iterations",
-            param_hint="--scientist-iterations",
-        )
-    if configuration.action_mode == "approval_required":
-        if not confirm_actions and not sys.stdin.isatty():
-            raise typer.BadParameter(
-                "non-interactive action runs require --confirm-actions",
-                param_hint="--confirm-actions",
-            )
-        if not confirm_actions and not typer.confirm(
-            "Resume an action-capable experiment? Every Tyr action still requires approval",
-            default=False,
-        ):
-            raise typer.Abort()
-
-    task_directory = resolve_task_directory(settings.task_root, source_record.task)
-    task = load_task(task_directory)
-
-    selected_model = model or configuration.model or settings.model_name
-    selected_scientist_model = (
-        scientist_model or settings.scientist_model_name or selected_model
-    )
-    selected_judge_model = (
-        judge_model or getattr(settings, "judge_model_name", "") or selected_model
-    )
-    if not selected_model:
-        raise typer.BadParameter("TYR_LOOP_MODEL is required")
-    target = TyrMcpClient(settings.tyr_mcp_url, settings.tyr_mcp_token)
-    collector = _collector_client(settings)
-    model_gateway = OpenAICompatibleModel(
-        settings.model_base_url,
-        settings.model_api_key,
-        selected_model,
-    )
-    scientist_model_gateway = (
-        model_gateway
-        if selected_scientist_model == selected_model
-        else OpenAICompatibleModel(
-            settings.model_base_url,
-            settings.model_api_key,
-            selected_scientist_model,
-        )
-    )
-    judge_model_gateway = (
-        model_gateway
-        if selected_judge_model == selected_model
-        else OpenAICompatibleModel(
-            settings.model_base_url,
-            settings.model_api_key,
-            selected_judge_model,
-        )
-    )
-    configuration = configuration.model_copy(
-        update={
-            "model": selected_model,
-            "scientist_model": selected_scientist_model,
-            "judge_model": selected_judge_model,
-        }
-    )
-
-    new_run_id = new_id()
-    started_at = datetime.now(UTC)
-    run_document = RunRecord(
-        id=new_run_id,
-        source=RunSource.CLI,
-        task=source_record.task,
-        state=RunState.RUNNING,
-        configuration=configuration,
-        retryOf=run_id,
-        createdAt=started_at,
-        updatedAt=started_at,
-    )
-    artifact_store.write_json(
-        f"runs/{new_run_id}/run.json",
-        run_document.model_dump(by_alias=True, mode="json"),
-    )
-
-    async def run_live() -> ExecutionOutput:
-        try:
-            return await ExperimentExecutionService().resume_scientist(
-                task,
-                configuration,
-                source_run_id=run_id,
-                run_id=new_run_id,
-                target=target,
-                model=model_gateway,
-                scientist_model=scientist_model_gateway,
-                judge_model=judge_model_gateway,
-                artifacts=artifact_store,
-                activity_sink=FilesystemActivitySink(artifact_store),
-                progress=_render_progress,
-                delivery_verifier=collector,
-                content_evidence_provider=collector,
-            )
-        finally:
-            await target.aclose()
-            if collector is not None:
-                await collector.aclose()
-
-    try:
-        output = asyncio.run(run_live())
-    except KeyboardInterrupt, asyncio.CancelledError:
-        cancelled_at = datetime.now(UTC)
-        artifact_store.write_json(
-            f"runs/{new_run_id}/run.json",
-            run_document.model_copy(
-                update={
-                    "state": RunState.CANCELLED,
-                    "error_summary": "Cancelled by operator (Ctrl+C)",
-                    "updated_at": cancelled_at,
-                    "finished_at": cancelled_at,
-                }
-            ).model_dump(by_alias=True, mode="json"),
-        )
-        console.print(f"[yellow]Cancelled[/] run [cyan]{new_run_id}[/] [dim]· Ctrl+C[/]")
-        raise typer.Exit(code=130) from None
-    except Exception as error:
-        failed_at = datetime.now(UTC)
-        artifact_store.write_json(
-            f"runs/{new_run_id}/run.json",
-            run_document.model_copy(
-                update={
-                    "state": RunState.FAILED,
-                    "error_summary": f"{type(error).__name__}: {error}",
-                    "updated_at": failed_at,
-                    "finished_at": failed_at,
-                }
-            ).model_dump(by_alias=True, mode="json"),
-        )
-        raise
-    finished_at = datetime.now(UTC)
-    terminal_state = (
-        RunState.FAILED
-        if output.result.outcome
-        in {ExecutionOutcome.FAILED, ExecutionOutcome.ERROR, ExecutionOutcome.INTERRUPTED}
-        else RunState.CANCELLED
-        if output.result.outcome is ExecutionOutcome.CANCELLED
-        else RunState.COMPLETED
-    )
-    artifact_store.write_json(
-        f"runs/{new_run_id}/run.json",
-        run_document.model_copy(
-            update={
-                "state": terminal_state,
-                "result_path": "result.json",
-                "updated_at": finished_at,
-                "finished_at": finished_at,
-            }
-        ).model_dump(by_alias=True, mode="json"),
-    )
-    console.print(f"Run [cyan]{output.result.run_id}[/cyan] {terminal_state.value}")
-    for result_error in output.result.errors:
-        console.print(f"[red]✗[/] {result_error}")
-    console.print(output.result_path)
 
 
 @experiment_app.command("show")
@@ -579,21 +231,18 @@ def chat(
 ) -> None:
     """Connect to Tyr through a read-only interactive chat session."""
 
-    if allow_actions:
-        if not confirm_actions and not sys.stdin.isatty():
-            raise typer.BadParameter(
-                "non-interactive action chat requires --confirm-actions",
-                param_hint="--confirm-actions",
-            )
-        if not confirm_actions and not typer.confirm(
-            "Enable action-capable tools? Each action still requires approval", default=False
-        ):
-            raise typer.Abort()
+    action_mode = validate_action_mode(
+        "approval_required" if allow_actions else "read_only",
+        allow_actions,
+        confirm_actions,
+        "Enable action-capable tools? Each action still requires approval",
+    )
     try:
         asyncio.run(
-            _chat_loop(
+            run_chat_loop(
+                console,
                 prompt,
-                action_mode="approval_required" if allow_actions else "read_only",
+                action_mode=action_mode,
                 model=model or None,
                 base_url=base_url or None,
             )
@@ -601,67 +250,3 @@ def chat(
     except Exception as error:
         console.print(f"[red]Chat failed:[/red] {type(error).__name__}: {error}")
         raise typer.Exit(code=1) from error
-
-
-async def _chat_loop(
-    initial_prompt: str,
-    *,
-    action_mode: str,
-    model: str | None,
-    base_url: str | None,
-) -> None:
-    async def approve(name: str, arguments: dict[str, object]) -> bool:
-        console.print(f"[yellow]Action requested:[/yellow] {name}")
-        console.print_json(json.dumps(arguments, ensure_ascii=False, default=str))
-        return typer.confirm("Run this tool?", default=False)
-
-    session, target = build_chat_session(
-        Settings(),
-        action_mode=action_mode,
-        approve=approve,
-        model_name=model,
-        base_url=base_url,
-    )
-    messages: list[dict[str, object]] = [
-        {
-            "role": "system",
-            "content": (
-                "You are a concise command-line assistant connected to Tyr through MCP. "
-                "Use available tools for Tyr questions. Never claim a tool succeeded unless "
-                "its result says so. If an operation is waiting for input, ask the operator "
-                "for the next message."
-            ),
-        }
-    ]
-    try:
-        tools = await session.connect()
-        console.print(f"[green]Connected to Tyr[/green] · {len(tools)} tools · mode={action_mode}")
-        next_prompt = initial_prompt
-        while True:
-            if not next_prompt:
-                try:
-                    next_prompt = typer.prompt("Message")
-                except EOFError, KeyboardInterrupt:
-                    return
-            command = next_prompt.strip()
-            next_prompt = ""
-            if not command:
-                continue
-            if command in {"/quit", "/exit"}:
-                return
-            if command == "/help":
-                console.print("/help  /tools  /reset  /quit")
-                continue
-            if command == "/tools":
-                console.print("\n".join(tools))
-                continue
-            if command == "/reset":
-                messages = messages[:1]
-                console.print("[green]Conversation reset[/green]")
-                continue
-            answer = await session.run_turn(messages, command)
-            console.print(Markdown(answer) if isinstance(answer, str) else answer)
-            if initial_prompt:
-                return
-    finally:
-        await target.aclose()

@@ -191,7 +191,7 @@ class InMemoryRegistry:
         current_cases = [
             str(item["caseId"])
             for item in cases.values()
-            if item["state"] in {"active", "blocked", "running"}
+            if item["state"] in {"active", "blocked", "running", "assessing"}
         ]
         phase_names = (
             "queued",

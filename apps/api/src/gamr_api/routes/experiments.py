@@ -30,6 +30,7 @@ class ExperimentCreate(BaseModel):
     discovery_turns: int = Field(default=20, alias="discoveryTurns", ge=1)
     case_ids: list[str] | None = Field(default=None, alias="caseIds")
     scientist_iterations: int = Field(default=0, alias="scientistIterations", ge=0)
+    max_concurrent_cases: int = Field(default=5, alias="maxConcurrentCases", ge=1, le=5)
     history_test_runs: int = Field(default=10, alias="historyTestRuns", ge=0, le=100)
     history_scientist_runs: int = Field(default=5, alias="historyScientistRuns", ge=0, le=100)
 
@@ -42,6 +43,7 @@ class ExperimentCreate(BaseModel):
             maxTurns=self.max_turns,
             discoveryTurns=self.discovery_turns,
             caseIds=self.case_ids,
+            maxConcurrentCases=self.max_concurrent_cases,
             scientistIterations=self.scientist_iterations,
             historyTestRuns=self.history_test_runs,
             historyScientistRuns=self.history_scientist_runs,
@@ -117,6 +119,7 @@ def get_experiment(
 
 class RunCreate(BaseModel):
     case_ids: list[str] | None = Field(default=None, alias="caseIds")
+    max_concurrent_cases: int | None = Field(default=None, alias="maxConcurrentCases", ge=1, le=5)
     scientist_iterations: int | None = Field(default=None, alias="scientistIterations", ge=0)
     history_test_runs: int | None = Field(default=None, alias="historyTestRuns", ge=0, le=100)
     history_scientist_runs: int | None = Field(
@@ -143,6 +146,11 @@ async def start_run(
                 payload.case_ids
                 if payload and payload.case_ids is not None
                 else item.configuration.case_ids
+            ),
+            "max_concurrent_cases": (
+                payload.max_concurrent_cases
+                if payload and payload.max_concurrent_cases is not None
+                else item.configuration.max_concurrent_cases
             ),
             "scientist_iterations": (
                 payload.scientist_iterations

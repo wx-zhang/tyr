@@ -120,6 +120,67 @@ def test_write_result_marks_existing_run_json_terminal(tmp_path: Path) -> None:
     assert document["updatedAt"] == document["finishedAt"]
 
 
+def test_per_case_checkpoint_writes_and_confinement(tmp_path: Path) -> None:
+    store = FilesystemArtifactStore(tmp_path / ".gamr", secrets=["secret-tok"])
+    path = store.write_case_checkpoint(
+        "run-1",
+        "case-1",
+        {"caseId": "case-1", "userToken": "secret-tok", "turn": 2},
+    )
+    assert "secret-tok" not in Path(path).read_text(encoding="utf-8")
+    assert "[REDACTED]" in Path(path).read_text(encoding="utf-8")
+    assert (
+        tmp_path / ".gamr" / "runs" / "run-1" / "checkpoints" / "cases" / "case-1.json"
+    ).is_file()
+
+    with pytest.raises(ValueError, match="escapes"):
+        store.write_case_checkpoint("run-1", "../escape", {"ok": True})
+
+
+def test_read_checkpoint_supports_legacy_and_per_case(tmp_path: Path) -> None:
+    store = FilesystemArtifactStore(tmp_path / ".gamr")
+    # Legacy singleton checkpoint
+    store.write_checkpoint("run-legacy", {"phase": "discovery", "turn": 1})
+    legacy = store.read_checkpoint("run-legacy")
+    assert legacy == {"phase": "discovery", "turn": 1}
+
+    # Per-case checkpoints
+    store.write_case_checkpoint("run-1", "case-a", {"caseId": "case-a", "turn": 1})
+    store.write_case_checkpoint("run-1", "case-b", {"caseId": "case-b", "turn": 2})
+
+    case_a = store.read_case_checkpoint("run-1", "case-a")
+    assert case_a == {"caseId": "case-a", "turn": 1}
+    case_b = store.read_case_checkpoint("run-1", "case-b")
+    assert case_b == {"caseId": "case-b", "turn": 2}
+
+
+def test_monotonic_activities_and_interleaved_append(tmp_path: Path) -> None:
+    store = FilesystemArtifactStore(tmp_path / ".gamr")
+    # Append transcript records interleaved
+    store.append_transcript("run-1", [{"caseId": "case-1", "role": "user", "content": "hello 1"}])
+    store.append_transcript("run-1", [{"caseId": "case-2", "role": "user", "content": "hello 2"}])
+    store.append_transcript(
+        "run-1", [{"caseId": "case-1", "role": "assistant", "content": "reply 1"}]
+    )
+
+    transcript = store.read_transcript("run-1")
+    assert len(transcript) == 3
+    assert [r["caseId"] for r in transcript] == ["case-1", "case-2", "case-1"]
+
+    # Append events
+    store.append_event("run-1", {"caseId": "case-1", "type": "turn.completed"})
+    store.append_event("run-1", {"caseId": "case-2", "type": "turn.completed"})
+    events_file = tmp_path / ".gamr" / "runs" / "run-1" / "events.jsonl"
+    lines = [
+        json.loads(line)
+        for line in events_file.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert len(lines) == 2
+    assert lines[0]["sequence"] == 1
+    assert lines[1]["sequence"] == 2
+
+
 def test_confined_redacted_evidence_reads_reject_escape_and_directories(tmp_path: Path) -> None:
     store = FilesystemArtifactStore(tmp_path / ".gamr")
     store.write_raw("run-1", "turn-1", {"message": "safe"})

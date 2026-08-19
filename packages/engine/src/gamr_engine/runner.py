@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import re
@@ -322,22 +323,36 @@ class ExperimentRunner:
         target_candidate = discovery.candidates[0]
         case_records: list[CaseRecord] = []
         errors: list[str] = []
-        for scenario in scenarios:
-            record, case_error = await self._run_case(
-                task,
-                scenario,
-                target_candidate,
-                config,
-                target,
-                model,
-                judge_model or model,
-                identifier,
-                artifacts,
-                conversation,
-            )
-            case_records.append(record)
-            if case_error:
-                errors.append(case_error)
+        if scenarios:
+            semaphore = asyncio.Semaphore(config.max_concurrent_cases)
+            records: list[CaseRecord | None] = [None] * len(scenarios)
+            case_errors: list[str | None] = [None] * len(scenarios)
+
+            async def execute_case(index: int, scenario: Scenario) -> None:
+                async with semaphore:
+                    record, case_error = await self._run_case(
+                        task,
+                        scenario,
+                        target_candidate,
+                        config,
+                        target,
+                        model,
+                        judge_model or model,
+                        identifier,
+                        artifacts,
+                        TargetConversation(),
+                    )
+                    records[index] = record
+                    case_errors[index] = case_error
+
+            async with asyncio.TaskGroup() as task_group:
+                for index, scenario in enumerate(scenarios):
+                    task_group.create_task(execute_case(index, scenario))
+
+            case_records = [record for record in records if record is not None]
+            errors.extend(error for error in case_errors if error is not None)
+        conversation.seen_reply = ""
+        conversation.operation_id = None
         if config.scientist_iterations:
             history_records = (
                 self._load_configured_history(task, target_candidate, config, artifacts, identifier)

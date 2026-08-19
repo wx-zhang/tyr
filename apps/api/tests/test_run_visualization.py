@@ -242,6 +242,68 @@ def test_visualization_marks_scientist_skipped_when_disabled() -> None:
         app.dependency_overrides.clear()
 
 
+def test_visualization_concurrent_case_states_and_redaction() -> None:
+    registry, run_id = _registry_with_run()
+    run = registry.runs[run_id]
+    registry.set_state(run, RunState.PREPARING)
+    registry.set_state(run, RunState.DISCOVERING)
+    registry.set_state(run, RunState.RUNNING)
+    registry.activities[run_id] = [
+        _activity(
+            run_id, 1, phase="case", case_id="case-1", status="active", summary="Case 1 active"
+        ),
+        _activity(
+            run_id, 2, phase="case", case_id="case-2", status="active", summary="Case 2 active"
+        ),
+        _activity(
+            run_id,
+            3,
+            phase="assessment",
+            case_id="case-1",
+            status="assessing",
+            summary="Case 1 assessing",
+        ),
+        _activity(
+            run_id, 4, phase="case", case_id="case-3", status="active", summary="Case 3 active"
+        ),
+        _activity(
+            run_id,
+            5,
+            phase="case",
+            case_id="case-2",
+            status="completed",
+            summary="Case 2 completed",
+        ),
+    ]
+    registry.case_runs[run_id] = [
+        {"caseId": "case-1", "order": 0, "status": "pending", "verdict": None},
+        {"caseId": "case-2", "order": 1, "status": "pending", "verdict": None},
+        {"caseId": "case-3", "order": 2, "status": "pending", "verdict": None},
+        {"caseId": "case-4", "order": 3, "status": "pending", "verdict": None},
+    ]
+
+    try:
+        response = _client(registry).get(f"/api/v1/runs/{run_id}/visualization")
+        assert response.status_code == 200
+        payload = response.json()
+        # Nonterminal active cases include case-1 (assessing), case-3 (active)
+        assert set(payload["run"]["currentCaseIds"]) == {"case-1", "case-3"}
+        case_map = {c["caseId"]: c for c in payload["cases"]}
+        assert case_map["case-1"]["state"] == "assessing"
+        assert case_map["case-2"]["state"] == "completed"
+        assert case_map["case-3"]["state"] == "active"
+        assert case_map["case-4"]["state"] == "pending"
+
+        # Check browser redaction - protected checkpoint or operation keys shouldn't leak
+        raw_text = json.dumps(payload)
+        assert "idempotencyKey" not in raw_text
+        assert "operationId" not in raw_text or payload.get("operationId") is None
+    finally:
+        app.dependency_overrides.clear()
+
+        app.dependency_overrides.clear()
+
+
 def test_visualization_includes_discovery_result_with_peer_paths(tmp_path: Path) -> None:
     artifact_root = tmp_path / "artifacts"
     bundle = artifact_root / "runs" / "run-discovery"

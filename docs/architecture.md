@@ -16,8 +16,8 @@ flowchart LR
     Bundles --> API
 ```
 
-`gamr-core` owns validated contracts. `gamr-engine` owns workflow and shared finalization.
-`gamr-adapters` owns provider and filesystem I/O. Apps compose these packages without duplicating
+`gamr-core` owns validated contracts (including `ExperimentConfig.max_concurrent_cases` bounded from 1 to 5). `gamr-engine` owns workflow and shared finalization with bounded concurrent base-case execution.
+`gamr-adapters` owns provider and filesystem I/O (including atomic per-case checkpoints under `checkpoints/cases/`). Apps compose these packages without duplicating
 experiment logic or invoking CLI subprocesses.
 
 One API process owns service scheduling. The default concurrency is three; additional runs wait

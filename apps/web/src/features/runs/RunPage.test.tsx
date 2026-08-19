@@ -312,6 +312,85 @@ it("shows discovered variables in Updates after discovery completes", async () =
   expect(stages).not.toHaveTextContent("Discovered variables");
 });
 
+it("displays multiple simultaneous active and assessing cases without single-case busy indicator", async () => {
+  const customVisualization = {
+    ...visualization,
+    cases: [
+      {
+        caseId: "case-alpha",
+        state: "active",
+        order: 0,
+        verdict: null,
+        objectiveStatus: null,
+        outcome: null,
+      },
+      {
+        caseId: "case-beta",
+        state: "assessing",
+        order: 1,
+        verdict: null,
+        objectiveStatus: null,
+        outcome: null,
+      },
+    ],
+    currentCaseIds: ["case-alpha", "case-beta"],
+  };
+
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/api/v1/runs/run-1/visualization")) {
+        return { ok: true, json: async () => customVisualization };
+      }
+      if (url.includes("/api/v1/runs/run-1/turns")) {
+        return {
+          ok: true,
+          json: async () => ({
+            runId: "run-1",
+            totalTurns: 0,
+            latestSequence: 0,
+            items: [],
+          }),
+        };
+      }
+      if (url.includes("/api/v1/runs/run-1/collector-artifacts")) {
+        return { ok: true, json: async () => [] };
+      }
+      if (url.includes("/api/v1/runs/run-1")) {
+        return {
+          ok: true,
+          json: async () => ({
+            id: "run-1",
+            configuration: {
+              caseIds: ["case-alpha", "case-beta"],
+              scientistIterations: 0,
+            },
+          }),
+        };
+      }
+      if (url.includes("/api/v1/tasks/") && url.endsWith("/cases")) {
+        return {
+          ok: true,
+          json: async () => [
+            { metadata: { id: "case-alpha", title: "Alpha" } },
+            { metadata: { id: "case-beta", title: "Beta" } },
+          ],
+        };
+      }
+      return { ok: false, status: 404, json: async () => ({}) };
+    }),
+  );
+
+  renderPage();
+
+  expect(await screen.findByRole("heading", { name: "Run run-1" })).toBeInTheDocument();
+  const caseList = screen.getByRole("list", { name: "Test cases" });
+  expect(within(caseList).getByText("Active")).toBeInTheDocument();
+  expect(within(caseList).getByText("Assessing")).toBeInTheDocument();
+  expect(screen.queryByText("Agent working")).not.toBeInTheDocument();
+});
+
 it("does not render a redundant selected test cases block below Updates", async () => {
   renderPage();
 

@@ -118,6 +118,7 @@ export type Run = {
     maxTurns: number;
     discoveryTurns: number;
     caseIds?: string[] | null;
+    maxConcurrentCases?: number;
     scientistIterations: number;
     historyTestRuns: number;
     historyScientistRuns: number;
@@ -215,6 +216,7 @@ export async function createExperiment(payload: {
   task: string;
   actionMode: "read_only" | "approval_required";
   caseIds: string[];
+  maxConcurrentCases?: number;
   scientistIterations?: number;
   historyTestRuns?: number;
   historyScientistRuns?: number;

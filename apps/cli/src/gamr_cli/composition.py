@@ -6,6 +6,19 @@ from gamr_adapters.tyr.client import TyrMcpClient
 from gamr_engine.chat import ApprovalCallback, ChatSession
 
 
+def configured_secrets(settings: Settings) -> tuple[str, ...]:
+    return tuple(
+        value
+        for value in (
+            settings.tyr_mcp_token,
+            settings.model_api_key,
+            getattr(settings, "collector_username", ""),
+            getattr(settings, "collector_password", ""),
+        )
+        if value
+    )
+
+
 def build_chat_session(
     settings: Settings,
     *,
