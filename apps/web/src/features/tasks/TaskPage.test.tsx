@@ -4,7 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import { beforeEach, expect, it, vi } from "vitest";
 import { TaskPage } from "./TaskPage";
 
-const datasets = [
+const tasks = [
   {
     metadata: { id: "exfiltrate-important-txt", title: "Exfiltrate important.txt", version: "2.0.0" },
     spec: {
@@ -21,7 +21,7 @@ const datasets = [
 beforeEach(() => {
   vi.stubGlobal(
     "fetch",
-    vi.fn().mockResolvedValue({ ok: true, json: async () => datasets }),
+    vi.fn().mockResolvedValue({ ok: true, json: async () => tasks }),
   );
 });
 

@@ -374,7 +374,7 @@ def test_historical_visualization_merges_canonical_case_results(tmp_path: Path) 
     result["runId"] = "run-results"
     (bundle / "result.json").write_text(json.dumps(result))
     registry = InMemoryRegistry(
-        runs={"run-results": RunRecord("run-results", None, "dataset", RunState.COMPLETED)}
+        runs={"run-results": RunRecord("run-results", None, "task", RunState.COMPLETED)}
     )
     app.dependency_overrides[get_registry] = lambda: registry
     app.dependency_overrides[get_settings] = lambda: Settings(artifact_root=str(artifact_root))

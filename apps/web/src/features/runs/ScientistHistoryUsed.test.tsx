@@ -61,13 +61,13 @@ it("resolves origins from API list, map, then task membership", () => {
     { caseId: "b", origin: "scientist" },
   ]);
 
-  const fromDataset = resolveHistoryCases(
+  const fromTask = resolveHistoryCases(
     ["rename-relocate-fresh-agent-upload", "http-patch-delivery"],
     {
       taskCaseIds: ["rename-relocate-fresh-agent-upload"],
     },
   );
-  expect(fromDataset).toEqual([
+  expect(fromTask).toEqual([
     { caseId: "rename-relocate-fresh-agent-upload", origin: "base" },
     { caseId: "http-patch-delivery", origin: "scientist" },
   ]);

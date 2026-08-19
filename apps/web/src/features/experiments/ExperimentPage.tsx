@@ -68,24 +68,24 @@ export function ExperimentPage() {
   const [error, setError] = useState<string | null>(null);
   const [casesOpen, setCasesOpen] = useState(true);
 
-  const datasets = useQuery({
+  const tasks = useQuery({
     queryKey: ["tasks"],
     queryFn: fetchTasks,
   });
 
   useEffect(() => {
-    if (taskId || !datasets.data?.length) return;
+    if (taskId || !tasks.data?.length) return;
     const preferred =
-      datasets.data.find((item) => item.metadata.id === "exfiltrate-important-txt") ??
-      datasets.data[0];
+      tasks.data.find((item) => item.metadata.id === "exfiltrate-important-txt") ??
+      tasks.data[0];
     if (preferred) {
       setTaskId(preferred.metadata.id);
     }
-  }, [datasets.data, taskId]);
+  }, [tasks.data, taskId]);
 
   const selectedTask = useMemo(
-    () => (isResearchMode ? undefined : datasets.data?.find((item) => item.metadata.id === taskId)),
-    [datasets.data, taskId, isResearchMode],
+    () => (isResearchMode ? undefined : tasks.data?.find((item) => item.metadata.id === taskId)),
+    [tasks.data, taskId, isResearchMode],
   );
 
   const cases = useQuery({
@@ -130,8 +130,8 @@ export function ExperimentPage() {
       return;
     }
     const defaultTask =
-      datasets.data?.find((item) => item.metadata.id === "exfiltrate-important-txt") ??
-      datasets.data?.[0];
+      tasks.data?.find((item) => item.metadata.id === "exfiltrate-important-txt") ??
+      tasks.data?.[0];
     const effectiveTask = isResearchMode ? (defaultTask?.metadata.id ?? "exfiltrate-important-txt") : taskId;
     const taskTitle = isResearchMode
       ? "Research new task"
@@ -210,23 +210,23 @@ export function ExperimentPage() {
                 setCasesOpen(true);
               }}
               required
-              disabled={datasets.isLoading}
+              disabled={tasks.isLoading}
             >
               <option value="" disabled>
-                {datasets.isLoading
+                {tasks.isLoading
                   ? "Loading tasks…"
                   : "Select a task"}
               </option>
               <option value={RESEARCH_NEW_TASK}>
                 Research new task
               </option>
-              {(datasets.data ?? []).map((dataset) => (
-                <option key={dataset.metadata.id} value={dataset.metadata.id}>
-                  {dataset.metadata.title} ({dataset.metadata.id})
+              {(tasks.data ?? []).map((task) => (
+                <option key={task.metadata.id} value={task.metadata.id}>
+                  {task.metadata.title} ({task.metadata.id})
                 </option>
               ))}
             </select>
-            {datasets.isError ? (
+            {tasks.isError ? (
               <p className="field-help" role="alert">
                 Could not load tasks. Check the API connection.
               </p>
@@ -358,7 +358,7 @@ export function ExperimentPage() {
           >
             <div className="card-header">
               <div>
-                <p className="eyebrow">Dataset cases</p>
+                <p className="eyebrow">Task cases</p>
                 <h2 id="test-cases-title">Test cases</h2>
               </div>
               <div className="case-explorer-actions">

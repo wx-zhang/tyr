@@ -166,8 +166,8 @@ function CaseDetail({ scenario }: { scenario: TaskScenario }) {
 export function TaskDetailPage() {
   const { taskId, caseId } = useParams();
 
-  const dataset = useQuery({
-    queryKey: ["dataset", taskId],
+  const task = useQuery({
+    queryKey: ["task", taskId],
     queryFn: () => fetchTask(taskId!),
     enabled: Boolean(taskId),
   });
@@ -179,30 +179,30 @@ export function TaskDetailPage() {
   });
 
   const plans = useQuery({
-    queryKey: ["dataset-plans", taskId],
+    queryKey: ["task-plans", taskId],
     queryFn: () => fetchTaskPlans(taskId!),
     enabled: Boolean(taskId),
   });
 
   const scenarios = cases.data ?? [];
-  const defaultCaseIds = new Set(dataset.data?.spec.defaults.defaultCaseIds ?? []);
+  const defaultCaseIds = new Set(task.data?.spec.defaults.defaultCaseIds ?? []);
   const selected =
     scenarios.find((item) => item.metadata.id === caseId) ??
     scenarios.find((item) => defaultCaseIds.has(item.metadata.id)) ??
     scenarios[0];
-  const actionMode = dataset.data?.spec.defaults.actionMode;
-  const variables = dataset.data?.spec.variables ?? {};
+  const actionMode = task.data?.spec.defaults.actionMode;
+  const variables = task.data?.spec.variables ?? {};
   const variableEntries = Object.entries(variables);
 
   return (
     <section className="section-stack">
       <PageHeader
         eyebrow="Authoring sources"
-        title={dataset.data?.metadata.title ?? taskId ?? "Dataset"}
+        title={task.data?.metadata.title ?? taskId ?? "Task"}
         description={
-          dataset.data
-            ? `${dataset.data.metadata.id} · v${dataset.data.metadata.version}`
-            : "Review dataset metadata and test cases."
+          task.data
+            ? `${task.data.metadata.id} · v${task.data.metadata.version}`
+            : "Review task metadata and test cases."
         }
         actions={
           <div className="button-row">
@@ -216,14 +216,14 @@ export function TaskDetailPage() {
         }
       />
 
-      {dataset.isLoading ? (
+      {task.isLoading ? (
         <div className="card empty-state" role="status">
           <div>
             <h2>Loading task</h2>
             <p>Reading the task manifest…</p>
           </div>
         </div>
-      ) : dataset.isError ? (
+      ) : task.isError ? (
         <div className="card empty-state" role="alert">
           <div>
             <h2>Unable to load task</h2>
@@ -249,16 +249,16 @@ export function TaskDetailPage() {
             <dl className="detail-list">
               <div className="detail-row">
                 <dt>Task ID</dt>
-                <dd className="mono">{dataset.data?.metadata.id ?? "—"}</dd>
+                <dd className="mono">{task.data?.metadata.id ?? "—"}</dd>
               </div>
               <div className="detail-row">
                 <dt>Version</dt>
-                <dd className="mono">{dataset.data?.metadata.version ?? "—"}</dd>
+                <dd className="mono">{task.data?.metadata.version ?? "—"}</dd>
               </div>
               <div className="detail-row">
                 <dt>Cases</dt>
                 <dd className="mono tabular">
-                  {dataset.data?.spec.cases.length ?? scenarios.length}
+                  {task.data?.spec.cases.length ?? scenarios.length}
                 </dd>
               </div>
               <div className="detail-row">
@@ -268,25 +268,25 @@ export function TaskDetailPage() {
               <div className="detail-row">
                 <dt>Max turns</dt>
                 <dd className="mono tabular">
-                  {dataset.data?.spec.defaults.maxTurns ?? "—"}
+                  {task.data?.spec.defaults.maxTurns ?? "—"}
                 </dd>
               </div>
               <div className="detail-row">
                 <dt>Default cases</dt>
                 <dd className="mono">
-                  {(dataset.data?.spec.defaults.defaultCaseIds ?? []).length > 0
-                    ? (dataset.data?.spec.defaults.defaultCaseIds ?? []).join(", ")
+                  {(task.data?.spec.defaults.defaultCaseIds ?? []).length > 0
+                    ? (task.data?.spec.defaults.defaultCaseIds ?? []).join(", ")
                     : "None"}
                 </dd>
               </div>
             </dl>
 
             {variableEntries.length > 0 ? (
-              <div className="dataset-variables">
+              <div className="task-variables">
                 <h3>Variables</h3>
                 <div className="table-scroll">
                   <table>
-                    <caption className="sr-only">Dataset template variables</caption>
+                    <caption className="sr-only">Task template variables</caption>
                     <thead>
                       <tr>
                         <th scope="col">Name</th>
@@ -345,8 +345,8 @@ export function TaskDetailPage() {
             ) : scenarios.length === 0 ? (
               <p className="secondary">No cases in this task.</p>
             ) : (
-              <div className="dataset-case-layout">
-                <nav className="case-nav" aria-label="Dataset cases">
+              <div className="task-case-layout">
+                <nav className="case-nav" aria-label="Task cases">
                   <ul className="case-nav-list">
                     {scenarios.map((scenario) => {
                       const id = scenario.metadata.id;

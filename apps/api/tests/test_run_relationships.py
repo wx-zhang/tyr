@@ -70,7 +70,7 @@ def test_relationship_routes_derive_projection_from_json_bundle(tmp_path: Path) 
     registry = InMemoryRegistry(
         runs={
             "run-relationships": RunRecord(
-                "run-relationships", "experiment", "dataset", state=RunState.RUNNING
+                "run-relationships", "experiment", "task", state=RunState.RUNNING
             )
         }
     )

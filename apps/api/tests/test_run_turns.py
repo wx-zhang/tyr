@@ -44,7 +44,7 @@ def test_turns_route_returns_grouped_redacted_conversation(tmp_path: Path) -> No
         "".join(json.dumps(record) + "\n" for record in records), encoding="utf-8"
     )
     registry = InMemoryRegistry(
-        runs={"run-turns": RunRecord("run-turns", "experiment", "dataset", state=RunState.RUNNING)}
+        runs={"run-turns": RunRecord("run-turns", "experiment", "task", state=RunState.RUNNING)}
     )
     app.dependency_overrides[get_registry] = lambda: registry
     app.dependency_overrides[get_settings] = lambda: Settings(
@@ -164,7 +164,7 @@ def test_turns_route_includes_scientist_generation_events(tmp_path: Path) -> Non
     )
     registry = InMemoryRegistry(
         runs={
-            "run-scientist": RunRecord("run-scientist", None, "dataset", state=RunState.COMPLETED)
+            "run-scientist": RunRecord("run-scientist", None, "task", state=RunState.COMPLETED)
         }
     )
     app.dependency_overrides[get_registry] = lambda: registry
@@ -242,7 +242,7 @@ def test_turns_route_includes_discovery_result_variables(tmp_path: Path) -> None
         encoding="utf-8",
     )
     registry = InMemoryRegistry(
-        runs={"run-discovery": RunRecord("run-discovery", None, "dataset", state=RunState.RUNNING)}
+        runs={"run-discovery": RunRecord("run-discovery", None, "task", state=RunState.RUNNING)}
     )
     app.dependency_overrides[get_registry] = lambda: registry
     app.dependency_overrides[get_settings] = lambda: Settings(
@@ -279,7 +279,7 @@ def test_turns_route_exposes_evaluation_fields(tmp_path: Path) -> None:
     (bundle / "result.json").write_text(json.dumps(result), encoding="utf-8")
     registry = InMemoryRegistry(
         runs={
-            "run-evaluation": RunRecord("run-evaluation", None, "dataset", state=RunState.COMPLETED)
+            "run-evaluation": RunRecord("run-evaluation", None, "task", state=RunState.COMPLETED)
         }
     )
     app.dependency_overrides[get_registry] = lambda: registry
@@ -320,7 +320,7 @@ def test_turns_route_bounds_results_to_latest_page(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     registry = InMemoryRegistry(
-        runs={"run-turns": RunRecord("run-turns", None, "dataset", state=RunState.COMPLETED)}
+        runs={"run-turns": RunRecord("run-turns", None, "task", state=RunState.COMPLETED)}
     )
     app.dependency_overrides[get_registry] = lambda: registry
     app.dependency_overrides[get_settings] = lambda: Settings(artifact_root=str(artifact_root))

@@ -17,7 +17,7 @@ vi.mock("react-router-dom", async () => {
   };
 });
 
-const datasets = [
+const tasks = [
   {
     metadata: { id: "exfiltrate-important-txt", title: "Exfiltrate important.txt", version: "2.0.0" },
     spec: {
@@ -77,7 +77,7 @@ function installFetch(onCreate?: (body: Record<string, unknown>) => void) {
         return { ok: true, json: async () => cases };
       }
       if (url.includes("/api/v1/tasks")) {
-        return { ok: true, json: async () => datasets };
+        return { ok: true, json: async () => tasks };
       }
       if (url.includes("/api/v1/experiments") && init?.method === "POST") {
         const body = JSON.parse(String(init.body)) as Record<string, unknown>;
@@ -228,7 +228,7 @@ it("does not redirect when the API fails to create the experiment", async () => 
         return { ok: true, json: async () => cases };
       }
       if (url.includes("/api/v1/tasks")) {
-        return { ok: true, json: async () => datasets };
+        return { ok: true, json: async () => tasks };
       }
       if (url.includes("/api/v1/experiments") && init?.method === "POST") {
         return { ok: false, status: 400, json: async () => ({}) };

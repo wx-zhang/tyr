@@ -5,7 +5,7 @@ import { PageHeader } from "../../components/PageHeader";
 import { StatusBadge } from "../../components/StatusBadge";
 
 export function TaskPage() {
-  const datasets = useQuery({ queryKey: ["tasks"], queryFn: fetchTasks });
+  const tasks = useQuery({ queryKey: ["tasks"], queryFn: fetchTasks });
   return (
     <section className="section-stack">
       <PageHeader
@@ -19,21 +19,21 @@ export function TaskPage() {
         }
       />
 
-      {datasets.isLoading ? (
+      {tasks.isLoading ? (
         <div className="card empty-state" role="status">
           <div>
             <h2>Loading tasks</h2>
             <p>Reading the configured task catalog…</p>
           </div>
         </div>
-      ) : datasets.isError ? (
+      ) : tasks.isError ? (
         <div className="card empty-state" role="alert">
           <div>
             <h2>Unable to load tasks</h2>
             <p>Check the API connection and try again.</p>
           </div>
         </div>
-      ) : datasets.data?.length === 0 ? (
+      ) : tasks.data?.length === 0 ? (
         <div className="card empty-state">
           <div>
             <h2>No tasks available</h2>
@@ -58,38 +58,38 @@ export function TaskPage() {
                 </tr>
               </thead>
               <tbody>
-                {(datasets.data ?? []).map((dataset) => (
-                  <tr key={dataset.metadata.id}>
+                {(tasks.data ?? []).map((task) => (
+                  <tr key={task.metadata.id}>
                     <td className="mono table-primary">
                       <Link
                         className="session-title"
-                        to={`/tasks/${encodeURIComponent(dataset.metadata.id)}`}
+                        to={`/tasks/${encodeURIComponent(task.metadata.id)}`}
                       >
-                        {dataset.metadata.id}
+                        {task.metadata.id}
                       </Link>
                     </td>
                     <td className="table-primary">
                       <Link
                         className="session-title"
-                        to={`/tasks/${encodeURIComponent(dataset.metadata.id)}`}
+                        to={`/tasks/${encodeURIComponent(task.metadata.id)}`}
                       >
-                        {dataset.metadata.title}
+                        {task.metadata.title}
                       </Link>
                     </td>
-                    <td className="mono">{dataset.metadata.version}</td>
+                    <td className="mono">{task.metadata.version}</td>
                     <td className="mono tabular">
-                      {dataset.spec.cases.length}
+                      {task.spec.cases.length}
                     </td>
                     <td>
                       <StatusBadge
                         label={
-                          dataset.spec.defaults.actionMode ===
+                          task.spec.defaults.actionMode ===
                           "approval_required"
                             ? "Actions Allowed"
                             : "Read-only"
                         }
                         tone={
-                          dataset.spec.defaults.actionMode ===
+                          task.spec.defaults.actionMode ===
                           "approval_required"
                             ? "warning"
                             : "neutral"

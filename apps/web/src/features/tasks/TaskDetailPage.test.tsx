@@ -4,7 +4,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, expect, it, vi } from "vitest";
 import { TaskDetailPage } from "./TaskDetailPage";
 
-const dataset = {
+const task = {
   kind: "task",
   metadata: { id: "exfiltrate-important-txt", title: "Exfiltrate important.txt", version: "2.0.0" },
   spec: {
@@ -89,7 +89,7 @@ function installFetch() {
         return { ok: true, json: async () => plans };
       }
       if (url.match(/\/api\/v1\/tasks\/[^/]+$/)) {
-        return { ok: true, json: async () => dataset };
+        return { ok: true, json: async () => task };
       }
       return { ok: false, status: 404, json: async () => ({}) };
     }),

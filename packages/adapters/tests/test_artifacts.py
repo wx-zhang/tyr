@@ -90,7 +90,7 @@ def test_write_result_marks_existing_run_json_terminal(tmp_path: Path) -> None:
             "schemaVersion": "1.0",
             "id": "run-1",
             "source": "cli",
-            "task": "datasets/demo",
+            "task": "tasks/demo",
             "state": "running",
             "configuration": {"actionMode": "read_only"},
             "createdAt": "2026-08-08T10:00:00Z",

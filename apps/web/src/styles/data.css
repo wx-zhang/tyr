@@ -338,15 +338,15 @@ tbody tr:last-child td {
   gap: var(--space-6);
 }
 
-.dataset-variables {
+.task-variables {
   margin-top: var(--space-6);
 }
 
-.dataset-variables h3 {
+.task-variables h3 {
   margin-bottom: var(--space-3);
 }
 
-.dataset-case-layout {
+.task-case-layout {
   display: grid;
   grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
   gap: var(--space-4);

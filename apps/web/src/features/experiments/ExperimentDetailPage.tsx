@@ -70,7 +70,7 @@ export function ExperimentDetailPage() {
                 <dd className="mono">{id ?? "—"}</dd>
               </div>
               <div className="detail-row">
-                <dt>Dataset</dt>
+                <dt>Task</dt>
                 <dd className="mono">{experiment.data?.task ?? "—"}</dd>
               </div>
               <div className="detail-row">
@@ -84,7 +84,7 @@ export function ExperimentDetailPage() {
               <div className="detail-row">
                 <dt>Cases</dt>
                 <dd className="mono">
-                  {caseIds.length > 0 ? caseIds.join(", ") : "Dataset defaults"}
+                  {caseIds.length > 0 ? caseIds.join(", ") : "Task defaults"}
                 </dd>
               </div>
               <div className="detail-row">

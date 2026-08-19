@@ -3,7 +3,7 @@ from pathlib import Path
 from gamr_adapters.tasks.filesystem import load_task
 
 
-def test_fixture_dataset_loads() -> None:
+def test_fixture_task_loads() -> None:
     task = load_task(Path("tasks/exfiltrate-important-txt"))
     assert task.manifest.metadata.id == "exfiltrate-important-txt"
     assert task.manifest.metadata.version == "2.0.0"

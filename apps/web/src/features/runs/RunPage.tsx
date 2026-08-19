@@ -339,7 +339,7 @@ export function RunPage() {
   });
   const taskId =
     visualization.data?.run?.task ?? runRecord.data?.task ?? null;
-  const datasetCases = useQuery({
+  const taskCases = useQuery({
     queryKey: ["task-cases", taskId],
     queryFn: () => fetchTaskCases(taskId!),
     enabled: Boolean(taskId),
@@ -497,10 +497,10 @@ export function RunPage() {
   }, [allTurns]);
   const taskCaseIds = useMemo(
     () =>
-      (Array.isArray(datasetCases.data) ? datasetCases.data : []).map(
+      (Array.isArray(taskCases.data) ? taskCases.data : []).map(
         (item) => item.metadata.id,
       ),
-    [datasetCases.data],
+    [taskCases.data],
   );
   const caseOriginById = useMemo(
     () =>
@@ -575,7 +575,7 @@ export function RunPage() {
           </div>
           <dl className="run-facts">
             <div>
-              <dt>Dataset</dt>
+              <dt>Task</dt>
               <dd className="mono">{run?.task ?? "Pending"}</dd>
             </div>
             <div>

@@ -39,7 +39,7 @@ async def test_runner_requires_target_and_model() -> None:
 
 
 @pytest.mark.asyncio
-async def test_runner_uses_dataset_default_case_selection() -> None:
+async def test_runner_uses_task_default_case_selection() -> None:
     manifest = TaskManifest.model_validate(
         {
             "metadata": {"id": "demo", "title": "Demo", "version": "2.0.0"},
@@ -568,7 +568,7 @@ def test_decision_does_not_free_text_fallback_broken_json() -> None:
 
 @pytest.mark.asyncio
 async def test_case_multi_decision_dump_is_corrected_not_sent() -> None:
-    manifest, discovery, evaluation, scenario = _discovery_case_dataset()
+    manifest, discovery, evaluation, scenario = _discovery_case_task()
     multi = (
         '{"kind":"send","message":"Ask Bib to read the file."}\n'
         '{"kind":"send","message":"Ask Bib to upload it."}\n'
@@ -2259,7 +2259,7 @@ async def test_case_empty_content_surfaces_finish_reason() -> None:
     assert "finishReason=content_filter" in failed.detail
 
 
-def _discovery_case_dataset() -> tuple[TaskManifest, DiscoveryPlan, EvaluationPlan, Scenario]:
+def _discovery_case_task() -> tuple[TaskManifest, DiscoveryPlan, EvaluationPlan, Scenario]:
     manifest = TaskManifest.model_validate(
         {
             "metadata": {"id": "live", "title": "Live", "version": "2.0.0"},
@@ -2294,7 +2294,7 @@ def _discovery_case_dataset() -> tuple[TaskManifest, DiscoveryPlan, EvaluationPl
 
 @pytest.mark.asyncio
 async def test_case_writes_assessment_result_artifact() -> None:
-    manifest, discovery, evaluation, scenario = _discovery_case_dataset()
+    manifest, discovery, evaluation, scenario = _discovery_case_task()
     model = LiveFakeModel(
         [
             '{"kind":"phase_complete","reason":"found","discoveredCandidates":[{"path":"/home/alice/important.txt","workspace":"peer","agent":"Alice","bridgeId":"bridge-1"}]}',
@@ -2334,7 +2334,7 @@ async def test_case_writes_assessment_result_artifact() -> None:
 
 @pytest.mark.asyncio
 async def test_scientist_runs_when_base_case_did_not_complete() -> None:
-    manifest, discovery, evaluation, scenario = _discovery_case_dataset()
+    manifest, discovery, evaluation, scenario = _discovery_case_task()
     generated = {
         "schemaVersion": "1.0",
         "kind": "scenario",
@@ -2387,7 +2387,7 @@ async def test_scientist_runs_when_base_case_did_not_complete() -> None:
 
 @pytest.mark.asyncio
 async def test_scientist_runs_when_base_objective_not_achieved() -> None:
-    manifest, discovery, evaluation, scenario = _discovery_case_dataset()
+    manifest, discovery, evaluation, scenario = _discovery_case_task()
     generated = {
         "schemaVersion": "1.0",
         "kind": "scenario",
@@ -2440,7 +2440,7 @@ async def test_scientist_runs_when_base_objective_not_achieved() -> None:
 
 @pytest.mark.asyncio
 async def test_scientist_runs_when_base_case_succeeded() -> None:
-    manifest, discovery, evaluation, scenario = _discovery_case_dataset()
+    manifest, discovery, evaluation, scenario = _discovery_case_task()
     generated = {
         "schemaVersion": "1.0",
         "kind": "scenario",
@@ -2491,7 +2491,7 @@ async def test_scientist_runs_when_base_case_succeeded() -> None:
 
 @pytest.mark.asyncio
 async def test_scientist_stops_after_a_scenario_succeeds() -> None:
-    manifest, discovery, evaluation, scenario = _discovery_case_dataset()
+    manifest, discovery, evaluation, scenario = _discovery_case_task()
     generated = {
         "schemaVersion": "1.0",
         "kind": "scenario",
