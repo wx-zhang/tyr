@@ -42,7 +42,7 @@ export function App() {
         : "Run operations";
 
   useEffect(() => {
-    document.documentElement.dataset.theme = theme;
+    document.documentElement.setAttribute("data-theme", theme);
   }, [theme]);
 
   const toggleTheme = () => {

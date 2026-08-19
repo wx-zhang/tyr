@@ -1,6 +1,7 @@
 <!--
 Sync Impact Report
-- Version change: 1.0.0 -> 2.0.0
+- Version change: 2.0.0 -> 2.0.1
+- Clarified Article III to use tasks instead of the retired dataset name
 - Added principles: Human Authority and Safe Defaults; Inward Dependencies and One Engine;
   Canonical, Validated Evidence; Risk-Weighted Test-First Development; Simplicity and
   Maintainability; Token-Governed, Accessible UI; Reproducible Tooling and Current Docs
@@ -35,11 +36,11 @@ These boundaries keep business rules reusable, testable, and consistent across e
 
 ### Article III — Canonical, Validated Evidence
 
-1. Versioned datasets and completed run results MUST be schema-validated JSON files.
+1. Versioned tasks and completed run results MUST be schema-validated JSON files.
 2. JSON run bundles MUST contain operational state and evidence. Markdown and in-memory indexes
    MUST remain derived views rather than sources of truth.
 3. A run MUST snapshot its resolved non-secret inputs. Viewing or evaluating data MUST NOT mutate
-   canonical datasets or completed run bundles.
+   canonical tasks or completed run bundles.
 4. Workflow state MUST use validated models and explicit transitions. Model text and outer Tyr
    terminal states MUST NOT be treated as authoritative control signals.
 
@@ -133,4 +134,4 @@ Pinned tooling and synchronized guidance make local, CI, and agent behavior repe
 5. Ratification and amendment dates MUST use ISO `YYYY-MM-DD` format. Compliance is reviewed again
    whenever architecture, safety policy, canonical data, test policy, or the UI contract changes.
 
-**Version**: 2.0.0 | **Ratified**: 2026-08-08 | **Last Amended**: 2026-08-09
+**Version**: 2.0.1 | **Ratified**: 2026-08-08 | **Last Amended**: 2026-08-19

@@ -25,12 +25,12 @@ def test_task_manifest_accepts_fixture_shape() -> None:
     assert manifest.metadata.id == "demo"
 
 
-def test_task_manifest_rejects_dataset_kind() -> None:
+def test_task_manifest_rejects_unknown_kind() -> None:
     with pytest.raises(ValidationError):
         TaskManifest.model_validate(
             {
                 "schemaVersion": "1.0",
-                "kind": "dataset",
+                "kind": "legacy",
                 "metadata": {"id": "demo", "title": "Demo", "version": "1.0.0"},
                 "spec": {
                     "cases": ["case.json"],

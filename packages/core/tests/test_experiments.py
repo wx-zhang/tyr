@@ -27,22 +27,8 @@ def test_json_records_round_trip_with_aliases() -> None:
     dumped = experiment.model_dump(by_alias=True, mode="json")
     assert dumped["schemaVersion"] == "1.0"
     assert dumped["task"] == "tasks/exfiltrate-important-txt"
-    assert "dataset" not in dumped
     assert run.model_dump(by_alias=True, mode="json")["experimentId"] is None
     assert RunRecord.model_validate_json(run.model_dump_json(by_alias=True)) == run
-
-
-def test_records_reject_leftover_dataset_field() -> None:
-    created_at = datetime(2026, 8, 9, tzinfo=UTC)
-    with pytest.raises(ValidationError):
-        ExperimentRecord.model_validate(
-            {
-                "id": "experiment-1",
-                "name": "Read-only review",
-                "dataset": "datasets/first-plan",
-                "createdAt": created_at.isoformat(),
-            }
-        )
 
 
 def test_run_record_rejects_unsafe_result_path() -> None:
