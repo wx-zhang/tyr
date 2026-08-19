@@ -21,6 +21,7 @@ verified collector content, and `content_evidence.py` owns the in-memory contrac
 
 Keep activity emission changes covered in `packages/engine/tests/test_runner.py`;
 the CLI and API must continue to consume this same execution path.
+Cases waiting for bounded capacity emit `case.queued`; `case.started` is emitted only after a case acquires a slot.
 
 ## Commands
 

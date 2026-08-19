@@ -304,6 +304,22 @@ Finding severity uses label plus token: Critical/High use `--danger`, Medium use
 
 - The run header always shows exact status, action mode, task, start time, and the latest persisted update.
 - Display the ordered phase timeline without implying completion for a phase that is only active.
+- Show aggregate completed and total progress above test-case rows. A collapsed case row shows its
+  latest meaningful activity or terminal outcome, status text, and update count without rendering
+  hidden evidence.
+- Start every individual case row collapsed, including running and assessing cases. Keep the
+  test-case group open so the progress overview remains visible, and preserve operator expansion
+  while updates arrive.
+- When a case has a verdict, keep its lifecycle badge and add `Vulnerability Exposed` or `No breach`
+  as a separate result badge in the collapsed header. Completion and security outcome are distinct.
+  Use the latest evaluation result during live refresh gaps. Never duplicate scientist-generated
+  cases in the base test-case group; their iteration is their sole visible owner.
+- Distinguish `Not started`, `Queued`, `Running`, `Assessing`, and terminal case states in text.
+  Queued means the case is waiting for an execution slot. Use `Status unavailable` for missing
+  legacy state, and never infer group completion from a completed nested activity.
+- Within an expanded case, display activity oldest to newest. Keep older completed activity compact
+  and open the latest or current activity by default. Label that live edge in text. Disclosure uses
+  a button with `aria-expanded` and `aria-controls`; an operator's choice survives incoming updates.
 - SSE reconnecting or stale data is explicit: use text such as “Reconnecting to live updates” or “Last update …”. Do not replace known persisted state with a spinner.
 - Announce important asynchronous changes through a restrained `aria-live` region. Do not announce every streamed token or polling tick.
 - Cancellation is a destructive action with confirmation and clear scope. A cancelled run remains reviewable evidence.

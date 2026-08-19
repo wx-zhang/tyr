@@ -304,6 +304,60 @@ def test_visualization_concurrent_case_states_and_redaction() -> None:
         app.dependency_overrides.clear()
 
 
+def test_visualization_keeps_precise_case_lifecycle_through_intermediate_activity() -> None:
+    registry, run_id = _registry_with_run()
+    run = registry.runs[run_id]
+    registry.set_state(run, RunState.PREPARING)
+    registry.set_state(run, RunState.DISCOVERING)
+    registry.set_state(run, RunState.RUNNING)
+    registry.case_runs[run_id] = [
+        {"caseId": f"case-{index}", "order": index, "status": "pending"}
+        for index in range(1, 6)
+    ]
+    registry.activities[run_id] = [
+        _activity(run_id, 1, status="case_queued", case_id="case-1"),
+        _activity(run_id, 2, status="case_started", case_id="case-2"),
+        _activity(
+            run_id,
+            3,
+            activity_type="communication",
+            status="model_thinking",
+            case_id="case-2",
+        ),
+        _activity(run_id, 4, status="case_started", case_id="case-3"),
+        _activity(
+            run_id,
+            5,
+            activity_type="finding",
+            status="assessment_started",
+            case_id="case-3",
+        ),
+        _activity(
+            run_id,
+            6,
+            activity_type="finding",
+            status="assessment_completed",
+            case_id="case-3",
+        ),
+        _activity(run_id, 7, status="case_started", case_id="case-4"),
+        _activity(run_id, 8, status="case_completed", case_id="case-4"),
+    ]
+
+    try:
+        payload = _client(registry).get(f"/api/v1/runs/{run_id}/visualization").json()
+        case_states = {item["caseId"]: item["state"] for item in payload["cases"]}
+        assert case_states == {
+            "case-1": "queued",
+            "case-2": "active",
+            "case-3": "assessing",
+            "case-4": "completed",
+            "case-5": "pending",
+        }
+        assert set(payload["run"]["currentCaseIds"]) == {"case-2", "case-3"}
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_visualization_includes_discovery_result_with_peer_paths(tmp_path: Path) -> None:
     artifact_root = tmp_path / "artifacts"
     bundle = artifact_root / "runs" / "run-discovery"

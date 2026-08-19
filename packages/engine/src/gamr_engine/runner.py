@@ -347,6 +347,14 @@ class ExperimentRunner:
 
             async with asyncio.TaskGroup() as task_group:
                 for index, scenario in enumerate(scenarios):
+                    if index >= config.max_concurrent_cases:
+                        self._emit(
+                            "case.queued",
+                            identifier,
+                            phase="case",
+                            case_id=scenario.metadata.id,
+                            detail="Waiting for an execution slot",
+                        )
                     task_group.create_task(execute_case(index, scenario))
 
             case_records = [record for record in records if record is not None]

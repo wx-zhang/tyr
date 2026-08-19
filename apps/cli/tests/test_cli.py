@@ -85,10 +85,14 @@ def test_experiment_run_ctrl_c_cancels_run(monkeypatch: pytest.MonkeyPatch) -> N
             close()
         raise KeyboardInterrupt
 
+    store = FakeStore()
+
+    def fake_build(*_args: object) -> tuple[object, object, None, object, object, object]:
+        model = FakeModel()
+        return store, FakeTarget(), None, model, model, model
+
     monkeypatch.setattr(cli, "Settings", FakeSettings)
-    monkeypatch.setattr(cli, "FilesystemArtifactStore", FakeStore)
-    monkeypatch.setattr(cli, "TyrMcpClient", FakeTarget)
-    monkeypatch.setattr(cli, "OpenAICompatibleModel", FakeModel)
+    monkeypatch.setattr(cli, "build_experiment_execution", fake_build, raising=False)
     monkeypatch.setattr(cli, "load_task", fake_load)
     monkeypatch.setattr(asyncio, "run", raise_interrupt)
 
@@ -305,13 +309,17 @@ def test_experiment_run_prints_result_errors(monkeypatch: pytest.MonkeyPatch) ->
             result_path=".gamr/runs/run-err/result.json",
         )
 
+    def fake_build(*_args: object) -> tuple[object, object, None, object, object, object]:
+        model = FakeModel()
+        return FakeStore(), FakeTarget(), None, model, model, model
+
     monkeypatch.setattr(cli, "Settings", FakeSettings)
-    monkeypatch.setattr(cli, "FilesystemArtifactStore", FakeStore)
-    monkeypatch.setattr(cli, "TyrMcpClient", FakeTarget)
-    monkeypatch.setattr(cli, "OpenAICompatibleModel", FakeModel)
+    monkeypatch.setattr(cli, "build_experiment_execution", fake_build, raising=False)
     monkeypatch.setattr(cli, "load_task", fake_load)
     monkeypatch.setattr(ExperimentExecutionService, "execute", fake_execute)
-    monkeypatch.setattr(cli, "FilesystemActivitySink", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        cli, "FilesystemActivitySink", lambda *_a, **_k: None, raising=False
+    )
 
     result = CliRunner().invoke(cli.app, ["experiment", "run", "tasks/exfiltrate-important-txt"])
 
@@ -375,13 +383,17 @@ def test_experiment_run_accepts_max_concurrent_cases_option(
             result_path=".gamr/runs/run-concurrency/result.json",
         )
 
+    def fake_build(*_args: object) -> tuple[object, object, None, object, object, object]:
+        model = FakeModel()
+        return FakeStore(), FakeTarget(), None, model, model, model
+
     monkeypatch.setattr(cli, "Settings", FakeSettings)
-    monkeypatch.setattr(cli, "FilesystemArtifactStore", FakeStore)
-    monkeypatch.setattr(cli, "TyrMcpClient", FakeTarget)
-    monkeypatch.setattr(cli, "OpenAICompatibleModel", FakeModel)
+    monkeypatch.setattr(cli, "build_experiment_execution", fake_build, raising=False)
     monkeypatch.setattr(cli, "load_task", fake_load)
     monkeypatch.setattr(ExperimentExecutionService, "execute", fake_execute)
-    monkeypatch.setattr(cli, "FilesystemActivitySink", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        cli, "FilesystemActivitySink", lambda *_a, **_k: None, raising=False
+    )
 
     # Default is 5
     result = CliRunner().invoke(cli.app, ["experiment", "run", "tasks/exfiltrate-important-txt"])
@@ -392,7 +404,13 @@ def test_experiment_run_accepts_max_concurrent_cases_option(
     for val in (1, 2, 3, 4, 5):
         result = CliRunner().invoke(
             cli.app,
-            ["experiment", "run", "tasks/exfiltrate-important-txt", "--max-concurrent-cases", str(val)],
+            [
+                "experiment",
+                "run",
+                "tasks/exfiltrate-important-txt",
+                "--max-concurrent-cases",
+                str(val),
+            ],
         )
         assert result.exit_code == 0
         assert getattr(captured_config[-1], "max_concurrent_cases", None) == val
@@ -401,6 +419,12 @@ def test_experiment_run_accepts_max_concurrent_cases_option(
     for invalid in (0, 6, -1):
         result = CliRunner().invoke(
             cli.app,
-            ["experiment", "run", "tasks/exfiltrate-important-txt", "--max-concurrent-cases", str(invalid)],
+            [
+                "experiment",
+                "run",
+                "tasks/exfiltrate-important-txt",
+                "--max-concurrent-cases",
+                str(invalid),
+            ],
         )
         assert result.exit_code != 0

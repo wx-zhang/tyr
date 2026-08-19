@@ -10,6 +10,8 @@ Dataset cases currently execute one at a time, which makes multi-case experiment
 - Preserve dataset order in completed results regardless of case completion order.
 - Wait for all base cases to finish before starting scientist iterations, which remain serial.
 - Represent multiple simultaneously active cases accurately in persisted evidence and run visualization.
+- Distinguish not-started, queued, running, assessing, and terminal cases, and derive stage completion from lifecycle progress rather than an intermediate completed activity.
+- Replace the flat run-history list with a grouped, expandable history that shows aggregate case progress, keeps the latest activity visible in collapsed summaries, and presents expanded case activity as an oldest-to-newest audit timeline with compact disclosures for completed history.
 
 ## Capabilities
 
@@ -28,3 +30,4 @@ None.
 - CLI, API, and web experiment surfaces expose the setting.
 - Run checkpoints, activity reduction, and visualization must support multiple active cases without exposing operation identifiers or idempotency keys.
 - Model, Tyr, collector, and artifact adapters continue to use the shared execution path and must support safe concurrent calls within one run.
+- The web run view replaces its single flat update list with a grouped stage and case hierarchy; the oversized run page module must be split into focused components to satisfy the 300-line source limit.

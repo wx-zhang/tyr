@@ -42,7 +42,7 @@ function boundedCount(value: string): number {
 
 function boundedConcurrency(value: string): number {
   const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return 5;
+  if (!Number.isFinite(parsed)) return 1;
   return Math.min(5, Math.max(1, Math.floor(parsed)));
 }
 
@@ -52,7 +52,7 @@ export function ExperimentPage() {
   const [taskId, setTaskId] = useState("");
   const [selectedCaseIds, setSelectedCaseIds] = useState<string[]>([]);
   const [allowActions, setAllowActions] = useState(true);
-  const [maxConcurrentCasesInput, setMaxConcurrentCasesInput] = useState("5");
+  const [maxConcurrentCasesInput, setMaxConcurrentCasesInput] = useState("1");
   const [scientistIterationsInput, setScientistIterationsInput] = useState("0");
   const [historyTestRunsInput, setHistoryTestRunsInput] = useState("10");
   const [historyScientistRunsInput, setHistoryScientistRunsInput] =
@@ -301,7 +301,8 @@ export function ExperimentPage() {
               }}
             />
             <p className="field-help">
-              Number of base test cases to execute simultaneously (1 to 5, default 5).
+              Number of base test cases to execute simultaneously (1 to 5,
+              default 5).
             </p>
           </div>
 

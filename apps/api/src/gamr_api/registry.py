@@ -27,6 +27,8 @@ from gamr_core import (
 from gamr_core.identifiers import new_id
 from pydantic import ValidationError
 
+from .case_progress import case_state_after_activity, normalize_case_state
+
 _SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
 
@@ -170,7 +172,7 @@ class InMemoryRegistry:
                 cases[case_id] = {
                     "caseId": case_id,
                     "order": item.get("order", order),
-                    "state": item.get("status", "unknown"),
+                    "state": normalize_case_state(str(item.get("status", "pending"))),
                     "verdict": item.get("verdict"),
                     "latestSequence": None,
                 }
@@ -182,12 +184,17 @@ class InMemoryRegistry:
                 {
                     "caseId": activity.case_id,
                     "order": len(cases),
-                    "state": "unknown",
+                    "state": "pending",
                     "verdict": None,
                     "latestSequence": None,
                 },
             )
-            item.update({"state": activity.status, "latestSequence": activity.sequence})
+            item.update(
+                {
+                    "state": case_state_after_activity(str(item["state"]), activity),
+                    "latestSequence": activity.sequence,
+                }
+            )
         current_cases = [
             str(item["caseId"])
             for item in cases.values()

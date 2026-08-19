@@ -131,7 +131,7 @@ it("creates the experiment via the API then redirects to details", async () => {
     task: "exfiltrate-important-txt",
     actionMode: "approval_required",
     caseIds: ["case-a"],
-    maxConcurrentCases: 5,
+    maxConcurrentCases: 1,
     scientistIterations: 0,
     historyTestRuns: 10,
     historyScientistRuns: 5,
@@ -180,7 +180,7 @@ it("sends scientist iterations when the operator sets them", async () => {
   });
 });
 
-it("defaults max concurrent cases to 5 and bounds operator input 1 through 5", async () => {
+it("defaults max concurrent cases to 1 and bounds operator input 1 through 5", async () => {
   const createBodies: Record<string, unknown>[] = [];
   installFetch((body) => {
     createBodies.push(body);
@@ -190,7 +190,7 @@ it("defaults max concurrent cases to 5 and bounds operator input 1 through 5", a
 
   expect(await screen.findByLabelText(/Case Alpha/)).toBeChecked();
   const concurrencyInput = screen.getByLabelText("Max concurrent cases");
-  expect(concurrencyInput).toHaveValue(5);
+  expect(concurrencyInput).toHaveValue(1);
 
   fireEvent.change(concurrencyInput, { target: { value: "3" } });
   expect(concurrencyInput).toHaveValue(3);

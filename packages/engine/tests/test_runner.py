@@ -680,8 +680,7 @@ async def test_progress_includes_tyr_message_bodies() -> None:
         "Read the file.",
     ]
     assert completed[0].detail == "done"
-    assert completed[1].detail is not None
-    assert "no new content" in completed[1].detail
+    assert completed[1].detail == "done"
 
 
 @pytest.mark.asyncio

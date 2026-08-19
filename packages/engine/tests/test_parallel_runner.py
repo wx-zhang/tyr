@@ -1,59 +1,88 @@
 import asyncio
+from typing import Any, cast
 
 import pytest
-from gamr_core import DiscoveryPlan, ExperimentConfig, Scenario, TaskManifest
-from gamr_engine.runner import ExperimentRunner, LoadedTask
+from gamr_core import (
+    DiscoveryCandidate,
+    ExecutionOutcome,
+    ExperimentConfig,
+    ObjectiveStatus,
+    Scenario,
+    SecurityVerdict,
+    TaskManifest,
+)
+from gamr_engine.ports.models import ModelGateway
+from gamr_engine.ports.targets import TargetGateway
+from gamr_engine.runner import (
+    CaseRecord,
+    ExperimentRunner,
+    LoadedTask,
+    PhaseResult,
+    TargetConversation,
+)
 
 
-class ParallelTarget:
-    def __init__(self) -> None:
-        self.active = 0
-        self.maximum_active = 0
-        self.operations: list[str | None] = []
-        self.release = asyncio.Event()
-
+class InitializableTarget:
     async def initialize(self) -> dict[str, object]:
         return {"ok": True}
 
-    async def query(
+
+class CoordinatorRunner(ExperimentRunner):
+    def __init__(self) -> None:
+        super().__init__()
+        self.active = 0
+        self.maximum_active = 0
+        self.conversations: list[TargetConversation] = []
+        self.release = asyncio.Event()
+
+    async def _run_discovery(self, *args: Any, **kwargs: Any) -> PhaseResult:
+        return PhaseResult(
+            [],
+            None,
+            None,
+            [DiscoveryCandidate(
+                path="/home/space/file", workspace="space", agent="agent", bridgeId="bridge"
+            )],
+        )
+
+    async def _run_case(
         self,
-        prompt: str,
+        task: LoadedTask,
+        scenario: Scenario,
+        candidate: DiscoveryCandidate,
+        config: ExperimentConfig,
+        target: Any,
+        model: Any,
+        judge_model: Any,
+        run_id: str,
+        artifacts: Any,
+        conversation: TargetConversation,
         *,
-        operation_id: str | None = None,
-        idempotency_key: str,
-    ) -> dict[str, object]:
-        if "Discover" in prompt:
-            return {"operationId": "discovery", "state": "completed", "response": "done"}
-        self.operations.append(operation_id)
+        phase: str = "case",
+    ) -> tuple[CaseRecord, None]:
+        self.conversations.append(conversation)
         self.active += 1
         self.maximum_active = max(self.maximum_active, self.active)
         await self.release.wait()
         self.active -= 1
-        return {
-            "operationId": f"case-{idempotency_key}",
-            "state": "completed",
-            "response": "done",
-        }
-
-    async def settle(
-        self, result: dict[str, object], *, operation_id: str | None = None
-    ) -> dict[str, object]:
-        return result
-
-
-class ParallelModel:
-    async def complete(self, prompt: str) -> dict[str, object]:
-        if "Discovery plan" in prompt:
-            return {
-                "content": (
-                    '{"kind":"phase_complete","reason":"done",'
-                    '"discoveredCandidates":[{"path":"/tmp/file","workspace":"space",'
-                    '"agent":"agent","bridgeId":"bridge"}]}'
-                )
-            }
-        if '"role":"assistant"' in prompt:
-            return {"content": '{"kind":"phase_complete","reason":"done"}'}
-        return {"content": '{"kind":"send","message":"observe"}'}
+        case = self._case_result(
+            scenario,
+            outcome=ExecutionOutcome.COMPLETED,
+            objective_status=ObjectiveStatus.NOT_ACHIEVED,
+            verdict=SecurityVerdict.PROTECTED,
+            summary="done",
+            turn_ids=[],
+        )
+        record = CaseRecord(
+            scenario,
+            scenario.metadata.title,
+            "observe",
+            ["observe"],
+            "",
+            case,
+            [],
+        )
+        return record, None
 
 
 def parallel_task() -> LoadedTask:
@@ -61,9 +90,12 @@ def parallel_task() -> LoadedTask:
         {
             "metadata": {"id": "parallel", "title": "Parallel", "version": "1.0.0"},
             "spec": {
-                "discovery": "discovery.json",
                 "cases": ["one.json", "two.json", "three.json"],
-                "defaults": {"maxTurns": 2, "actionMode": "read_only"},
+                "defaults": {
+                    "maxTurns": 2,
+                    "actionMode": "read_only",
+                    "defaultCaseIds": ["one", "two", "three"],
+                },
             },
         }
     )
@@ -81,35 +113,29 @@ def parallel_task() -> LoadedTask:
         )
         for case_id in ("one", "two", "three")
     ]
-    return LoadedTask(
-        manifest,
-        scenarios,
-        {},
-        discovery=DiscoveryPlan(
-            prompt="Discover.", outputFields=["path", "workspace", "agent"]
-        ),
-    )
+    return LoadedTask(manifest, scenarios, {})
 
 
 @pytest.mark.asyncio
 async def test_parallel_cases_are_bounded_isolated_and_keep_manifest_order() -> None:
-    target = ParallelTarget()
+    runner = CoordinatorRunner()
     run = asyncio.create_task(
-        ExperimentRunner().run(
+        runner.run(
             parallel_task(),
             ExperimentConfig(maxConcurrentCases=2),
-            target=target,
-            model=ParallelModel(),
+            target=cast(TargetGateway, InitializableTarget()),
+            model=cast(ModelGateway, object()),
         )
     )
 
     for _ in range(100):
-        if target.maximum_active == 2:
+        if runner.maximum_active == 2:
             break
         await asyncio.sleep(0.001)
-    target.release.set()
+    runner.release.set()
     result = await run
 
-    assert target.maximum_active == 2
-    assert target.operations == [None, None, None]
+    assert runner.maximum_active == 2
+    assert len({id(conversation) for conversation in runner.conversations}) == 3
+    assert all(conversation.operation_id is None for conversation in runner.conversations)
     assert [case.scenario_id for case in result.cases] == ["one", "two", "three"]
