@@ -1,6 +1,6 @@
 # GAMR UI Design Tokens and System
 
-This document is the visual and interaction contract for GAMR's optional web interface: datasets, experiment execution starts, run visualization, case transcripts, findings, and evidence artifacts.
+This document is the visual and interaction contract for GAMR's optional web interface: tasks, experiment execution starts, run visualization, case transcripts, findings, and evidence artifacts.
 
 GAMR is the red-team product **for Tyr** ([tyr.ai](https://tyr.ai/)). Branding should always make that relationship clear: the product name is **GAMR**, the logo tagline is **Tyr's final opponent**, and the shell links out to Tyr. Reuse the Tyr spear monogram as a co-brand mark, not as a replacement for the GAMR identity.
 
@@ -34,7 +34,7 @@ The intended character is a **calm evidence console**: precise enough for operat
 The shell supports the routes defined by the scaffold:
 
 - Run dashboard
-- Datasets
+- Tasks
 - New and saved experiments
 - Run overview
 - Case transcript and evidence
@@ -74,6 +74,7 @@ Use a persistent left navigation rail for product identity, workspace routes, lo
 - Transcript prose and long evidence descriptions use `--reading-max` for readable line length.
 - Keep the primary task and its supporting context visible together on wide screens. An optional inspector is `--inspector-w`.
 - Below 720px, move the left rail into a compact top rail, use one column, allow tables to scroll horizontally, and keep actions close to the content they affect. Never reduce important data to icon-only controls.
+- Compact choice cards (`.choice-card-compact`) may be used for inline risk flags or secondary approvals where a smaller visual footprint is preferred.
 - Compact table rows may be 36–40px. Transcript entries and approval cards grow to fit their content.
 - Prefer section dividers and headings to wrapping every section in a card.
 
@@ -293,7 +294,7 @@ Finding severity uses label plus token: Critical/High use `--danger`, Medium use
 
 ### Tables and lists
 
-- Use semantic tables for datasets, experiments, cases, and artifacts when columns align across rows.
+- Use semantic tables for tasks, experiments, cases, and artifacts when columns align across rows.
 - Keep headers visible on long tables where practical. IDs, versions, counts, and timestamps use monospace/tabular numerals.
 - Provide meaningful empty, loading, and error states; an empty `<tbody>` is not an empty state.
 - Row actions must work by keyboard and must not rely on hover to become discoverable.
@@ -301,7 +302,7 @@ Finding severity uses label plus token: Critical/High use `--danger`, Medium use
 
 ### Run timeline and live state
 
-- The run header always shows exact status, action mode, dataset, start time, and the latest persisted update.
+- The run header always shows exact status, action mode, task, start time, and the latest persisted update.
 - Display the ordered phase timeline without implying completion for a phase that is only active.
 - SSE reconnecting or stale data is explicit: use text such as “Reconnecting to live updates” or “Last update …”. Do not replace known persisted state with a spinner.
 - Announce important asynchronous changes through a restrained `aria-live` region. Do not announce every streamed token or polling tick.
@@ -404,7 +405,7 @@ Run the narrowest web test while iterating and the repository checks required by
 
 Before merging a UI change, confirm:
 
-- The screen makes the current dataset, experiment, run, or case context clear.
+- The screen makes the current task, experiment, run, or case context clear.
 - Read-only/action mode and approval state are explicit where relevant.
 - Status is conveyed with text, not color alone.
 - The principal action is obvious and competing filled actions are absent.

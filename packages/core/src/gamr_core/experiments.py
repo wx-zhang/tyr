@@ -14,7 +14,7 @@ class RunSource(StrEnum):
     SERVICE = "service"
 
 
-class DatasetReference(BaseModel):
+class TaskReference(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     id: str
@@ -52,7 +52,7 @@ class ExperimentRecord(BaseModel):
     schema_version: str = Field(default="1.0", alias="schemaVersion")
     id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
     name: str = Field(min_length=1)
-    dataset: str = Field(min_length=1)
+    task: str = Field(min_length=1)
     configuration: ExperimentConfig = Field(default_factory=ExperimentConfig)
     created_at: datetime = Field(alias="createdAt")
 
@@ -66,7 +66,7 @@ class RunRecord(BaseModel):
     experiment_id: str | None = Field(default=None, alias="experimentId")
     retry_of: str | None = Field(default=None, alias="retryOf")
     name: str | None = Field(default=None)
-    dataset: str = Field(min_length=1)
+    task: str = Field(min_length=1)
     state: RunState
     configuration: ExperimentConfig = Field(default_factory=ExperimentConfig)
     result_path: str | None = Field(default=None, alias="resultPath")
@@ -120,7 +120,7 @@ class RunResult(BaseModel):
     schema_ref: str | None = Field(default=None, alias="$schema")
     schema_version: str = Field(default="1.0", alias="schemaVersion")
     run_id: str = Field(alias="runId")
-    dataset: DatasetReference
+    task: TaskReference
     started_at: datetime = Field(alias="startedAt")
     finished_at: datetime | None = Field(default=None, alias="finishedAt")
     outcome: ExecutionOutcome

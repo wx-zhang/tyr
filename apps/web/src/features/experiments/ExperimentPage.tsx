@@ -3,33 +3,35 @@ import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   createExperiment,
-  fetchDatasetCases,
-  fetchDatasets,
+  fetchTaskCases,
+  fetchTasks,
   scenarioToCase,
-  type Dataset,
+  type Task,
 } from "../../api/client";
 import { PageHeader } from "../../components/PageHeader";
 import { CaseChecklist } from "./CaseChecklist";
 import { ScientistHistoryPanel } from "./ScientistHistoryPanel";
 
+const RESEARCH_NEW_TASK = "__research_new_task__";
+
 function defaultCaseSelection(
-  dataset: Dataset | undefined,
+  task: Task | undefined,
   caseIds: string[],
 ): string[] {
-  if (!dataset) return [];
-  const defaults = dataset.spec.defaults.defaultCaseIds ?? [];
+  if (!task) return [];
+  const defaults = task.spec.defaults.defaultCaseIds ?? [];
   const known = new Set(caseIds);
-  const fromDefaults = defaults.filter((id) => known.has(id));
+  const fromDefaults = defaults.filter((id: string) => known.has(id));
   if (fromDefaults.length > 0) return fromDefaults;
   return caseIds;
 }
 
-function defaultExperimentName(datasetTitle: string): string {
+function defaultExperimentName(taskTitle: string): string {
   const stamp = new Intl.DateTimeFormat(undefined, {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date());
-  return `${datasetTitle} · ${stamp}`;
+  return `${taskTitle} · ${stamp}`;
 }
 
 function boundedCount(value: string): number {
@@ -41,14 +43,15 @@ function boundedCount(value: string): number {
 export function ExperimentPage() {
   const navigate = useNavigate();
   const [name, setName] = useState("");
-  const [datasetId, setDatasetId] = useState("");
-  const [executeTestCases, setExecuteTestCases] = useState(true);
+  const [taskId, setTaskId] = useState("");
   const [selectedCaseIds, setSelectedCaseIds] = useState<string[]>([]);
   const [allowActions, setAllowActions] = useState(true);
   const [scientistIterationsInput, setScientistIterationsInput] = useState("0");
   const [historyTestRunsInput, setHistoryTestRunsInput] = useState("10");
   const [historyScientistRunsInput, setHistoryScientistRunsInput] =
     useState("5");
+  const isResearchMode = taskId === RESEARCH_NEW_TASK;
+  const executeTestCases = Boolean(taskId) && !isResearchMode;
   const scientistIterations = useMemo(() => {
     const parsed = Number(scientistIterationsInput);
     return Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)) : 0;
@@ -66,37 +69,40 @@ export function ExperimentPage() {
   const [casesOpen, setCasesOpen] = useState(true);
 
   const datasets = useQuery({
-    queryKey: ["datasets"],
-    queryFn: fetchDatasets,
+    queryKey: ["tasks"],
+    queryFn: fetchTasks,
   });
 
   useEffect(() => {
-    if (datasetId || !datasets.data?.length) return;
-    if (datasets.data.length === 1) {
-      setDatasetId(datasets.data[0].metadata.id);
+    if (taskId || !datasets.data?.length) return;
+    const preferred =
+      datasets.data.find((item) => item.metadata.id === "exfiltrate-important-txt") ??
+      datasets.data[0];
+    if (preferred) {
+      setTaskId(preferred.metadata.id);
     }
-  }, [datasets.data, datasetId]);
+  }, [datasets.data, taskId]);
 
-  const selectedDataset = useMemo(
-    () => datasets.data?.find((item) => item.metadata.id === datasetId),
-    [datasets.data, datasetId],
+  const selectedTask = useMemo(
+    () => (isResearchMode ? undefined : datasets.data?.find((item) => item.metadata.id === taskId)),
+    [datasets.data, taskId, isResearchMode],
   );
 
   const cases = useQuery({
-    queryKey: ["dataset-cases", datasetId],
-    queryFn: () => fetchDatasetCases(datasetId),
-    enabled: Boolean(datasetId) && executeTestCases,
+    queryKey: ["task-cases", taskId],
+    queryFn: () => fetchTaskCases(taskId),
+    enabled: Boolean(taskId) && executeTestCases,
   });
 
   useEffect(() => {
     if (!cases.data || !executeTestCases) return;
     setSelectedCaseIds(
       defaultCaseSelection(
-        selectedDataset,
+        selectedTask,
         cases.data.map((item) => item.metadata.id),
       ),
     );
-  }, [cases.data, executeTestCases, selectedDataset]);
+  }, [cases.data, executeTestCases, selectedTask]);
 
   const toggleCase = (caseId: string) => {
     setSelectedCaseIds((current) =>
@@ -109,27 +115,33 @@ export function ExperimentPage() {
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setError(null);
-    if (!datasetId) {
-      setError("Select a dataset.");
+    if (!taskId) {
+      setError("Select a task.");
       return;
     }
     if (executeTestCases && selectedCaseIds.length === 0) {
-      setError("Select at least one test case or turn off Execute Test Cases.");
+      setError("Select at least one test case or choose Research new task.");
       return;
     }
     if (!executeTestCases && scientistIterations === 0) {
       setError(
-        "Set scientist iterations above 0 for scientist-only execution.",
+        "Set number of new task research above 0 for scientist-only execution.",
       );
       return;
     }
-    const datasetTitle = selectedDataset?.metadata.title ?? datasetId;
-    const experimentName = name.trim() || defaultExperimentName(datasetTitle);
+    const defaultTask =
+      datasets.data?.find((item) => item.metadata.id === "exfiltrate-important-txt") ??
+      datasets.data?.[0];
+    const effectiveTask = isResearchMode ? (defaultTask?.metadata.id ?? "exfiltrate-important-txt") : taskId;
+    const taskTitle = isResearchMode
+      ? "Research new task"
+      : (selectedTask?.metadata.title ?? taskId);
+    const experimentName = name.trim() || defaultExperimentName(taskTitle);
     setSubmitting(true);
     try {
       const experiment = await createExperiment({
         name: experimentName,
-        dataset: datasetId,
+        task: effectiveTask,
         actionMode: allowActions ? "approval_required" : "read_only",
         caseIds: executeTestCases ? selectedCaseIds : [],
         scientistIterations,
@@ -151,26 +163,26 @@ export function ExperimentPage() {
 
   const caseList = (cases.data ?? []).map(scenarioToCase);
   const canSubmit =
-    Boolean(datasetId) &&
+    Boolean(taskId) &&
     (executeTestCases ? selectedCaseIds.length > 0 : scientistIterations > 0) &&
     !submitting &&
-    !cases.isLoading;
+    (!executeTestCases || !cases.isLoading);
 
   return (
     <section className="section-stack">
       <PageHeader
         eyebrow="Experiment execution"
         title="Execute experiment"
-        description="Choose a dataset and execution mode, then start a live red-team run against Tyr."
+        description="Choose a task and execution mode, then start a live red-team run against Tyr."
         actions={
-          <Link className="button button-secondary" to="/datasets">
-            Browse datasets
+          <Link className="button button-secondary" to="/tasks">
+            Browse tasks
           </Link>
         }
       />
 
       <div
-        className={`execute-layout${executeTestCases && !casesOpen ? " execute-layout-collapsed" : ""}`}
+        className={`execute-layout${executeTestCases && !casesOpen ? " execute-layout-collapsed" : !executeTestCases ? "" : ""}`}
       >
         <form className="card form-card" onSubmit={submit}>
           <div className="field-group">
@@ -180,75 +192,46 @@ export function ExperimentPage() {
               name="name"
               value={name}
               onChange={(event) => setName(event.target.value)}
-              placeholder="Optional · defaults to dataset and time"
+              placeholder="Optional · defaults to task and time"
             />
           </div>
 
-          <label className="choice-card case-choice">
-            <input
-              type="checkbox"
-              checked={executeTestCases}
+          <div className="field-group">
+            <label htmlFor="experiment-task">Task</label>
+            <select
+              id="experiment-task"
+              name="task"
+              value={taskId}
               onChange={(event) => {
-                const next = event.target.checked;
-                setExecuteTestCases(next);
+                const nextTaskId = event.target.value;
+                setTaskId(nextTaskId);
+                setSelectedCaseIds([]);
                 setError(null);
                 setCasesOpen(true);
-                if (!next) {
-                  setSelectedCaseIds([]);
-                } else if (cases.data) {
-                  setSelectedCaseIds(
-                    defaultCaseSelection(
-                      selectedDataset,
-                      cases.data.map((item) => item.metadata.id),
-                    ),
-                  );
-                }
               }}
-              aria-label="Execute Test Cases"
-            />
-            <span>
-              <span className="choice-title" aria-hidden="true">
-                Execute Test Cases
-              </span>
-              <span className="choice-description">
-                Run the selected dataset cases before the scientist stage.
-              </span>
-            </span>
-          </label>
-
-          {executeTestCases ? (
-            <div className="field-group">
-              <label htmlFor="experiment-dataset">Dataset</label>
-              <select
-                id="experiment-dataset"
-                name="dataset"
-                value={datasetId}
-                onChange={(event) => {
-                  setDatasetId(event.target.value);
-                  setSelectedCaseIds([]);
-                  setError(null);
-                }}
-                required
-                disabled={datasets.isLoading}
-              >
-                <option value="" disabled>
-                  {datasets.isLoading
-                    ? "Loading datasets…"
-                    : "Select a validated dataset"}
+              required
+              disabled={datasets.isLoading}
+            >
+              <option value="" disabled>
+                {datasets.isLoading
+                  ? "Loading tasks…"
+                  : "Select a task"}
+              </option>
+              <option value={RESEARCH_NEW_TASK}>
+                Research new task
+              </option>
+              {(datasets.data ?? []).map((dataset) => (
+                <option key={dataset.metadata.id} value={dataset.metadata.id}>
+                  {dataset.metadata.title} ({dataset.metadata.id})
                 </option>
-                {(datasets.data ?? []).map((dataset) => (
-                  <option key={dataset.metadata.id} value={dataset.metadata.id}>
-                    {dataset.metadata.title} ({dataset.metadata.id})
-                  </option>
-                ))}
-              </select>
-              {datasets.isError ? (
-                <p className="field-help" role="alert">
-                  Could not load datasets. Check the API connection.
-                </p>
-              ) : null}
-            </div>
-          ) : null}
+              ))}
+            </select>
+            {datasets.isError ? (
+              <p className="field-help" role="alert">
+                Could not load tasks. Check the API connection.
+              </p>
+            ) : null}
+          </div>
 
           {executeTestCases && !casesOpen ? (
             <div className="field-group">
@@ -270,31 +253,30 @@ export function ExperimentPage() {
             </div>
           ) : null}
 
-          <label className="choice-card case-choice choice-card-risk">
+          <label className="choice-card choice-card-compact choice-card-risk">
             <input
               type="checkbox"
               checked={allowActions}
               onChange={(event) => setAllowActions(event.target.checked)}
               aria-label="Actions Allowed"
             />
-            <span>
+            <span className="choice-inline-content">
               <span className="choice-title" aria-hidden="true">
                 Actions Allowed
               </span>
               <span className="choice-description">
-                Tyr still requires a human decision per action. Uncheck for
-                read-only.
+                (approval required per action)
               </span>
             </span>
           </label>
 
           <div className="field-group">
             <div className="field-label-row">
-              <label htmlFor="scientist-iterations">Scientist iterations</label>
+              <label htmlFor="scientist-iterations">Number of new task research</label>
               <button
                 type="button"
                 className="info-tip"
-                aria-label="What scientist iterations mean"
+                aria-label="What number of new task research means"
                 aria-describedby="scientist-iterations-tip"
               >
                 <span aria-hidden="true">i</span>
@@ -326,7 +308,7 @@ export function ExperimentPage() {
             />
             <p className="field-help">
               {!executeTestCases && scientistIterations === 0
-                ? "Set iterations above 0 for scientist-only execution."
+                ? "Set number of new task research above 0 for scientist-only execution."
                 : scientistIterations === 0
                   ? "Off. Selected cases run only."
                   : !executeTestCases
@@ -380,7 +362,7 @@ export function ExperimentPage() {
                 <h2 id="test-cases-title">Test cases</h2>
               </div>
               <div className="case-explorer-actions">
-                {datasetId && selectedCaseIds.length > 0 ? (
+                {taskId && selectedCaseIds.length > 0 ? (
                   <span className="secondary mono tabular">
                     {selectedCaseIds.length} selected
                   </span>
@@ -396,18 +378,18 @@ export function ExperimentPage() {
                 </button>
               </div>
             </div>
-            {!datasetId ? (
-              <p className="field-help">Select a dataset to load cases.</p>
+            {!taskId ? (
+              <p className="field-help">Select a task to load cases.</p>
             ) : cases.isLoading ? (
               <p className="field-help" role="status">
                 Loading cases…
               </p>
             ) : cases.isError ? (
               <p className="field-help" role="alert">
-                Could not load cases for this dataset.
+                Could not load cases for this task.
               </p>
             ) : caseList.length === 0 ? (
-              <p className="field-help">No cases in this dataset.</p>
+              <p className="field-help">No cases in this task.</p>
             ) : (
               <CaseChecklist
                 cases={caseList}
@@ -416,7 +398,7 @@ export function ExperimentPage() {
                 onSelectDefaults={() =>
                   setSelectedCaseIds(
                     defaultCaseSelection(
-                      selectedDataset,
+                      selectedTask,
                       caseList.map((item) => item.id),
                     ),
                   )

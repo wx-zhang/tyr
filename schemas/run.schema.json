@@ -147,9 +147,9 @@
       "default": null,
       "title": "Name"
     },
-    "dataset": {
+    "task": {
       "minLength": 1,
-      "title": "Dataset",
+      "title": "Task",
       "type": "string"
     },
     "state": {
@@ -209,7 +209,7 @@
   "required": [
     "id",
     "source",
-    "dataset",
+    "task",
     "state",
     "createdAt",
     "updatedAt"

@@ -13,7 +13,7 @@ class Settings(BaseSettings):
 
     environment: str = Field(default="development", validation_alias="GAMR_ENVIRONMENT")
     artifact_root: str = Field(default=".gamr", validation_alias="GAMR_ARTIFACT_ROOT")
-    dataset_root: str = Field(default="datasets", validation_alias="GAMR_DATASET_ROOT")
+    task_root: str = Field(default="tasks", validation_alias="GAMR_TASK_ROOT")
     api_origin: str = Field(default="http://127.0.0.1:6687", validation_alias="GAMR_API_ORIGIN")
     web_origin: str = Field(default="http://127.0.0.1:6688", validation_alias="GAMR_WEB_ORIGIN")
     tyr_mcp_url: str = Field(
@@ -34,9 +34,7 @@ class Settings(BaseSettings):
     model_api_key: str = Field(default="", validation_alias="OPENROUTER_API_KEY")
     model_name: str = Field(default="", validation_alias="TYR_LOOP_MODEL")
     scientist_model_name: str = Field(default="", validation_alias="TYR_LOOP_SCIENTIST_MODEL")
-    chat_model_name: str = Field(
-        default="x-ai/grok-4.5", validation_alias="TYR_LOOP_CHAT_MODEL"
-    )
+    chat_model_name: str = Field(default="x-ai/grok-4.5", validation_alias="TYR_LOOP_CHAT_MODEL")
     max_concurrent_runs: int = Field(
         default=3,
         ge=1,

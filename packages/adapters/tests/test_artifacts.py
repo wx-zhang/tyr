@@ -7,13 +7,13 @@ from gamr_adapters.artifacts.evidence import BundleNormalizer
 from gamr_adapters.artifacts.filesystem import FilesystemArtifactStore, redact_payload
 from gamr_core import (
     CaseResult,
-    DatasetReference,
     Evidence,
     ExecutionOutcome,
     ExperimentConfig,
     ResultSummary,
     RunResult,
     SecurityVerdict,
+    TaskReference,
 )
 
 
@@ -58,7 +58,7 @@ def test_result_finalization_preserves_existing_raw_diagnostics(tmp_path: Path) 
     before = raw_path.read_bytes()
     result = RunResult(
         runId="run-1",
-        dataset=DatasetReference(id="demo", version="1.0", digest="sha256:demo"),
+        task=TaskReference(id="demo", version="1.0", digest="sha256:demo"),
         startedAt=datetime(2026, 8, 8, 10, tzinfo=UTC),
         outcome=ExecutionOutcome.COMPLETED,
         configuration=ExperimentConfig(),
@@ -90,7 +90,7 @@ def test_write_result_marks_existing_run_json_terminal(tmp_path: Path) -> None:
             "schemaVersion": "1.0",
             "id": "run-1",
             "source": "cli",
-            "dataset": "datasets/demo",
+            "task": "datasets/demo",
             "state": "running",
             "configuration": {"actionMode": "read_only"},
             "createdAt": "2026-08-08T10:00:00Z",
@@ -99,7 +99,7 @@ def test_write_result_marks_existing_run_json_terminal(tmp_path: Path) -> None:
     )
     result = RunResult(
         runId="run-1",
-        dataset=DatasetReference(id="demo", version="1.0", digest="sha256:demo"),
+        task=TaskReference(id="demo", version="1.0", digest="sha256:demo"),
         startedAt=datetime(2026, 8, 8, 10, tzinfo=UTC),
         outcome=ExecutionOutcome.BLOCKED,
         configuration=ExperimentConfig(),

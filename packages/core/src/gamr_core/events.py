@@ -124,11 +124,7 @@ class RunActivity(BaseModel):
     @classmethod
     def utc_timestamp(cls, value: datetime) -> datetime:
         offset = value.utcoffset()
-        if (
-            value.tzinfo is None
-            or offset is None
-            or offset.total_seconds() != 0
-        ):
+        if value.tzinfo is None or offset is None or offset.total_seconds() != 0:
             raise ValueError("occurredAt must be an explicit UTC timestamp")
         return value
 
@@ -234,9 +230,7 @@ class EvidenceQuery(BaseModel):
     def utc_filter(cls, value: datetime | None) -> datetime | None:
         offset = value.utcoffset() if value is not None else None
         if value is not None and (
-            value.tzinfo is None
-            or offset is None
-            or offset.total_seconds() != 0
+            value.tzinfo is None or offset is None or offset.total_seconds() != 0
         ):
             raise ValueError("query timestamps must be explicit UTC timestamps")
         return value

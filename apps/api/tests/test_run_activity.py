@@ -53,7 +53,7 @@ def historical_client(
             RUN_ID: RunRecord(
                 id=RUN_ID,
                 experiment_id="experiment-history",
-                dataset="fixture-evidence",
+                task="fixture-evidence",
                 state=RunState.COMPLETED,
                 configuration=ExperimentConfig(),
                 created_at=datetime(2026, 8, 8, 10, 1, tzinfo=UTC),
@@ -111,9 +111,7 @@ def test_historical_visualization_uses_canonical_lifecycle_stages(
     ]
     phases = {phase["id"]: phase["state"] for phase in payload["phases"]}
     assert phases["scientist"] == "skipped"
-    assert {state for phase_id, state in phases.items() if phase_id != "scientist"} == {
-        "completed"
-    }
+    assert {state for phase_id, state in phases.items() if phase_id != "scientist"} == {"completed"}
     assert payload["run"]["currentPhase"] is not None
     assert payload["run"]["currentPhase"] != "unknown"
 

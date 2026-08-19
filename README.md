@@ -16,8 +16,8 @@ runs and visualize every run under the shared `.gamr` root, including runs start
 ```bash
 uv sync --all-packages --dev
 uv run gamr doctor
-uv run gamr dataset validate datasets/first-plan
-uv run gamr experiment run datasets/first-plan
+uv run gamr task validate tasks/exfiltrate-important-txt
+uv run gamr experiment run tasks/exfiltrate-important-txt
 uv run gamr result validate .gamr/runs/<run-id>/result.json
 ```
 
@@ -40,7 +40,7 @@ are not raw bodies; their independently verified quarantined files remain downlo
 By default, experiments are **read-only**. To let an experiment take real actions through Tyr, run
 with Actions Allowed (`--action-mode approval_required --allow-actions`); each action still needs an
 explicit human approval on the Tyr side. GAMR never auto-approves an action. Use `--all-cases` to run
-every case in a dataset instead of one.
+every case in a task instead of one.
 
 ## Interactive chat
 
@@ -88,7 +88,7 @@ docker compose up -d --build
 
 The API listens on `http://127.0.0.1:6687` and the web app on
 `http://127.0.0.1:6688`. Compose loads `.env`, mounts `./.gamr` for run artifacts and
-`./datasets` read-only, and does not scale the API (one in-process queue). Host CLI runs that
+`./tasks` read-only, and does not scale the API (one in-process queue). Host CLI runs that
 write to `./.gamr` appear in the UI.
 
 The service runs up to `GAMR_MAX_CONCURRENT_RUNS` experiments, defaulting to three, and

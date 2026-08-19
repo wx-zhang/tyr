@@ -101,9 +101,7 @@ def _stored_case_ids(value: object) -> tuple[str, ...]:
     return tuple(item for item in value if isinstance(item, str) and item.strip())
 
 
-def _history_case_origins(
-    value: dict[str, object], case_ids: tuple[str, ...]
-) -> tuple[str, ...]:
+def _history_case_origins(value: dict[str, object], case_ids: tuple[str, ...]) -> tuple[str, ...]:
     if not case_ids:
         return ()
     metadata = value.get("metadata")
@@ -267,9 +265,7 @@ def _scientist_turns_from_activity(
         number = item["number"]
         assert isinstance(number, int)
         message = str(item["agent_message"])
-        if item.get("status") == "failed" and (
-            not message or message == "scientist failed"
-        ):
+        if item.get("status") == "failed" and (not message or message == "scientist failed"):
             if error_index < len(result_errors):
                 message = result_errors[error_index]
                 error_index += 1
@@ -308,15 +304,13 @@ def _scientist_turns_from_activity(
     return turns
 
 
-def _scientist_errors_from_result(
-    root: Path, secrets: Iterable[str] = ()
-) -> list[str]:
+def _scientist_errors_from_result(root: Path, secrets: Iterable[str] = ()) -> list[str]:
     path = root / "result.json"
     if not path.is_file():
         return []
     try:
         payload = redact_payload(json.loads(path.read_text(encoding="utf-8")), secrets)
-    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+    except OSError, json.JSONDecodeError, UnicodeDecodeError:
         return []
     if not isinstance(payload, dict):
         return []
@@ -330,9 +324,7 @@ def _scientist_errors_from_result(
     ]
 
 
-def load_run_result(
-    root: str | Path, secrets: Iterable[str] = ()
-) -> RunResult | None:
+def load_run_result(root: str | Path, secrets: Iterable[str] = ()) -> RunResult | None:
     path = Path(root) / "result.json"
     if not path.is_file():
         return None
@@ -343,7 +335,7 @@ def load_run_result(
             result.model_dump(by_alias=True, exclude_none=True, mode="json"), secrets
         )
         return RunResult.model_validate(safe_payload)
-    except (OSError, json.JSONDecodeError, UnicodeDecodeError, ValidationError):
+    except OSError, json.JSONDecodeError, UnicodeDecodeError, ValidationError:
         return None
 
 
@@ -408,9 +400,7 @@ def _stamp_discovery_after_chatter(
             moment = item.replied_at or item.occurred_at
             if moment is not None:
                 moments.append(moment)
-        stamped.append(
-            replace(turn, occurred_at=max(moments)) if moments else turn
-        )
+        stamped.append(replace(turn, occurred_at=max(moments)) if moments else turn)
     return stamped
 
 
@@ -425,7 +415,7 @@ def _discovery_turn_from_artifact(
         return []
     try:
         raw = redact_payload(json.loads(path.read_text(encoding="utf-8")), secrets)
-    except (OSError, json.JSONDecodeError):
+    except OSError, json.JSONDecodeError:
         return []
     if not isinstance(raw, dict):
         return []
@@ -525,11 +515,7 @@ def _evaluation_turns_from_case_results(
         try:
             payload = redact_payload(json.loads(path.read_text(encoding="utf-8")), secrets)
             case = CaseResult.model_validate(
-                {
-                    key: value
-                    for key, value in payload.items()
-                    if key not in {"stage", "occurredAt"}
-                }
+                {key: value for key, value in payload.items() if key not in {"stage", "occurredAt"}}
             )
         except (
             OSError,
@@ -572,9 +558,7 @@ def _evaluation_turns(
         contexts = _case_completion_context(root)
         updates: list[NormalizedTurn] = []
         for number, case in enumerate(result.cases, 1):
-            stage, occurred_at = contexts.get(
-                case.scenario_id, ("case", result.finished_at)
-            )
+            stage, occurred_at = contexts.get(case.scenario_id, ("case", result.finished_at))
             updates.append(
                 _evaluation_turn_from_case(
                     run_id=run_id,
@@ -666,15 +650,9 @@ def normalize_turns(
         occurred_raw = item.get("occurred_at")
         replied_raw = item.get("replied_at")
         occurred_at = (
-            occurred_raw
-            if isinstance(occurred_raw, datetime)
-            else fallback.get("started")
+            occurred_raw if isinstance(occurred_raw, datetime) else fallback.get("started")
         )
-        replied_at = (
-            replied_raw
-            if isinstance(replied_raw, datetime)
-            else fallback.get("replied")
-        )
+        replied_at = replied_raw if isinstance(replied_raw, datetime) else fallback.get("replied")
         conversation.append(
             NormalizedTurn(
                 id=turn_id,
@@ -820,9 +798,7 @@ class BundleNormalizer:
                 "evidenceRefs",
                 "detailAvailability",
             }
-            canonical_payload = {
-                key: record[key] for key in allowed_fields if key in record
-            }
+            canonical_payload = {key: record[key] for key in allowed_fields if key in record}
             canonical_payload["runId"] = run_id
             canonical_payload["metadata"] = self._participant_metadata(record, canonical_payload)
             for field in (
@@ -1228,7 +1204,7 @@ class BundleNormalizer:
             return None
         try:
             value = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
+        except OSError, json.JSONDecodeError:
             return None
         if not isinstance(value, dict):
             return None
@@ -1346,9 +1322,7 @@ class BundleNormalizer:
             existing_ids.add(item.id)
         return merged
 
-    def _project_raw_network_activities(
-        self, root: Path, run_id: str
-    ) -> list[RunActivity]:
+    def _project_raw_network_activities(self, root: Path, run_id: str) -> list[RunActivity]:
         raw_dir = root / "raw"
         if not raw_dir.is_dir():
             return []
@@ -1363,7 +1337,7 @@ class BundleNormalizer:
         for path in sorted(raw_dir.glob("*.json")):
             try:
                 payload = redact_payload(json.loads(path.read_text(encoding="utf-8")), self.secrets)
-            except (OSError, json.JSONDecodeError, TypeError, ValueError):
+            except OSError, json.JSONDecodeError, TypeError, ValueError:
                 continue
             if not isinstance(payload, dict):
                 continue
@@ -1466,10 +1440,7 @@ class FilesystemActivitySink:
 
     def latest_sequence(self, run_id: str) -> int:
         return max(
-            (
-                int(item.get("sequence", 0))
-                for item in self.store.read_activity_records(run_id)
-            ),
+            (int(item.get("sequence", 0)) for item in self.store.read_activity_records(run_id)),
             default=0,
         )
 

@@ -236,7 +236,7 @@ class FilesystemArtifactStore:
         self,
         run_id: str,
         result: RunResult,
-        dataset_snapshot: dict[str, object] | None = None,
+        task_snapshot: dict[str, object] | None = None,
     ) -> str:
         run_root = self._run_root(run_id)
         payload = result.model_dump(by_alias=True, exclude_none=True, mode="json")
@@ -263,8 +263,8 @@ class FilesystemArtifactStore:
                 redact_payload({"runId": run_id, "status": result.outcome.value}, self.secrets),
             )
         self._atomic_json(
-            run_root / "dataset.snapshot.json",
-            redact_payload(dataset_snapshot or {"dataset": payload["dataset"]}, self.secrets),
+            run_root / "task.snapshot.json",
+            redact_payload(task_snapshot or {"task": payload["task"]}, self.secrets),
         )
         self.write_checkpoint(run_id, {"runId": run_id, "status": result.outcome.value})
         self.append_event(
@@ -298,7 +298,7 @@ class FilesystemArtifactStore:
     ) -> None:
         try:
             document = json.loads(run_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
+        except OSError, json.JSONDecodeError:
             return
         if not isinstance(document, dict):
             return

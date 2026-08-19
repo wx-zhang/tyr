@@ -233,12 +233,12 @@ components:
       properties:
         run:
           type: object
-          required: [id, state, actionMode, dataset, startedAt, latestUpdateAt]
+          required: [id, state, actionMode, task, startedAt, latestUpdateAt]
           properties:
             id: { type: string }
             state: { type: string }
             actionMode: { type: string, enum: [read_only, approval_required] }
-            dataset: { type: string }
+            task: { type: string }
             startedAt: { type: string, format: date-time }
             latestUpdateAt: { type: string, format: date-time }
             finishedAt: { type: [string, 'null'], format: date-time }

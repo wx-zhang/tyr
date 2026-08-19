@@ -19,7 +19,7 @@ from .ports.artifacts import ActivitySink, ArtifactStore
 from .ports.models import ModelGateway
 from .ports.targets import TargetGateway
 from .reporting import render_markdown
-from .runner import ExperimentRunner, LoadedDataset, ProgressCallback
+from .runner import ExperimentRunner, LoadedTask, ProgressCallback
 
 
 @dataclass(frozen=True)
@@ -31,7 +31,7 @@ class ExecutionOutput:
 class ExperimentExecutionService:
     async def execute(
         self,
-        dataset: LoadedDataset,
+        task: LoadedTask,
         configuration: ExperimentConfig,
         *,
         target: TargetGateway,
@@ -48,7 +48,7 @@ class ExperimentExecutionService:
             activity_sink=activity_sink,
             delivery_verifier=delivery_verifier,
         ).run(
-            dataset,
+            task,
             configuration,
             run_id=run_id,
             target=target,
@@ -59,7 +59,7 @@ class ExperimentExecutionService:
         result_path = artifacts.write_result(
             result.run_id,
             result,
-            dataset_snapshot=dataset.raw,
+            task_snapshot=task.raw,
         )
         artifacts.write_report(result.run_id, render_markdown(result))
         if activity_sink is not None:
@@ -68,7 +68,7 @@ class ExperimentExecutionService:
 
     async def resume_scientist(
         self,
-        dataset: LoadedDataset,
+        task: LoadedTask,
         configuration: ExperimentConfig,
         *,
         source_run_id: str,
@@ -86,7 +86,7 @@ class ExperimentExecutionService:
             activity_sink=activity_sink,
             delivery_verifier=delivery_verifier,
         ).resume_scientist(
-            dataset,
+            task,
             configuration,
             source_run_id=source_run_id,
             run_id=run_id,
@@ -98,7 +98,7 @@ class ExperimentExecutionService:
         result_path = artifacts.write_result(
             result.run_id,
             result,
-            dataset_snapshot=dataset.raw,
+            task_snapshot=task.raw,
         )
         artifacts.write_report(result.run_id, render_markdown(result))
         if activity_sink is not None:

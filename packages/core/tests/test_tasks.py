@@ -1,19 +1,20 @@
 import pytest
-from gamr_core.datasets import (
-    DatasetManifest,
+from gamr_core.tasks import (
     DiscoveryPlan,
     Scenario,
+    TaskManifest,
     escape_unknown_template_placeholders,
     render_template,
     validate_template_placeholders,
 )
+from pydantic import ValidationError
 
 
-def test_dataset_manifest_accepts_fixture_shape() -> None:
-    manifest = DatasetManifest.model_validate(
+def test_task_manifest_accepts_fixture_shape() -> None:
+    manifest = TaskManifest.model_validate(
         {
             "schemaVersion": "1.0",
-            "kind": "dataset",
+            "kind": "task",
             "metadata": {"id": "demo", "title": "Demo", "version": "1.0.0"},
             "spec": {
                 "cases": ["case.json"],
@@ -24,10 +25,29 @@ def test_dataset_manifest_accepts_fixture_shape() -> None:
     assert manifest.metadata.id == "demo"
 
 
+def test_task_manifest_rejects_dataset_kind() -> None:
+    with pytest.raises(ValidationError):
+        TaskManifest.model_validate(
+            {
+                "schemaVersion": "1.0",
+                "kind": "dataset",
+                "metadata": {"id": "demo", "title": "Demo", "version": "1.0.0"},
+                "spec": {
+                    "cases": ["case.json"],
+                    "defaults": {"maxTurns": 1, "actionMode": "read_only"},
+                },
+            }
+        )
+
+
 def test_migration_manifest_preserves_selection_and_variables() -> None:
-    manifest = DatasetManifest.model_validate(
+    manifest = TaskManifest.model_validate(
         {
-            "metadata": {"id": "first-plan", "title": "First Plan", "version": "2.0.0"},
+            "metadata": {
+                "id": "exfiltrate-important-txt",
+                "title": "Exfiltrate important.txt",
+                "version": "2.0.0",
+            },
             "spec": {
                 "discovery": "discovery.json",
                 "methodology": "methodology.json",
@@ -52,9 +72,7 @@ def test_migration_manifest_preserves_selection_and_variables() -> None:
         }
     )
     assert manifest.metadata.version == "2.0.0"
-    assert manifest.spec.defaults.default_case_ids == [
-        "visualize-file-as-image-fresh-agent-upload"
-    ]
+    assert manifest.spec.defaults.default_case_ids == ["visualize-file-as-image-fresh-agent-upload"]
     assert manifest.spec.variables["path"].field == "path"
 
 
@@ -97,7 +115,7 @@ def test_template_validation_is_strict_and_renders_declared_values() -> None:
     assert render_template("Use {path}.", {"path": "/home/test/important.txt"}) == (
         "Use /home/test/important.txt."
     )
-    with pytest.raises(ValueError, match="unknown dataset template variables"):
+    with pytest.raises(ValueError, match="unknown task template variables"):
         validate_template_placeholders("Use {typo}.", {"path"})
 
 

@@ -2,11 +2,11 @@ import { render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, expect, it, vi } from "vitest";
-import { DatasetPage } from "./DatasetPage";
+import { TaskPage } from "./TaskPage";
 
 const datasets = [
   {
-    metadata: { id: "first-plan", title: "First Plan", version: "2.0.0" },
+    metadata: { id: "exfiltrate-important-txt", title: "Exfiltrate important.txt", version: "2.0.0" },
     spec: {
       cases: ["cases/a.json"],
       defaults: {
@@ -25,34 +25,34 @@ beforeEach(() => {
   );
 });
 
-it("renders the dataset heading", async () => {
+it("renders the task heading", async () => {
   render(
     <MemoryRouter>
       <QueryClientProvider client={new QueryClient()}>
-        <DatasetPage />
+        <TaskPage />
       </QueryClientProvider>
     </MemoryRouter>,
   );
   expect(
-    await screen.findByRole("heading", { name: "Datasets" }),
+    await screen.findByRole("heading", { name: "Tasks" }),
   ).toBeInTheDocument();
 });
 
-it("links each dataset to its detail page", async () => {
+it("links each task to its detail page", async () => {
   render(
     <MemoryRouter>
       <QueryClientProvider
         client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
       >
-        <DatasetPage />
+        <TaskPage />
       </QueryClientProvider>
     </MemoryRouter>,
   );
 
-  const link = await screen.findByRole("link", { name: "first-plan" });
-  expect(link).toHaveAttribute("href", "/datasets/first-plan");
-  expect(screen.getByRole("link", { name: "First Plan" })).toHaveAttribute(
+  const link = await screen.findByRole("link", { name: "exfiltrate-important-txt" });
+  expect(link).toHaveAttribute("href", "/tasks/exfiltrate-important-txt");
+  expect(screen.getByRole("link", { name: "Exfiltrate important.txt" })).toHaveAttribute(
     "href",
-    "/datasets/first-plan",
+    "/tasks/exfiltrate-important-txt",
   );
 });

@@ -25,6 +25,7 @@ from gamr_core import (
     RunRecord as RunDocument,
 )
 from gamr_core.identifiers import new_id
+from pydantic import ValidationError
 
 _SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
@@ -33,7 +34,7 @@ _SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 class ExperimentRecord:
     id: str
     name: str
-    dataset: str
+    task: str
     configuration: ExperimentConfig = field(default_factory=ExperimentConfig)
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
@@ -42,7 +43,7 @@ class ExperimentRecord:
 class RunRecord:
     id: str
     experiment_id: str | None
-    dataset: str
+    task: str
     state: RunState = RunState.QUEUED
     configuration: ExperimentConfig = field(default_factory=ExperimentConfig)
     result_path: str | None = None
@@ -64,16 +65,16 @@ class InMemoryRegistry:
     case_runs: dict[str, list[dict[str, object]]] = field(default_factory=dict)
 
     def create_experiment(
-        self, name: str, dataset: str, configuration: ExperimentConfig | None = None
+        self, name: str, task: str, configuration: ExperimentConfig | None = None
     ) -> ExperimentRecord:
-        item = ExperimentRecord(new_id(), name, dataset, configuration or ExperimentConfig())
+        item = ExperimentRecord(new_id(), name, task, configuration or ExperimentConfig())
         self.experiments[item.id] = item
         return item
 
     def create_run(
         self,
         experiment_id: str | None,
-        dataset: str,
+        task: str,
         configuration: ExperimentConfig | None = None,
         *,
         source: RunSource = RunSource.SERVICE,
@@ -84,7 +85,7 @@ class InMemoryRegistry:
         item = RunRecord(
             new_id(),
             experiment_id,
-            dataset,
+            task,
             configuration=configuration or ExperimentConfig(),
             created_at=now,
             updated_at=now,
@@ -93,7 +94,7 @@ class InMemoryRegistry:
             name=name,
         )
         self.runs[item.id] = item
-        self.append_event(item, "run.queued", {"dataset": dataset})
+        self.append_event(item, "run.queued", {"task": task})
         return item
 
     def get_run(self, run_id: str) -> RunRecord | None:
@@ -135,9 +136,7 @@ class InMemoryRegistry:
         self.activities.pop(run_id, None)
         self.case_runs.pop(run_id, None)
 
-    def append_event(
-        self, run: RunRecord, event_type: str, payload: dict[str, object]
-    ) -> RunEvent:
+    def append_event(self, run: RunRecord, event_type: str, payload: dict[str, object]) -> RunEvent:
         event = RunEvent(
             sequence=len(run.events) + 1,
             run_id=run.id,
@@ -152,9 +151,7 @@ class InMemoryRegistry:
     def refresh(self) -> None:
         return None
 
-    def stream_events(
-        self, run_id: str, after_sequence: int = 0
-    ) -> list[RunActivity | RunEvent]:
+    def stream_events(self, run_id: str, after_sequence: int = 0) -> list[RunActivity | RunEvent]:
         activities = self.activities.get(run_id)
         if activities:
             return [item for item in activities if item.sequence > after_sequence]
@@ -248,11 +245,16 @@ class InMemoryRegistry:
             elif run.state is RunState.COMPLETED or index < current_index:
                 state = "completed"
             elif index == current_index:
-                state = run.state.value if run.state in {
-                    RunState.FAILED,
-                    RunState.CANCELLED,
-                    RunState.INTERRUPTED,
-                } else "active"
+                state = (
+                    run.state.value
+                    if run.state
+                    in {
+                        RunState.FAILED,
+                        RunState.CANCELLED,
+                        RunState.INTERRUPTED,
+                    }
+                    else "active"
+                )
             else:
                 state = "pending"
             if phase == "scientist" and scientist_seen:
@@ -289,9 +291,7 @@ class InMemoryRegistry:
             and item.status in {"pending", "running", "active"}
             for item in activities
         )
-        latest_sequence = max(
-            [len(run.events), *(item.sequence for item in activities)], default=0
-        )
+        latest_sequence = max([len(run.events), *(item.sequence for item in activities)], default=0)
         completed_cases = sum(item["state"] == "completed" for item in cases.values())
         latest = activities[-1] if activities else None
         return {
@@ -299,7 +299,7 @@ class InMemoryRegistry:
                 "id": run.id,
                 "state": run.state.value,
                 "actionMode": run.configuration.action_mode,
-                "dataset": run.dataset,
+                "task": run.task,
                 "startedAt": run.created_at,
                 "latestUpdateAt": run.updated_at,
                 "finishedAt": run.finished_at,
@@ -361,12 +361,12 @@ class JsonRegistry(InMemoryRegistry):
                     document = ExperimentDocument.model_validate_json(
                         path.read_text(encoding="utf-8")
                     )
-                except (OSError, ValueError):
+                except OSError, ValueError:
                     continue
                 self.experiments[document.id] = ExperimentRecord(
                     document.id,
                     document.name,
-                    document.dataset,
+                    document.task,
                     document.configuration,
                     document.created_at,
                 )
@@ -378,15 +378,15 @@ class JsonRegistry(InMemoryRegistry):
                     self.runs[item.id] = item
 
     def create_experiment(
-        self, name: str, dataset: str, configuration: ExperimentConfig | None = None
+        self, name: str, task: str, configuration: ExperimentConfig | None = None
     ) -> ExperimentRecord:
-        item = super().create_experiment(name, dataset, configuration)
+        item = super().create_experiment(name, task, configuration)
         self.store.write_json(
             f"experiments/{item.id}.json",
             ExperimentDocument(
                 id=item.id,
                 name=item.name,
-                dataset=item.dataset,
+                task=item.task,
                 configuration=item.configuration,
                 createdAt=item.created_at,
             ).model_dump(by_alias=True, mode="json"),
@@ -396,7 +396,7 @@ class JsonRegistry(InMemoryRegistry):
     def create_run(
         self,
         experiment_id: str | None,
-        dataset: str,
+        task: str,
         configuration: ExperimentConfig | None = None,
         *,
         source: RunSource = RunSource.SERVICE,
@@ -405,7 +405,7 @@ class JsonRegistry(InMemoryRegistry):
     ) -> RunRecord:
         item = super().create_run(
             experiment_id,
-            dataset,
+            task,
             configuration,
             source=source,
             retry_of=retry_of,
@@ -447,9 +447,7 @@ class JsonRegistry(InMemoryRegistry):
         self.store.delete_run(run_id)
         super().delete_run(run_id)
 
-    def append_event(
-        self, run: RunRecord, event_type: str, payload: dict[str, object]
-    ) -> RunEvent:
+    def append_event(self, run: RunRecord, event_type: str, payload: dict[str, object]) -> RunEvent:
         event = super().append_event(run, event_type, payload)
         if (self.root / "runs" / run.id / "run.json").is_file():
             self._persist_event(event)
@@ -468,9 +466,7 @@ class JsonRegistry(InMemoryRegistry):
                 interrupted.append(run.id)
         return interrupted
 
-    def stream_events(
-        self, run_id: str, after_sequence: int = 0
-    ) -> list[RunActivity | RunEvent]:
+    def stream_events(self, run_id: str, after_sequence: int = 0) -> list[RunActivity | RunEvent]:
         run = self.get_run(run_id)
         if run is None:
             return []
@@ -484,9 +480,12 @@ class JsonRegistry(InMemoryRegistry):
         result_path = run.result_path
         if result_path:
             try:
-                result_path = Path(result_path).resolve().relative_to(
-                    (self.root / "runs" / run.id).resolve()
-                ).as_posix()
+                result_path = (
+                    Path(result_path)
+                    .resolve()
+                    .relative_to((self.root / "runs" / run.id).resolve())
+                    .as_posix()
+                )
             except ValueError:
                 result_path = None
         document = RunDocument(
@@ -495,7 +494,7 @@ class JsonRegistry(InMemoryRegistry):
             experimentId=run.experiment_id,
             retryOf=run.retry_of,
             name=run.name,
-            dataset=run.dataset,
+            task=run.task,
             state=run.state,
             configuration=run.configuration,
             resultPath=result_path,
@@ -538,16 +537,14 @@ class JsonRegistry(InMemoryRegistry):
         try:
             value = json.loads(path.read_text(encoding="utf-8"))
             document = RunDocument.model_validate(value)
-        except (OSError, ValueError):
+        except OSError, ValueError:
             return self._load_legacy_run(path)
-        result_path = (
-            str(path.parent / document.result_path) if document.result_path else None
-        )
+        result_path = str(path.parent / document.result_path) if document.result_path else None
         return RunRecord(
             id=document.id,
             experiment_id=document.experiment_id,
             name=document.name,
-            dataset=document.dataset,
+            task=document.task,
             state=document.state,
             configuration=document.configuration,
             result_path=result_path,
@@ -571,15 +568,21 @@ class JsonRegistry(InMemoryRegistry):
             }.get(status)
             state = legacy_state or RunState(status)
             created_at = datetime.fromtimestamp(path.stat().st_mtime, UTC)
-        except (OSError, ValueError, AttributeError):
+            config_payload = value.get("configuration") or {}
+            config = (
+                ExperimentConfig.model_validate(config_payload)
+                if isinstance(config_payload, dict)
+                else ExperimentConfig()
+            )
+        except (OSError, ValueError, AttributeError, ValidationError):
             return None
         result = path.parent / "result.json"
         return RunRecord(
             run_id,
             None,
-            str(value.get("dataset") or "unknown"),
+            str(value.get("task") or "unknown"),
             state,
-            ExperimentConfig.model_validate(value.get("configuration") or {}),
+            config,
             str(result) if result.is_file() else None,
             self._load_events(path.parent, run_id),
             created_at,

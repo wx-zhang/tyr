@@ -23,7 +23,7 @@ def registry_client() -> Iterator[tuple[TestClient, InMemoryRegistry]]:
 
 def make_run(registry: InMemoryRegistry) -> RunRecord:
     experiment = registry.create_experiment("busy run", "fixture-evidence")
-    return registry.create_run(experiment.id, experiment.dataset)
+    return registry.create_run(experiment.id, experiment.task)
 
 
 def test_replay_window_emits_one_resync_signal_instead_of_unbounded_events() -> None:
@@ -49,9 +49,7 @@ def test_event_stream_includes_fifteen_second_heartbeat_and_reconnects_in_sequen
         registry.append_event(run, "activity.second", {"index": 2})
         registry.append_event(run, "activity.third", {"index": 3})
 
-        response = client.get(
-            f"/api/v1/runs/{run.id}/events", headers={"Last-Event-ID": "1"}
-        )
+        response = client.get(f"/api/v1/runs/{run.id}/events", headers={"Last-Event-ID": "1"})
 
         assert ": heartbeat; interval=15" in response.text
         assert "event: heartbeat" in response.text
@@ -91,9 +89,7 @@ def test_stale_replay_cursor_requests_resync_and_interrupted_run_has_no_result()
         run.state = RunState.INTERRUPTED
         registry.append_event(run, "run.interrupted", {"reason": "service_stopped"})
 
-        response = client.get(
-            f"/api/v1/runs/{run.id}/events", headers={"Last-Event-ID": "999"}
-        )
+        response = client.get(f"/api/v1/runs/{run.id}/events", headers={"Last-Event-ID": "999"})
 
         assert response.status_code == 200
         assert "event: resync-required" in response.text
@@ -117,9 +113,7 @@ def test_run_activity_events_are_named_ordered_resumable_and_heartbeat() -> None
         assert "event: heartbeat" in response.text
         assert response.text.index("id: 1") < response.text.index("id: 2")
 
-        resumed = client.get(
-            f"/api/v1/runs/{run.id}/events", headers={"Last-Event-ID": "1"}
-        )
+        resumed = client.get(f"/api/v1/runs/{run.id}/events", headers={"Last-Event-ID": "1"})
         assert "id: 1" not in resumed.text
         assert "id: 2" in resumed.text
 

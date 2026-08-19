@@ -4,7 +4,7 @@ import { useParams } from "react-router-dom";
 import {
   cancelRun,
   fetchCollectorArtifacts,
-  fetchDatasetCases,
+  fetchTaskCases,
   fetchRun,
   fetchRunTurns,
   fetchRunVisualization,
@@ -337,12 +337,12 @@ export function RunPage() {
     queryKey: ["run", runId],
     queryFn: () => fetchRun(runId),
   });
-  const datasetId =
-    visualization.data?.run?.dataset ?? runRecord.data?.dataset ?? null;
+  const taskId =
+    visualization.data?.run?.task ?? runRecord.data?.task ?? null;
   const datasetCases = useQuery({
-    queryKey: ["dataset-cases", datasetId],
-    queryFn: () => fetchDatasetCases(datasetId!),
-    enabled: Boolean(datasetId),
+    queryKey: ["task-cases", taskId],
+    queryFn: () => fetchTaskCases(taskId!),
+    enabled: Boolean(taskId),
   });
   const turns = useQuery({
     queryKey: ["run-turns", runId],
@@ -495,7 +495,7 @@ export function RunPage() {
     }
     return map;
   }, [allTurns]);
-  const datasetCaseIds = useMemo(
+  const taskCaseIds = useMemo(
     () =>
       (Array.isArray(datasetCases.data) ? datasetCases.data : []).map(
         (item) => item.metadata.id,
@@ -508,9 +508,9 @@ export function RunPage() {
         allTurns,
         runRecord.data?.configuration?.caseIds?.length
           ? runRecord.data.configuration.caseIds
-          : datasetCaseIds,
+          : taskCaseIds,
       ),
-    [allTurns, runRecord.data?.configuration?.caseIds, datasetCaseIds],
+    [allTurns, runRecord.data?.configuration?.caseIds, taskCaseIds],
   );
   const hasOpenTurnWork = Boolean(
     visibleLatestTurns.some(turnHasOpenWork) ||
@@ -576,7 +576,7 @@ export function RunPage() {
           <dl className="run-facts">
             <div>
               <dt>Dataset</dt>
-              <dd className="mono">{run?.dataset ?? "Pending"}</dd>
+              <dd className="mono">{run?.task ?? "Pending"}</dd>
             </div>
             <div>
               <dt>Started</dt>
@@ -594,7 +594,7 @@ export function RunPage() {
             </div>
             {scientistIterations > 0 ? (
               <div>
-                <dt>Scientist iterations</dt>
+                <dt>Number of new task research</dt>
                 <dd className="mono tabular">{scientistIterations}</dd>
               </div>
             ) : null}
@@ -783,7 +783,7 @@ export function RunPage() {
                     : undefined
                 }
                 caseOriginById={caseOriginById}
-                datasetCaseIds={datasetCaseIds}
+                taskCaseIds={taskCaseIds}
               />
             ),
           )}
@@ -814,7 +814,7 @@ function Turn({
   now,
   scientistIteration,
   caseOriginById,
-  datasetCaseIds,
+  taskCaseIds,
 }: {
   turn: RunTurn;
   newest: boolean;
@@ -822,7 +822,7 @@ function Turn({
   now: number;
   scientistIteration?: number;
   caseOriginById?: Map<string, HistoryCaseOrigin>;
-  datasetCaseIds?: string[];
+  taskCaseIds?: string[];
 }) {
   const waiting = turn.status === "waiting_for_tyr" && !turn.tyrMessage;
   const scientistGeneration = isScientistGeneration(turn);
@@ -986,7 +986,7 @@ function Turn({
                 cases={resolveHistoryCases(turn.historyCaseIds, {
                   origins: turn.historyCaseOrigins,
                   originByCaseId: caseOriginById,
-                  datasetCaseIds,
+                  taskCaseIds,
                 })}
               />
             ) : null}

@@ -26,7 +26,7 @@ packages/
   core/      domain models, schemas, identifiers, states
   engine/    shared orchestration and execution finalization
   adapters/  JSON files, Tyr, model providers, bundle queries
-datasets/    versioned dataset JSON
+tasks/       versioned task JSON
 schemas/     generated JSON Schema and OpenAPI contracts
 ```
 
@@ -43,7 +43,7 @@ Each CLI or service run owns one bundle:
 ```text
 .gamr/runs/<run-id>/
 ├── run.json
-├── dataset.snapshot.json
+├── task.snapshot.json
 ├── checkpoint.json
 ├── activity.jsonl
 ├── events.jsonl
@@ -80,7 +80,7 @@ derived from the bundle. Relationship tokens and cursors stay run-scoped and bou
 - Secrets are redacted before persistence or browser delivery.
 - Every Tyr request uses an idempotency key.
 - Outer Tyr completion never overrides delegated or unsettled work.
-- Dataset, experiment, live-run, result, and OpenAPI schemas are generated from owning models.
+- Task, experiment, live-run, result, and OpenAPI schemas are generated from owning models.
 - Default tests require no live provider and follow risk-weighted TDD.
 
 ## Extension policy

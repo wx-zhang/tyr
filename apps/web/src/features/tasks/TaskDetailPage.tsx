@@ -1,11 +1,11 @@
 import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
-  fetchDataset,
-  fetchDatasetCases,
-  fetchDatasetPlans,
-  type DatasetPlans,
-  type DatasetScenario,
+  fetchTask,
+  fetchTaskCases,
+  fetchTaskPlans,
+  type TaskPlans,
+  type TaskScenario,
 } from "../../api/client";
 import { PageHeader } from "../../components/PageHeader";
 import { StatusBadge } from "../../components/StatusBadge";
@@ -38,7 +38,7 @@ function PlansSection({
   isLoading,
   isError,
 }: {
-  plans: DatasetPlans | undefined;
+  plans: TaskPlans | undefined;
   isLoading: boolean;
   isError: boolean;
 }) {
@@ -103,7 +103,7 @@ function PlansSection({
   );
 }
 
-function CaseDetail({ scenario }: { scenario: DatasetScenario }) {
+function CaseDetail({ scenario }: { scenario: TaskScenario }) {
   return (
     <div className="case-detail">
       <div className="case-detail-header">
@@ -163,25 +163,25 @@ function CaseDetail({ scenario }: { scenario: DatasetScenario }) {
   );
 }
 
-export function DatasetDetailPage() {
-  const { datasetId, caseId } = useParams();
+export function TaskDetailPage() {
+  const { taskId, caseId } = useParams();
 
   const dataset = useQuery({
-    queryKey: ["dataset", datasetId],
-    queryFn: () => fetchDataset(datasetId!),
-    enabled: Boolean(datasetId),
+    queryKey: ["dataset", taskId],
+    queryFn: () => fetchTask(taskId!),
+    enabled: Boolean(taskId),
   });
 
   const cases = useQuery({
-    queryKey: ["dataset-cases", datasetId],
-    queryFn: () => fetchDatasetCases(datasetId!),
-    enabled: Boolean(datasetId),
+    queryKey: ["task-cases", taskId],
+    queryFn: () => fetchTaskCases(taskId!),
+    enabled: Boolean(taskId),
   });
 
   const plans = useQuery({
-    queryKey: ["dataset-plans", datasetId],
-    queryFn: () => fetchDatasetPlans(datasetId!),
-    enabled: Boolean(datasetId),
+    queryKey: ["dataset-plans", taskId],
+    queryFn: () => fetchTaskPlans(taskId!),
+    enabled: Boolean(taskId),
   });
 
   const scenarios = cases.data ?? [];
@@ -198,7 +198,7 @@ export function DatasetDetailPage() {
     <section className="section-stack">
       <PageHeader
         eyebrow="Authoring sources"
-        title={dataset.data?.metadata.title ?? datasetId ?? "Dataset"}
+        title={dataset.data?.metadata.title ?? taskId ?? "Dataset"}
         description={
           dataset.data
             ? `${dataset.data.metadata.id} · v${dataset.data.metadata.version}`
@@ -206,8 +206,8 @@ export function DatasetDetailPage() {
         }
         actions={
           <div className="button-row">
-            <Link className="button button-secondary" to="/datasets">
-              All datasets
+            <Link className="button button-secondary" to="/tasks">
+              All tasks
             </Link>
             <Link className="button button-primary" to="/experiments/new">
               Execute
@@ -219,17 +219,17 @@ export function DatasetDetailPage() {
       {dataset.isLoading ? (
         <div className="card empty-state" role="status">
           <div>
-            <h2>Loading dataset</h2>
-            <p>Reading the dataset manifest…</p>
+            <h2>Loading task</h2>
+            <p>Reading the task manifest…</p>
           </div>
         </div>
       ) : dataset.isError ? (
         <div className="card empty-state" role="alert">
           <div>
-            <h2>Unable to load dataset</h2>
-            <p>Check the dataset ID and API connection, then try again.</p>
-            <Link className="button button-secondary" to="/datasets">
-              Back to datasets
+            <h2>Unable to load task</h2>
+            <p>Check the task ID and API connection, then try again.</p>
+            <Link className="button button-secondary" to="/tasks">
+              Back to tasks
             </Link>
           </div>
         </div>
@@ -239,7 +239,7 @@ export function DatasetDetailPage() {
             <div className="card-header">
               <div>
                 <p className="eyebrow">Overview</p>
-                <h2>Dataset details</h2>
+                <h2>Task details</h2>
               </div>
               <StatusBadge
                 label={modeLabel(actionMode)}
@@ -248,7 +248,7 @@ export function DatasetDetailPage() {
             </div>
             <dl className="detail-list">
               <div className="detail-row">
-                <dt>Dataset ID</dt>
+                <dt>Task ID</dt>
                 <dd className="mono">{dataset.data?.metadata.id ?? "—"}</dd>
               </div>
               <div className="detail-row">
@@ -340,10 +340,10 @@ export function DatasetDetailPage() {
               </p>
             ) : cases.isError ? (
               <p className="secondary" role="alert">
-                Could not load cases for this dataset.
+                Could not load cases for this task.
               </p>
             ) : scenarios.length === 0 ? (
-              <p className="secondary">No cases in this dataset.</p>
+              <p className="secondary">No cases in this task.</p>
             ) : (
               <div className="dataset-case-layout">
                 <nav className="case-nav" aria-label="Dataset cases">
@@ -355,7 +355,7 @@ export function DatasetDetailPage() {
                       return (
                         <li key={id}>
                           <Link
-                            to={`/datasets/${encodeURIComponent(datasetId!)}/cases/${encodeURIComponent(id)}`}
+                            to={`/tasks/${encodeURIComponent(taskId!)}/cases/${encodeURIComponent(id)}`}
                             className={`case-nav-link${isActive ? " is-active" : ""}`}
                             aria-current={isActive ? "page" : undefined}
                           >
@@ -381,7 +381,7 @@ export function DatasetDetailPage() {
                   ) : caseId ? (
                     <p className="secondary" role="alert">
                       Case <span className="mono">{caseId}</span> was not found in
-                      this dataset.
+                      this task.
                     </p>
                   ) : (
                     <p className="secondary">Select a case to review its details.</p>

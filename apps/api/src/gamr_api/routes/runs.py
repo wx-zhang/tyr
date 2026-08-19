@@ -67,7 +67,7 @@ class RunVisualizationSummary(BaseModel):
     id: str
     state: str
     action_mode: str = Field(alias="actionMode")
-    dataset: str
+    task: str
     started_at: datetime = Field(alias="startedAt")
     latest_update_at: datetime = Field(alias="latestUpdateAt")
     finished_at: datetime | None = Field(default=None, alias="finishedAt")
@@ -145,7 +145,7 @@ def _run_payload(run: RunRecord) -> dict[str, object]:
         "retryOf": run.retry_of,
         "name": run.name,
         "state": run.state,
-        "dataset": run.dataset,
+        "task": run.task,
         "configuration": run.configuration.model_dump(by_alias=True),
         "resultPath": run.result_path,
         "createdAt": run.created_at,
@@ -225,7 +225,7 @@ async def retry_run(
         )
     run = registry.create_run(
         previous.experiment_id,
-        previous.dataset,
+        previous.task,
         previous.configuration,
         source=previous.source,
         retry_of=previous.id,
@@ -333,10 +333,7 @@ async def events(
                         f"data: {json.dumps(item, default=str)}\n\n"
                     )
             yield f": heartbeat; interval={HEARTBEAT_SECONDS}\n\n"
-            yield (
-                f"event: heartbeat\n"
-                f"data: {json.dumps({'interval': HEARTBEAT_SECONDS})}\n\n"
-            )
+            yield (f"event: heartbeat\ndata: {json.dumps({'interval': HEARTBEAT_SECONDS})}\n\n")
             if not follows_stream:
                 break
             await asyncio.sleep(HEARTBEAT_SECONDS)

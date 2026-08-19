@@ -4,14 +4,14 @@ from pathlib import Path
 import pytest
 from gamr_adapters.artifacts.filesystem import FilesystemArtifactStore
 from gamr_core import (
-    DatasetManifest,
     DiscoveryPlan,
     EvaluationPlan,
     ExperimentConfig,
     Scenario,
+    TaskManifest,
 )
 from gamr_engine.execution import ExperimentExecutionService
-from gamr_engine.runner import ExperimentRunner, LoadedDataset
+from gamr_engine.runner import ExperimentRunner, LoadedTask
 
 
 class LiveFakeModel:
@@ -69,8 +69,8 @@ class LiveFakeTarget:
         return result
 
 
-def _dataset() -> LoadedDataset:
-    manifest = DatasetManifest.model_validate(
+def _dataset() -> LoadedTask:
+    manifest = TaskManifest.model_validate(
         {
             "metadata": {"id": "live", "title": "Live", "version": "2.0.0"},
             "spec": {
@@ -99,7 +99,7 @@ def _dataset() -> LoadedDataset:
             },
         }
     )
-    return LoadedDataset(
+    return LoadedTask(
         manifest,
         [scenario],
         {"discovery": discovery.model_dump()},

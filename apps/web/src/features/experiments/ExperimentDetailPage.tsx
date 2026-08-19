@@ -71,7 +71,7 @@ export function ExperimentDetailPage() {
               </div>
               <div className="detail-row">
                 <dt>Dataset</dt>
-                <dd className="mono">{experiment.data?.dataset ?? "—"}</dd>
+                <dd className="mono">{experiment.data?.task ?? "—"}</dd>
               </div>
               <div className="detail-row">
                 <dt>Action mode</dt>
@@ -88,7 +88,7 @@ export function ExperimentDetailPage() {
                 </dd>
               </div>
               <div className="detail-row">
-                <dt>Scientist iterations</dt>
+                <dt>Number of new task research</dt>
                 <dd className="mono tabular">
                   {scientistIterations > 0 ? scientistIterations : "0 (off)"}
                 </dd>
@@ -115,7 +115,7 @@ export function ExperimentDetailPage() {
             <div>
               <h3>Queue a run</h3>
               <p>
-                Starts with the stored dataset, cases, action mode, and scientist
+                Starts with the stored task, cases, action mode, and scientist
                 iterations. Live progress opens on the run page.
               </p>
               <button

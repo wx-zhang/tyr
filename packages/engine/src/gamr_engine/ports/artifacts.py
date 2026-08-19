@@ -32,7 +32,7 @@ class ArtifactStore(Protocol):
         self,
         run_id: str,
         result: RunResult,
-        dataset_snapshot: dict[str, object] | None = None,
+        task_snapshot: dict[str, object] | None = None,
     ) -> str: ...
 
     def read_json(self, run_id: str, relative_path: str) -> dict[str, object]: ...

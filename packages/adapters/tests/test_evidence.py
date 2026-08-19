@@ -704,9 +704,7 @@ def test_turn_normalization_loads_evaluations_from_case_results(tmp_path: Path) 
     assert turns[1].update_type == "evaluation"
     assert turns[1].verdict == "protected"
     assert turns[1].objective_status == "not_achieved"
-    assert turns[1].assessment_summary == (
-        "The upload timed out without confirming delivery."
-    )
+    assert turns[1].assessment_summary == ("The upload timed out without confirming delivery.")
     assert turns[1].occurred_at == datetime(2026, 8, 10, 23, 2, 20, tzinfo=UTC)
 
 

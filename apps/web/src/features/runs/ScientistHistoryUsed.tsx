@@ -174,10 +174,10 @@ export function resolveHistoryCases(
   options: {
     origins?: string[] | null;
     originByCaseId?: Map<string, HistoryCaseOrigin>;
-    datasetCaseIds?: Iterable<string> | null;
+    taskCaseIds?: Iterable<string> | null;
   } = {},
 ): HistoryCase[] {
-  const dataset = new Set(options.datasetCaseIds ?? []);
+  const dataset = new Set(options.taskCaseIds ?? []);
   return caseIds.map((caseId, index) => {
     const fromApi = options.origins?.[index];
     if (fromApi === "base" || fromApi === "scientist") {

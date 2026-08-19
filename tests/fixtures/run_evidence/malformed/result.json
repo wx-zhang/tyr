@@ -2,7 +2,7 @@
   "$schema": "../../../schemas/run-result.schema.json",
   "schemaVersion": "1.0",
   "runId": "0190a000-0000-7000-8000-000000000004",
-  "dataset": {
+  "task": {
     "id": "fixture-evidence",
     "version": "1.0.0",
     "digest": "sha256:fixture-malformed"

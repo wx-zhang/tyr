@@ -11,7 +11,7 @@ Tyr is a security and governance layer for AI agents. It sits between an AI agen
 - `docs/SCAFFOLD_SPEC.md` is the canonical architecture and scaffold contract.
 - Use Python 3.14 with one root uv workspace and `uv.lock`. Use Node.js 24 LTS with pnpm only for `apps/web` and one root `pnpm-lock.yaml`.
 - Apps depend on shared packages; packages never depend on apps. CLI and API execution share the same engine.
-- Datasets and canonical run results are schema-validated JSON files. Databases contain rebuildable operational state only.
+- Tasks and canonical run results are schema-validated JSON files. Databases contain rebuildable operational state only.
 - Read-only is the default. Real actions always require explicit, recorded human approval, and secrets must never enter persisted evidence.
 - Put module-specific architecture, commands, conventions, and tests in the nearest child `AGENTS.md`; do not duplicate them here.
 - Keep every `AGENTS.md` below 300 lines and follow the root file's general pattern: purpose, scoped standards, layout or ownership, working commands, safety/testing rules, and coding standards. Omit sections that do not apply.
@@ -22,7 +22,7 @@ The intended monorepo layout is:
 
 ```text
 apps/
-  cli/       Typer/Rich `gamr` command: standalone experiments, dataset/result validation, doctor, and interactive chat
+  cli/       Typer/Rich `gamr` command: standalone experiments, task/result validation, doctor, and interactive chat
   api/       FastAPI HTTP API, dependency composition, error mapping, routes, and SSE delivery
   web/       Optional React/TypeScript/Vite interface for experiment starts and run visualization
 
@@ -31,17 +31,17 @@ packages/
   engine/    Experiment/chat orchestration, approval coordination, reporting, services, and abstract ports
   adapters/  Tyr MCP, OpenAI-compatible models, JSON filesystem stores, and artifact storage
 
-datasets/
-  <dataset>/ Versioned dataset.json, optional discovery.json, and cases/*.json
+tasks/
+  <task>/ Versioned task.json, optional discovery.json, and cases/*.json
 
-schemas/     Generated dataset, run-result, and OpenAPI schemas
+schemas/     Generated task, run-result, and OpenAPI schemas
 docs/        Architecture, data-format, development, and scaffold specifications
 scripts/     Schema export and local development data utilities
 tests/       Cross-package fixtures, integration tests, and smoke tests
 .gamr/       Gitignored local run bundles and standalone operational state
 ```
 
-Scoped instruction files belong in `apps/`, every `apps/*` module, `packages/`, every `packages/*` module, `datasets/`, `schemas/`, `docs/`, `scripts/`, and `tests/`. A scoped file adds only subtree-specific rules and may tighten, but never weaken, this file's safety requirements. See `docs/SCAFFOLD_SPEC.md` for the ownership of each instruction file.
+Scoped instruction files belong in `apps/`, every `apps/*` module, `packages/`, every `packages/*` module, `tasks/`, `schemas/`, `docs/`, `scripts/`, and `tests/`. A scoped file adds only subtree-specific rules and may tighten, but never weaken, this file's safety requirements. See `docs/SCAFFOLD_SPEC.md` for the ownership of each instruction file.
 
 ### Module dependency rules
 
@@ -73,9 +73,9 @@ Expected CLI surface:
 
 ```text
 gamr doctor
-gamr dataset list
-gamr dataset validate <dataset-directory>
-gamr experiment run <dataset-directory>
+gamr task list
+gamr task validate <task-directory>
+gamr experiment run <task-directory>
 gamr experiment show <run-id>
 gamr result validate <result.json>
 gamr chat
@@ -90,11 +90,11 @@ gamr chat
 - Use an idempotency key for every Tyr request and approval resolution. Retry an interrupted external step only when its idempotency and checkpoint state make the retry safe.
 - Redact API keys, bearer tokens, authorization headers, and configured secret fields before writing logs, events, snapshots, raw payloads, or API responses.
 - Never trust an outer Tyr terminal state alone: delegated executions, bridge work, or a late user-visible response may still be pending. Preserve the settle-window behavior and raw diagnostic evidence.
-- Never overwrite canonical dataset files or completed run bundles as a side effect of viewing or evaluating them.
+- Never overwrite canonical task files or completed run bundles as a side effect of viewing or evaluating them.
 
 ### Testing expectations
 
-- Validate dataset and result JSON against generated schemas in tests and CI.
+- Validate task and result JSON against generated schemas in tests and CI.
 - Default tests use fake ports and fixtures; they must not require live Tyr, a model provider, or action approval.
 - Any bug fix adds a regression test at the lowest layer that can reproduce it.
 - Always prefer TDD when implementing a functionality: first write test, check they fail and then write working implementation.

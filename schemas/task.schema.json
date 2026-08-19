@@ -1,220 +1,5 @@
 {
   "$defs": {
-    "DatasetDefaults": {
-      "additionalProperties": false,
-      "properties": {
-        "maxTurns": {
-          "minimum": 1,
-          "title": "Maxturns",
-          "type": "integer"
-        },
-        "actionMode": {
-          "pattern": "^(read_only|approval_required)$",
-          "title": "Actionmode",
-          "type": "string"
-        },
-        "defaultCaseIds": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Defaultcaseids",
-          "type": "array"
-        }
-      },
-      "required": [
-        "maxTurns",
-        "actionMode"
-      ],
-      "title": "DatasetDefaults",
-      "type": "object"
-    },
-    "DatasetManifest": {
-      "additionalProperties": false,
-      "properties": {
-        "$schema": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "$Schema"
-        },
-        "schemaVersion": {
-          "default": "1.0",
-          "title": "Schemaversion",
-          "type": "string"
-        },
-        "kind": {
-          "const": "dataset",
-          "default": "dataset",
-          "title": "Kind",
-          "type": "string"
-        },
-        "metadata": {
-          "$ref": "#/$defs/DatasetMetadata"
-        },
-        "spec": {
-          "$ref": "#/$defs/DatasetSpec"
-        }
-      },
-      "required": [
-        "metadata",
-        "spec"
-      ],
-      "title": "DatasetManifest",
-      "type": "object"
-    },
-    "DatasetMetadata": {
-      "additionalProperties": false,
-      "properties": {
-        "id": {
-          "minLength": 1,
-          "title": "Id",
-          "type": "string"
-        },
-        "title": {
-          "minLength": 1,
-          "title": "Title",
-          "type": "string"
-        },
-        "version": {
-          "pattern": "^\\d+\\.\\d+\\.\\d+$",
-          "title": "Version",
-          "type": "string"
-        }
-      },
-      "required": [
-        "id",
-        "title",
-        "version"
-      ],
-      "title": "DatasetMetadata",
-      "type": "object"
-    },
-    "DatasetSpec": {
-      "additionalProperties": false,
-      "properties": {
-        "discovery": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Discovery"
-        },
-        "methodology": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Methodology"
-        },
-        "evaluation": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Evaluation"
-        },
-        "cases": {
-          "items": {
-            "type": "string"
-          },
-          "minItems": 1,
-          "title": "Cases",
-          "type": "array"
-        },
-        "defaults": {
-          "$ref": "#/$defs/DatasetDefaults"
-        },
-        "variables": {
-          "additionalProperties": {
-            "$ref": "#/$defs/DatasetVariable"
-          },
-          "title": "Variables",
-          "type": "object"
-        }
-      },
-      "required": [
-        "cases",
-        "defaults"
-      ],
-      "title": "DatasetSpec",
-      "type": "object"
-    },
-    "DatasetVariable": {
-      "additionalProperties": false,
-      "properties": {
-        "source": {
-          "enum": [
-            "run",
-            "literal",
-            "discovery"
-          ],
-          "title": "Source",
-          "type": "string"
-        },
-        "default": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Default"
-        },
-        "value": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Value"
-        },
-        "field": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Field"
-        }
-      },
-      "required": [
-        "source"
-      ],
-      "title": "DatasetVariable",
-      "type": "object"
-    },
     "DiscoveryPlan": {
       "additionalProperties": false,
       "properties": {
@@ -449,21 +234,236 @@
       ],
       "title": "ScenarioSpec",
       "type": "object"
+    },
+    "TaskDefaults": {
+      "additionalProperties": false,
+      "properties": {
+        "maxTurns": {
+          "minimum": 1,
+          "title": "Maxturns",
+          "type": "integer"
+        },
+        "actionMode": {
+          "pattern": "^(read_only|approval_required)$",
+          "title": "Actionmode",
+          "type": "string"
+        },
+        "defaultCaseIds": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Defaultcaseids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "maxTurns",
+        "actionMode"
+      ],
+      "title": "TaskDefaults",
+      "type": "object"
+    },
+    "TaskManifest": {
+      "additionalProperties": false,
+      "properties": {
+        "$schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "$Schema"
+        },
+        "schemaVersion": {
+          "default": "1.0",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "kind": {
+          "const": "task",
+          "default": "task",
+          "title": "Kind",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/$defs/TaskMetadata"
+        },
+        "spec": {
+          "$ref": "#/$defs/TaskSpec"
+        }
+      },
+      "required": [
+        "metadata",
+        "spec"
+      ],
+      "title": "TaskManifest",
+      "type": "object"
+    },
+    "TaskMetadata": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "version": {
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "version"
+      ],
+      "title": "TaskMetadata",
+      "type": "object"
+    },
+    "TaskSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "discovery": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Discovery"
+        },
+        "methodology": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Methodology"
+        },
+        "evaluation": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evaluation"
+        },
+        "cases": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Cases",
+          "type": "array"
+        },
+        "defaults": {
+          "$ref": "#/$defs/TaskDefaults"
+        },
+        "variables": {
+          "additionalProperties": {
+            "$ref": "#/$defs/TaskVariable"
+          },
+          "title": "Variables",
+          "type": "object"
+        }
+      },
+      "required": [
+        "cases",
+        "defaults"
+      ],
+      "title": "TaskSpec",
+      "type": "object"
+    },
+    "TaskVariable": {
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "enum": [
+            "run",
+            "literal",
+            "discovery"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "default": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Default"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        },
+        "field": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Field"
+        }
+      },
+      "required": [
+        "source"
+      ],
+      "title": "TaskVariable",
+      "type": "object"
     }
   },
   "discriminator": {
     "mapping": {
-      "dataset": "#/$defs/DatasetManifest",
       "discovery": "#/$defs/DiscoveryPlan",
       "evaluation": "#/$defs/EvaluationPlan",
       "methodology": "#/$defs/PromptBundle",
-      "scenario": "#/$defs/Scenario"
+      "scenario": "#/$defs/Scenario",
+      "task": "#/$defs/TaskManifest"
     },
     "propertyName": "kind"
   },
   "oneOf": [
     {
-      "$ref": "#/$defs/DatasetManifest"
+      "$ref": "#/$defs/TaskManifest"
     },
     {
       "$ref": "#/$defs/DiscoveryPlan"
@@ -478,5 +478,5 @@
       "$ref": "#/$defs/Scenario"
     }
   ],
-  "$id": "https://gamr.local/schemas/dataset.schema.json"
+  "$id": "https://gamr.local/schemas/task.schema.json"
 }

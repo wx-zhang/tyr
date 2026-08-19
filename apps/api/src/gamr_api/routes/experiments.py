@@ -2,9 +2,9 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from gamr_adapters.config import Settings
-from gamr_adapters.datasets.filesystem import (
-    FilesystemDatasetRepository,
-    resolve_dataset_directory,
+from gamr_adapters.tasks.filesystem import (
+    FilesystemTaskRepository,
+    resolve_task_directory,
 )
 from gamr_core import ExperimentConfig
 from pydantic import BaseModel, Field
@@ -19,7 +19,7 @@ router = APIRouter(prefix="/api/v1/experiments", tags=["experiments"])
 
 class ExperimentCreate(BaseModel):
     name: str = Field(min_length=1)
-    dataset: str = "first-plan"
+    task: str = "exfiltrate-important-txt"
     action_mode: str = Field(
         default="read_only",
         alias="actionMode",
@@ -48,9 +48,9 @@ class ExperimentCreate(BaseModel):
         )
 
 
-def _normalize_dataset_reference(settings: Settings, reference: str) -> str:
-    directory = resolve_dataset_directory(settings.dataset_root, reference)
-    root = Path(settings.dataset_root).resolve()
+def _normalize_task_reference(settings: Settings, reference: str) -> str:
+    directory = resolve_task_directory(settings.task_root, reference)
+    root = Path(settings.task_root).resolve()
     return directory.relative_to(root).as_posix()
 
 
@@ -60,7 +60,7 @@ def list_experiments(registry: InMemoryRegistry = Depends(get_registry)) -> list
         {
             "id": item.id,
             "name": item.name,
-            "dataset": item.dataset,
+            "task": item.task,
             "configuration": item.configuration.model_dump(by_alias=True),
             "createdAt": item.created_at,
         }
@@ -75,9 +75,9 @@ def create_experiment(
     settings: Settings = Depends(get_settings),
 ) -> dict[str, object]:
     try:
-        dataset_ref = _normalize_dataset_reference(settings, payload.dataset)
-        directory = resolve_dataset_directory(settings.dataset_root, dataset_ref)
-        _, scenarios = FilesystemDatasetRepository(settings.dataset_root).load(directory)
+        task_ref = _normalize_task_reference(settings, payload.task)
+        directory = resolve_task_directory(settings.task_root, task_ref)
+        _, scenarios = FilesystemTaskRepository(settings.task_root).load(directory)
         if payload.case_ids is not None:
             known = {scenario.metadata.id for scenario in scenarios}
             missing = sorted(set(payload.case_ids) - known)
@@ -87,13 +87,13 @@ def create_experiment(
     except Exception as error:
         raise HTTPException(
             status_code=400,
-            detail={"code": "invalid_dataset", "detail": str(error)},
+            detail={"code": "invalid_task", "detail": str(error)},
         ) from error
-    item = registry.create_experiment(payload.name, dataset_ref, configuration)
+    item = registry.create_experiment(payload.name, task_ref, configuration)
     return {
         "id": item.id,
         "name": item.name,
-        "dataset": item.dataset,
+        "task": item.task,
         "configuration": item.configuration.model_dump(by_alias=True),
         "createdAt": item.created_at,
     }
@@ -109,7 +109,7 @@ def get_experiment(
     return {
         "id": item.id,
         "name": item.name,
-        "dataset": item.dataset,
+        "task": item.task,
         "configuration": item.configuration.model_dump(by_alias=True),
         "createdAt": item.created_at,
     }
@@ -168,7 +168,7 @@ async def start_run(
             status_code=400,
             detail={"code": "invalid_configuration", "detail": str(error)},
         ) from error
-    run = registry.create_run(item.id, item.dataset, configuration, name=item.name)
+    run = registry.create_run(item.id, item.task, configuration, name=item.name)
     if manager is not None:
         await manager.submit(run.id)
     return {"id": run.id, "state": run.state, "statusUrl": f"/api/v1/runs/{run.id}"}

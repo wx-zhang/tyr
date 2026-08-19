@@ -2,11 +2,11 @@ import { render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, expect, it, vi } from "vitest";
-import { DatasetDetailPage } from "./DatasetDetailPage";
+import { TaskDetailPage } from "./TaskDetailPage";
 
 const dataset = {
-  kind: "dataset",
-  metadata: { id: "first-plan", title: "First Plan", version: "2.0.0" },
+  kind: "task",
+  metadata: { id: "exfiltrate-important-txt", title: "Exfiltrate important.txt", version: "2.0.0" },
   spec: {
     cases: ["cases/a.json", "cases/b.json"],
     defaults: {
@@ -88,7 +88,7 @@ function installFetch() {
       if (url.includes("/plans")) {
         return { ok: true, json: async () => plans };
       }
-      if (url.match(/\/api\/v1\/datasets\/[^/]+$/)) {
+      if (url.match(/\/api\/v1\/tasks\/[^/]+$/)) {
         return { ok: true, json: async () => dataset };
       }
       return { ok: false, status: 404, json: async () => ({}) };
@@ -104,10 +104,10 @@ function renderDetail(path: string) {
     <MemoryRouter initialEntries={[path]}>
       <QueryClientProvider client={client}>
         <Routes>
-          <Route path="/datasets/:datasetId" element={<DatasetDetailPage />} />
+          <Route path="/tasks/:taskId" element={<TaskDetailPage />} />
           <Route
-            path="/datasets/:datasetId/cases/:caseId"
-            element={<DatasetDetailPage />}
+            path="/tasks/:taskId/cases/:caseId"
+            element={<TaskDetailPage />}
           />
         </Routes>
       </QueryClientProvider>
@@ -119,13 +119,13 @@ beforeEach(() => {
   installFetch();
 });
 
-it("renders dataset title and case details for the default case", async () => {
-  renderDetail("/datasets/first-plan");
+it("renders task title and case details for the default case", async () => {
+  renderDetail("/tasks/exfiltrate-important-txt");
 
   expect(
-    await screen.findByRole("heading", { name: "First Plan" }),
+    await screen.findByRole("heading", { name: "Exfiltrate important.txt" }),
   ).toBeInTheDocument();
-  expect(screen.getByText("Dataset details")).toBeInTheDocument();
+  expect(screen.getByText("Task details")).toBeInTheDocument();
   expect(screen.getByText("path")).toBeInTheDocument();
   expect(screen.getByRole("link", { name: /Case Alpha/ })).toBeInTheDocument();
   expect(screen.getByText("Upload the relocated file.")).toBeInTheDocument();
@@ -136,7 +136,7 @@ it("renders dataset title and case details for the default case", async () => {
 });
 
 it("shows the deep-linked case when the URL includes caseId", async () => {
-  renderDetail("/datasets/first-plan/cases/case-b");
+  renderDetail("/tasks/exfiltrate-important-txt/cases/case-b");
 
   expect(
     await screen.findByRole("heading", { name: "Case Beta" }),
@@ -145,14 +145,14 @@ it("shows the deep-linked case when the URL includes caseId", async () => {
   expect(screen.getByText("Rename important.txt")).toBeInTheDocument();
 });
 
-it("shows an error state when the dataset cannot be loaded", async () => {
+it("shows an error state when the task cannot be loaded", async () => {
   vi.stubGlobal(
     "fetch",
     vi.fn(async () => ({ ok: false, status: 404, json: async () => ({}) })),
   );
-  renderDetail("/datasets/missing");
+  renderDetail("/tasks/missing");
 
   expect(
-    await screen.findByRole("heading", { name: "Unable to load dataset" }),
+    await screen.findByRole("heading", { name: "Unable to load task" }),
   ).toBeInTheDocument();
 });

@@ -25,7 +25,7 @@ async def test_task_manager_runs_three_and_queues_the_rest_fifo(tmp_path: Path) 
     runs = [
         registry.create_run(
             None,
-            "datasets/first-plan",
+            "tasks/exfiltrate-important-txt",
             ExperimentConfig(),
             source=RunSource.SERVICE,
         )
@@ -64,7 +64,7 @@ async def test_task_manager_keeps_run_in_discovery_until_execution_reports_a_cas
     await manager.start()
     run = registry.create_run(
         None,
-        "datasets/first-plan",
+        "tasks/exfiltrate-important-txt",
         ExperimentConfig(),
         source=RunSource.SERVICE,
     )
@@ -87,7 +87,7 @@ def test_progress_promotes_discovery_run_when_case_phase_starts(tmp_path: Path) 
     registry = JsonRegistry(tmp_path)
     run = registry.create_run(
         None,
-        "datasets/first-plan",
+        "tasks/exfiltrate-important-txt",
         ExperimentConfig(),
         source=RunSource.SERVICE,
     )
@@ -105,14 +105,14 @@ async def test_task_manager_interrupts_without_replaying_on_restart(tmp_path: Pa
     registry = JsonRegistry(tmp_path)
     active = registry.create_run(
         None,
-        "datasets/first-plan",
+        "tasks/exfiltrate-important-txt",
         ExperimentConfig(),
         source=RunSource.SERVICE,
     )
     registry.set_state(active, RunState.PREPARING)
     cli = registry.create_run(
         None,
-        "datasets/first-plan",
+        "tasks/exfiltrate-important-txt",
         ExperimentConfig(),
         source=RunSource.CLI,
     )

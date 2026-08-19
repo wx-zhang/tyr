@@ -96,7 +96,7 @@ As a reviewer, I can pause automatic following, filter or select activity, inspe
 ### Edge Cases
 
 - A queued run has no active phase, case, participants, or activity yet.
-- Progress totals are not yet known or the dataset contains zero selected cases.
+- Progress totals are not yet known or the task contains zero selected cases.
 - Several cases or Tyr operations overlap, complete out of order, or publish activity at nearly the same time.
 - An event arrives late, is repeated after reconnection, or refers to a participant or operation not previously observed.
 - Tyr reports an outer terminal state while delegated or bridge work is still settling.
@@ -115,7 +115,7 @@ As a reviewer, I can pause automatic following, filter or select activity, inspe
 ### Functional Requirements
 
 - **FR-001**: The web interface MUST provide a unified visualization for both ongoing and previous runs within the selected run's review experience.
-- **FR-002**: The visualization MUST show the exact run state, action mode, dataset, start time, latest persisted update time, and live connection state using text rather than color alone.
+- **FR-002**: The visualization MUST show the exact run state, action mode, task, start time, latest persisted update time, and live connection state using text rather than color alone.
 - **FR-003**: The visualization MUST show progress across the known run phases and selected cases, distinguishing completed, active, pending, waiting, failed, cancelled, and unknown states without treating active work as complete.
 - **FR-004**: The visualization MUST identify the current phase, current case or cases when concurrent work is known, and the latest meaningful activity.
 - **FR-005**: The visualization MUST show completed and total case counts when totals are known and explicitly state when a total or remaining-work estimate is unavailable.
@@ -149,7 +149,7 @@ As a reviewer, I can pause automatic following, filter or select activity, inspe
 - **FR-033**: An execution with selected case IDs MUST run those cases and MAY run scientist iterations; an execution with an explicitly empty case-ID list MUST run scientist iterations only when iterations are enabled. Discovery MUST precede either mode, and an empty case-ID list with scientist disabled MUST be rejected.
 - **FR-034**: Each scientist iteration MUST persist a bounded, redacted progress update identifying the case IDs used as history, or explicitly state that no prior tests were available. The history indicator MUST be available to live, API, and historical run views without exposing prompts, transcripts, credentials, or server paths.
 - **FR-035**: Verified remote-backed collector artifacts MUST refresh automatically during a live run, appear chronologically as entries in Updates, and offer bounded, run-scoped previews for common text, Markdown, XML, and raster-image files without exposing collector credentials or server paths. Retained UTF-8 request bodies MUST be exposed through the same controls only after their decoded byte length matches collector metadata and a SHA-256 digest is recorded. Decoded multipart field summaries MUST NOT be treated as raw request bodies or invalidate independently verified files. Exact request IDs MAY recover verified remote artifacts in memory from historical failed manifests without rewriting them. Collector verification MUST reauthenticate and retry bounded redirects and transient HTTP failures, then persist the safe operation, attempt count, and HTTP status or transport error type when retries are exhausted. Unsupported, lossy, and oversized artifacts MUST remain unavailable or download-only as appropriate.
-- **FR-035**: Scientist-enabled executions MUST support configurable history windows for prior test-case runs and prior scientist runs, defaulting to the latest 10 and 5 runs respectively. Only completed or terminal persisted runs for the same dataset with available results MAY be used, and the selected records MUST be combined with the current run's records using the existing scientist history rebuild process.
+- **FR-035**: Scientist-enabled executions MUST support configurable history windows for prior test-case runs and prior scientist runs, defaulting to the latest 10 and 5 runs respectively. Only completed or terminal persisted runs for the same task with available results MAY be used, and the selected records MUST be combined with the current run's records using the existing scientist history rebuild process.
 
 ### Key Entities
 

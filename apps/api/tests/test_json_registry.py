@@ -8,17 +8,17 @@ from gamr_core import ExperimentConfig, RunSource, RunState
 def test_json_registry_persists_and_rediscovers_cli_and_service_runs(tmp_path: Path) -> None:
     registry = JsonRegistry(tmp_path, secrets=("top-secret",))
     experiment = registry.create_experiment(
-        "Review", "datasets/first-plan", ExperimentConfig(model="safe-model")
+        "Review", "tasks/exfiltrate-important-txt", ExperimentConfig(model="safe-model")
     )
     service_run = registry.create_run(
         experiment.id,
-        experiment.dataset,
+        experiment.task,
         experiment.configuration,
         source=RunSource.SERVICE,
     )
     cli_run = registry.create_run(
         None,
-        "datasets/first-plan",
+        "tasks/exfiltrate-important-txt",
         ExperimentConfig(model="cli-model"),
         source=RunSource.CLI,
     )
@@ -39,7 +39,7 @@ def test_json_registry_redacts_persisted_values_and_rejects_escaped_ids(tmp_path
     registry = JsonRegistry(tmp_path, secrets=("top-secret",))
     run = registry.create_run(
         None,
-        "datasets/first-plan",
+        "tasks/exfiltrate-important-txt",
         ExperimentConfig(model="model-top-secret"),
         source=RunSource.CLI,
     )
@@ -53,7 +53,7 @@ def test_json_registry_delete_run_removes_bundle_and_index_entry(tmp_path: Path)
     registry = JsonRegistry(tmp_path)
     run = registry.create_run(
         None,
-        "datasets/first-plan",
+        "tasks/exfiltrate-important-txt",
         ExperimentConfig(),
         source=RunSource.CLI,
     )
