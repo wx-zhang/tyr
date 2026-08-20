@@ -112,9 +112,7 @@ class ActivityMemoryRepository:
         self.activities = sorted(activities, key=lambda item: item.sequence)
 
     def latest_sequence(self, run_id: str) -> int:
-        return max(
-            (item.sequence for item in self.activities if item.run_id == run_id), default=0
-        )
+        return max((item.sequence for item in self.activities if item.run_id == run_id), default=0)
 
     def query(self, query: EvidenceQuery) -> ActivityPage:
         if len(self.activities) > 10_000:
@@ -190,9 +188,7 @@ class ActivityMemoryRepository:
                 statuses[item.status] = statuses.get(item.status, 0) + 1
             relationships.append(
                 RelationshipAggregate(
-                    RelationshipTokenCodec.encode(
-                        query.run_id, self._scope(query), source, target
-                    ),
+                    RelationshipTokenCodec.encode(query.run_id, self._scope(query), source, target),
                     source,
                     target,
                     list(
@@ -208,9 +204,7 @@ class ActivityMemoryRepository:
 
     relationships = aggregate_relationships
 
-    def _relationship_scope(
-        self, query: EvidenceQuery
-    ) -> tuple[EvidenceQuery, str, str] | None:
+    def _relationship_scope(self, query: EvidenceQuery) -> tuple[EvidenceQuery, str, str] | None:
         if not query.relationship_id:
             return None
         payload = RelationshipTokenCodec.decode(query.relationship_id, query.run_id)

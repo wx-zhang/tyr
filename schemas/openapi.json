@@ -56,13 +56,13 @@
         }
       }
     },
-    "/api/v1/datasets": {
+    "/api/v1/tasks": {
       "get": {
         "tags": [
-          "datasets"
+          "tasks"
         ],
-        "summary": "List Datasets",
-        "operationId": "list_datasets_api_v1_datasets_get",
+        "summary": "List Tasks",
+        "operationId": "list_tasks_api_v1_tasks_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -74,7 +74,7 @@
                     "type": "object"
                   },
                   "type": "array",
-                  "title": "Response List Datasets Api V1 Datasets Get"
+                  "title": "Response List Tasks Api V1 Tasks Get"
                 }
               }
             }
@@ -82,13 +82,13 @@
         }
       }
     },
-    "/api/v1/datasets/validate": {
+    "/api/v1/tasks/validate": {
       "post": {
         "tags": [
-          "datasets"
+          "tasks"
         ],
-        "summary": "Validate Dataset",
-        "operationId": "validate_dataset_api_v1_datasets_validate_post",
+        "summary": "Validate Task",
+        "operationId": "validate_task_api_v1_tasks_validate_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -111,7 +111,7 @@
                 "schema": {
                   "additionalProperties": true,
                   "type": "object",
-                  "title": "Response Validate Dataset Api V1 Datasets Validate Post"
+                  "title": "Response Validate Task Api V1 Tasks Validate Post"
                 }
               }
             }
@@ -129,21 +129,21 @@
         }
       }
     },
-    "/api/v1/datasets/{dataset_id}/cases": {
+    "/api/v1/tasks/{task_id}/cases": {
       "get": {
         "tags": [
-          "datasets"
+          "tasks"
         ],
-        "summary": "List Dataset Cases",
-        "operationId": "list_dataset_cases_api_v1_datasets__dataset_id__cases_get",
+        "summary": "List Task Cases",
+        "operationId": "list_task_cases_api_v1_tasks__task_id__cases_get",
         "parameters": [
           {
-            "name": "dataset_id",
+            "name": "task_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Dataset Id"
+              "title": "Task Id"
             }
           }
         ],
@@ -158,7 +158,7 @@
                     "type": "object",
                     "additionalProperties": true
                   },
-                  "title": "Response List Dataset Cases Api V1 Datasets  Dataset Id  Cases Get"
+                  "title": "Response List Task Cases Api V1 Tasks  Task Id  Cases Get"
                 }
               }
             }
@@ -176,21 +176,21 @@
         }
       }
     },
-    "/api/v1/datasets/{dataset_id}/plans": {
+    "/api/v1/tasks/{task_id}/plans": {
       "get": {
         "tags": [
-          "datasets"
+          "tasks"
         ],
-        "summary": "Get Dataset Plans",
-        "operationId": "get_dataset_plans_api_v1_datasets__dataset_id__plans_get",
+        "summary": "Get Task Plans",
+        "operationId": "get_task_plans_api_v1_tasks__task_id__plans_get",
         "parameters": [
           {
-            "name": "dataset_id",
+            "name": "task_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Dataset Id"
+              "title": "Task Id"
             }
           }
         ],
@@ -209,7 +209,7 @@
                       }
                     ]
                   },
-                  "title": "Response Get Dataset Plans Api V1 Datasets  Dataset Id  Plans Get"
+                  "title": "Response Get Task Plans Api V1 Tasks  Task Id  Plans Get"
                 }
               }
             }
@@ -227,21 +227,21 @@
         }
       }
     },
-    "/api/v1/datasets/{dataset_id}": {
+    "/api/v1/tasks/{task_id}": {
       "get": {
         "tags": [
-          "datasets"
+          "tasks"
         ],
-        "summary": "Get Dataset",
-        "operationId": "get_dataset_api_v1_datasets__dataset_id__get",
+        "summary": "Get Task",
+        "operationId": "get_task_api_v1_tasks__task_id__get",
         "parameters": [
           {
-            "name": "dataset_id",
+            "name": "task_id",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Dataset Id"
+              "title": "Task Id"
             }
           }
         ],
@@ -253,7 +253,7 @@
                 "schema": {
                   "type": "object",
                   "additionalProperties": true,
-                  "title": "Response Get Dataset Api V1 Datasets  Dataset Id  Get"
+                  "title": "Response Get Task Api V1 Tasks  Task Id  Get"
                 }
               }
             }
@@ -2144,10 +2144,10 @@
             "minLength": 1,
             "title": "Name"
           },
-          "dataset": {
+          "task": {
             "type": "string",
-            "title": "Dataset",
-            "default": "first-plan"
+            "title": "Task",
+            "default": "exfiltrate-important-txt"
           },
           "actionMode": {
             "type": "string",
@@ -2755,9 +2755,9 @@
             "type": "string",
             "title": "Actionmode"
           },
-          "dataset": {
+          "task": {
             "type": "string",
-            "title": "Dataset"
+            "title": "Task"
           },
           "startedAt": {
             "type": "string",
@@ -2820,7 +2820,7 @@
           "id",
           "state",
           "actionMode",
-          "dataset",
+          "task",
           "startedAt",
           "latestUpdateAt",
           "executionMode"

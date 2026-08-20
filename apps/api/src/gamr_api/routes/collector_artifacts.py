@@ -139,9 +139,7 @@ async def _find_file(run_id: str, file_id: str, settings: Settings) -> Collector
     raise not_found("collector file")
 
 
-async def _remote_files(
-    manifest: dict[str, Any], settings: Settings
-) -> list[dict[str, object]]:
+async def _remote_files(manifest: dict[str, Any], settings: Settings) -> list[dict[str, object]]:
     existing_ids = {item.get("fileId") for item in _files(manifest)}
     requests: list[tuple[str, CollectorRequirement]] = []
     for item in manifest.get("requests", []):
@@ -179,7 +177,7 @@ async def _verified_remote_files(
     try:
         try:
             verified = await client.verify(request_id, requirement)
-        except (CollectorError, httpx.HTTPError, OSError):
+        except CollectorError, httpx.HTTPError, OSError:
             return []
     finally:
         await client.aclose()

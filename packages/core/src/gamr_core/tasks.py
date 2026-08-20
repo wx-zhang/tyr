@@ -8,7 +8,7 @@ from typing import Annotated, Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, field_validator, model_validator
 
 
-class DatasetMetadata(BaseModel):
+class TaskMetadata(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     id: str = Field(min_length=1)
@@ -16,7 +16,7 @@ class DatasetMetadata(BaseModel):
     version: str = Field(pattern=r"^\d+\.\d+\.\d+$")
 
 
-class DatasetVariable(BaseModel):
+class TaskVariable(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     source: Literal["run", "literal", "discovery"]
@@ -25,7 +25,7 @@ class DatasetVariable(BaseModel):
     field: str | None = None
 
     @model_validator(mode="after")
-    def validate_source_fields(self) -> DatasetVariable:
+    def validate_source_fields(self) -> TaskVariable:
         if self.source == "literal" and self.value is None:
             raise ValueError("literal variables require a value")
         if self.source == "discovery" and not self.field:
@@ -37,7 +37,7 @@ class DatasetVariable(BaseModel):
         return self
 
 
-class DatasetDefaults(BaseModel):
+class TaskDefaults(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     max_turns: int = Field(alias="maxTurns", ge=1)
@@ -52,31 +52,31 @@ class DatasetDefaults(BaseModel):
         return value
 
 
-class DatasetSpec(BaseModel):
+class TaskSpec(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     discovery: str | None = None
     methodology: str | None = None
     evaluation: str | None = None
     cases: list[str] = Field(min_length=1)
-    defaults: DatasetDefaults
-    variables: dict[str, DatasetVariable] = Field(default_factory=dict)
+    defaults: TaskDefaults
+    variables: dict[str, TaskVariable] = Field(default_factory=dict)
 
 
-class DatasetManifest(BaseModel):
+class TaskManifest(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     schema_ref: str | None = Field(default=None, alias="$schema")
     schema_version: str = Field(default="1.0", alias="schemaVersion")
-    kind: Literal["dataset"] = "dataset"
-    metadata: DatasetMetadata
-    spec: DatasetSpec
+    kind: Literal["task"] = "task"
+    metadata: TaskMetadata
+    spec: TaskSpec
 
     @field_validator("schema_version")
     @classmethod
     def supported_schema(cls, value: str) -> str:
         if value != "1.0":
-            raise ValueError("only dataset schema version 1.0 is supported")
+            raise ValueError("only task schema version 1.0 is supported")
         return value
 
 
@@ -142,18 +142,18 @@ class Scenario(BaseModel):
     spec: ScenarioSpec
 
 
-DatasetDocument = Annotated[
-    DatasetManifest | DiscoveryPlan | PromptBundle | EvaluationPlan | Scenario,
+TaskDocument = Annotated[
+    TaskManifest | DiscoveryPlan | PromptBundle | EvaluationPlan | Scenario,
     Field(discriminator="kind"),
 ]
-_DOCUMENT_ADAPTER: TypeAdapter[DatasetDocument] = TypeAdapter(DatasetDocument)
+_DOCUMENT_ADAPTER: TypeAdapter[TaskDocument] = TypeAdapter(TaskDocument)
 _PLACEHOLDER_RE = re.compile(r"(?<!\{)\{([A-Za-z_][A-Za-z0-9_]*)\}(?!\})")
 
 
 def validate_template_placeholders(text: str, declared: set[str]) -> None:
     unknown = sorted(set(_PLACEHOLDER_RE.findall(text)) - declared)
     if unknown:
-        raise ValueError(f"unknown dataset template variables: {', '.join(unknown)}")
+        raise ValueError(f"unknown task template variables: {', '.join(unknown)}")
 
 
 def escape_unknown_template_placeholders(text: str, declared: set[str]) -> str:
@@ -176,12 +176,12 @@ def render_template(text: str, values: dict[str, str]) -> str:
     return _PLACEHOLDER_RE.sub(replace, text).replace("{{", "{").replace("}}", "}")
 
 
-def validate_document(payload: dict[str, Any]) -> DatasetDocument:
+def validate_document(payload: dict[str, Any]) -> TaskDocument:
     return _DOCUMENT_ADAPTER.validate_python(payload)
 
 
-def load_manifest(payload: dict[str, Any]) -> DatasetManifest:
-    return DatasetManifest.model_validate(payload)
+def load_manifest(payload: dict[str, Any]) -> TaskManifest:
+    return TaskManifest.model_validate(payload)
 
 
 def load_scenario(payload: dict[str, Any]) -> Scenario:

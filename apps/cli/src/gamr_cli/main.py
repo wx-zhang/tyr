@@ -11,12 +11,12 @@ from gamr_adapters.artifacts.evidence import FilesystemActivitySink
 from gamr_adapters.artifacts.filesystem import FilesystemArtifactStore
 from gamr_adapters.collector import CollectorClient
 from gamr_adapters.config import Settings
-from gamr_adapters.datasets.filesystem import (
-    FilesystemDatasetRepository,
-    load_dataset,
-    resolve_dataset_directory,
-)
 from gamr_adapters.models.openai_compatible import OpenAICompatibleModel
+from gamr_adapters.tasks.filesystem import (
+    FilesystemTaskRepository,
+    load_task,
+    resolve_task_directory,
+)
 from gamr_adapters.tyr.client import TyrMcpClient
 from gamr_core import (
     ExecutionOutcome,
@@ -41,7 +41,7 @@ app = typer.Typer(
     help="GAMR — Tyr's final opponent. Red-team experiment tools for Tyr (https://tyr.ai/).",
     no_args_is_help=True,
 )
-dataset_app = typer.Typer(help="Inspect and validate JSON datasets")
+task_app = typer.Typer(help="Inspect and validate JSON tasks")
 experiment_app = typer.Typer(help="Create and inspect experiment runs")
 result_app = typer.Typer(help="Validate canonical run results")
 
@@ -69,7 +69,9 @@ def _collector_client(settings: Settings) -> CollectorClient | None:
         username,
         password,
     )
-app.add_typer(dataset_app, name="dataset")
+
+
+app.add_typer(task_app, name="task")
 app.add_typer(experiment_app, name="experiment")
 app.add_typer(result_app, name="result")
 
@@ -83,7 +85,7 @@ def doctor() -> None:
     """Check the local scaffold and safe defaults."""
 
     checks = {
-        "dataset_root": Path("datasets").is_dir(),
+        "task_root": Path("tasks").is_dir(),
         "schema_root": Path("schemas").is_dir(),
         "read_only_default": ExperimentConfig().action_mode == "read_only",
     }
@@ -93,28 +95,26 @@ def doctor() -> None:
         raise typer.Exit(code=1)
 
 
-@dataset_app.command("list")
-def list_datasets(root: Path = typer.Option(Path("datasets"), "--root")) -> None:
-    """List available dataset manifests."""
+@task_app.command("list")
+def list_tasks(root: Path = typer.Option(Path("tasks"), "--root")) -> None:
+    """List available task manifests."""
 
     table = Table("ID", "Version", "Title")
-    for manifest in FilesystemDatasetRepository(root).list():
+    for manifest in FilesystemTaskRepository(root).list():
         table.add_row(manifest.metadata.id, manifest.metadata.version, manifest.metadata.title)
     console.print(table)
 
 
-@dataset_app.command("validate")
-def validate_dataset(directory: Path) -> None:
-    """Validate a dataset manifest and all scenario files."""
+@task_app.command("validate")
+def validate_task(directory: Path) -> None:
+    """Validate a task manifest and all scenario files."""
 
     try:
-        dataset = load_dataset(directory)
+        task = load_task(directory)
     except Exception as error:
-        console.print(f"[red]Invalid dataset:[/red] {error}")
+        console.print(f"[red]Invalid task:[/red] {error}")
         raise typer.Exit(code=1) from error
-    console.print(
-        f"[green]Valid[/green] {dataset.manifest.metadata.id} ({len(dataset.scenarios)} cases)"
-    )
+    console.print(f"[green]Valid[/green] {task.manifest.metadata.id} ({len(task.scenarios)} cases)")
 
 
 @experiment_app.command("run")
@@ -138,7 +138,7 @@ def run_experiment(
     case_id: list[str] = typer.Option(
         [], "--case-id", help="Select a case; repeat to run multiple cases in manifest order."
     ),
-    all_cases: bool = typer.Option(False, "--all-cases", help="Run every case in the dataset."),
+    all_cases: bool = typer.Option(False, "--all-cases", help="Run every case in the task."),
     scientist_iterations: int = typer.Option(
         0, "--scientist-iterations", min=0, help="Generate and run bounded follow-up scenarios."
     ),
@@ -157,7 +157,7 @@ def run_experiment(
         help="Use this many recent scientist runs as history.",
     ),
 ) -> None:
-    """Run a dataset through the shared engine and write a JSON bundle."""
+    """Run a task through the shared engine and write a JSON bundle."""
 
     if action_mode not in {"read_only", "approval_required"}:
         raise typer.BadParameter(
@@ -181,11 +181,11 @@ def run_experiment(
             default=False,
         ):
             raise typer.Abort()
-    dataset = load_dataset(directory)
+    task = load_task(directory)
     if case_id and all_cases:
         raise typer.BadParameter("use --case-id or --all-cases, not both")
     selected_case_ids = (
-        [scenario.metadata.id for scenario in dataset.scenarios] if all_cases else case_id or None
+        [scenario.metadata.id for scenario in task.scenarios] if all_cases else case_id or None
     )
     settings = Settings()
     selected_model = model or settings.model_name
@@ -221,7 +221,7 @@ def run_experiment(
         actionMode=action_mode,
         model=selected_model,
         scientistModel=selected_scientist_model,
-        maxTurns=dataset.manifest.spec.defaults.max_turns,
+        maxTurns=task.manifest.spec.defaults.max_turns,
         discoveryTurns=20,
         caseIds=selected_case_ids,
         scientistIterations=scientist_iterations,
@@ -233,7 +233,7 @@ def run_experiment(
     run_document = RunRecord(
         id=run_id,
         source=RunSource.CLI,
-        dataset=str(directory),
+        task=str(directory),
         state=RunState.RUNNING,
         configuration=configuration,
         createdAt=started_at,
@@ -247,7 +247,7 @@ def run_experiment(
     async def run_live() -> ExecutionOutput:
         try:
             return await ExperimentExecutionService().execute(
-                dataset,
+                task,
                 configuration,
                 run_id=run_id,
                 target=target,
@@ -265,7 +265,7 @@ def run_experiment(
 
     try:
         output = asyncio.run(run_live())
-    except (KeyboardInterrupt, asyncio.CancelledError):
+    except KeyboardInterrupt, asyncio.CancelledError:
         cancelled_at = datetime.now(UTC)
         artifact_store.write_json(
             f"runs/{run_id}/run.json",
@@ -278,9 +278,7 @@ def run_experiment(
                 }
             ).model_dump(by_alias=True, mode="json"),
         )
-        console.print(
-            f"[yellow]Cancelled[/] run [cyan]{run_id}[/] [dim]· Ctrl+C[/]"
-        )
+        console.print(f"[yellow]Cancelled[/] run [cyan]{run_id}[/] [dim]· Ctrl+C[/]")
         raise typer.Exit(code=130) from None
     except Exception as error:
         failed_at = datetime.now(UTC)
@@ -379,13 +377,11 @@ def resume_scientist_experiment(
         ):
             raise typer.Abort()
 
-    dataset_directory = resolve_dataset_directory(settings.dataset_root, source_record.dataset)
-    dataset = load_dataset(dataset_directory)
+    task_directory = resolve_task_directory(settings.task_root, source_record.task)
+    task = load_task(task_directory)
 
     selected_model = model or configuration.model or settings.model_name
-    selected_scientist_model = (
-        scientist_model or settings.scientist_model_name or selected_model
-    )
+    selected_scientist_model = scientist_model or settings.scientist_model_name or selected_model
     if not selected_model:
         raise typer.BadParameter("TYR_LOOP_MODEL is required")
     target = TyrMcpClient(settings.tyr_mcp_url, settings.tyr_mcp_token)
@@ -413,7 +409,7 @@ def resume_scientist_experiment(
     run_document = RunRecord(
         id=new_run_id,
         source=RunSource.CLI,
-        dataset=source_record.dataset,
+        task=source_record.task,
         state=RunState.RUNNING,
         configuration=configuration,
         retryOf=run_id,
@@ -428,7 +424,7 @@ def resume_scientist_experiment(
     async def run_live() -> ExecutionOutput:
         try:
             return await ExperimentExecutionService().resume_scientist(
-                dataset,
+                task,
                 configuration,
                 source_run_id=run_id,
                 run_id=new_run_id,
@@ -447,7 +443,7 @@ def resume_scientist_experiment(
 
     try:
         output = asyncio.run(run_live())
-    except (KeyboardInterrupt, asyncio.CancelledError):
+    except KeyboardInterrupt, asyncio.CancelledError:
         cancelled_at = datetime.now(UTC)
         artifact_store.write_json(
             f"runs/{new_run_id}/run.json",
@@ -460,9 +456,7 @@ def resume_scientist_experiment(
                 }
             ).model_dump(by_alias=True, mode="json"),
         )
-        console.print(
-            f"[yellow]Cancelled[/] run [cyan]{new_run_id}[/] [dim]· Ctrl+C[/]"
-        )
+        console.print(f"[yellow]Cancelled[/] run [cyan]{new_run_id}[/] [dim]· Ctrl+C[/]")
         raise typer.Exit(code=130) from None
     except Exception as error:
         failed_at = datetime.now(UTC)
@@ -606,7 +600,7 @@ async def _chat_loop(
             if not next_prompt:
                 try:
                     next_prompt = typer.prompt("Message")
-                except (EOFError, KeyboardInterrupt):
+                except EOFError, KeyboardInterrupt:
                     return
             command = next_prompt.strip()
             next_prompt = ""

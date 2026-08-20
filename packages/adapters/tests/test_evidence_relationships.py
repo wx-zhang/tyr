@@ -167,11 +167,14 @@ def test_normalizer_preserves_explicit_identity_direction_and_relationship_kinds
         relationship.source_participant_id == "operation-unrelated"
         for relationship in normalized.relationships
     )
-    assert next(
-        relationship
-        for relationship in normalized.relationships
-        if relationship.source_participant_id.startswith("unknown:")
-    ).target_participant_id == "agent-a"
+    assert (
+        next(
+            relationship
+            for relationship in normalized.relationships
+            if relationship.source_participant_id.startswith("unknown:")
+        ).target_participant_id
+        == "agent-a"
+    )
 
 
 def test_operation_normalization_maps_tyr_agent_bridge_tool_and_approval_endpoints() -> None:
@@ -334,16 +337,10 @@ def test_raw_network_projection_dedupes_child_objects_across_poll_snapshots(
         },
     ]
     for index, snapshot in enumerate(snapshots, 1):
-        (bundle / "raw" / f"{index:02d}.json").write_text(
-            json.dumps(snapshot), encoding="utf-8"
-        )
+        (bundle / "raw" / f"{index:02d}.json").write_text(json.dumps(snapshot), encoding="utf-8")
 
     activities = BundleNormalizer().normalize(bundle, run_id="network-run")
-    projected = [
-        item
-        for item in activities
-        if item.activity_type.value in {"bridge", "execution"}
-    ]
+    projected = [item for item in activities if item.activity_type.value in {"bridge", "execution"}]
     assert len(projected) == 3
     bridges = [item for item in projected if item.activity_type.value == "bridge"]
     executions = [item for item in projected if item.activity_type.value == "execution"]
@@ -352,13 +349,9 @@ def test_raw_network_projection_dedupes_child_objects_across_poll_snapshots(
     assert executions[0].target_participant_id == "agent:agent-1"
     assert executions[0].status == "completed"
     assert all(item.source_participant_id == "tyr" for item in projected)
-    assert all(
-        item.target_participant_id == "bridge:bridge-1" for item in bridges
-    )
+    assert all(item.target_participant_id == "bridge:bridge-1" for item in bridges)
 
-    relationships = BundleNormalizer().normalize_with_relationships(
-        bundle, run_id="network-run"
-    )
+    relationships = BundleNormalizer().normalize_with_relationships(bundle, run_id="network-run")
     pairs = {
         (item.source_participant_id, item.target_participant_id, item.activity_count)
         for item in relationships.relationships
@@ -401,13 +394,8 @@ def test_raw_network_projection_ignores_free_text_topology_mentions(tmp_path: Pa
         + "\n",
         encoding="utf-8",
     )
-    relationships = BundleNormalizer().normalize_with_relationships(
-        bundle, run_id="text-only"
-    )
+    relationships = BundleNormalizer().normalize_with_relationships(bundle, run_id="text-only")
     assert not any(
-        "mike" in participant.display_label.casefold()
-        for participant in relationships.participants
+        "mike" in participant.display_label.casefold() for participant in relationships.participants
     )
-    assert not any(
-        item.activity_type.value == "bridge" for item in relationships.activities
-    )
+    assert not any(item.activity_type.value == "bridge" for item in relationships.activities)

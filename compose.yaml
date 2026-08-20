@@ -7,12 +7,12 @@ services:
       - .env
     environment:
       GAMR_ARTIFACT_ROOT: /app/.gamr
-      GAMR_DATASET_ROOT: /app/datasets
+      GAMR_TASK_ROOT: /app/tasks
     ports:
       - "6687:6687"
     volumes:
       - ./.gamr:/app/.gamr
-      - ./datasets:/app/datasets:ro
+      - ./tasks:/app/tasks:ro
     healthcheck:
       test:
         [

@@ -171,9 +171,7 @@ class RunTurnResponse(BaseModel):
     outcome: str | None = None
     assessment_summary: str | None = Field(default=None, alias="assessmentSummary")
     history_case_ids: list[str] = Field(default_factory=list, alias="historyCaseIds")
-    history_case_origins: list[str] = Field(
-        default_factory=list, alias="historyCaseOrigins"
-    )
+    history_case_origins: list[str] = Field(default_factory=list, alias="historyCaseOrigins")
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -314,19 +312,17 @@ def _read_run_json(root: Path) -> dict[str, object]:
     try:
         value = json.loads((root / "run.json").read_text(encoding="utf-8"))
         return value if isinstance(value, dict) else {}
-    except (OSError, json.JSONDecodeError):
+    except OSError, json.JSONDecodeError:
         return {}
 
 
-def _load_discovery_result(
-    root: Path, secrets: tuple[str, ...] = ()
-) -> dict[str, object] | None:
+def _load_discovery_result(root: Path, secrets: tuple[str, ...] = ()) -> dict[str, object] | None:
     path = root / "discovery-result.json"
     if not path.is_file():
         return None
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    except OSError, json.JSONDecodeError:
         return None
     if not isinstance(value, dict):
         return None
@@ -599,7 +595,7 @@ def visualization(
                     "id": run_id,
                     "state": state,
                     "actionMode": metadata.get("actionMode") or run.configuration.action_mode,
-                    "dataset": metadata.get("dataset") or run.dataset,
+                    "task": metadata.get("task") or run.task,
                     "startedAt": metadata.get("startedAt") or run.created_at,
                     "latestUpdateAt": latest_update,
                     "finishedAt": metadata.get("finishedAt"),
@@ -618,9 +614,7 @@ def visualization(
                 "counts": {
                     "totalKnown": isinstance(known_cases, list),
                     "totalCases": len(known_cases) if isinstance(known_cases, list) else None,
-                    "completedCases": sum(
-                        item["state"] == "completed" for item in cases.values()
-                    ),
+                    "completedCases": sum(item["state"] == "completed" for item in cases.values()),
                 },
                 "latestSequence": max((item.sequence for item in bundle.activities), default=0),
             },
@@ -662,9 +656,7 @@ def turns(
             number=item.number,
             stage=item.stage,
             caseId=item.case_id,
-            status=(
-                "incomplete" if terminal and item.status == "waiting_for_tyr" else item.status
-            ),
+            status=("incomplete" if terminal and item.status == "waiting_for_tyr" else item.status),
             agentMessage=item.agent_message,
             tyrMessage=item.tyr_message,
             occurredAt=item.occurred_at,
@@ -714,9 +706,7 @@ def relationships(
             occurred_from=occurred_from,
             occurred_to=occurred_to,
         )
-        _root, bundle = _normalized(
-            run_id, settings, secrets=redaction_secrets(settings)
-        )
+        _root, bundle = _normalized(run_id, settings, secrets=redaction_secrets(settings))
         result = ActivityMemoryRepository(bundle.activities).aggregate_relationships(query)
         return _projection_payload(result, redaction_secrets(settings))
     except ValueError as error:
@@ -766,9 +756,7 @@ def activity(
         raise _invalid_query(str(error)) from error
     return ActivityPageResponse(
         items=[
-            ActivityItemResponse.model_validate(
-                browser_safe_activity(item, secrets=secrets)
-            )
+            ActivityItemResponse.model_validate(browser_safe_activity(item, secrets=secrets))
             for item in page.items
         ],
         nextCursor=page.next_cursor,
@@ -817,9 +805,7 @@ def evidence_content(
     try:
         content = FilesystemArtifactStore(
             settings.artifact_root, secrets=secrets
-        ).read_evidence_content(
-            run_id, item.content_ref
-        )
+        ).read_evidence_content(run_id, item.content_ref)
     except OverflowError as error:
         raise HTTPException(
             status_code=413, detail={"code": "evidence_too_large", "detail": str(error)}
@@ -853,9 +839,7 @@ def evidence_download(
     try:
         content = FilesystemArtifactStore(
             settings.artifact_root, secrets=secrets
-        ).read_evidence_download(
-            run_id, item.content_ref
-        )
+        ).read_evidence_download(run_id, item.content_ref)
     except (FileNotFoundError, ValueError) as error:
         raise not_found("evidence content") from error
     filename = FilesystemArtifactStore.safe_evidence_filename(run_id, evidence_id)

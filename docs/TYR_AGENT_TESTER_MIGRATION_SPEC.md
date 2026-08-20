@@ -3,7 +3,7 @@
 Status: implemented
 Updated: 2026-08-09
 
-The legacy loop script has been migrated into GAMR's typed shared engine and JSON dataset/run
+The legacy loop script has been migrated into GAMR's typed shared engine and JSON task/run
 contracts.
 
 ## Final shape
@@ -12,7 +12,7 @@ contracts.
 - API execution calls the same service for read-only and action-enabled runs (no auto-approval).
 - The web app is an optional launcher and evidence viewer.
 - CLI and service runs share `.gamr/runs/<run-id>` bundles.
-- Dataset snapshots, checkpoints, events, transcripts, raw diagnostics, results, and reports remain
+- Task snapshots, checkpoints, events, transcripts, raw diagnostics, results, and reports remain
   portable without a database export.
 - Explicit state, structured model output, redaction, idempotency, and Tyr settling replace legacy
   transcript control tokens and optimistic terminal-state handling.

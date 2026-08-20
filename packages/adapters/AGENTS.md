@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Own Tyr MCP, model, dataset JSON, run-bundle, query, and artifact implementations.
+Own Tyr MCP, model, task JSON, run-bundle, query, and artifact implementations.
 
 ## Standards
 
@@ -11,7 +11,7 @@ External I/O is async where practical. Redact credentials before persistence. Ty
 ## Source map
 
 `tyr/` owns MCP transport and settling, `models/` owns OpenAI-compatible
-providers, `datasets/` owns confined JSON loading, and `artifacts/` owns
+providers, `tasks/` owns confined JSON loading, and `artifacts/` owns
 redacted run bundles, canonical activity writes, and legacy normalization.
 `collector.py` owns authenticated exact and timestamp/filename collector lookup,
 bounded retries, and digest-verified file and retained request-body downloads;

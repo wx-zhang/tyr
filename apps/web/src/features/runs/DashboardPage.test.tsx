@@ -10,7 +10,7 @@ function run(overrides: Record<string, unknown> = {}) {
     experimentId: null,
     source: "service",
     state: "completed",
-    dataset: "datasets/first-plan",
+    task: "tasks/exfiltrate-important-txt",
     configuration: {
       actionMode: "read_only",
       model: "test",
@@ -29,10 +29,10 @@ let runs: ReturnType<typeof run>[] = [];
 
 beforeEach(() => {
   runs = [
-    run({ id: "run-1111", dataset: "datasets/first-plan" }),
+    run({ id: "run-1111", task: "tasks/exfiltrate-important-txt" }),
     run({
       id: "run-2222",
-      dataset: "datasets/second-plan",
+      task: "tasks/second-plan",
       state: "running",
       finishedAt: null,
     }),
@@ -78,29 +78,29 @@ function findRow(text: string): HTMLElement {
   return row as HTMLElement;
 }
 
-it("shows the run's own name instead of the dataset when one was set", async () => {
+it("shows the run's own name instead of the task when one was set", async () => {
   runs = [
-    run({ id: "run-5555", dataset: "datasets/first-plan", name: "Nightly red team" }),
+    run({ id: "run-5555", task: "tasks/exfiltrate-important-txt", name: "Nightly red team" }),
   ];
   renderPage();
 
   await screen.findByText("Nightly red team");
-  expect(screen.queryByText("first-plan")).not.toBeInTheDocument();
+  expect(screen.queryByText("exfiltrate-important-txt")).not.toBeInTheDocument();
 });
 
-it("falls back to the dataset label when the run has no name", async () => {
-  runs = [run({ id: "run-6666", dataset: "datasets/first-plan", name: null })];
+it("falls back to the task label when the run has no name", async () => {
+  runs = [run({ id: "run-6666", task: "tasks/exfiltrate-important-txt", name: null })];
   renderPage();
 
-  await screen.findByText("first-plan");
+  await screen.findByText("exfiltrate-important-txt");
 });
 
 it("deletes a single finished session after confirmation", async () => {
   const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
   renderPage();
 
-  await screen.findByText("first-plan");
-  const row = findRow("first-plan");
+  await screen.findByText("exfiltrate-important-txt");
+  const row = findRow("exfiltrate-important-txt");
   fireEvent.click(within(row).getByRole("button", { name: "Delete" }));
 
   expect(confirm).toHaveBeenCalled();
@@ -115,7 +115,7 @@ it("deletes a single finished session after confirmation", async () => {
 
 it("disables delete but offers Stop for a run that is still live", async () => {
   renderPage();
-  await screen.findByText("first-plan");
+  await screen.findByText("exfiltrate-important-txt");
   const liveRow = findRow("second-plan");
 
   expect(within(liveRow).getByRole("button", { name: "Delete" })).toBeDisabled();
@@ -127,7 +127,7 @@ it("stops a live run from the dashboard after confirmation", async () => {
   const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
   renderPage();
 
-  await screen.findByText("first-plan");
+  await screen.findByText("exfiltrate-important-txt");
   const liveRow = findRow("second-plan");
   fireEvent.click(within(liveRow).getByRole("button", { name: "Stop" }));
 
@@ -142,7 +142,7 @@ it("stops a live run from the dashboard after confirmation", async () => {
 });
 
 it("allows deleting a queued run directly without stopping it first", async () => {
-  runs = [run({ id: "run-4444", dataset: "datasets/fourth-plan", state: "queued", finishedAt: null })];
+  runs = [run({ id: "run-4444", task: "tasks/fourth-plan", state: "queued", finishedAt: null })];
   const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
   renderPage();
 
@@ -163,7 +163,7 @@ it("allows deleting a queued run directly without stopping it first", async () =
 
 it("hides selection checkboxes until Select is chosen", async () => {
   renderPage();
-  await screen.findByText("first-plan");
+  await screen.findByText("exfiltrate-important-txt");
 
   expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Select" }));
@@ -182,13 +182,13 @@ it("hides selection checkboxes until Select is chosen", async () => {
 
 it("bulk-deletes selected sessions from the toolbar", async () => {
   runs = [
-    run({ id: "run-1111", dataset: "datasets/first-plan" }),
-    run({ id: "run-3333", dataset: "datasets/third-plan" }),
+    run({ id: "run-1111", task: "tasks/exfiltrate-important-txt" }),
+    run({ id: "run-3333", task: "tasks/third-plan" }),
   ];
   const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
   renderPage();
 
-  await screen.findByText("first-plan");
+  await screen.findByText("exfiltrate-important-txt");
   await screen.findByText("third-plan");
   fireEvent.click(screen.getByRole("button", { name: "Select" }));
   const selectAll = screen.getByRole("checkbox", { name: "Select all deletable sessions" });

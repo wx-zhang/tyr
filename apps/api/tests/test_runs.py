@@ -11,7 +11,7 @@ from gamr_core import ExperimentConfig, RunSource, RunState
 def _experiment(client: TestClient) -> str:
     response = client.post(
         "/api/v1/experiments",
-        json={"name": "run API test", "dataset": "datasets/first-plan"},
+        json={"name": "run API test", "task": "tasks/exfiltrate-important-txt"},
     )
     assert response.status_code == 201
     return cast(str, response.json()["id"])
@@ -22,7 +22,7 @@ def test_list_runs_includes_timestamps_and_orders_newest_first() -> None:
     older = RunRecord(
         "run-older",
         None,
-        "datasets/first-plan",
+        "tasks/exfiltrate-important-txt",
         created_at=datetime(2026, 8, 8, 10, tzinfo=UTC),
         updated_at=datetime(2026, 8, 8, 10, tzinfo=UTC),
         source=RunSource.CLI,
@@ -30,7 +30,7 @@ def test_list_runs_includes_timestamps_and_orders_newest_first() -> None:
     newer = RunRecord(
         "run-newer",
         None,
-        "datasets/first-plan",
+        "tasks/exfiltrate-important-txt",
         created_at=datetime(2026, 8, 9, 12, tzinfo=UTC),
         updated_at=datetime(2026, 8, 9, 12, tzinfo=UTC),
         source=RunSource.CLI,
@@ -52,7 +52,7 @@ def test_service_accepts_approval_required_experiment() -> None:
     registry = InMemoryRegistry()
     experiment = registry.create_experiment(
         "action run",
-        "first-plan",
+        "exfiltrate-important-txt",
         ExperimentConfig(actionMode="approval_required"),
     )
     app.dependency_overrides[get_registry] = lambda: registry
@@ -70,7 +70,7 @@ def test_service_accepts_approval_required_experiment() -> None:
 
 def test_starting_a_run_carries_the_experiment_name() -> None:
     registry = InMemoryRegistry()
-    experiment = registry.create_experiment("Nightly red team", "first-plan")
+    experiment = registry.create_experiment("Nightly red team", "exfiltrate-important-txt")
     app.dependency_overrides[get_registry] = lambda: registry
     try:
         client = TestClient(app)
@@ -87,7 +87,7 @@ def test_retrying_a_run_keeps_its_name() -> None:
     registry = InMemoryRegistry()
     failed = registry.create_run(
         None,
-        "datasets/first-plan",
+        "tasks/exfiltrate-important-txt",
         source=RunSource.SERVICE,
         name="Nightly red team",
     )
@@ -102,7 +102,7 @@ def test_retrying_a_run_keeps_its_name() -> None:
         app.dependency_overrides.clear()
 
 
-def test_create_experiment_accepts_dataset_id_and_case_ids() -> None:
+def test_create_experiment_accepts_task_id_and_case_ids() -> None:
     registry = InMemoryRegistry()
     app.dependency_overrides[get_registry] = lambda: registry
     try:
@@ -111,14 +111,14 @@ def test_create_experiment_accepts_dataset_id_and_case_ids() -> None:
             "/api/v1/experiments",
             json={
                 "name": "case selection",
-                "dataset": "first-plan",
+                "task": "exfiltrate-important-txt",
                 "actionMode": "approval_required",
                 "caseIds": ["rename-relocate-fresh-agent-upload"],
             },
         )
         assert response.status_code == 201
         body = response.json()
-        assert body["dataset"] == "first-plan"
+        assert body["task"] == "exfiltrate-important-txt"
         assert body["configuration"]["actionMode"] == "approval_required"
         assert body["configuration"]["caseIds"] == ["rename-relocate-fresh-agent-upload"]
     finally:
@@ -133,7 +133,7 @@ def test_create_experiment_accepts_configured_scientist_history_windows() -> Non
             "/api/v1/experiments",
             json={
                 "name": "history windows",
-                "dataset": "first-plan",
+                "task": "exfiltrate-important-txt",
                 "caseIds": [],
                 "scientistIterations": 1,
                 "historyTestRuns": 7,
@@ -153,13 +153,13 @@ def test_create_experiment_rejects_unknown_case_id() -> None:
         "/api/v1/experiments",
         json={
             "name": "bad case",
-            "dataset": "first-plan",
+            "task": "exfiltrate-important-txt",
             "actionMode": "read_only",
             "caseIds": ["not-a-real-case"],
         },
     )
     assert response.status_code == 400
-    assert response.json()["detail"]["code"] == "invalid_dataset"
+    assert response.json()["detail"]["code"] == "invalid_task"
 
 
 def test_start_run_supports_scientist_only_and_rejects_empty_disabled_runs() -> None:
@@ -204,9 +204,7 @@ def test_run_events_support_last_event_id() -> None:
         run = client.post(f"/api/v1/experiments/{experiment_id}/runs", json={}).json()
         response = client.get(f"/api/v1/runs/{run['id']}/events")
         assert "id: 1" in response.text
-        resumed = client.get(
-            f"/api/v1/runs/{run['id']}/events", headers={"Last-Event-ID": "1"}
-        )
+        resumed = client.get(f"/api/v1/runs/{run['id']}/events", headers={"Last-Event-ID": "1"})
         assert ": heartbeat; interval=15" in resumed.text
         assert "event: heartbeat" in resumed.text
         assert '"interval": 15' in resumed.text
@@ -233,7 +231,7 @@ def test_delete_run_removes_it_from_the_registry() -> None:
     registry = InMemoryRegistry()
     finished = registry.create_run(
         None,
-        "datasets/first-plan",
+        "tasks/exfiltrate-important-txt",
         ExperimentConfig(),
         source=RunSource.SERVICE,
     )
@@ -257,7 +255,7 @@ def test_delete_run_removes_a_queued_run_without_requiring_cancel_first() -> Non
     registry = InMemoryRegistry()
     queued = registry.create_run(
         None,
-        "datasets/first-plan",
+        "tasks/exfiltrate-important-txt",
         ExperimentConfig(),
         source=RunSource.SERVICE,
     )
@@ -276,7 +274,7 @@ def test_delete_run_rejects_a_run_still_in_progress() -> None:
     registry = InMemoryRegistry()
     running = registry.create_run(
         None,
-        "datasets/first-plan",
+        "tasks/exfiltrate-important-txt",
         ExperimentConfig(),
         source=RunSource.SERVICE,
     )
@@ -304,7 +302,7 @@ def test_retry_creates_a_linked_new_bundle_and_approval_routes_are_removed() -> 
     registry = InMemoryRegistry()
     failed = registry.create_run(
         None,
-        "datasets/first-plan",
+        "tasks/exfiltrate-important-txt",
         ExperimentConfig(),
         source=RunSource.SERVICE,
     )

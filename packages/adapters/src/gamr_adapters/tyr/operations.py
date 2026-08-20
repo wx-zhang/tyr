@@ -345,8 +345,7 @@ def failure_notes(result: dict[str, object]) -> tuple[str, ...]:
             fields = {
                 key: str(entry[key]).strip()
                 for key in _DIAGNOSTIC_KEYS
-                if isinstance(entry.get(key), (str, int, float, bool))
-                and str(entry[key]).strip()
+                if isinstance(entry.get(key), (str, int, float, bool)) and str(entry[key]).strip()
             }
             cause_keys = set(fields) - {"agentName", "agent", "computerName", "state", "status"}
             if state == "completed" and not cause_keys:

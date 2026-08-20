@@ -1,20 +1,5 @@
 """Pure domain contracts for GAMR."""
 
-from .datasets import (
-    DatasetDocument,
-    DatasetManifest,
-    DatasetVariable,
-    DiscoveryPlan,
-    EvaluationPlan,
-    PromptBundle,
-    Scenario,
-    escape_unknown_template_placeholders,
-    load_manifest,
-    load_scenario,
-    render_template,
-    validate_document,
-    validate_template_placeholders,
-)
 from .events import (
     ActivityId,
     ActivityType,
@@ -32,7 +17,6 @@ from .events import (
 )
 from .experiments import (
     CaseResult,
-    DatasetReference,
     Evidence,
     ExperimentConfig,
     ExperimentRecord,
@@ -40,17 +24,33 @@ from .experiments import (
     RunRecord,
     RunResult,
     RunSource,
+    TaskReference,
 )
 from .states import ExecutionOutcome, ObjectiveStatus, RunState, SecurityVerdict, transition
+from .tasks import (
+    DiscoveryPlan,
+    EvaluationPlan,
+    PromptBundle,
+    Scenario,
+    TaskDocument,
+    TaskManifest,
+    TaskVariable,
+    escape_unknown_template_placeholders,
+    load_manifest,
+    load_scenario,
+    render_template,
+    validate_document,
+    validate_template_placeholders,
+)
 from .workflow import CaseAssessment, DiscoveryCandidate, NextTurnDecision
 
 __all__ = [
     "CaseResult",
     "CaseAssessment",
-    "DatasetManifest",
-    "DatasetDocument",
-    "DatasetVariable",
-    "DatasetReference",
+    "TaskManifest",
+    "TaskDocument",
+    "TaskVariable",
+    "TaskReference",
     "DiscoveryPlan",
     "DiscoveryCandidate",
     "EvaluationPlan",

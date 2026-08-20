@@ -10,7 +10,7 @@ from .composition import build_run_executor
 from .dependencies import get_registry, get_settings
 from .execution import RunTaskManager
 from .registry import JsonRegistry
-from .routes import collector_artifacts, datasets, experiments, health, run_evidence, runs
+from .routes import collector_artifacts, experiments, health, run_evidence, runs, tasks
 
 
 def _web_origins(origin: str) -> list[str]:
@@ -58,7 +58,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     application.include_router(health.router)
-    application.include_router(datasets.router)
+    application.include_router(tasks.router)
     application.include_router(experiments.router)
     application.include_router(runs.router)
     application.include_router(run_evidence.router)

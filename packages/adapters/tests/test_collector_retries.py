@@ -251,8 +251,6 @@ async def test_collector_reports_transport_error_type_without_message(
         with pytest.raises(CollectorUnavailableError) as raised:
             await _find(client)
 
-    assert str(raised.value) == (
-        "Collector fallback lookup failed after 3 attempts: ConnectError"
-    )
+    assert str(raised.value) == ("Collector fallback lookup failed after 3 attempts: ConnectError")
     assert "sensitive" not in str(raised.value)
     assert ledger_attempts == 3

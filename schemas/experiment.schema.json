@@ -88,9 +88,9 @@
       "title": "Name",
       "type": "string"
     },
-    "dataset": {
+    "task": {
       "minLength": 1,
-      "title": "Dataset",
+      "title": "Task",
       "type": "string"
     },
     "configuration": {
@@ -105,7 +105,7 @@
   "required": [
     "id",
     "name",
-    "dataset",
+    "task",
     "createdAt"
   ],
   "title": "ExperimentRecord",

@@ -63,15 +63,14 @@ def test_relationship_routes_derive_projection_from_json_bundle(tmp_path: Path) 
     activities = [_activity(1), _activity(2), _activity(3, target="tool")]
     (bundle / "activity.jsonl").write_text(
         "".join(
-            json.dumps(item.model_dump(by_alias=True, mode="json")) + "\n"
-            for item in activities
+            json.dumps(item.model_dump(by_alias=True, mode="json")) + "\n" for item in activities
         ),
         encoding="utf-8",
     )
     registry = InMemoryRegistry(
         runs={
             "run-relationships": RunRecord(
-                "run-relationships", "experiment", "dataset", state=RunState.RUNNING
+                "run-relationships", "experiment", "task", state=RunState.RUNNING
             )
         }
     )

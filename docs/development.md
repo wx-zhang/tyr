@@ -5,7 +5,7 @@ uv sync --all-packages --dev
 corepack enable
 uv run poe web-install
 uv run gamr doctor
-uv run gamr experiment run datasets/first-plan
+uv run gamr experiment run tasks/exfiltrate-important-txt
 uv run poe dev
 uv run poe dev:watch
 uv run poe schemas
@@ -22,8 +22,8 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-Compose loads `.env` for Tyr/model settings, overrides artifact/dataset paths inside the containers,
-bind-mounts `./.gamr` (read-write) and `./datasets` (read-only), and publishes `6687` (API) and
+Compose loads `.env` for Tyr/model settings, overrides artifact/task paths inside the containers,
+bind-mounts `./.gamr` (read-write) and `./tasks` (read-only), and publishes `6687` (API) and
 `6688` (web). Host CLI runs that write to `./.gamr` remain visible in the web app. Do not scale the
 `api` service; the run queue is in-process on a single API container.
 

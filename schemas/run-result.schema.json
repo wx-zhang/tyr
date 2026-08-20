@@ -39,30 +39,6 @@
       "title": "CaseResult",
       "type": "object"
     },
-    "DatasetReference": {
-      "additionalProperties": false,
-      "properties": {
-        "id": {
-          "title": "Id",
-          "type": "string"
-        },
-        "version": {
-          "title": "Version",
-          "type": "string"
-        },
-        "digest": {
-          "title": "Digest",
-          "type": "string"
-        }
-      },
-      "required": [
-        "id",
-        "version",
-        "digest"
-      ],
-      "title": "DatasetReference",
-      "type": "object"
-    },
     "Evidence": {
       "additionalProperties": false,
       "properties": {
@@ -211,6 +187,30 @@
       ],
       "title": "SecurityVerdict",
       "type": "string"
+    },
+    "TaskReference": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "version": {
+          "title": "Version",
+          "type": "string"
+        },
+        "digest": {
+          "title": "Digest",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "version",
+        "digest"
+      ],
+      "title": "TaskReference",
+      "type": "object"
     }
   },
   "additionalProperties": false,
@@ -236,8 +236,8 @@
       "title": "Runid",
       "type": "string"
     },
-    "dataset": {
-      "$ref": "#/$defs/DatasetReference"
+    "task": {
+      "$ref": "#/$defs/TaskReference"
     },
     "startedAt": {
       "format": "date-time",
@@ -291,7 +291,7 @@
   },
   "required": [
     "runId",
-    "dataset",
+    "task",
     "startedAt",
     "outcome",
     "configuration",

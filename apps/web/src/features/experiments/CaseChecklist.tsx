@@ -1,7 +1,7 @@
-import type { DatasetCase } from "../../api/client";
+import type { TaskCase } from "../../api/client";
 
 type CaseChecklistProps = {
-  cases: DatasetCase[];
+  cases: TaskCase[];
   selectedCaseIds: string[];
   onToggle: (caseId: string) => void;
   onSelectDefaults: () => void;

@@ -82,9 +82,9 @@ function compareRunsNewestFirst(left: Run, right: Run): number {
   return right.id.localeCompare(left.id);
 }
 
-function datasetLabel(dataset: string): string {
-  const parts = dataset.split("/").filter(Boolean);
-  return parts[parts.length - 1] ?? dataset;
+function taskLabel(task: string): string {
+  const parts = task.split("/").filter(Boolean);
+  return parts[parts.length - 1] ?? task;
 }
 
 function sourceLabel(source: Run["source"] | undefined): string {
@@ -412,7 +412,7 @@ export function DashboardPage() {
                           className="table-primary session-title"
                           title={run.id}
                         >
-                          {run.name?.trim() || datasetLabel(run.dataset)}
+                          {run.name?.trim() || taskLabel(run.task)}
                         </Link>
                         <p className="session-meta muted">
                           <span className="mono" title={run.id}>

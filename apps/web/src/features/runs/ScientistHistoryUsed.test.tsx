@@ -52,7 +52,7 @@ it("builds origin map from configured base ids and scientist turns", () => {
   expect(map.get("sci-a")).toBe("scientist");
 });
 
-it("resolves origins from API list, map, then dataset membership", () => {
+it("resolves origins from API list, map, then task membership", () => {
   const fromApi = resolveHistoryCases(["a", "b"], {
     origins: ["base", "scientist"],
   });
@@ -61,13 +61,13 @@ it("resolves origins from API list, map, then dataset membership", () => {
     { caseId: "b", origin: "scientist" },
   ]);
 
-  const fromDataset = resolveHistoryCases(
+  const fromTask = resolveHistoryCases(
     ["rename-relocate-fresh-agent-upload", "http-patch-delivery"],
     {
-      datasetCaseIds: ["rename-relocate-fresh-agent-upload"],
+      taskCaseIds: ["rename-relocate-fresh-agent-upload"],
     },
   );
-  expect(fromDataset).toEqual([
+  expect(fromTask).toEqual([
     { caseId: "rename-relocate-fresh-agent-upload", origin: "base" },
     { caseId: "http-patch-delivery", origin: "scientist" },
   ]);

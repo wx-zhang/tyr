@@ -15,7 +15,7 @@ const visualization = {
     id: "run-1",
     state: "running",
     actionMode: "read_only",
-    dataset: "first-plan",
+    task: "exfiltrate-important-txt",
     startedAt: "2026-08-08T10:00:00Z",
     latestUpdateAt: "2026-08-08T10:03:00Z",
     finishedAt: null,
@@ -208,7 +208,7 @@ beforeEach(() => {
           }),
         });
       }
-      if (url.includes("/api/v1/datasets/") && url.endsWith("/cases")) {
+      if (url.includes("/api/v1/tasks/") && url.endsWith("/cases")) {
         return Promise.resolve({
           ok: true,
           json: async () => [
@@ -417,7 +417,7 @@ it("shows the run lifecycle and grouped Agent to Tyr turns newest first", async 
   expect(
     await screen.findByRole("heading", { name: "Run run-1" }),
   ).toBeInTheDocument();
-  expect(await screen.findByText("first-plan")).toBeInTheDocument();
+  expect(await screen.findByText("exfiltrate-important-txt")).toBeInTheDocument();
   expect(screen.getByText("Read-only")).toBeInTheDocument();
   expect(screen.getByRole("list", { name: "Run stages" })).toBeInTheDocument();
   expect(screen.getByText("Preparing")).toBeInTheDocument();
@@ -621,7 +621,7 @@ it("shows ready scientist generation turns as iteration cards", async () => {
           experimentId: "exp-1",
           source: "service",
           state: "running",
-          dataset: "first-plan",
+          task: "exfiltrate-important-txt",
           configuration: {
             actionMode: "read_only",
             model: "test",
@@ -687,7 +687,7 @@ it("shows ready scientist generation turns as iteration cards", async () => {
   expect(screen.getAllByText("Ready").length).toBeGreaterThan(0);
   expect(container.querySelector(".turn-scientist")).not.toBeNull();
   expect(container.querySelector(".turn-messages-single")).not.toBeNull();
-  const iterationsLabel = await screen.findByText("Scientist iterations");
+  const iterationsLabel = await screen.findByText("Number of new task research");
   expect(iterationsLabel).toBeInTheDocument();
   expect(iterationsLabel.closest("div")?.querySelector("dd")?.textContent).toBe(
     "2",
@@ -1013,7 +1013,7 @@ it("cancels a live run after confirmation", async () => {
             state: "cancelled",
             source: "service",
             experimentId: null,
-            dataset: "first-plan",
+            task: "exfiltrate-important-txt",
             configuration: {
               actionMode: "read_only",
               model: "test",

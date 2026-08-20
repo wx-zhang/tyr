@@ -6,9 +6,7 @@ import pytest
 from gamr_adapters.config import Settings
 
 
-def test_settings_load_provider_env_names(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_settings_load_provider_env_names(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("TYR_MCP_TOKEN", raising=False)
     monkeypatch.delenv("TYR_MCP_URL", raising=False)
@@ -53,9 +51,7 @@ def test_chat_model_defaults_independently_of_loop_model(
     assert settings.chat_model_name == "x-ai/grok-4.5"
 
 
-def test_chat_model_can_be_overridden(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_chat_model_can_be_overridden(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("TYR_LOOP_CHAT_MODEL", "example/other-model")
 

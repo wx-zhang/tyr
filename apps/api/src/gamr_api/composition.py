@@ -4,8 +4,8 @@ from gamr_adapters.artifacts.evidence import FilesystemActivitySink
 from gamr_adapters.artifacts.filesystem import FilesystemArtifactStore
 from gamr_adapters.collector import CollectorClient
 from gamr_adapters.config import Settings
-from gamr_adapters.datasets.filesystem import load_dataset, resolve_dataset_directory
 from gamr_adapters.models.openai_compatible import OpenAICompatibleModel
+from gamr_adapters.tasks.filesystem import load_task, resolve_task_directory
 from gamr_adapters.tyr.client import TyrMcpClient
 from gamr_core import RunState
 from gamr_engine import ExperimentExecutionService, ProgressEvent
@@ -39,8 +39,8 @@ def build_run_executor(settings: Settings, registry: JsonRegistry) -> RunExecuto
             update={"model": selected_model, "scientist_model": selected_scientist_model}
         )
         registry.save_run(run)
-        dataset_path = resolve_dataset_directory(settings.dataset_root, run.dataset)
-        dataset = load_dataset(dataset_path)
+        task_path = resolve_task_directory(settings.task_root, run.task)
+        task = load_task(task_path)
         artifacts = FilesystemArtifactStore(
             settings.artifact_root,
             secrets=(
@@ -76,7 +76,7 @@ def build_run_executor(settings: Settings, registry: JsonRegistry) -> RunExecuto
         )
         try:
             output = await ExperimentExecutionService().execute(
-                dataset,
+                task,
                 run.configuration,
                 run_id=run.id,
                 target=target,

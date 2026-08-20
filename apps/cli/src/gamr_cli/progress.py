@@ -32,13 +32,9 @@ def render_progress(console: Console, event: ProgressEvent) -> None:
                 label = f"{name:<{width}}"
                 console.print(f"  [cyan]{escape(label)}[/]  {escape(value)}")
     elif event.event_type == "scientist.started":
-        console.print(
-            f"[bold blue]▸[/] Scientist [dim]· {escape(event.detail or '')}[/]"
-        )
+        console.print(f"[bold blue]▸[/] Scientist [dim]· {escape(event.detail or '')}[/]")
     elif event.event_type == "scientist.history_used":
-        console.print(
-            f"[cyan]↳[/] Scientist history [dim]· {escape(event.detail or '')}[/]"
-        )
+        console.print(f"[cyan]↳[/] Scientist history [dim]· {escape(event.detail or '')}[/]")
         if event.history_case_ids:
             for case_id in event.history_case_ids:
                 console.print(f"  [cyan]•[/] {escape(case_id)}")
@@ -49,17 +45,11 @@ def render_progress(console: Console, event: ProgressEvent) -> None:
             f"[dim] · {escape(event.detail or '')}[/]"
         )
     elif event.event_type == "scientist.failed":
-        console.print(
-            f"[red]✗[/] Scientist failed [dim]({escape(event.detail or '')})[/]"
-        )
+        console.print(f"[red]✗[/] Scientist failed [dim]({escape(event.detail or '')})[/]")
     elif event.event_type == "scientist.skipped":
-        console.print(
-            f"[yellow]⊘[/] Scientist skipped [dim]· {escape(event.detail or '')}[/]"
-        )
+        console.print(f"[yellow]⊘[/] Scientist skipped [dim]· {escape(event.detail or '')}[/]")
     elif event.event_type == "scientist.completed":
-        console.print(
-            f"[green]✓[/] Scientist complete [dim]· {escape(event.detail or '')}[/]"
-        )
+        console.print(f"[green]✓[/] Scientist complete [dim]· {escape(event.detail or '')}[/]")
     elif event.event_type == "case.started":
         console.print(f"[bold blue]▸[/] Case [cyan]{escape(event.case_id or '')}[/]")
     elif event.event_type == "model.thinking":

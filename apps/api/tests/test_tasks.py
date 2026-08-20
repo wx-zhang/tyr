@@ -2,17 +2,15 @@ from fastapi.testclient import TestClient
 from gamr_api.main import app
 
 
-def test_datasets_allows_localhost_web_origin() -> None:
-    response = TestClient(app).get(
-        "/api/v1/datasets", headers={"Origin": "http://localhost:6688"}
-    )
+def test_tasks_allows_localhost_web_origin() -> None:
+    response = TestClient(app).get("/api/v1/tasks", headers={"Origin": "http://localhost:6688"})
 
     assert response.status_code == 200
     assert response.headers["access-control-allow-origin"] == "http://localhost:6688"
 
 
-def test_dataset_cases_returns_full_scenarios() -> None:
-    response = TestClient(app).get("/api/v1/datasets/first-plan/cases")
+def test_task_cases_returns_full_scenarios() -> None:
+    response = TestClient(app).get("/api/v1/tasks/exfiltrate-important-txt/cases")
     assert response.status_code == 200
     payload = response.json()
     assert isinstance(payload, list)
@@ -29,13 +27,13 @@ def test_dataset_cases_returns_full_scenarios() -> None:
     assert "rename-relocate-fresh-agent-upload" in ids
 
 
-def test_dataset_cases_unknown_id_returns_404() -> None:
-    response = TestClient(app).get("/api/v1/datasets/does-not-exist/cases")
+def test_task_cases_unknown_id_returns_404() -> None:
+    response = TestClient(app).get("/api/v1/tasks/does-not-exist/cases")
     assert response.status_code == 404
 
 
-def test_dataset_plans_returns_supporting_documents() -> None:
-    response = TestClient(app).get("/api/v1/datasets/first-plan/plans")
+def test_task_plans_returns_supporting_documents() -> None:
+    response = TestClient(app).get("/api/v1/tasks/exfiltrate-important-txt/plans")
     assert response.status_code == 200
     payload = response.json()
     assert set(payload) == {"discovery", "methodology", "evaluation"}
@@ -50,15 +48,15 @@ def test_dataset_plans_returns_supporting_documents() -> None:
     assert isinstance(payload["evaluation"]["prompt"], str)
 
 
-def test_dataset_plans_unknown_id_returns_404() -> None:
-    response = TestClient(app).get("/api/v1/datasets/does-not-exist/plans")
+def test_task_plans_unknown_id_returns_404() -> None:
+    response = TestClient(app).get("/api/v1/tasks/does-not-exist/plans")
     assert response.status_code == 404
 
 
-def test_get_dataset_returns_manifest() -> None:
-    response = TestClient(app).get("/api/v1/datasets/first-plan")
+def test_get_task_returns_manifest() -> None:
+    response = TestClient(app).get("/api/v1/tasks/exfiltrate-important-txt")
     assert response.status_code == 200
     payload = response.json()
-    assert payload["metadata"]["id"] == "first-plan"
-    assert payload["kind"] == "dataset"
+    assert payload["metadata"]["id"] == "exfiltrate-important-txt"
+    assert payload["kind"] == "task"
     assert "defaults" in payload["spec"]

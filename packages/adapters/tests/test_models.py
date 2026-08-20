@@ -40,9 +40,7 @@ async def test_complete_sets_a_large_enough_json_completion_budget(
         lambda *, base_url, api_key: FakeClient(completions),
     )
 
-    model = openai_compatible.OpenAICompatibleModel(
-        "https://example.test/v1", "key", "test-model"
-    )
+    model = openai_compatible.OpenAICompatibleModel("https://example.test/v1", "key", "test-model")
     await model.complete("Return JSON.")
 
     assert completions.request is not None

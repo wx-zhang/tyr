@@ -18,8 +18,8 @@ vi.mock("react-router-dom", async () => {
 
 const experiment = {
   id: "exp-1",
-  name: "First Plan · test",
-  dataset: "first-plan",
+  name: "Exfiltrate important.txt · test",
+  task: "exfiltrate-important-txt",
   configuration: {
     actionMode: "approval_required" as const,
     model: "test-model",
@@ -93,7 +93,7 @@ beforeEach(() => {
 it("shows stored scientist iterations on the configuration snapshot", async () => {
   renderPage();
 
-  expect(await screen.findByText("Scientist iterations")).toBeInTheDocument();
+  expect(await screen.findByText("Number of new task research")).toBeInTheDocument();
   expect(screen.getByText("3")).toBeInTheDocument();
 });
 
@@ -101,7 +101,7 @@ it("shows off when scientist iterations are zero", async () => {
   installFetch({ scientistIterations: 0 });
   renderPage();
 
-  expect(await screen.findByText("Scientist iterations")).toBeInTheDocument();
+  expect(await screen.findByText("Number of new task research")).toBeInTheDocument();
   expect(screen.getByText("0 (off)")).toBeInTheDocument();
 });
 

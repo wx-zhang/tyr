@@ -49,7 +49,7 @@ def _client(tmp_path: Path) -> TestClient:
             "run-1": RunRecord(
                 id="run-1",
                 experiment_id="experiment-1",
-                dataset="fixture",
+                task="fixture",
                 state=RunState.COMPLETED,
                 configuration=ExperimentConfig(),
                 created_at=datetime.now(UTC),
@@ -57,7 +57,7 @@ def _client(tmp_path: Path) -> TestClient:
             "run-2": RunRecord(
                 id="run-2",
                 experiment_id="experiment-1",
-                dataset="fixture",
+                task="fixture",
                 state=RunState.COMPLETED,
                 configuration=ExperimentConfig(),
                 created_at=datetime.now(UTC),
@@ -177,8 +177,7 @@ def test_hydrates_and_previews_verified_request_body(
     try:
         listed = client.get("/api/v1/runs/run-1/collector-verifications")
         preview = client.get(
-            "/api/v1/runs/run-1/collector-files/"
-            "body-0123456789abcdef0123456789abcdef/preview"
+            "/api/v1/runs/run-1/collector-files/body-0123456789abcdef0123456789abcdef/preview"
         )
     finally:
         app.dependency_overrides.clear()
@@ -223,9 +222,7 @@ def test_recovers_files_for_existing_failed_exact_request_manifest(
     manifest.write_text(json.dumps(payload), encoding="utf-8")
     try:
         listed = client.get("/api/v1/runs/run-1/collector-verifications")
-        downloaded = client.get(
-            "/api/v1/runs/run-1/collector-files/recovered-file/download"
-        )
+        downloaded = client.get("/api/v1/runs/run-1/collector-files/recovered-file/download")
     finally:
         app.dependency_overrides.clear()
 

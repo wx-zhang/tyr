@@ -174,9 +174,7 @@ class CollectorClient:
             raise CollectorError("Collector request body metadata changed")
         return body.content
 
-    async def _with_http_retries(
-        self, operation: str, action: Callable[[], Awaitable[T]]
-    ) -> T:
+    async def _with_http_retries(self, operation: str, action: Callable[[], Awaitable[T]]) -> T:
         attempts = 0
         while True:
             attempts += 1

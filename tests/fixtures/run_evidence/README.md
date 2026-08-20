@@ -13,6 +13,6 @@ normalizer and projection rebuild consume; they are not live Tyr or model captur
 | `delegation` | Outer operation terminal while delegated work is still unsettled |
 | `bridge` | Outer operation terminal while bridge work is still unsettled |
 
-The common files use the canonical bundle names: `run.json`, `dataset.snapshot.json`,
+The common files use the canonical bundle names: `run.json`, `task.snapshot.json`,
 `checkpoint.json`, `events.jsonl`, `transcript.jsonl`, and optional `result.json` and `raw/` files.
 All times are UTC, IDs are stable fixture values, and all summaries are safe redacted text.

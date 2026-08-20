@@ -1,7 +1,7 @@
 import { createBrowserRouter } from "react-router-dom";
 import { App } from "../app/App";
-import { DatasetDetailPage } from "../features/datasets/DatasetDetailPage";
-import { DatasetPage } from "../features/datasets/DatasetPage";
+import { TaskDetailPage } from "../features/tasks/TaskDetailPage";
+import { TaskPage } from "../features/tasks/TaskPage";
 import { ExperimentDetailPage } from "../features/experiments/ExperimentDetailPage";
 import { DashboardPage } from "../features/runs/DashboardPage";
 import { RunPage } from "../features/runs/RunPage";
@@ -13,11 +13,11 @@ export const router = createBrowserRouter([
     element: <App />,
     children: [
       { index: true, element: <DashboardPage /> },
-      { path: "datasets", element: <DatasetPage /> },
-      { path: "datasets/:datasetId", element: <DatasetDetailPage /> },
+      { path: "tasks", element: <TaskPage /> },
+      { path: "tasks/:taskId", element: <TaskDetailPage /> },
       {
-        path: "datasets/:datasetId/cases/:caseId",
-        element: <DatasetDetailPage />,
+        path: "tasks/:taskId/cases/:caseId",
+        element: <TaskDetailPage />,
       },
       { path: "experiments/new", element: <ExperimentPage /> },
       { path: "experiments/:id", element: <ExperimentDetailPage /> },

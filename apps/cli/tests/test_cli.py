@@ -34,7 +34,7 @@ def test_experiment_run_requires_provider_configuration(
         scientist_model_name = ""
 
     monkeypatch.setattr(cli, "Settings", MissingSettings)
-    result = CliRunner().invoke(cli.app, ["experiment", "run", "datasets/first-plan"])
+    result = CliRunner().invoke(cli.app, ["experiment", "run", "tasks/exfiltrate-important-txt"])
 
     assert result.exit_code == 2
     assert "TYR_MCP_TOKEN is required" in result.output
@@ -89,10 +89,10 @@ def test_experiment_run_ctrl_c_cancels_run(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setattr(cli, "FilesystemArtifactStore", FakeStore)
     monkeypatch.setattr(cli, "TyrMcpClient", FakeTarget)
     monkeypatch.setattr(cli, "OpenAICompatibleModel", FakeModel)
-    monkeypatch.setattr(cli, "load_dataset", fake_load)
+    monkeypatch.setattr(cli, "load_task", fake_load)
     monkeypatch.setattr(asyncio, "run", raise_interrupt)
 
-    result = CliRunner().invoke(cli.app, ["experiment", "run", "datasets/first-plan"])
+    result = CliRunner().invoke(cli.app, ["experiment", "run", "tasks/exfiltrate-important-txt"])
 
     assert result.exit_code == 130
     assert "Cancelled" in result.output
@@ -309,11 +309,11 @@ def test_experiment_run_prints_result_errors(monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.setattr(cli, "FilesystemArtifactStore", FakeStore)
     monkeypatch.setattr(cli, "TyrMcpClient", FakeTarget)
     monkeypatch.setattr(cli, "OpenAICompatibleModel", FakeModel)
-    monkeypatch.setattr(cli, "load_dataset", fake_load)
+    monkeypatch.setattr(cli, "load_task", fake_load)
     monkeypatch.setattr(ExperimentExecutionService, "execute", fake_execute)
     monkeypatch.setattr(cli, "FilesystemActivitySink", lambda *_a, **_k: None)
 
-    result = CliRunner().invoke(cli.app, ["experiment", "run", "datasets/first-plan"])
+    result = CliRunner().invoke(cli.app, ["experiment", "run", "tasks/exfiltrate-important-txt"])
 
     assert result.exit_code == 0
     rendered = output.getvalue()

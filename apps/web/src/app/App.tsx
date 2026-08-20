@@ -33,8 +33,8 @@ export function App() {
     getSidebarCollapsed(),
   );
   const location = useLocation();
-  const context = location.pathname.startsWith("/datasets")
-    ? "Dataset catalog"
+  const context = location.pathname.startsWith("/tasks")
+    ? "Task catalog"
     : location.pathname.startsWith("/experiments")
       ? "Experiment configuration"
       : location.pathname.startsWith("/runs")
@@ -42,7 +42,7 @@ export function App() {
         : "Run operations";
 
   useEffect(() => {
-    document.documentElement.dataset.theme = theme;
+    document.documentElement.setAttribute("data-theme", theme);
   }, [theme]);
 
   const toggleTheme = () => {
@@ -103,14 +103,14 @@ export function App() {
               <span className="nav-label">Dashboard</span>
             </NavLink>
             <NavLink
-              to="/datasets"
-              aria-label="Datasets"
+              to="/tasks"
+              aria-label="Tasks"
               data-short="▦"
               className={({ isActive }) =>
                 isActive ? "nav-link active" : "nav-link"
               }
             >
-              <span className="nav-label">Datasets</span>
+              <span className="nav-label">Tasks</span>
             </NavLink>
             <NavLink
               to="/experiments/new"

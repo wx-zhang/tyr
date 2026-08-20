@@ -162,9 +162,7 @@ async def test_collector_rejects_inline_body_length_mismatch() -> None:
 async def test_multipart_summary_does_not_invalidate_verified_file() -> None:
     content = b"evidence"
     digest = hashlib.sha256(content).hexdigest()
-    detail = MULTIPART_DETAIL.format(
-        files=DETAIL.format(digest=digest, size=len(content))
-    )
+    detail = MULTIPART_DETAIL.format(files=DETAIL.format(digest=digest, size=len(content)))
 
     def handler(request: httpx.Request) -> httpx.Response:
         if request.url.path.endswith("/admin/login") and request.method == "GET":

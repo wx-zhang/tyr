@@ -4,14 +4,14 @@ from pathlib import Path
 import pytest
 from gamr_adapters.artifacts.filesystem import FilesystemArtifactStore
 from gamr_core import (
-    DatasetManifest,
     DiscoveryPlan,
     EvaluationPlan,
     ExperimentConfig,
     Scenario,
+    TaskManifest,
 )
 from gamr_engine.execution import ExperimentExecutionService
-from gamr_engine.runner import ExperimentRunner, LoadedDataset
+from gamr_engine.runner import ExperimentRunner, LoadedTask
 
 
 class LiveFakeModel:
@@ -69,8 +69,8 @@ class LiveFakeTarget:
         return result
 
 
-def _dataset() -> LoadedDataset:
-    manifest = DatasetManifest.model_validate(
+def _task() -> LoadedTask:
+    manifest = TaskManifest.model_validate(
         {
             "metadata": {"id": "live", "title": "Live", "version": "2.0.0"},
             "spec": {
@@ -99,7 +99,7 @@ def _dataset() -> LoadedDataset:
             },
         }
     )
-    return LoadedDataset(
+    return LoadedTask(
         manifest,
         [scenario],
         {"discovery": discovery.model_dump()},
@@ -117,7 +117,7 @@ _DISCOVERY_REPLY = (
 @pytest.mark.asyncio
 async def test_resume_scientist_reuses_prior_run_history(tmp_path: Path) -> None:
     store = FilesystemArtifactStore(root=tmp_path)
-    dataset = _dataset()
+    task = _task()
 
     generated = {
         "schemaVersion": "1.0",
@@ -150,7 +150,7 @@ async def test_resume_scientist_reuses_prior_run_history(tmp_path: Path) -> None
         ]
     )
     source_output = await ExperimentExecutionService().execute(
-        dataset,
+        task,
         ExperimentConfig(scientistIterations=1),
         target=LiveFakeTarget(),
         model=source_model,
@@ -184,7 +184,7 @@ async def test_resume_scientist_reuses_prior_run_history(tmp_path: Path) -> None
         ]
     )
     resume_output = await ExperimentExecutionService().resume_scientist(
-        dataset,
+        task,
         ExperimentConfig(scientistIterations=1),
         source_run_id="source-run",
         target=LiveFakeTarget(),
@@ -208,10 +208,10 @@ async def test_resume_scientist_reuses_prior_run_history(tmp_path: Path) -> None
 
 @pytest.mark.asyncio
 async def test_resume_scientist_requires_artifacts_and_iterations(tmp_path: Path) -> None:
-    dataset = _dataset()
+    task = _task()
     with pytest.raises(ValueError, match="artifact store"):
         await ExperimentRunner().resume_scientist(
-            dataset,
+            task,
             ExperimentConfig(scientistIterations=1),
             source_run_id="missing-run",
             target=LiveFakeTarget(),
@@ -219,7 +219,7 @@ async def test_resume_scientist_requires_artifacts_and_iterations(tmp_path: Path
         )
     with pytest.raises(ValueError, match="scientist_iterations"):
         await ExperimentRunner().resume_scientist(
-            dataset,
+            task,
             ExperimentConfig(),
             source_run_id="missing-run",
             target=LiveFakeTarget(),

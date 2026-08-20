@@ -4,16 +4,16 @@ from typing import cast
 import pytest
 from gamr_core import (
     ActivityType,
-    DatasetManifest,
     ExecutionOutcome,
     ExperimentConfig,
     RunActivity,
     RunState,
     Scenario,
+    TaskManifest,
 )
 from gamr_engine.execution import ExperimentExecutionService
 from gamr_engine.ports.artifacts import ArtifactStore
-from gamr_engine.runner import LoadedDataset
+from gamr_engine.runner import LoadedTask
 
 
 class _FakeModel:
@@ -75,7 +75,7 @@ class _ArtifactStore:
         self,
         run_id: str,
         result: object,
-        dataset_snapshot: dict[str, object] | None = None,
+        task_snapshot: dict[str, object] | None = None,
     ) -> str:
         self.results.append(run_id)
         return f"{run_id}/result.json"
@@ -100,7 +100,7 @@ class _ActivityCollector:
 
 @pytest.mark.asyncio
 async def test_execution_emits_terminal_run_state_after_result() -> None:
-    manifest = DatasetManifest.model_validate(
+    manifest = TaskManifest.model_validate(
         {
             "metadata": {"id": "demo", "title": "Demo", "version": "1.0.0"},
             "spec": {
@@ -124,7 +124,7 @@ async def test_execution_emits_terminal_run_state_after_result() -> None:
     activities = _ActivityCollector()
 
     output = await ExperimentExecutionService().execute(
-        LoadedDataset(manifest, [scenario], {}),
+        LoadedTask(manifest, [scenario], {}),
         ExperimentConfig(),
         target=_FakeTarget(),
         model=_FakeModel(),
@@ -138,8 +138,7 @@ async def test_execution_emits_terminal_run_state_after_result() -> None:
     terminal = [
         item
         for item in activities.items
-        if item.activity_type is ActivityType.RUN_STATE
-        and item.status == RunState.COMPLETED.value
+        if item.activity_type is ActivityType.RUN_STATE and item.status == RunState.COMPLETED.value
     ]
     assert terminal
     assert terminal[-1].sequence == max(item.sequence for item in activities.items)

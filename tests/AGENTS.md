@@ -12,7 +12,7 @@ Use fake ports by default. Live Tyr/OpenRouter tests are opt-in markers and neve
 
 `fixtures/run_evidence/<name>/` contains self-contained, redacted bundles for live, completed,
 interrupted, malformed, approval, delegation, and bridge scenarios. A bundle may contain
-`run.json`, `dataset.snapshot.json`, `checkpoint.json`, `events.jsonl`, `transcript.jsonl`,
+`run.json`, `task.snapshot.json`, `checkpoint.json`, `events.jsonl`, `transcript.jsonl`,
 `result.json`, and redacted files under `raw/`. The live, interrupted, approval, delegation, and
 bridge bundles intentionally omit a terminal `result.json`. The `malformed` bundle deliberately
 marks retained detail as malformed; its raw file is not a valid JSON document so normalizers can

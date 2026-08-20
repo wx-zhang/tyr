@@ -16,13 +16,13 @@ export function getPreferredTheme(): Theme {
 }
 
 export function applyTheme(theme: Theme) {
-  document.documentElement.dataset.theme = theme;
+  document.documentElement.setAttribute("data-theme", theme);
   window.localStorage.setItem(themeStorageKey, theme);
 }
 
 export function initializeTheme() {
   const stored = window.localStorage.getItem(themeStorageKey);
   if (isTheme(stored)) {
-    document.documentElement.dataset.theme = stored;
+    document.documentElement.setAttribute("data-theme", stored);
   }
 }

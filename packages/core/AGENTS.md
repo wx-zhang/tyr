@@ -10,7 +10,7 @@ No FastAPI, Typer, filesystem, network, terminal, or vendor SDK imports. Model w
 
 ## Source map
 
-`datasets.py` owns dataset documents and template binding; `experiments.py`
+`tasks.py` owns task documents and template binding; `experiments.py`
 owns run/result contracts; `events.py` owns normalized run activities,
 participants, evidence, and transient evidence queries; `workflow.py` owns
 discovery candidates, turn decisions, and structured assessments; `states.py`
@@ -21,4 +21,4 @@ browser-facing redaction belongs to the API and adapter tests rather than core.
 
 ## Commands
 
-`uv run pytest packages/core/tests` and `uv run python scripts/export_dataset_schema.py`.
+`uv run pytest packages/core/tests` and `uv run python scripts/export_task_schema.py`.

@@ -38,15 +38,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/datasets": {
+    "/api/v1/tasks": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** List Datasets */
-        get: operations["list_datasets_api_v1_datasets_get"];
+        /** List Tasks */
+        get: operations["list_tasks_api_v1_tasks_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -55,7 +55,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/datasets/validate": {
+    "/api/v1/tasks/validate": {
         parameters: {
             query?: never;
             header?: never;
@@ -64,23 +64,23 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Validate Dataset */
-        post: operations["validate_dataset_api_v1_datasets_validate_post"];
+        /** Validate Task */
+        post: operations["validate_task_api_v1_tasks_validate_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/v1/datasets/{dataset_id}/cases": {
+    "/api/v1/tasks/{task_id}/cases": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** List Dataset Cases */
-        get: operations["list_dataset_cases_api_v1_datasets__dataset_id__cases_get"];
+        /** List Task Cases */
+        get: operations["list_task_cases_api_v1_tasks__task_id__cases_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -89,15 +89,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/datasets/{dataset_id}/plans": {
+    "/api/v1/tasks/{task_id}/plans": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Get Dataset Plans */
-        get: operations["get_dataset_plans_api_v1_datasets__dataset_id__plans_get"];
+        /** Get Task Plans */
+        get: operations["get_task_plans_api_v1_tasks__task_id__plans_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -106,15 +106,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/datasets/{dataset_id}": {
+    "/api/v1/tasks/{task_id}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Get Dataset */
-        get: operations["get_dataset_api_v1_datasets__dataset_id__get"];
+        /** Get Task */
+        get: operations["get_task_api_v1_tasks__task_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -651,10 +651,10 @@ export interface components {
             /** Name */
             name: string;
             /**
-             * Dataset
-             * @default first-plan
+             * Task
+             * @default exfiltrate-important-txt
              */
-            dataset: string;
+            task: string;
             /**
              * Actionmode
              * @default read_only
@@ -854,8 +854,8 @@ export interface components {
             state: string;
             /** Actionmode */
             actionMode: string;
-            /** Dataset */
-            dataset: string;
+            /** Task */
+            task: string;
             /**
              * Startedat
              * Format: date-time
@@ -943,7 +943,7 @@ export interface operations {
             };
         };
     };
-    list_datasets_api_v1_datasets_get: {
+    list_tasks_api_v1_tasks_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -965,7 +965,7 @@ export interface operations {
             };
         };
     };
-    validate_dataset_api_v1_datasets_validate_post: {
+    validate_task_api_v1_tasks_validate_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -1002,12 +1002,12 @@ export interface operations {
             };
         };
     };
-    list_dataset_cases_api_v1_datasets__dataset_id__cases_get: {
+    list_task_cases_api_v1_tasks__task_id__cases_get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                dataset_id: string;
+                task_id: string;
             };
             cookie?: never;
         };
@@ -1035,12 +1035,12 @@ export interface operations {
             };
         };
     };
-    get_dataset_plans_api_v1_datasets__dataset_id__plans_get: {
+    get_task_plans_api_v1_tasks__task_id__plans_get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                dataset_id: string;
+                task_id: string;
             };
             cookie?: never;
         };
@@ -1068,12 +1068,12 @@ export interface operations {
             };
         };
     };
-    get_dataset_api_v1_datasets__dataset_id__get: {
+    get_task_api_v1_tasks__task_id__get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                dataset_id: string;
+                task_id: string;
             };
             cookie?: never;
         };

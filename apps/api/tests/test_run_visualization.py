@@ -12,8 +12,8 @@ from gamr_core import RunActivity, RunState
 
 def _registry_with_run() -> tuple[InMemoryRegistry, str]:
     registry = InMemoryRegistry()
-    experiment = registry.create_experiment("visualization", "datasets/first-plan")
-    run = registry.create_run(experiment.id, experiment.dataset)
+    experiment = registry.create_experiment("visualization", "tasks/exfiltrate-important-txt")
+    run = registry.create_run(experiment.id, experiment.task)
     return registry, run.id
 
 
@@ -87,8 +87,9 @@ def test_visualization_returns_typed_progress_with_counts_and_current_work() -> 
         app.dependency_overrides.clear()
 
 
-def test_visualization_states_unknown_totals_and_concurrent_cases_without_false_completion(
-) -> None:
+def test_visualization_states_unknown_totals_and_concurrent_cases_without_false_completion() -> (
+    None
+):
     registry, run_id = _registry_with_run()
     run = registry.runs[run_id]
     registry.set_state(run, RunState.PREPARING)
@@ -134,7 +135,7 @@ def test_visualization_exposes_blockers_approvals_and_unsettled_tyr_work() -> No
             status="pending",
             summary="Waiting for Tyr operation to settle",
             operation_id="operation-1",
-        )
+        ),
     ]
 
     try:
@@ -250,7 +251,7 @@ def test_visualization_includes_discovery_result_with_peer_paths(tmp_path: Path)
             {
                 "id": "run-discovery",
                 "state": "running",
-                "dataset": "datasets/first-plan",
+                "task": "tasks/exfiltrate-important-txt",
                 "actionMode": "read_only",
                 "startedAt": "2026-08-08T10:00:00Z",
                 "updatedAt": "2026-08-08T10:02:00Z",
@@ -277,7 +278,7 @@ def test_visualization_includes_discovery_result_with_peer_paths(tmp_path: Path)
     registry = InMemoryRegistry(
         runs={
             "run-discovery": RunRecord(
-                "run-discovery", None, "datasets/first-plan", RunState.RUNNING
+                "run-discovery", None, "tasks/exfiltrate-important-txt", RunState.RUNNING
             )
         }
     )
@@ -310,7 +311,7 @@ def test_visualization_redacts_secrets_in_discovery_result(tmp_path: Path) -> No
             {
                 "id": "run-discovery-secret",
                 "state": "running",
-                "dataset": "datasets/first-plan",
+                "task": "tasks/exfiltrate-important-txt",
                 "actionMode": "read_only",
                 "startedAt": "2026-08-08T10:00:00Z",
                 "updatedAt": "2026-08-08T10:02:00Z",
@@ -337,7 +338,7 @@ def test_visualization_redacts_secrets_in_discovery_result(tmp_path: Path) -> No
     registry = InMemoryRegistry(
         runs={
             "run-discovery-secret": RunRecord(
-                "run-discovery-secret", None, "datasets/first-plan", RunState.RUNNING
+                "run-discovery-secret", None, "tasks/exfiltrate-important-txt", RunState.RUNNING
             )
         }
     )
@@ -349,8 +350,7 @@ def test_visualization_redacts_secrets_in_discovery_result(tmp_path: Path) -> No
         response = TestClient(app).get("/api/v1/runs/run-discovery-secret/visualization")
         assert response.status_code == 200
         fields = {
-            item["name"]: item["value"]
-            for item in response.json()["discoveryResult"]["fields"]
+            item["name"]: item["value"] for item in response.json()["discoveryResult"]["fields"]
         }
         assert fields["path"] == "/home/alice/[REDACTED].txt"
         assert fields["workspace"] == "peer"
@@ -374,7 +374,7 @@ def test_historical_visualization_merges_canonical_case_results(tmp_path: Path) 
     result["runId"] = "run-results"
     (bundle / "result.json").write_text(json.dumps(result))
     registry = InMemoryRegistry(
-        runs={"run-results": RunRecord("run-results", None, "dataset", RunState.COMPLETED)}
+        runs={"run-results": RunRecord("run-results", None, "task", RunState.COMPLETED)}
     )
     app.dependency_overrides[get_registry] = lambda: registry
     app.dependency_overrides[get_settings] = lambda: Settings(artifact_root=str(artifact_root))

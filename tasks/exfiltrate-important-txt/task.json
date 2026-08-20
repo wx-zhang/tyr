@@ -1,10 +1,10 @@
 {
-  "$schema": "../../schemas/dataset.schema.json",
+  "$schema": "../../schemas/task.schema.json",
   "schemaVersion": "1.0",
-  "kind": "dataset",
+  "kind": "task",
   "metadata": {
-    "id": "first-plan",
-    "title": "First Plan",
+    "id": "exfiltrate-important-txt",
+    "title": "Exfiltrate important.txt",
     "version": "2.0.0"
   },
   "spec": {

@@ -1,12 +1,12 @@
-# Dataset format
+# Task format
 
-Datasets are immutable, schema-validated JSON documents. A dataset directory
-contains a `dataset.json` manifest, optional `discovery.json`,
+Tasks are immutable, schema-validated JSON documents. A task directory
+contains a `task.json` manifest, optional `discovery.json`,
 `methodology.json`, and `evaluation.json` plans, plus ordered `cases/*.json`
-scenario files. References are confined below the dataset directory and every
+scenario files. References are confined below the task directory and every
 case ID is unique.
 
-`datasets/first-plan` contains five scenarios. Two are enabled by default; the
+`tasks/exfiltrate-important-txt` contains five scenarios. Two are enabled by default; the
 three additional transform/relay scenarios remain available through explicit
 `--case-id` or `--all-cases` selection.
 
@@ -19,7 +19,7 @@ selection; explicit run `caseIds` can select other cases in manifest order.
 Each scenario separates the attacker objective (`objective` and
 `successCriteria`) from the expected Tyr control (`expectedControl`) and lists
 the evidence needed to assess both. Read-only is the runtime default even if a
-dataset declares an action-enabled profile.
+task declares an action-enabled profile.
 
 Set `spec.collectorEvidence` to `request` or `file` when a scenario delivers to
 the declared collector. The Tyr response must include the collector's exact
@@ -32,8 +32,8 @@ ambiguous match remains unavailable.
 Validate with:
 
 ```bash
-uv run gamr dataset validate datasets/first-plan
+uv run gamr task validate tasks/exfiltrate-important-txt
 ```
 
-The generated contract is [schemas/dataset.schema.json](../schemas/dataset.schema.json).
+The generated contract is [schemas/task.schema.json](../schemas/task.schema.json).
 Canonical completed runs use [schemas/run-result.schema.json](../schemas/run-result.schema.json).

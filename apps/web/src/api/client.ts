@@ -1,7 +1,7 @@
 import type { components } from "./generated";
 
-export type Dataset = {
-  kind?: "dataset";
+export type Task = {
+  kind?: "task";
   metadata: { id: string; title: string; version: string };
   spec: {
     cases: string[];
@@ -20,7 +20,7 @@ export type Dataset = {
   };
 };
 
-export type DatasetScenario = {
+export type TaskScenario = {
   schemaVersion?: string;
   kind?: "scenario";
   metadata: {
@@ -40,13 +40,13 @@ export type DatasetScenario = {
 };
 
 /** Summary fields used by the experiment case checklist. */
-export type DatasetCase = {
+export type TaskCase = {
   id: string;
   title: string;
   category?: string | null;
 };
 
-export type DatasetPlans = {
+export type TaskPlans = {
   discovery: {
     kind?: string;
     prompt: string;
@@ -64,7 +64,7 @@ export type DatasetPlans = {
   } | null;
 };
 
-export function scenarioToCase(scenario: DatasetScenario): DatasetCase {
+export function scenarioToCase(scenario: TaskScenario): TaskCase {
   return {
     id: scenario.metadata.id,
     title: scenario.metadata.title,
@@ -99,7 +99,7 @@ export type Run = {
   retryOf?: string | null;
   name?: string | null;
   state: RunState;
-  dataset: string;
+  task: string;
   configuration: {
     actionMode: "read_only" | "approval_required";
     model: string;
@@ -120,7 +120,7 @@ export type Run = {
 export type Experiment = {
   id: string;
   name: string;
-  dataset: string;
+  task: string;
   configuration?: Run["configuration"];
 };
 
@@ -146,25 +146,25 @@ export type EvidenceFilters = {
 
 const apiOrigin = import.meta.env.VITE_API_ORIGIN ?? "http://127.0.0.1:6687";
 
-export async function fetchDatasets(): Promise<Dataset[]> {
-  const response = await fetch(`${apiOrigin}/api/v1/datasets`);
-  if (!response.ok) throw new Error("Could not load datasets");
-  return response.json() as Promise<Dataset[]>;
+export async function fetchTasks(): Promise<Task[]> {
+  const response = await fetch(`${apiOrigin}/api/v1/tasks`);
+  if (!response.ok) throw new Error("Could not load tasks");
+  return response.json() as Promise<Task[]>;
 }
 
-export function fetchDataset(datasetId: string): Promise<Dataset> {
-  return get<Dataset>(`/api/v1/datasets/${encodeURIComponent(datasetId)}`);
+export function fetchTask(taskId: string): Promise<Task> {
+  return get<Task>(`/api/v1/tasks/${encodeURIComponent(taskId)}`);
 }
 
-export function fetchDatasetCases(datasetId: string): Promise<DatasetScenario[]> {
-  return get<DatasetScenario[]>(
-    `/api/v1/datasets/${encodeURIComponent(datasetId)}/cases`,
+export function fetchTaskCases(taskId: string): Promise<TaskScenario[]> {
+  return get<TaskScenario[]>(
+    `/api/v1/tasks/${encodeURIComponent(taskId)}/cases`,
   );
 }
 
-export function fetchDatasetPlans(datasetId: string): Promise<DatasetPlans> {
-  return get<DatasetPlans>(
-    `/api/v1/datasets/${encodeURIComponent(datasetId)}/plans`,
+export function fetchTaskPlans(taskId: string): Promise<TaskPlans> {
+  return get<TaskPlans>(
+    `/api/v1/tasks/${encodeURIComponent(taskId)}/plans`,
   );
 }
 
@@ -201,7 +201,7 @@ export function fetchExperiment(experimentId: string): Promise<Experiment> {
 
 export async function createExperiment(payload: {
   name: string;
-  dataset: string;
+  task: string;
   actionMode: "read_only" | "approval_required";
   caseIds: string[];
   scientistIterations?: number;
