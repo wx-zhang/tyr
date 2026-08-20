@@ -43,6 +43,7 @@ Evaluation updates supply the result badge until visualization catches up. Scien
 cases belong only to their iteration group and never contribute to base test-case progress.
 `features/runs/runHistoryPresentation.ts` derives redacted summaries, and
 `RunTurnCard.tsx` plus `RunTurnDetail.tsx` render the activity disclosure and bounded evidence.
+Evaluation details show judge status, sensitive content comparison, checked files, and missing evidence when the API supplies them.
 `features/runs/CollectorArtifacts.tsx` renders verified collector files as
 Updates entries with bounded text, Markdown, XML, and image previews plus run-scoped downloads,
 without receiving collector credentials.

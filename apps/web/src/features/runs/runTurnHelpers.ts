@@ -123,6 +123,13 @@ export function isScientistGeneration(turn: RunTurn): boolean {
   );
 }
 
+export function contentOverlapLabel(status: string): string {
+  if (status === "confirmed") return "Confirmed overlap";
+  if (status === "not_found") return "No overlap found";
+  if (status === "inconclusive") return "Needs review";
+  return "Not checked";
+}
+
 export function isEvaluation(turn: RunTurn): boolean {
   return turn.updateType === "evaluation";
 }

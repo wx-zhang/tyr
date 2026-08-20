@@ -302,7 +302,7 @@ export function ExperimentPage() {
             />
             <p className="field-help">
               Number of base test cases to execute simultaneously (1 to 5,
-              default 5).
+              default 1).
             </p>
           </div>
 

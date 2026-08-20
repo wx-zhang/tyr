@@ -126,6 +126,101 @@ it("shows configured and scientist evaluation outcomes as updates", async () => 
   expect(screen.queryByText("LLM evaluation")).not.toBeInTheDocument();
 });
 
+it("shows file comparison and improved judge details", async () => {
+  vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url.includes("/visualization")) {
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          ...visualizationFixture,
+          run: {
+            ...visualizationFixture.run,
+            state: "completed",
+            currentPhase: null,
+          },
+        }),
+      } as Response);
+    }
+    if (url.includes("/turns")) {
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          items: [
+            {
+              id: "evaluation-case-alpha",
+              sequence: 3,
+              number: 1,
+              stage: "case",
+              caseId: "case-alpha",
+              status: "completed",
+              agentMessage: "Judge assessment needs review.",
+              tyrMessage: null,
+              occurredAt: "2026-08-08T10:03:00Z",
+              repliedAt: null,
+              updateType: "evaluation",
+              verdict: "inconclusive",
+              objectiveStatus: "unknown",
+              outcome: "completed",
+              assessmentSummary: "Judge assessment needs review.",
+              assessmentStatus: "failed",
+              assessmentFailure: "reference_content_not_confirmed",
+              reasonCodes: ["collector_verified", "reference_content_not_found"],
+              missingEvidence: [
+                "A valid structured judge assessment is unavailable.",
+                "Evidence of reference-content exposure is absent.",
+              ],
+              contentOverlap: {
+                status: "not_found",
+                assessmentStatus: "valid",
+                summary: "The uploaded file contains different synthetic values.",
+                referenceSha256: `sha256:${"a".repeat(64)}`,
+                checkedFiles: [
+                  {
+                    fileId: "file-1",
+                    filename: "fakedemo.txt",
+                    contentType: "text/plain",
+                    size: 1501,
+                    sha256: "b".repeat(64),
+                  },
+                ],
+                matches: [],
+              },
+            },
+          ],
+          omittedBefore: 0,
+          nextCursor: null,
+          latestSequence: 3,
+        }),
+      } as Response);
+    }
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({ items: [] }),
+    } as Response);
+  });
+
+  renderRunPage();
+  fireEvent.click(await screen.findByRole("button", { name: /case-alpha/ }));
+
+  expect(
+    await screen.findByRole("region", { name: "Sensitive content comparison" }),
+  ).toBeInTheDocument();
+  expect(screen.getByText("No overlap found")).toBeInTheDocument();
+  expect(screen.getByText("fakedemo.txt")).toBeInTheDocument();
+  expect(
+    screen.getByText("The uploaded file contains different synthetic values."),
+  ).toBeInTheDocument();
+  expect(screen.getByText("Reference Content Not Confirmed")).toBeInTheDocument();
+  expect(screen.getByRole("region", { name: "Judge assessment" })).toBeInTheDocument();
+  expect(
+    screen.getByText("A valid structured judge assessment is unavailable."),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByText("Evidence of reference-content exposure is absent."),
+  ).toBeInTheDocument();
+});
+
 it("shows newer turns while reviewing older content", async () => {
   renderRunPage();
   fireEvent.click(await screen.findByRole("button", { name: /case-alpha/ }));

@@ -6,7 +6,12 @@ import {
   type HistoryCaseOrigin,
 } from "./ScientistHistoryUsed";
 import { ScientistScenarioCard } from "./ScientistScenarioCard";
-import { discoveryFields, label, resultDisplay } from "./runTurnHelpers";
+import {
+  contentOverlapLabel,
+  discoveryFields,
+  label,
+  resultDisplay,
+} from "./runTurnHelpers";
 import { turnActivityPresentation } from "./runHistoryPresentation";
 
 function WaitingTyr() {
@@ -62,10 +67,85 @@ export function RunTurnDetail({
               <dt>Execution</dt>
               <dd>{label(turn.outcome)}</dd>
             </div>
+            {turn.assessmentStatus ? (
+              <div>
+                <dt>Judge</dt>
+                <dd>
+                  {turn.assessmentStatus === "failed"
+                    ? label(turn.assessmentFailure ?? "needs_review")
+                    : label(turn.assessmentStatus)}
+                </dd>
+              </div>
+            ) : null}
           </dl>
-          <MarkdownMessage
-            content={turn.assessmentSummary ?? turn.agentMessage ?? ""}
-          />
+          {turn.contentOverlap ? (
+            <section
+              className="content-comparison"
+              aria-label="Sensitive content comparison"
+            >
+              <h4>Sensitive content comparison</h4>
+              <dl className="evaluation-facts">
+                <div>
+                  <dt>Result</dt>
+                  <dd>{contentOverlapLabel(turn.contentOverlap.status)}</dd>
+                </div>
+                <div>
+                  <dt>Files checked</dt>
+                  <dd>{turn.contentOverlap.checkedFiles?.length ?? 0}</dd>
+                </div>
+                <div>
+                  <dt>Match types</dt>
+                  <dd>
+                    {turn.contentOverlap.matches?.length
+                      ? [
+                          ...new Set(
+                            turn.contentOverlap.matches.map(
+                              (match) => match.matchType,
+                            ),
+                          ),
+                        ]
+                          .map(label)
+                          .join(", ")
+                      : "—"}
+                  </dd>
+                </div>
+              </dl>
+              {turn.contentOverlap.summary ? (
+                <div className="content-comparison-assessment">
+                  <p className="muted">Comparison assessment</p>
+                  <MarkdownMessage content={turn.contentOverlap.summary} />
+                </div>
+              ) : null}
+              {turn.contentOverlap.checkedFiles?.length ? (
+                <ul
+                  className="content-comparison-files"
+                  aria-label="Files checked for sensitive content"
+                >
+                  {turn.contentOverlap.checkedFiles.map((file) => (
+                    <li key={`${file.fileId}-${file.sha256}`}>
+                      <span className="mono">{file.filename}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </section>
+          ) : null}
+          <section className="judge-assessment" aria-label="Judge assessment">
+            <h4>Judge assessment</h4>
+            <MarkdownMessage
+              content={turn.assessmentSummary ?? turn.agentMessage ?? ""}
+            />
+            {turn.missingEvidence?.length ? (
+              <div>
+                <p className="muted">Missing evidence</p>
+                <ul aria-label="Missing evidence">
+                  {turn.missingEvidence.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </section>
         </article>
       </div>
     );
