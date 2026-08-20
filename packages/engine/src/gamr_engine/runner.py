@@ -1006,7 +1006,7 @@ class ExperimentRunner:
         )
         verifications = verification.items
         content_overlap = await self._assess_content(
-            dataset,
+            task,
             scenario,
             verifications,
             judge_model,

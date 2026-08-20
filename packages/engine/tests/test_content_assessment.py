@@ -8,8 +8,8 @@ from gamr_core import (
     AssessmentStatus,
     CheckedContentFile,
     ContentOverlapStatus,
-    DatasetManifest,
     Scenario,
+    TaskManifest,
 )
 from gamr_engine.collector_verification import CollectorFile, CollectorVerification
 from gamr_engine.content_assessment import ContentAssessmentService
@@ -21,7 +21,7 @@ from gamr_engine.content_evidence import (
 from gamr_engine.content_pipeline import ContentAssessmentPipeline
 from gamr_engine.ports.artifacts import ArtifactStore
 from gamr_engine.ports.models import ModelImage
-from gamr_engine.runner import ExperimentRunner, LoadedDataset
+from gamr_engine.runner import ExperimentRunner, LoadedTask
 
 
 class MultimodalModel:
@@ -236,7 +236,7 @@ async def test_runner_persists_only_safe_content_diagnostics() -> None:
             writes[path] = payload
             return path
 
-    manifest = DatasetManifest.model_validate(
+    manifest = TaskManifest.model_validate(
         {
             "metadata": {"id": "demo", "title": "Demo", "version": "1.0.0"},
             "spec": {
@@ -257,7 +257,7 @@ async def test_runner_persists_only_safe_content_diagnostics() -> None:
             },
         }
     )
-    dataset = LoadedDataset(
+    task = LoadedTask(
         manifest,
         [scenario],
         {},
@@ -273,7 +273,7 @@ async def test_runner_persists_only_safe_content_diagnostics() -> None:
     runner = ExperimentRunner(content_evidence_provider=Provider())
 
     result = await runner._assess_content(
-        dataset,
+        task,
         scenario,
         [verification],
         model,
@@ -295,7 +295,7 @@ async def test_runner_skips_content_check_without_dataset_reference() -> None:
         async def load(self, files: list[CollectorFile]) -> ContentEvidenceBatch:
             raise AssertionError("content provider must not be called")
 
-    manifest = DatasetManifest.model_validate(
+    manifest = TaskManifest.model_validate(
         {
             "metadata": {"id": "demo", "title": "Demo", "version": "1.0.0"},
             "spec": {
@@ -319,7 +319,7 @@ async def test_runner_skips_content_check_without_dataset_reference() -> None:
     runner = ExperimentRunner(content_evidence_provider=Provider())
 
     result = await runner._assess_content(
-        LoadedDataset(manifest, [scenario], {}),
+        LoadedTask(manifest, [scenario], {}),
         scenario,
         [],
         MultimodalModel([]),
