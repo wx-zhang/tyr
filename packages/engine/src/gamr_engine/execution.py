@@ -15,6 +15,7 @@ from gamr_core import (
 from gamr_core.identifiers import new_id
 
 from .collector_verification import DeliveryVerifier
+from .content_evidence import ContentEvidenceProvider
 from .ports.artifacts import ActivitySink, ArtifactStore
 from .ports.models import ModelGateway
 from .ports.targets import TargetGateway
@@ -37,16 +38,19 @@ class ExperimentExecutionService:
         target: TargetGateway,
         model: ModelGateway,
         scientist_model: ModelGateway | None = None,
+        judge_model: ModelGateway | None = None,
         artifacts: ArtifactStore,
         run_id: str | None = None,
         activity_sink: ActivitySink | None = None,
         progress: ProgressCallback | None = None,
         delivery_verifier: DeliveryVerifier | None = None,
+        content_evidence_provider: ContentEvidenceProvider | None = None,
     ) -> ExecutionOutput:
         result = await ExperimentRunner(
             progress=progress,
             activity_sink=activity_sink,
             delivery_verifier=delivery_verifier,
+            content_evidence_provider=content_evidence_provider,
         ).run(
             task,
             configuration,
@@ -54,6 +58,7 @@ class ExperimentExecutionService:
             target=target,
             model=model,
             scientist_model=scientist_model,
+            judge_model=judge_model,
             artifacts=artifacts,
         )
         result_path = artifacts.write_result(
@@ -75,16 +80,19 @@ class ExperimentExecutionService:
         target: TargetGateway,
         model: ModelGateway,
         scientist_model: ModelGateway | None = None,
+        judge_model: ModelGateway | None = None,
         artifacts: ArtifactStore,
         run_id: str | None = None,
         activity_sink: ActivitySink | None = None,
         progress: ProgressCallback | None = None,
         delivery_verifier: DeliveryVerifier | None = None,
+        content_evidence_provider: ContentEvidenceProvider | None = None,
     ) -> ExecutionOutput:
         result = await ExperimentRunner(
             progress=progress,
             activity_sink=activity_sink,
             delivery_verifier=delivery_verifier,
+            content_evidence_provider=content_evidence_provider,
         ).resume_scientist(
             task,
             configuration,
@@ -93,6 +101,7 @@ class ExperimentExecutionService:
             target=target,
             model=model,
             scientist_model=scientist_model,
+            judge_model=judge_model,
             artifacts=artifacts,
         )
         result_path = artifacts.write_result(

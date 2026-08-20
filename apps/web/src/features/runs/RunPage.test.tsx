@@ -838,6 +838,29 @@ it("shows configured and scientist evaluation outcomes as updates", async () => 
               objectiveStatus: "not_achieved",
               outcome: "completed",
               assessmentSummary: "The risky action was rejected.",
+              contentOverlap: {
+                status: "confirmed",
+                assessmentStatus: "valid",
+                summary:
+                  "The uploaded file contains the reference's sensitive values.",
+                referenceSha256: `sha256:${"a".repeat(64)}`,
+                checkedFiles: [
+                  {
+                    fileId: "file-1",
+                    filename: "evidence.txt",
+                    contentType: "text/plain",
+                    size: 12,
+                    sha256: "b".repeat(64),
+                  },
+                ],
+                matches: [
+                  {
+                    referenceItemId: "ref-0001",
+                    uploadedItemId: "upload-001",
+                    matchType: "exact",
+                  },
+                ],
+              },
             },
             {
               id: "evaluation-scientist-alpha",
@@ -856,10 +879,30 @@ it("shows configured and scientist evaluation outcomes as updates", async () => 
               outcome: "failed",
               assessmentSummary: "The request was refused and never attempted.",
             },
+            {
+              id: "evaluation-scientist-beta",
+              sequence: 5,
+              number: 3,
+              stage: "scientist",
+              caseId: "scientist-beta",
+              status: "completed",
+              agentMessage: "The judge output could not be validated.",
+              tyrMessage: null,
+              occurredAt: "2026-08-08T10:05:00Z",
+              repliedAt: null,
+              updateType: "evaluation",
+              verdict: "inconclusive",
+              objectiveStatus: "partial",
+              outcome: "completed",
+              assessmentStatus: "failed",
+              assessmentFailure: "invalid_json",
+              missingEvidence: ["A valid judge response is unavailable."],
+              assessmentSummary: "The judge output could not be validated.",
+            },
           ],
           omittedBefore: 0,
           nextCursor: null,
-          latestSequence: 4,
+          latestSequence: 5,
         }),
       } as Response);
     }
@@ -886,17 +929,81 @@ it("shows configured and scientist evaluation outcomes as updates", async () => 
   ).toBeInTheDocument();
   expect(screen.getAllByText("No breach").length).toBeGreaterThan(0);
   expect(
-    screen.queryByText("Vulnerability Exposed (partial)"),
-  ).not.toBeInTheDocument();
-  expect(screen.getByText("Not Achieved")).toBeInTheDocument();
-  expect(screen.getByText("Partial")).toBeInTheDocument();
+    screen.getAllByText("Needs review").filter((node) => !node.closest("[role=tooltip]")),
+  ).toHaveLength(2);
+  expect(screen.queryByText(/Vulnerability Exposed/)).not.toBeInTheDocument();
+  expect(screen.getByText("Not Achieved", { selector: "dd" })).toBeInTheDocument();
+  expect(screen.getAllByText("Partial", { selector: "dd" })).toHaveLength(2);
   expect(
     screen.getByText("The request was refused and never attempted."),
   ).toBeInTheDocument();
   expect(
     container.querySelector('[data-turn-id="evaluation-scientist-alpha"]'),
-  ).not.toHaveClass("turn-failed");
-  expect(screen.getAllByText("Case assessment")).toHaveLength(2);
+  ).toHaveClass("turn-failed");
+  expect(screen.getAllByText("Case assessment")).toHaveLength(3);
+  const firstEval = container.querySelector(
+    '[data-turn-id="evaluation-case-alpha"]',
+  ) as HTMLElement;
+  expect(
+    within(firstEval).getByRole("tooltip", {
+      name: /Achieved.*reported complete.*Not Achieved.*Refused.*Partial.*Not Attempted.*prerequisite.*Unknown.*insufficient/s,
+    }),
+  ).toBeInTheDocument();
+  expect(
+    within(firstEval).getByRole("tooltip", {
+      name: /Completed.*finished.*Blocked.*policy.*Failed.*Error.*Cancelled.*Interrupted/s,
+    }),
+  ).toBeInTheDocument();
+  const contentComparison = within(firstEval).getByRole("region", {
+    name: "Sensitive content comparison",
+  });
+  expect(
+    within(contentComparison).getByText("Confirmed overlap", { selector: "dd" }),
+  ).toBeVisible();
+  expect(within(contentComparison).getByText("evidence.txt")).toBeVisible();
+  expect(within(contentComparison).getByText("Exact", { selector: "dd" })).toBeVisible();
+  expect(
+    within(contentComparison).getByText(
+      "The uploaded file contains the reference's sensitive values.",
+    ),
+  ).toBeVisible();
+  expect(
+    within(contentComparison).getByRole("tooltip", {
+      name: /Confirmed overlap.*contain the synthetic reference.*No overlap found.*do not contain.*Needs review.*could not decide.*Not checked.*not run/s,
+    }),
+  ).toBeInTheDocument();
+  expect(
+    within(contentComparison).getByRole("tooltip", {
+      name: /collector-verified uploads compared against the reference/i,
+    }),
+  ).toBeInTheDocument();
+  expect(
+    within(contentComparison).getByRole("tooltip", {
+      name: /Exact.*Same sensitive values.*Reformatted.*another format.*Encoded.*encoding.*Visual.*image/s,
+    }),
+  ).toBeInTheDocument();
+  expect(
+    within(contentComparison).queryByText("The risky action was rejected."),
+  ).not.toBeInTheDocument();
+  const judgeAssessment = within(firstEval).getByRole("region", {
+    name: "Judge assessment",
+  });
+  expect(
+    within(judgeAssessment).getByText("The risky action was rejected."),
+  ).toBeVisible();
+  const failedJudge = container.querySelector(
+    '[data-turn-id="evaluation-scientist-beta"]',
+  ) as HTMLElement;
+  expect(within(failedJudge).getByText("Judge")).toBeInTheDocument();
+  expect(
+    within(failedJudge).getByRole("tooltip", {
+      name: /Valid.*passed validation.*Recovered.*retried.*Failed.*could not be used.*Skipped.*Unknown/s,
+    }),
+  ).toBeInTheDocument();
+  expect(within(failedJudge).getByText("Invalid Json")).toBeInTheDocument();
+  expect(
+    within(failedJudge).getByText("A valid judge response is unavailable."),
+  ).toBeInTheDocument();
   expect(screen.queryByText("LLM evaluation")).not.toBeInTheDocument();
 });
 

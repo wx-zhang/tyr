@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from typing import Any
+import base64
+from typing import Any, cast
 
-from openai import AsyncOpenAI
+from gamr_engine.ports.models import ModelImage
+from openai import AsyncOpenAI, BadRequestError
 
 
 class OpenAICompatibleModel:
@@ -16,6 +18,94 @@ class OpenAICompatibleModel:
             messages=[{"role": "user", "content": prompt}],
             max_tokens=8192,
         )
+        choice = response.choices[0] if response.choices else None
+        message = choice.message.content if choice and choice.message.content else ""
+        return {
+            "content": message,
+            "usage": response.usage.model_dump() if response.usage else {},
+            "model": response.model,
+            "finishReason": choice.finish_reason if choice else "empty",
+            "refusal": getattr(choice.message, "refusal", None) if choice else None,
+        }
+
+    async def complete_structured(
+        self,
+        prompt: str,
+        *,
+        system: str,
+        json_schema: dict[str, object],
+    ) -> dict[str, object]:
+        request: dict[str, object] = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": prompt},
+            ],
+            "max_tokens": 8192,
+            "temperature": 0,
+            "response_format": {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "case_assessment",
+                    "strict": True,
+                    "schema": json_schema,
+                },
+            },
+        }
+        return await self._structured_response(request)
+
+    async def complete_multimodal_structured(
+        self,
+        prompt: str,
+        *,
+        images: list[ModelImage],
+        system: str,
+        json_schema: dict[str, object],
+        schema_name: str,
+    ) -> dict[str, object]:
+        content: list[dict[str, object]] = [{"type": "text", "text": prompt}]
+        for image in images:
+            encoded = base64.b64encode(image.content).decode()
+            content.extend(
+                [
+                    {
+                        "type": "text",
+                        "text": f"Uploaded image item: {image.uploaded_item_id}",
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:{image.content_type};base64,{encoded}",
+                            "detail": "high",
+                        },
+                    },
+                ]
+            )
+        request: dict[str, object] = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": content},
+            ],
+            "max_tokens": 1024,
+            "temperature": 0,
+            "response_format": {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": schema_name,
+                    "strict": True,
+                    "schema": json_schema,
+                },
+            },
+        }
+        return await self._structured_response(request)
+
+    async def _structured_response(self, request: dict[str, object]) -> dict[str, object]:
+        try:
+            response = await self.client.chat.completions.create(**cast(Any, request))
+        except BadRequestError:
+            request["response_format"] = {"type": "json_object"}
+            response = await self.client.chat.completions.create(**cast(Any, request))
         choice = response.choices[0] if response.choices else None
         message = choice.message.content if choice and choice.message.content else ""
         return {

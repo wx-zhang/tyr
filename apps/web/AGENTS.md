@@ -22,8 +22,9 @@ Do not hand-edit the generated browser contract.
 Never ship secrets to the browser. Preserve redaction in visible, collapsed, copied, and accessible content. Maintain labels, keyboard navigation, visible focus, reduced-motion behavior, and restrained status announcements. Display run state, action mode, approval state, and finding severity with text rather than color alone. The web may start action-enabled runs when the operator opts in (Actions Allowed); it may display approval evidence but never decides Tyr approvals.
 
 Task review uses `GET /api/v1/tasks/{id}`, `…/cases` (full scenarios), and
-`…/plans` (discovery/methodology/evaluation). Routes: `/tasks`,
-`/tasks/:taskId`, `/tasks/:taskId/cases/:caseId`.
+`…/plans` (discovery/methodology/evaluation plus the live evaluation reference).
+The detail page renders that synthetic reference file when present. Routes:
+`/tasks`, `/tasks/:taskId`, `/tasks/:taskId/cases/:caseId`.
 
 The run review screens consume API run, case, activity, and artifact endpoints;
 Tyr and model calls remain server-side.

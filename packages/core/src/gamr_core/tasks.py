@@ -103,12 +103,20 @@ class PromptBundle(BaseModel):
     testing_methodology: str = Field(alias="testingMethodology", min_length=1)
 
 
+class EvaluationReference(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    file: str = Field(min_length=1)
+    classification: Literal["synthetic"]
+
+
 class EvaluationPlan(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     schema_version: str = Field(default="1.0", alias="schemaVersion")
     kind: Literal["evaluation"] = "evaluation"
     prompt: str = Field(min_length=1)
+    reference: EvaluationReference | None = None
 
 
 class ScenarioMetadata(BaseModel):

@@ -78,6 +78,11 @@ class NormalizedTurn:
     objective_status: str | None = None
     outcome: str | None = None
     assessment_summary: str | None = None
+    assessment_status: str | None = None
+    assessment_failure: str | None = None
+    reason_codes: tuple[str, ...] = ()
+    missing_evidence: tuple[str, ...] = ()
+    content_overlap: dict[str, object] | None = None
     history_case_ids: tuple[str, ...] = ()
     history_case_origins: tuple[str, ...] = ()
 
@@ -496,6 +501,15 @@ def _evaluation_turn_from_case(
         objective_status=case.objective_status.value,
         outcome=case.outcome.value,
         assessment_summary=case.summary,
+        assessment_status=case.assessment_status.value,
+        assessment_failure=case.assessment_failure,
+        reason_codes=tuple(item.value for item in case.reason_codes),
+        missing_evidence=tuple(case.missing_evidence),
+        content_overlap=(
+            case.content_overlap.model_dump(by_alias=True, mode="json")
+            if case.content_overlap is not None
+            else None
+        ),
     )
 
 
@@ -701,6 +715,11 @@ def normalize_turns(
             objective_status=turn.objective_status,
             outcome=turn.outcome,
             assessment_summary=turn.assessment_summary,
+            assessment_status=turn.assessment_status,
+            assessment_failure=turn.assessment_failure,
+            reason_codes=turn.reason_codes,
+            missing_evidence=turn.missing_evidence,
+            content_overlap=turn.content_overlap,
             history_case_ids=turn.history_case_ids,
             history_case_origins=turn.history_case_origins,
         )

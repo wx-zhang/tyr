@@ -11,6 +11,10 @@ Keep all provider and persistence access behind protocols. CLI and API use the s
 ## Source map
 
 `runner.py` is the shared discovery/case engine and emits typed activities,
+`assessment.py` builds and validates the evidence judge contract,
+`assessment_contract.py` owns its strict schema, `content_assessment.py` owns
+the synthetic-reference overlap judge, `content_pipeline.py` coordinates
+verified collector content, and `content_evidence.py` owns the in-memory contracts,
 `execution.py` finalizes the shared JSON result and report,
 `chat.py` is the interactive tool loop, `reporting.py` derives Markdown, and
 `ports/` contains provider, artifact, and activity-sink interfaces.

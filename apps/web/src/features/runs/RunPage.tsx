@@ -118,24 +118,19 @@ type ResultDisplay = {
 
 function resultDisplay(
   verdict: string | null | undefined,
-  objectiveStatus: string | null | undefined,
-  outcome: string | null | undefined,
 ): ResultDisplay {
-  if (
-    verdict === "protected" ||
-    (verdict !== "vulnerable" && outcome === "failed")
-  ) {
+  if (verdict === "protected") {
     return { label: "No breach", tone: "success", className: "protected" };
   }
-  if (
-    verdict === "vulnerable" ||
-    (verdict === "inconclusive" && objectiveStatus === "partial")
-  ) {
+  if (verdict === "vulnerable") {
     return {
-      label: `Vulnerability Exposed${objectiveStatus === "partial" ? " (partial)" : ""}`,
+      label: "Vulnerability Exposed",
       tone: "danger",
       className: "vulnerable",
     };
+  }
+  if (verdict === "inconclusive") {
+    return { label: "Needs review", tone: "warning", className: "inconclusive" };
   }
   return {
     label: label(verdict),
@@ -144,12 +139,50 @@ function resultDisplay(
   };
 }
 
+function contentOverlapLabel(status: string): string {
+  if (status === "confirmed") return "Confirmed overlap";
+  if (status === "not_found") return "No overlap found";
+  if (status === "inconclusive") return "Needs review";
+  return "Not checked";
+}
+
+function FactLabel({
+  id,
+  children,
+  hint,
+  statuses,
+}: {
+  id: string;
+  children: string;
+  hint: string;
+  statuses?: Array<{ name: string; detail: string }>;
+}) {
+  return (
+    <dt className="fact-label" tabIndex={0} aria-describedby={id}>
+      {children}
+      <span id={id} role="tooltip" className="info-tip-bubble">
+        <span className="info-tip-lead">{hint}</span>
+        {statuses?.length ? (
+          <ul className="info-tip-statuses">
+            {statuses.map((status) => (
+              <li key={status.name}>
+                <span className="info-tip-status-name">{status.name}</span>
+                <span className="info-tip-status-detail">{status.detail}</span>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </span>
+    </dt>
+  );
+}
+
 function caseStatus(item: CaseProgress): {
   label: string;
   tone: ReturnType<typeof tone>;
 } {
   if (item.verdict)
-    return resultDisplay(item.verdict, item.objectiveStatus, item.outcome);
+    return resultDisplay(item.verdict);
   return { label: label(item.state), tone: tone(item.state) };
 }
 
@@ -841,7 +874,7 @@ function Turn({
           ? `Scientist Scenario ${scientistIteration} - Turn ${turn.number}`
           : `${label(turn.stage)} - Turn ${turn.number}`;
   const evaluationResult = evaluation
-    ? resultDisplay(turn.verdict, turn.objectiveStatus, turn.outcome)
+    ? resultDisplay(turn.verdict)
     : null;
   const status = evaluationResult ?? {
     label:
@@ -934,17 +967,217 @@ function Turn({
             </p>
             <dl className="evaluation-facts">
               <div>
-                <dt>Objective</dt>
+                <FactLabel
+                  id={`${turn.id}-objective-tip`}
+                  hint="Whether the scenario's success criteria were met."
+                  statuses={[
+                    {
+                      name: "Achieved",
+                      detail: "The final action happened and was reported complete.",
+                    },
+                    {
+                      name: "Not Achieved",
+                      detail: "Refused, never attempted, or returned an error.",
+                    },
+                    {
+                      name: "Partial",
+                      detail:
+                        "Earlier work landed, but the final action has no stated outcome.",
+                    },
+                    {
+                      name: "Not Attempted",
+                      detail: "A prerequisite prevented execution.",
+                    },
+                    {
+                      name: "Unknown",
+                      detail: "Evidence is insufficient.",
+                    },
+                  ]}
+                >
+                  Objective
+                </FactLabel>
                 <dd>{label(turn.objectiveStatus)}</dd>
               </div>
               <div>
-                <dt>Execution</dt>
+                <FactLabel
+                  id={`${turn.id}-execution-tip`}
+                  hint="How this case run finished."
+                  statuses={[
+                    { name: "Completed", detail: "The case run finished." },
+                    {
+                      name: "Blocked",
+                      detail: "Tyr or a policy stopped the case.",
+                    },
+                    { name: "Failed", detail: "The case ended in a failed outcome." },
+                    { name: "Error", detail: "The runner hit an error." },
+                    {
+                      name: "Cancelled",
+                      detail: "An operator cancelled the run.",
+                    },
+                    {
+                      name: "Interrupted",
+                      detail: "The run stopped before it could finish.",
+                    },
+                  ]}
+                >
+                  Execution
+                </FactLabel>
                 <dd>{label(turn.outcome)}</dd>
               </div>
+              {turn.assessmentStatus ? (
+                <div>
+                  <FactLabel
+                    id={`${turn.id}-judge-tip`}
+                    hint="Whether the judge returned a valid assessment. Failed shows the error."
+                    statuses={[
+                      {
+                        name: "Valid",
+                        detail: "The judge response passed validation.",
+                      },
+                      {
+                        name: "Recovered",
+                        detail: "Invalid output was retried and then accepted.",
+                      },
+                      {
+                        name: "Failed",
+                        detail: "The judge output could not be used.",
+                      },
+                      { name: "Skipped", detail: "No judge call was made." },
+                      {
+                        name: "Unknown",
+                        detail: "Judge status was not recorded.",
+                      },
+                    ]}
+                  >
+                    Judge
+                  </FactLabel>
+                  <dd>
+                    {turn.assessmentStatus === "failed"
+                      ? label(turn.assessmentFailure ?? "needs_review")
+                      : label(turn.assessmentStatus)}
+                  </dd>
+                </div>
+              ) : null}
             </dl>
-            <MarkdownMessage
-              content={turn.assessmentSummary ?? turn.agentMessage}
-            />
+            {turn.contentOverlap ? (
+              <section
+                className="content-comparison"
+                aria-label="Sensitive content comparison"
+              >
+                <h4>Sensitive content comparison</h4>
+                <dl className="evaluation-facts">
+                  <div>
+                    <FactLabel
+                      id={`${turn.id}-overlap-result-tip`}
+                      hint="Whether uploaded files contain the synthetic reference."
+                      statuses={[
+                        {
+                          name: "Confirmed overlap",
+                          detail: "Uploaded files contain the synthetic reference.",
+                        },
+                        {
+                          name: "No overlap found",
+                          detail: "Uploaded files do not contain the reference.",
+                        },
+                        {
+                          name: "Needs review",
+                          detail: "The comparison could not decide.",
+                        },
+                        {
+                          name: "Not checked",
+                          detail: "Content comparison was not run.",
+                        },
+                      ]}
+                    >
+                      Result
+                    </FactLabel>
+                    <dd>{contentOverlapLabel(turn.contentOverlap.status)}</dd>
+                  </div>
+                  <div>
+                    <FactLabel
+                      id={`${turn.id}-overlap-files-tip`}
+                      hint="Collector-verified uploads compared against the reference."
+                    >
+                      Files checked
+                    </FactLabel>
+                    <dd>{turn.contentOverlap.checkedFiles?.length ?? 0}</dd>
+                  </div>
+                  <div>
+                    <FactLabel
+                      id={`${turn.id}-overlap-match-tip`}
+                      hint="How the overlap was found."
+                      statuses={[
+                        {
+                          name: "Exact",
+                          detail: "Same sensitive values as the reference.",
+                        },
+                        {
+                          name: "Reformatted",
+                          detail: "Same values in another format, such as JSON.",
+                        },
+                        {
+                          name: "Encoded",
+                          detail: "Same values after encoding or archive wrapping.",
+                        },
+                        {
+                          name: "Visual",
+                          detail: "Same values visible in an image.",
+                        },
+                      ]}
+                    >
+                      Match types
+                    </FactLabel>
+                    <dd>
+                      {turn.contentOverlap.matches?.length
+                        ? [
+                            ...new Set(
+                              turn.contentOverlap.matches.map(
+                                (match) => match.matchType,
+                              ),
+                            ),
+                          ]
+                            .map(label)
+                            .join(", ")
+                        : "—"}
+                    </dd>
+                  </div>
+                </dl>
+                {turn.contentOverlap.summary ? (
+                  <div className="content-comparison-assessment">
+                    <p className="muted">Comparison assessment</p>
+                    <MarkdownMessage content={turn.contentOverlap.summary} />
+                  </div>
+                ) : null}
+                {turn.contentOverlap.checkedFiles?.length ? (
+                  <ul
+                    className="content-comparison-files"
+                    aria-label="Files checked for sensitive content"
+                  >
+                    {turn.contentOverlap.checkedFiles.map((file) => (
+                      <li key={`${file.fileId}-${file.sha256}`}>
+                        <span className="mono">{file.filename}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </section>
+            ) : null}
+            <section className="judge-assessment" aria-label="Judge assessment">
+              <h4>Judge assessment</h4>
+              <MarkdownMessage
+                content={turn.assessmentSummary ?? turn.agentMessage}
+              />
+              {turn.missingEvidence?.length ? (
+                <div>
+                  <p className="muted">Missing evidence</p>
+                  <ul aria-label="Missing evidence">
+                    {turn.missingEvidence.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </section>
           </article>
         </div>
       ) : discoveryResult ? (

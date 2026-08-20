@@ -19,6 +19,11 @@
           "title": "Scientistmodel",
           "type": "string"
         },
+        "judgeModel": {
+          "default": "",
+          "title": "Judgemodel",
+          "type": "string"
+        },
         "maxTurns": {
           "default": 40,
           "minimum": 1,

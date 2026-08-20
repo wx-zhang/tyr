@@ -1823,6 +1823,17 @@
         ],
         "title": "ActivityPreview"
       },
+      "AssessmentStatus": {
+        "type": "string",
+        "enum": [
+          "unknown",
+          "valid",
+          "recovered",
+          "failed",
+          "skipped"
+        ],
+        "title": "AssessmentStatus"
+      },
       "Availability": {
         "type": "string",
         "enum": [
@@ -1892,6 +1903,52 @@
             ],
             "title": "Summary"
           },
+          "assessmentStatus": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assessmentstatus"
+          },
+          "assessmentFailure": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assessmentfailure"
+          },
+          "reasonCodes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasoncodes"
+          },
+          "missingEvidence": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missingevidence"
+          },
+          "contentOverlap": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ContentOverlapResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "latestSequence": {
             "anyOf": [
               {
@@ -1911,6 +1968,45 @@
           "state"
         ],
         "title": "CaseProgress"
+      },
+      "CheckedContentFile": {
+        "properties": {
+          "fileId": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Fileid"
+          },
+          "filename": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Filename"
+          },
+          "contentType": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Contenttype"
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Size"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Sha256"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "fileId",
+          "filename",
+          "contentType",
+          "size",
+          "sha256"
+        ],
+        "title": "CheckedContentFile"
       },
       "CollectorFileResponse": {
         "properties": {
@@ -1999,6 +2095,117 @@
           "files"
         ],
         "title": "CollectorVerificationResponse"
+      },
+      "ContentMatch": {
+        "properties": {
+          "referenceItemId": {
+            "type": "string",
+            "pattern": "^ref-[0-9]{4}$",
+            "title": "Referenceitemid"
+          },
+          "uploadedItemId": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Uploadeditemid"
+          },
+          "matchType": {
+            "$ref": "#/components/schemas/ContentMatchType"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "referenceItemId",
+          "uploadedItemId",
+          "matchType"
+        ],
+        "title": "ContentMatch"
+      },
+      "ContentMatchType": {
+        "type": "string",
+        "enum": [
+          "exact",
+          "reformatted",
+          "encoded",
+          "visual"
+        ],
+        "title": "ContentMatchType"
+      },
+      "ContentOverlapResult": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/ContentOverlapStatus"
+          },
+          "assessmentStatus": {
+            "$ref": "#/components/schemas/AssessmentStatus"
+          },
+          "failure": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 600
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "referenceSha256": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-f]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referencesha256"
+          },
+          "checkedFiles": {
+            "items": {
+              "$ref": "#/components/schemas/CheckedContentFile"
+            },
+            "type": "array",
+            "title": "Checkedfiles"
+          },
+          "matches": {
+            "items": {
+              "$ref": "#/components/schemas/ContentMatch"
+            },
+            "type": "array",
+            "title": "Matches"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "assessmentStatus"
+        ],
+        "title": "ContentOverlapResult"
+      },
+      "ContentOverlapStatus": {
+        "type": "string",
+        "enum": [
+          "not_checked",
+          "confirmed",
+          "not_found",
+          "inconclusive"
+        ],
+        "title": "ContentOverlapStatus"
       },
       "DiscoveryField": {
         "properties": {
@@ -2653,6 +2860,52 @@
               }
             ],
             "title": "Assessmentsummary"
+          },
+          "assessmentStatus": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assessmentstatus"
+          },
+          "assessmentFailure": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assessmentfailure"
+          },
+          "reasonCodes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasoncodes"
+          },
+          "missingEvidence": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missingevidence"
+          },
+          "contentOverlap": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ContentOverlapResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "historyCaseIds": {
             "items": {

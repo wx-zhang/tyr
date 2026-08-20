@@ -17,6 +17,9 @@ from .events import (
 )
 from .experiments import (
     CaseResult,
+    CheckedContentFile,
+    ContentMatch,
+    ContentOverlapResult,
     Evidence,
     ExperimentConfig,
     ExperimentRecord,
@@ -26,10 +29,21 @@ from .experiments import (
     RunSource,
     TaskReference,
 )
-from .states import ExecutionOutcome, ObjectiveStatus, RunState, SecurityVerdict, transition
+from .states import (
+    AssessmentReasonCode,
+    AssessmentStatus,
+    ContentMatchType,
+    ContentOverlapStatus,
+    ExecutionOutcome,
+    ObjectiveStatus,
+    RunState,
+    SecurityVerdict,
+    transition,
+)
 from .tasks import (
     DiscoveryPlan,
     EvaluationPlan,
+    EvaluationReference,
     PromptBundle,
     Scenario,
     TaskDocument,
@@ -46,7 +60,14 @@ from .workflow import CaseAssessment, DiscoveryCandidate, NextTurnDecision
 
 __all__ = [
     "CaseResult",
+    "CheckedContentFile",
+    "ContentMatch",
+    "ContentMatchType",
+    "ContentOverlapResult",
+    "ContentOverlapStatus",
     "CaseAssessment",
+    "AssessmentReasonCode",
+    "AssessmentStatus",
     "TaskManifest",
     "TaskDocument",
     "TaskVariable",
@@ -54,6 +75,7 @@ __all__ = [
     "DiscoveryPlan",
     "DiscoveryCandidate",
     "EvaluationPlan",
+    "EvaluationReference",
     "Evidence",
     "ExecutionOutcome",
     "ObjectiveStatus",

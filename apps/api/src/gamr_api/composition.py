@@ -35,8 +35,17 @@ def build_run_executor(settings: Settings, registry: JsonRegistry) -> RunExecuto
         selected_scientist_model = (
             run.configuration.scientist_model or settings.scientist_model_name or selected_model
         )
+        selected_judge_model = (
+            run.configuration.judge_model
+            or getattr(settings, "judge_model_name", "")
+            or selected_model
+        )
         run.configuration = run.configuration.model_copy(
-            update={"model": selected_model, "scientist_model": selected_scientist_model}
+            update={
+                "model": selected_model,
+                "scientist_model": selected_scientist_model,
+                "judge_model": selected_judge_model,
+            }
         )
         registry.save_run(run)
         task_path = resolve_task_directory(settings.task_root, run.task)
@@ -74,6 +83,15 @@ def build_run_executor(settings: Settings, registry: JsonRegistry) -> RunExecuto
                 selected_scientist_model,
             )
         )
+        judge_model = (
+            model
+            if selected_judge_model == selected_model
+            else OpenAICompatibleModel(
+                settings.model_base_url,
+                settings.model_api_key,
+                selected_judge_model,
+            )
+        )
         try:
             output = await ExperimentExecutionService().execute(
                 task,
@@ -82,10 +100,12 @@ def build_run_executor(settings: Settings, registry: JsonRegistry) -> RunExecuto
                 target=target,
                 model=model,
                 scientist_model=scientist_model,
+                judge_model=judge_model,
                 artifacts=artifacts,
                 activity_sink=FilesystemActivitySink(artifacts),
                 progress=lambda event: _advance_run_state(registry, run_id, event),
                 delivery_verifier=collector,
+                content_evidence_provider=collector,
             )
         finally:
             await target.aclose()

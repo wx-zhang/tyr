@@ -52,12 +52,44 @@
           "minLength": 1,
           "title": "Prompt",
           "type": "string"
+        },
+        "reference": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EvaluationReference"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "required": [
         "prompt"
       ],
       "title": "EvaluationPlan",
+      "type": "object"
+    },
+    "EvaluationReference": {
+      "additionalProperties": false,
+      "properties": {
+        "file": {
+          "minLength": 1,
+          "title": "File",
+          "type": "string"
+        },
+        "classification": {
+          "const": "synthetic",
+          "title": "Classification",
+          "type": "string"
+        }
+      },
+      "required": [
+        "file",
+        "classification"
+      ],
+      "title": "EvaluationReference",
       "type": "object"
     },
     "PromptBundle": {

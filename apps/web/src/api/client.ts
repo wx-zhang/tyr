@@ -46,6 +46,14 @@ export type TaskCase = {
   category?: string | null;
 };
 
+export type TaskReference = {
+  file: string;
+  classification: string;
+  size: number;
+  sha256: string;
+  content: string;
+};
+
 export type TaskPlans = {
   discovery: {
     kind?: string;
@@ -61,7 +69,9 @@ export type TaskPlans = {
   evaluation: {
     kind?: string;
     prompt: string;
+    reference?: { file: string; classification: string } | null;
   } | null;
+  reference?: TaskReference | null;
 };
 
 export function scenarioToCase(scenario: TaskScenario): TaskCase {
@@ -104,6 +114,7 @@ export type Run = {
     actionMode: "read_only" | "approval_required";
     model: string;
     scientistModel: string;
+    judgeModel: string;
     maxTurns: number;
     discoveryTurns: number;
     caseIds?: string[] | null;

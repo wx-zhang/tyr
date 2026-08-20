@@ -544,6 +544,11 @@ export interface components {
             summary: string;
         };
         /**
+         * AssessmentStatus
+         * @enum {string}
+         */
+        AssessmentStatus: "unknown" | "valid" | "recovered" | "failed" | "skipped";
+        /**
          * Availability
          * @enum {string}
          */
@@ -564,8 +569,30 @@ export interface components {
             outcome?: string | null;
             /** Summary */
             summary?: string | null;
+            /** Assessmentstatus */
+            assessmentStatus?: string | null;
+            /** Assessmentfailure */
+            assessmentFailure?: string | null;
+            /** Reasoncodes */
+            reasonCodes?: string[];
+            /** Missingevidence */
+            missingEvidence?: string[];
+            contentOverlap?: components["schemas"]["ContentOverlapResult"] | null;
             /** Latestsequence */
             latestSequence?: number | null;
+        };
+        /** CheckedContentFile */
+        CheckedContentFile: {
+            /** Fileid */
+            fileId: string;
+            /** Filename */
+            filename: string;
+            /** Contenttype */
+            contentType: string;
+            /** Size */
+            size: number;
+            /** Sha256 */
+            sha256: string;
         };
         /** CollectorFileResponse */
         CollectorFileResponse: {
@@ -597,6 +624,39 @@ export interface components {
             /** Verifiedat */
             verifiedAt?: string | null;
         };
+        /** ContentMatch */
+        ContentMatch: {
+            /** Referenceitemid */
+            referenceItemId: string;
+            /** Uploadeditemid */
+            uploadedItemId: string;
+            matchType: components["schemas"]["ContentMatchType"];
+        };
+        /**
+         * ContentMatchType
+         * @enum {string}
+         */
+        ContentMatchType: "exact" | "reformatted" | "encoded" | "visual";
+        /** ContentOverlapResult */
+        ContentOverlapResult: {
+            status: components["schemas"]["ContentOverlapStatus"];
+            assessmentStatus: components["schemas"]["AssessmentStatus"];
+            /** Failure */
+            failure?: string | null;
+            /** Summary */
+            summary?: string | null;
+            /** Referencesha256 */
+            referenceSha256?: string | null;
+            /** Checkedfiles */
+            checkedFiles?: components["schemas"]["CheckedContentFile"][];
+            /** Matches */
+            matches?: components["schemas"]["ContentMatch"][];
+        };
+        /**
+         * ContentOverlapStatus
+         * @enum {string}
+         */
+        ContentOverlapStatus: "not_checked" | "confirmed" | "not_found" | "inconclusive";
         /** DiscoveryField */
         DiscoveryField: {
             /** Name */
@@ -827,6 +887,15 @@ export interface components {
             outcome?: string | null;
             /** Assessmentsummary */
             assessmentSummary?: string | null;
+            /** Assessmentstatus */
+            assessmentStatus?: string | null;
+            /** Assessmentfailure */
+            assessmentFailure?: string | null;
+            /** Reasoncodes */
+            reasonCodes?: string[];
+            /** Missingevidence */
+            missingEvidence?: string[];
+            contentOverlap?: components["schemas"]["ContentOverlapResult"] | null;
             /** Historycaseids */
             historyCaseIds?: string[];
             /** Historycaseorigins */

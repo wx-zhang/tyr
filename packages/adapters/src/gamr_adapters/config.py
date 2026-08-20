@@ -34,7 +34,10 @@ class Settings(BaseSettings):
     model_api_key: str = Field(default="", validation_alias="OPENROUTER_API_KEY")
     model_name: str = Field(default="", validation_alias="TYR_LOOP_MODEL")
     scientist_model_name: str = Field(default="", validation_alias="TYR_LOOP_SCIENTIST_MODEL")
-    chat_model_name: str = Field(default="x-ai/grok-4.5", validation_alias="TYR_LOOP_CHAT_MODEL")
+    judge_model_name: str = Field(default="", validation_alias="TYR_LOOP_JUDGE_MODEL")
+    chat_model_name: str = Field(
+        default="x-ai/grok-4.5", validation_alias="TYR_LOOP_CHAT_MODEL"
+    )
     max_concurrent_runs: int = Field(
         default=3,
         ge=1,

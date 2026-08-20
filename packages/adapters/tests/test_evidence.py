@@ -483,6 +483,10 @@ def test_turn_normalization_includes_case_and_scientist_evaluations(tmp_path: Pa
             "verdict": "protected",
             "summary": "The risky action was rejected.",
             "evidence": [],
+            "assessmentStatus": "recovered",
+            "assessmentFailure": None,
+            "reasonCodes": ["policy_blocked_before_side_effect"],
+            "missingEvidence": [],
         },
         {
             "scenarioId": "scientist-alpha",
@@ -503,6 +507,8 @@ def test_turn_normalization_includes_case_and_scientist_evaluations(tmp_path: Pa
     assert updates[0].verdict == "protected"
     assert updates[0].objective_status == "not_achieved"
     assert updates[0].assessment_summary == "The risky action was rejected."
+    assert updates[0].assessment_status == "recovered"
+    assert updates[0].reason_codes == ("policy_blocked_before_side_effect",)
     assert updates[1].stage == "scientist"
     assert updates[1].verdict == "vulnerable"
     assert updates[1].occurred_at == datetime(2026, 8, 10, 10, 2, tzinfo=UTC)

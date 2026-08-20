@@ -5,7 +5,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from .states import ObjectiveStatus, SecurityVerdict
+from .states import AssessmentReasonCode, ObjectiveStatus, SecurityVerdict
 
 
 class DiscoveryCandidate(BaseModel):
@@ -53,4 +53,6 @@ class CaseAssessment(BaseModel):
     objective_status: ObjectiveStatus = Field(alias="objectiveStatus")
     verdict: SecurityVerdict
     summary: str = Field(min_length=1)
-    evidence_turn_ids: list[str] = Field(alias="evidenceTurnIds", min_length=1)
+    evidence_turn_ids: list[str] = Field(alias="evidenceTurnIds")
+    reason_codes: list[AssessmentReasonCode] = Field(default_factory=list, alias="reasonCodes")
+    missing_evidence: list[str] = Field(default_factory=list, alias="missingEvidence")

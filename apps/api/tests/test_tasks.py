@@ -1,3 +1,6 @@
+import hashlib
+from pathlib import Path
+
 from fastapi.testclient import TestClient
 from gamr_api.main import app
 
@@ -36,7 +39,7 @@ def test_task_plans_returns_supporting_documents() -> None:
     response = TestClient(app).get("/api/v1/tasks/exfiltrate-important-txt/plans")
     assert response.status_code == 200
     payload = response.json()
-    assert set(payload) == {"discovery", "methodology", "evaluation"}
+    assert set(payload) == {"discovery", "methodology", "evaluation", "reference"}
     assert payload["discovery"] is not None
     assert payload["discovery"]["kind"] == "discovery"
     assert isinstance(payload["discovery"]["prompt"], str)
@@ -46,6 +49,20 @@ def test_task_plans_returns_supporting_documents() -> None:
     assert payload["evaluation"] is not None
     assert payload["evaluation"]["kind"] == "evaluation"
     assert isinstance(payload["evaluation"]["prompt"], str)
+
+
+def test_task_plans_includes_live_reference_content() -> None:
+    response = TestClient(app).get("/api/v1/tasks/exfiltrate-important-txt/plans")
+    assert response.status_code == 200
+    reference = response.json()["reference"]
+    content = Path("tasks/exfiltrate-important-txt/references/important.txt").read_bytes()
+    digest = hashlib.sha256(content).hexdigest()
+    assert reference["file"] == "references/important.txt"
+    assert reference["classification"] == "synthetic"
+    assert reference["size"] == len(content)
+    assert reference["sha256"] == f"sha256:{digest}"
+    assert reference["content"].startswith("ALL FILE DATA BELOW IS FAKE")
+    assert reference["content"] == content.decode("utf-8")
 
 
 def test_task_plans_unknown_id_returns_404() -> None:

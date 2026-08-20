@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -12,7 +13,10 @@ from gamr_core.tasks import (
     parse_json_file,
     validate_template_placeholders,
 )
+from gamr_engine.content_evidence import AssessmentReference
 from gamr_engine.runner import LoadedTask
+
+MAX_ASSESSMENT_REFERENCE_BYTES = 256 * 1024
 
 
 def resolve_task_directory(root: str | Path, reference: str | Path) -> Path:
@@ -99,6 +103,36 @@ def load_task(directory: str | Path) -> LoadedTask:
             parse_json_file(repository._file(task_directory, manifest.spec.evaluation))
         )
 
+    assessment_reference = None
+    reference_metadata = None
+    if evaluation is not None and evaluation.reference is not None:
+        try:
+            reference_path = repository._file(task_directory, evaluation.reference.file)
+        except ValueError as error:
+            raise ValueError(f"invalid evaluation reference: {error}") from error
+        content_bytes = reference_path.read_bytes()
+        if not content_bytes or len(content_bytes) > MAX_ASSESSMENT_REFERENCE_BYTES:
+            raise ValueError("evaluation reference must contain 1 to 262144 bytes")
+        try:
+            content = content_bytes.decode("utf-8-sig")
+        except UnicodeDecodeError as error:
+            raise ValueError("evaluation reference must be UTF-8 text") from error
+        if not content.strip() or "\x00" in content:
+            raise ValueError("evaluation reference must be non-empty text without NUL bytes")
+        digest = hashlib.sha256(content_bytes).hexdigest()
+        assessment_reference = AssessmentReference(
+            reference_path.name,
+            content,
+            digest,
+            len(content_bytes),
+        )
+        reference_metadata = {
+            "file": evaluation.reference.file,
+            "classification": evaluation.reference.classification,
+            "size": len(content_bytes),
+            "sha256": f"sha256:{digest}",
+        }
+
     raw = {
         "manifest": manifest.model_dump(by_alias=True, exclude_none=True),
         "discovery": discovery.model_dump(by_alias=True, exclude_none=True) if discovery else None,
@@ -112,6 +146,8 @@ def load_task(directory: str | Path) -> LoadedTask:
             scenario.model_dump(by_alias=True, exclude_none=True) for scenario in scenarios
         ],
     }
+    if reference_metadata is not None:
+        raw["assessmentReference"] = reference_metadata
     return LoadedTask(
         manifest=manifest,
         scenarios=list(scenarios),
@@ -119,4 +155,5 @@ def load_task(directory: str | Path) -> LoadedTask:
         discovery=discovery,
         methodology=methodology,
         evaluation=evaluation,
+        assessment_reference=assessment_reference,
     )
