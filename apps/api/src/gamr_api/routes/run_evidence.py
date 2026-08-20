@@ -35,6 +35,7 @@ from gamr_core import (
 )
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from ..case_progress import case_state_after_activity
 from ..dependencies import (
     browser_safe_activity,
     browser_safe_evidence,
@@ -65,16 +66,6 @@ _ACTIVITY_STAGE = {
     "scientist": "scientist",
 }
 _COARSE_RUN_STATES = frozenset({"running", "waiting_for_approval"})
-_CASE_STATE = {
-    "case_started": "active",
-    "case_completed": "completed",
-    "completed": "completed",
-    "active": "active",
-    "running": "active",
-    "failed": "failed",
-    "blocked": "blocked",
-    "pending": "pending",
-}
 
 
 class ActivityItemResponse(BaseModel):
@@ -367,10 +358,6 @@ def _map_activity_stage(phase: str | None) -> str | None:
     return mapped if mapped in _LIFECYCLE_STAGES else None
 
 
-def _normalize_case_state(status: str) -> str:
-    return _CASE_STATE.get(status, status if status in _CASE_STATE.values() else "unknown")
-
-
 def _activity_case_state(activities: list[RunActivity]) -> dict[str, dict[str, object]]:
     cases: dict[str, dict[str, object]] = {}
     for activity in activities:
@@ -381,14 +368,14 @@ def _activity_case_state(activities: list[RunActivity]) -> dict[str, dict[str, o
             {
                 "caseId": activity.case_id,
                 "order": len(cases),
-                "state": "unknown",
+                "state": "pending",
                 "verdict": None,
                 "latestSequence": None,
             },
         )
         item.update(
             {
-                "state": _normalize_case_state(activity.status),
+                "state": case_state_after_activity(str(item["state"]), activity),
                 "latestSequence": activity.sequence,
             }
         )
@@ -554,7 +541,7 @@ def visualization(
             {
                 "caseId": str(case_id),
                 "order": order,
-                "state": "unknown",
+                "state": "pending",
                 "verdict": None,
                 "latestSequence": None,
             },
@@ -595,7 +582,7 @@ def visualization(
     current_case_ids = [
         str(item["caseId"])
         for item in cases.values()
-        if item["state"] in {"active", "blocked", "running"}
+        if item["state"] in {"active", "blocked", "running", "assessing"}
     ]
     execution_mode = (
         "scientist_only"

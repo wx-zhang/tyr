@@ -26,6 +26,7 @@ export function ExperimentDetailPage() {
   const actionMode = config?.actionMode ?? "read_only";
   const configuredCaseIds = config?.caseIds;
   const caseIds = configuredCaseIds ?? [];
+  const maxConcurrentCases = config?.maxConcurrentCases ?? 5;
   const scientistIterations = config?.scientistIterations ?? 0;
   const historyTestRuns = config?.historyTestRuns ?? 10;
   const historyScientistRuns = config?.historyScientistRuns ?? 5;
@@ -86,6 +87,10 @@ export function ExperimentDetailPage() {
                 <dd className="mono">
                   {caseIds.length > 0 ? caseIds.join(", ") : "Task defaults"}
                 </dd>
+              </div>
+              <div className="detail-row">
+                <dt>Max concurrent cases</dt>
+                <dd className="mono tabular">{maxConcurrentCases}</dd>
               </div>
               <div className="detail-row">
                 <dt>Number of new task research</dt>

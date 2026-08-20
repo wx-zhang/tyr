@@ -16,11 +16,22 @@ flowchart LR
     Bundles --> API
 ```
 
-`gamr-core` owns validated contracts. `gamr-engine` owns workflow and shared finalization.
-`gamr-adapters` owns provider and filesystem I/O. Apps compose these packages without duplicating
+`gamr-core` owns validated contracts (including `ExperimentConfig.max_concurrent_cases` bounded from 1 to 5). `gamr-engine` owns workflow and shared finalization with bounded concurrent base-case execution.
+`gamr-adapters` owns provider and filesystem I/O (including atomic per-case checkpoints under `checkpoints/cases/`). Apps compose these packages without duplicating
 experiment logic or invoking CLI subprocesses.
 
 One API process owns service scheduling. The default concurrency is three; additional runs wait
 FIFO. JSON is authoritative, while activity search and relationship views are derived in memory.
 The filesystem and scheduler boundaries stay narrow so a demonstrated future deployment need can
 replace either without changing the engine.
+
+The web run history groups persisted updates by phase and case without changing bundle order.
+Test-case activity is presented oldest to newest. Case rows expose aggregate completion and the
+precise pending, queued, running, assessing, or terminal lifecycle. Discovery and case-group
+completion follows lifecycle progress rather than the last nested activity status. Collapsed rows
+retain the latest meaningful summary; expanded timelines keep older completed entries compact and
+reveal the latest or current entry by default. Disclosure state is local presentation state and
+never mutates canonical run evidence. Individual cases enter collapsed in every lifecycle state;
+the case overview remains open and an operator's expansion survives incoming updates.
+Scientist-generated cases are removed from the base overview and owned only by their iteration;
+evaluation turns provide immediate result badges while the visualization snapshot catches up.

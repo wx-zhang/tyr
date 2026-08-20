@@ -40,18 +40,29 @@ function boundedCount(value: string): number {
   return Math.min(100, Math.max(0, Math.floor(parsed)));
 }
 
+function boundedConcurrency(value: string): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return 1;
+  return Math.min(5, Math.max(1, Math.floor(parsed)));
+}
+
 export function ExperimentPage() {
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [taskId, setTaskId] = useState("");
   const [selectedCaseIds, setSelectedCaseIds] = useState<string[]>([]);
   const [allowActions, setAllowActions] = useState(true);
+  const [maxConcurrentCasesInput, setMaxConcurrentCasesInput] = useState("1");
   const [scientistIterationsInput, setScientistIterationsInput] = useState("0");
   const [historyTestRunsInput, setHistoryTestRunsInput] = useState("10");
   const [historyScientistRunsInput, setHistoryScientistRunsInput] =
     useState("5");
   const isResearchMode = taskId === RESEARCH_NEW_TASK;
   const executeTestCases = Boolean(taskId) && !isResearchMode;
+  const maxConcurrentCases = useMemo(
+    () => boundedConcurrency(maxConcurrentCasesInput),
+    [maxConcurrentCasesInput],
+  );
   const scientistIterations = useMemo(() => {
     const parsed = Number(scientistIterationsInput);
     return Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)) : 0;
@@ -144,6 +155,7 @@ export function ExperimentPage() {
         task: effectiveTask,
         actionMode: allowActions ? "approval_required" : "read_only",
         caseIds: executeTestCases ? selectedCaseIds : [],
+        maxConcurrentCases,
         scientistIterations,
         historyTestRuns,
         historyScientistRuns,
@@ -269,6 +281,30 @@ export function ExperimentPage() {
               </span>
             </span>
           </label>
+
+          <div className="field-group">
+            <label htmlFor="max-concurrent-cases">Max concurrent cases</label>
+            <input
+              id="max-concurrent-cases"
+              name="maxConcurrentCases"
+              type="number"
+              min={1}
+              max={5}
+              step={1}
+              inputMode="numeric"
+              value={maxConcurrentCasesInput}
+              onChange={(event) => {
+                setMaxConcurrentCasesInput(event.target.value);
+              }}
+              onBlur={() => {
+                setMaxConcurrentCasesInput(String(maxConcurrentCases));
+              }}
+            />
+            <p className="field-help">
+              Number of base test cases to execute simultaneously (1 to 5,
+              default 1).
+            </p>
+          </div>
 
           <div className="field-group">
             <div className="field-label-row">

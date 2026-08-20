@@ -9,37 +9,21 @@ from collections.abc import Iterable
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from threading import RLock
-from typing import Any
+from typing import Any, cast
 
-from gamr_core import ExecutionOutcome, RunResult, RunState
+from gamr_core import RunResult
 
-_SECRET_KEY = re.compile(
-    r"(?:authorization|api[_-]?key|token|secret|password|cookie|idempotency)", re.I
-)
-_BEARER = re.compile(r"Bearer\s+[^\s,;]+", re.I)
-_REDACTED = "[REDACTED]"
+from .finalizer import finalize_result
+from .redaction import redact_payload
+
+__all__ = [
+    "FilesystemArtifactStore",
+    "MAX_INTERACTIVE_EVIDENCE_BYTES",
+    "finalize_result",
+    "redact_payload",
+]
+
 MAX_INTERACTIVE_EVIDENCE_BYTES = 64 * 1024
-
-
-def redact_payload(value: Any, secrets: Iterable[str] = ()) -> Any:
-    configured = tuple(secret for secret in secrets if secret)
-    if isinstance(value, dict):
-        return {
-            str(key): _REDACTED
-            if _SECRET_KEY.search(str(key))
-            else redact_payload(item, configured)
-            for key, item in value.items()
-        }
-    if isinstance(value, list):
-        return [redact_payload(item, configured) for item in value]
-    if isinstance(value, tuple):
-        return [redact_payload(item, configured) for item in value]
-    if isinstance(value, str):
-        redacted = _BEARER.sub("Bearer [REDACTED]", value)
-        for secret in configured:
-            redacted = redacted.replace(secret, _REDACTED)
-        return redacted
-    return value
 
 
 class FilesystemArtifactStore:
@@ -226,6 +210,44 @@ class FilesystemArtifactStore:
         self._atomic_json(path, redact_payload(payload, self.secrets))
         return str(path)
 
+    def write_case_checkpoint(self, run_id: str, case_id: str, payload: dict[str, Any]) -> str:
+        if "/" in case_id or "\\" in case_id or ".." in case_id:
+            raise ValueError("case checkpoint path escapes run root")
+        run_root = self._run_root(run_id)
+        safe_case = re.sub(r"[^A-Za-z0-9_-]", "-", case_id)[:128] or "case"
+        case_dir = (run_root / "checkpoints" / "cases").resolve()
+        path = (case_dir / f"{safe_case}.json").resolve()
+        if run_root not in path.parents or case_dir not in path.parents:
+            raise ValueError("case checkpoint path escapes run root")
+        case_dir.mkdir(parents=True, exist_ok=True)
+        self._atomic_json(path, redact_payload(payload, self.secrets))
+        return str(path)
+
+    def read_checkpoint(self, run_id: str) -> dict[str, Any]:
+        run_root = self._run_root(run_id, create=False)
+        path = run_root / "checkpoint.json"
+        if not path.is_file():
+            return {}
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as error:
+            raise ValueError("checkpoint is malformed JSON") from error
+        return cast(dict[str, Any], redact_payload(payload, self.secrets))
+
+    def read_case_checkpoint(self, run_id: str, case_id: str) -> dict[str, Any]:
+        run_root = self._run_root(run_id, create=False)
+        safe_case = re.sub(r"[^A-Za-z0-9_-]", "-", case_id)[:128] or "case"
+        path = (run_root / "checkpoints" / "cases" / f"{safe_case}.json").resolve()
+        if run_root not in path.parents:
+            raise ValueError("case checkpoint path escapes run root")
+        if not path.is_file():
+            return {}
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as error:
+            raise ValueError("case checkpoint is malformed JSON") from error
+        return cast(dict[str, Any], redact_payload(payload, self.secrets))
+
     def append_transcript(self, run_id: str, records: list[dict[str, Any]]) -> str:
         run_root = self._run_root(run_id)
         path = run_root / "transcript.jsonl"
@@ -238,88 +260,7 @@ class FilesystemArtifactStore:
         result: RunResult,
         task_snapshot: dict[str, object] | None = None,
     ) -> str:
-        run_root = self._run_root(run_id)
-        payload = result.model_dump(by_alias=True, exclude_none=True, mode="json")
-        payload["$schema"] = "../../../schemas/run-result.schema.json"
-        self._atomic_json(run_root / "result.json", redact_payload(payload, self.secrets))
-        run_path = run_root / "run.json"
-        terminal_state = self._terminal_run_state(result.outcome)
-        finished_at = (
-            result.finished_at.isoformat().replace("+00:00", "Z")
-            if result.finished_at is not None
-            else payload.get("finishedAt")
-        )
-        if not isinstance(finished_at, str) or not finished_at:
-            finished_at = payload.get("startedAt") or ""
-        if run_path.exists():
-            self._mark_run_document_terminal(
-                run_path,
-                terminal_state=terminal_state,
-                finished_at=str(finished_at),
-            )
-        else:
-            self._atomic_json(
-                run_path,
-                redact_payload({"runId": run_id, "status": result.outcome.value}, self.secrets),
-            )
-        self._atomic_json(
-            run_root / "task.snapshot.json",
-            redact_payload(task_snapshot or {"task": payload["task"]}, self.secrets),
-        )
-        self.write_checkpoint(run_id, {"runId": run_id, "status": result.outcome.value})
-        self.append_event(
-            run_id,
-            {"runId": run_id, "eventType": "run.completed", "status": result.outcome.value},
-        )
-        transcript_path = run_root / "transcript.jsonl"
-        if not transcript_path.exists():
-            self.append_transcript(
-                run_id,
-                [
-                    {"scenarioId": case.scenario_id, "summary": case.summary}
-                    for case in result.cases
-                ],
-            )
-        for case in result.cases:
-            for evidence in case.evidence:
-                evidence_path = (run_root / evidence.artifact).resolve()
-                if run_root not in evidence_path.parents:
-                    raise ValueError("evidence path escapes run root")
-                if not evidence_path.exists():
-                    evidence_path.parent.mkdir(parents=True, exist_ok=True)
-        return str(run_root / "result.json")
-
-    def _mark_run_document_terminal(
-        self,
-        run_path: Path,
-        *,
-        terminal_state: RunState,
-        finished_at: str,
-    ) -> None:
-        try:
-            document = json.loads(run_path.read_text(encoding="utf-8"))
-        except OSError, json.JSONDecodeError:
-            return
-        if not isinstance(document, dict):
-            return
-        if "state" in document or "schemaVersion" in document:
-            document["state"] = terminal_state.value
-            document["resultPath"] = document.get("resultPath") or "result.json"
-            document["updatedAt"] = finished_at
-            document["finishedAt"] = finished_at
-        else:
-            document["status"] = terminal_state.value
-        self._atomic_json(run_path, redact_payload(document, self.secrets))
-
-    @staticmethod
-    def _terminal_run_state(outcome: ExecutionOutcome) -> RunState:
-        if outcome is ExecutionOutcome.CANCELLED:
-            return RunState.CANCELLED
-        if outcome is ExecutionOutcome.INTERRUPTED:
-            return RunState.INTERRUPTED
-        if outcome in {ExecutionOutcome.FAILED, ExecutionOutcome.ERROR}:
-            return RunState.FAILED
-        return RunState.COMPLETED
+        return finalize_result(self, run_id, result, task_snapshot=task_snapshot)
 
     def _atomic_json(self, path: Path, payload: dict[str, Any]) -> None:
         with NamedTemporaryFile("w", encoding="utf-8", dir=path.parent, delete=False) as handle:

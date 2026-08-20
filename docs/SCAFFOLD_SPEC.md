@@ -45,6 +45,9 @@ Each CLI or service run owns one bundle:
 ├── run.json
 ├── task.snapshot.json
 ├── checkpoint.json
+├── checkpoints/
+│   └── cases/
+│       └── <safe-case-id>.json
 ├── activity.jsonl
 ├── events.jsonl
 ├── transcript.jsonl

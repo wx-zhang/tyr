@@ -85,10 +85,14 @@ def test_experiment_run_ctrl_c_cancels_run(monkeypatch: pytest.MonkeyPatch) -> N
             close()
         raise KeyboardInterrupt
 
+    store = FakeStore()
+
+    def fake_build(*_args: object) -> tuple[object, object, None, object, object, object]:
+        model = FakeModel()
+        return store, FakeTarget(), None, model, model, model
+
     monkeypatch.setattr(cli, "Settings", FakeSettings)
-    monkeypatch.setattr(cli, "FilesystemArtifactStore", FakeStore)
-    monkeypatch.setattr(cli, "TyrMcpClient", FakeTarget)
-    monkeypatch.setattr(cli, "OpenAICompatibleModel", FakeModel)
+    monkeypatch.setattr(cli, "build_experiment_execution", fake_build, raising=False)
     monkeypatch.setattr(cli, "load_task", fake_load)
     monkeypatch.setattr(asyncio, "run", raise_interrupt)
 
@@ -305,13 +309,17 @@ def test_experiment_run_prints_result_errors(monkeypatch: pytest.MonkeyPatch) ->
             result_path=".gamr/runs/run-err/result.json",
         )
 
+    def fake_build(*_args: object) -> tuple[object, object, None, object, object, object]:
+        model = FakeModel()
+        return FakeStore(), FakeTarget(), None, model, model, model
+
     monkeypatch.setattr(cli, "Settings", FakeSettings)
-    monkeypatch.setattr(cli, "FilesystemArtifactStore", FakeStore)
-    monkeypatch.setattr(cli, "TyrMcpClient", FakeTarget)
-    monkeypatch.setattr(cli, "OpenAICompatibleModel", FakeModel)
+    monkeypatch.setattr(cli, "build_experiment_execution", fake_build, raising=False)
     monkeypatch.setattr(cli, "load_task", fake_load)
     monkeypatch.setattr(ExperimentExecutionService, "execute", fake_execute)
-    monkeypatch.setattr(cli, "FilesystemActivitySink", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        cli, "FilesystemActivitySink", lambda *_a, **_k: None, raising=False
+    )
 
     result = CliRunner().invoke(cli.app, ["experiment", "run", "tasks/exfiltrate-important-txt"])
 
@@ -319,3 +327,104 @@ def test_experiment_run_prints_result_errors(monkeypatch: pytest.MonkeyPatch) ->
     rendered = output.getvalue()
     assert "scientist scenario 1 invalid" in rendered
     assert "run-err" in rendered
+
+
+def test_experiment_run_accepts_max_concurrent_cases_option(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured_config: list[object] = []
+
+    class FakeSettings:
+        tyr_mcp_token = "token"
+        tyr_mcp_url = "https://example.test/mcp"
+        model_api_key = "key"
+        model_name = "model"
+        scientist_model_name = ""
+        model_base_url = "https://example.test"
+        artifact_root = ".gamr"
+
+    class FakeStore:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            pass
+
+        def write_json(self, path: str, payload: dict[str, object]) -> None:
+            return None
+
+    class FakeTarget:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            pass
+
+        async def aclose(self) -> None:
+            return None
+
+    class FakeModel:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            pass
+
+    def fake_load(_directory: object) -> SimpleNamespace:
+        return SimpleNamespace(
+            scenarios=[],
+            manifest=SimpleNamespace(
+                metadata=SimpleNamespace(id="demo"),
+                spec=SimpleNamespace(defaults=SimpleNamespace(max_turns=4)),
+            ),
+        )
+
+    async def fake_execute(
+        _service: object, _dataset: object, config: object, **_kwargs: object
+    ) -> SimpleNamespace:
+        captured_config.append(config)
+        return SimpleNamespace(
+            result=SimpleNamespace(
+                run_id="run-concurrency",
+                outcome=ExecutionOutcome.COMPLETED,
+                errors=[],
+            ),
+            result_path=".gamr/runs/run-concurrency/result.json",
+        )
+
+    def fake_build(*_args: object) -> tuple[object, object, None, object, object, object]:
+        model = FakeModel()
+        return FakeStore(), FakeTarget(), None, model, model, model
+
+    monkeypatch.setattr(cli, "Settings", FakeSettings)
+    monkeypatch.setattr(cli, "build_experiment_execution", fake_build, raising=False)
+    monkeypatch.setattr(cli, "load_task", fake_load)
+    monkeypatch.setattr(ExperimentExecutionService, "execute", fake_execute)
+    monkeypatch.setattr(
+        cli, "FilesystemActivitySink", lambda *_a, **_k: None, raising=False
+    )
+
+    # Default is 5
+    result = CliRunner().invoke(cli.app, ["experiment", "run", "tasks/exfiltrate-important-txt"])
+    assert result.exit_code == 0
+    assert getattr(captured_config[-1], "max_concurrent_cases", None) == 5
+
+    # Valid values 1 through 5
+    for val in (1, 2, 3, 4, 5):
+        result = CliRunner().invoke(
+            cli.app,
+            [
+                "experiment",
+                "run",
+                "tasks/exfiltrate-important-txt",
+                "--max-concurrent-cases",
+                str(val),
+            ],
+        )
+        assert result.exit_code == 0
+        assert getattr(captured_config[-1], "max_concurrent_cases", None) == val
+
+    # Invalid values (<1 or >5) rejected
+    for invalid in (0, 6, -1):
+        result = CliRunner().invoke(
+            cli.app,
+            [
+                "experiment",
+                "run",
+                "tasks/exfiltrate-important-txt",
+                "--max-concurrent-cases",
+                str(invalid),
+            ],
+        )
+        assert result.exit_code != 0

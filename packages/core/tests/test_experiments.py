@@ -132,3 +132,34 @@ def test_content_overlap_status_and_matches_cannot_disagree(
                 "matches": matches,
             }
         )
+
+
+def test_max_concurrent_cases_defaults_to_five() -> None:
+    configuration = ExperimentConfig()
+    assert configuration.max_concurrent_cases == 5
+    dumped = configuration.model_dump(by_alias=True, mode="json")
+    assert dumped["maxConcurrentCases"] == 5
+
+
+@pytest.mark.parametrize("value", [1, 2, 3, 4, 5])
+def test_max_concurrent_cases_accepts_values_one_through_five(value: int) -> None:
+    configuration = ExperimentConfig(maxConcurrentCases=value)
+    assert configuration.max_concurrent_cases == value
+    dumped = configuration.model_dump(by_alias=True, mode="json")
+    assert dumped["maxConcurrentCases"] == value
+
+
+@pytest.mark.parametrize("value", [0, 6, -1, 10, "many", 3.5, None])
+def test_max_concurrent_cases_rejects_out_of_range_and_non_integer(value: object) -> None:
+    with pytest.raises(ValidationError):
+        ExperimentConfig(maxConcurrentCases=value)  # type: ignore[arg-type]
+
+
+def test_experiment_config_loads_without_max_concurrent_cases() -> None:
+    old_data = {
+        "actionMode": "read_only",
+        "model": "test-model",
+        "maxTurns": 40,
+    }
+    config = ExperimentConfig.model_validate(old_data)
+    assert config.max_concurrent_cases == 5

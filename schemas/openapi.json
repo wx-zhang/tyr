@@ -2399,6 +2399,13 @@
             "title": "Scientistiterations",
             "default": 0
           },
+          "maxConcurrentCases": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Maxconcurrentcases",
+            "default": 5
+          },
           "historyTestRuns": {
             "type": "integer",
             "maximum": 100.0,
@@ -2657,6 +2664,19 @@
               }
             ],
             "title": "Caseids"
+          },
+          "maxConcurrentCases": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 5.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maxconcurrentcases"
           },
           "scientistIterations": {
             "anyOf": [

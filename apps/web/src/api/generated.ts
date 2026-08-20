@@ -743,6 +743,11 @@ export interface components {
              */
             scientistIterations: number;
             /**
+             * Maxconcurrentcases
+             * @default 5
+             */
+            maxConcurrentCases: number;
+            /**
              * Historytestruns
              * @default 10
              */
@@ -834,6 +839,8 @@ export interface components {
         RunCreate: {
             /** Caseids */
             caseIds?: string[] | null;
+            /** Maxconcurrentcases */
+            maxConcurrentCases?: number | null;
             /** Scientistiterations */
             scientistIterations?: number | null;
             /** Historytestruns */

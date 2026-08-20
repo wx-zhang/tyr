@@ -28,12 +28,30 @@ The detail page renders that synthetic reference file when present. Routes:
 
 The run review screens consume API run, case, activity, and artifact endpoints;
 Tyr and model calls remain server-side.
-`features/runs/CollectorArtifacts.tsx` renders verified collector files as chronological
+New web experiment forms initialize max concurrent cases to 1; operators may raise it through 5.
+`features/runs/RunHistory.tsx`, `RunHistoryGroup.tsx`, and `RunHistoryCase.tsx` render
+grouped run history partitioned into discovery, test cases, scientist iterations, and other updates.
+`features/runs/runHistoryGroups.ts` performs the grouping, while `runHistoryTypes.ts` owns its
+shared presentation types and chronological sorting helpers.
+Test cases expose aggregate completion progress and summary-first rows. Their activity timelines
+read oldest to newest; older completed activity is compact, while the latest or current activity
+opens by default. Collapsed rows distinguish not started, queued, running, assessing, and terminal
+work; group completion follows lifecycle progress rather than a nested activity status.
+Every case row starts collapsed when entering the page; operator expansion persists across updates.
+Verdict-bearing case headers show lifecycle and vulnerability outcome as separate text badges.
+Evaluation updates supply the result badge until visualization catches up. Scientist-generated
+cases belong only to their iteration group and never contribute to base test-case progress.
+`features/runs/runHistoryPresentation.ts` derives redacted summaries, and
+`RunTurnCard.tsx` plus `RunTurnDetail.tsx` render the activity disclosure and bounded evidence.
+Evaluation details show judge status, sensitive content comparison, checked files, and missing evidence when the API supplies them.
+`features/runs/CollectorArtifacts.tsx` renders verified collector files as
 Updates entries with bounded text, Markdown, XML, and image previews plus run-scoped downloads,
 without receiving collector credentials.
 
-Run-evidence behavior tests are split across `RunEvidence.test.tsx`,
-`RelationshipGraph.test.tsx`, `RunBusyEvidence.test.tsx`, and
-`useRunEvents.test.ts`. Run `pnpm --dir apps/web test -- --run` for the complete
-deterministic web suite and regenerate `src/api/generated.ts` with
+Run-evidence behavior tests are split across `RunPage.test.tsx`,
+`RunPageScientist.test.tsx`, `RunPageUpdates.test.tsx`, `RunPageCancel.test.tsx`,
+`RunPageNetwork.test.tsx`, `RunPageSettings.test.tsx`, `RunHistory.test.tsx`,
+`RunHistoryInteraction.test.tsx`, `RunHistoryActivity.test.tsx`, and `useRunEvents.test.ts`. Run
+`pnpm --dir apps/web test -- --run` for the complete deterministic web suite and
+regenerate `src/api/generated.ts` with
 `pnpm --dir apps/web generate:api`.

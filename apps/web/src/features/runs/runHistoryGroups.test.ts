@@ -1,0 +1,306 @@
+import { describe, expect, it } from "vitest";
+import type {
+  CaseProgress,
+  CollectorArtifact,
+  RunTurn,
+} from "../../api/client";
+import { groupRunHistory } from "./runHistoryGroups";
+
+function makeTurn(
+  partial: Partial<RunTurn> & { id: string; sequence: number },
+): RunTurn {
+  const { id, sequence, ...rest } = partial;
+  return {
+    id,
+    sequence,
+    number: partial.number ?? 1,
+    stage: partial.stage ?? "case",
+    caseId: partial.caseId ?? null,
+    updateType: partial.updateType ?? "execution",
+    status: partial.status ?? "completed",
+    verdict: partial.verdict ?? null,
+    objectiveStatus: partial.objectiveStatus ?? null,
+    outcome: partial.outcome ?? null,
+    agentMessage: partial.agentMessage ?? "",
+    tyrMessage: partial.tyrMessage ?? null,
+    occurredAt: partial.occurredAt ?? "2026-08-08T10:00:00Z",
+    repliedAt: partial.repliedAt ?? "2026-08-08T10:00:01Z",
+    ...rest,
+  };
+}
+
+function makeCase(
+  partial: Partial<CaseProgress> & { id?: string; caseId?: string },
+): CaseProgress {
+  const caseId = partial.caseId ?? partial.id ?? "case-1";
+  return {
+    caseId,
+    order: partial.order ?? 1,
+    state: partial.state ?? "pending",
+    ...partial,
+  };
+}
+
+describe("groupRunHistory", () => {
+  it("uses lifecycle phase state instead of a completed intermediate discovery turn", () => {
+    const completedTurn = makeTurn({
+      id: "disc-intermediate",
+      sequence: 1,
+      stage: "discovery",
+      status: "completed",
+    });
+
+    const [activeDiscovery] = groupRunHistory({
+      turns: [completedTurn],
+      cases: [],
+      artifacts: [],
+      phases: [{ id: "discovering", label: "Discovering", state: "active" }],
+    });
+    const [completedDiscovery] = groupRunHistory({
+      turns: [completedTurn],
+      cases: [],
+      artifacts: [],
+      phases: [{ id: "discovering", label: "Discovering", state: "completed" }],
+    });
+
+    expect(activeDiscovery.isTerminal).toBe(false);
+    expect(activeDiscovery.state).toBe("active");
+    expect(completedDiscovery.isTerminal).toBe(true);
+    expect(completedDiscovery.state).toBe("completed");
+  });
+
+  it("buckets discovery turns by updateType or stage into discovery group", () => {
+    const discoveryTurn1 = makeTurn({
+      id: "disc-1",
+      sequence: 1,
+      stage: "discovery",
+      updateType: "execution",
+      caseId: null,
+    });
+    const discoveryTurn2 = makeTurn({
+      id: "disc-2",
+      sequence: 2,
+      stage: "case",
+      updateType: "discovery",
+      caseId: null,
+    });
+
+    const groups = groupRunHistory({
+      turns: [discoveryTurn1, discoveryTurn2],
+      cases: [],
+      artifacts: [],
+    });
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0].id).toBe("discovery");
+    expect(groups[0].label).toBe("Discovery");
+    expect(groups[0].cases).toHaveLength(0);
+    expect(groups[0].updates).toHaveLength(2);
+    expect(groups[0].updates.map((u) => u.sequence)).toEqual([1, 2]);
+  });
+
+  it("buckets scientist turns to their resolved iteration group", () => {
+    const sciGen1 = makeTurn({
+      id: "sci-gen-1",
+      sequence: 5,
+      number: 1,
+      stage: "scientist",
+      updateType: "scientist_generation",
+      caseId: null,
+    });
+    const sciTurn1 = makeTurn({
+      id: "sci-case-1",
+      sequence: 6,
+      number: 1,
+      stage: "scientist",
+      updateType: "execution",
+      caseId: "sci-case-alpha",
+      tyrMessage: "some tyr msg",
+    });
+
+    const groups = groupRunHistory({
+      turns: [sciGen1, sciTurn1],
+      cases: [
+        makeCase({ id: "base-case", order: 1, state: "completed" }),
+        makeCase({ id: "sci-case-alpha", order: 2, state: "active" }),
+      ],
+      artifacts: [],
+    });
+
+    const iterGroup = groups.find((g) => g.id === "iteration-1");
+    expect(iterGroup).toBeDefined();
+    expect(iterGroup!.label).toBe("Iteration 1");
+    expect(iterGroup!.updates).toHaveLength(1); // generation update
+    expect(iterGroup!.cases).toHaveLength(1); // case entry for sci-case-alpha
+    expect(iterGroup!.cases[0].caseId).toBe("sci-case-alpha");
+    expect(iterGroup!.cases[0].updates).toHaveLength(1);
+    const baseGroup = groups.find((group) => group.id === "cases");
+    expect(baseGroup!.cases.map((entry) => entry.caseId)).toEqual([
+      "base-case",
+    ]);
+    expect(baseGroup!.state).toBe("completed");
+  });
+
+  it("buckets remaining caseId turns to the base-case group", () => {
+    const caseTurn = makeTurn({
+      id: "turn-1",
+      sequence: 3,
+      stage: "case",
+      caseId: "case-alpha",
+    });
+
+    const groups = groupRunHistory({
+      turns: [caseTurn],
+      cases: [makeCase({ id: "case-alpha", order: 1 })],
+      artifacts: [],
+    });
+
+    const casesGroup = groups.find((g) => g.id === "cases");
+    expect(casesGroup).toBeDefined();
+    expect(casesGroup!.label).toBe("Test cases");
+    expect(casesGroup!.cases).toHaveLength(1);
+    expect(casesGroup!.cases[0].caseId).toBe("case-alpha");
+    expect(casesGroup!.cases[0].updates).toHaveLength(1);
+  });
+
+  it("buckets unknown-stage turns without caseId to a trailing 'Other updates' group", () => {
+    const unknownTurn = makeTurn({
+      id: "turn-unknown",
+      sequence: 10,
+      stage: "unknown",
+      caseId: null,
+    });
+
+    const groups = groupRunHistory({
+      turns: [unknownTurn],
+      cases: [],
+      artifacts: [],
+    });
+
+    const otherGroup = groups.find((g) => g.id === "other");
+    expect(otherGroup).toBeDefined();
+    expect(otherGroup!.label).toBe("Other updates");
+    expect(otherGroup!.updates).toHaveLength(1);
+  });
+
+  it("asserts case entries follow visualization.cases order including pending cases", () => {
+    const turnBeta = makeTurn({
+      id: "turn-beta",
+      sequence: 2,
+      stage: "case",
+      caseId: "case-beta",
+    });
+
+    const cases = [
+      makeCase({ id: "case-alpha", order: 1, state: "pending" }),
+      makeCase({ id: "case-beta", order: 2, state: "active" }),
+      makeCase({ id: "case-gamma", order: 3, state: "pending" }),
+    ];
+
+    const groups = groupRunHistory({
+      turns: [turnBeta],
+      cases,
+      artifacts: [],
+    });
+
+    const casesGroup = groups.find((g) => g.id === "cases");
+    expect(casesGroup).toBeDefined();
+    expect(casesGroup!.cases.map((c) => c.caseId)).toEqual([
+      "case-alpha",
+      "case-beta",
+      "case-gamma",
+    ]);
+    expect(casesGroup!.cases[0].updates).toHaveLength(0);
+    expect(casesGroup!.cases[1].updates).toHaveLength(1);
+    expect(casesGroup!.cases[2].updates).toHaveLength(0);
+  });
+
+  it("appends an entry instead of dropping when caseId is unrecognized", () => {
+    const unknownCaseTurn = makeTurn({
+      id: "turn-custom",
+      sequence: 4,
+      stage: "case",
+      caseId: "case-custom",
+    });
+
+    const cases = [makeCase({ id: "case-alpha", order: 1 })];
+
+    const groups = groupRunHistory({
+      turns: [unknownCaseTurn],
+      cases,
+      artifacts: [],
+    });
+
+    const casesGroup = groups.find((g) => g.id === "cases");
+    expect(casesGroup).toBeDefined();
+    expect(casesGroup!.cases.map((c) => c.caseId)).toEqual([
+      "case-alpha",
+      "case-custom",
+    ]);
+    expect(casesGroup!.cases[1].progress).toBeUndefined();
+    expect(casesGroup!.cases[1].updates).toHaveLength(1);
+  });
+
+  it("attaches collector artifacts by caseId", () => {
+    const artifact: CollectorArtifact = {
+      caseId: "case-alpha",
+      requirement: "file",
+      status: "verified",
+      requestIds: ["req-1"],
+      verifiedAt: "2026-08-08T10:05:00Z",
+      files: [],
+    };
+
+    const groups = groupRunHistory({
+      turns: [],
+      cases: [makeCase({ id: "case-alpha", order: 1 })],
+      artifacts: [artifact],
+    });
+
+    const casesGroup = groups.find((g) => g.id === "cases");
+    expect(casesGroup).toBeDefined();
+    expect(casesGroup!.cases[0].updates).toHaveLength(1);
+    expect(casesGroup!.cases[0].updates[0].kind).toBe("artifact");
+  });
+
+  it("orders updates within a case from oldest to newest", () => {
+    const turn1 = makeTurn({
+      id: "turn-1",
+      sequence: 1,
+      stage: "case",
+      caseId: "case-alpha",
+      occurredAt: "2026-08-08T10:00:00Z",
+    });
+    const turn2 = makeTurn({
+      id: "turn-2",
+      sequence: 3,
+      stage: "case",
+      caseId: "case-alpha",
+      occurredAt: "2026-08-08T10:02:00Z",
+    });
+    const artifact: CollectorArtifact = {
+      caseId: "case-alpha",
+      requirement: "file",
+      status: "verified",
+      requestIds: ["req-1"],
+      verifiedAt: "2026-08-08T10:01:00Z",
+      files: [],
+    };
+
+    const groups = groupRunHistory({
+      turns: [turn1, turn2],
+      cases: [makeCase({ id: "case-alpha", order: 1 })],
+      artifacts: [artifact],
+    });
+
+    const casesGroup = groups.find((g) => g.id === "cases");
+    expect(casesGroup).toBeDefined();
+    const caseAlpha = casesGroup!.cases[0];
+    expect(caseAlpha.updates).toHaveLength(3);
+    expect(caseAlpha.updates[0].kind).toBe("turn");
+    expect(caseAlpha.updates[0].sequence).toBe(1);
+    expect(caseAlpha.updates[1].kind).toBe("artifact");
+    expect(caseAlpha.updates[2].sequence).toBe(3);
+    expect(caseAlpha.updates[2].kind).toBe("turn");
+  });
+});

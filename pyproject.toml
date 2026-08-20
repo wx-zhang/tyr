@@ -55,7 +55,10 @@ extend-ignore = ["B008"]
 
 [tool.pytest.ini_options]
 testpaths = ["packages", "apps", "tests"]
-addopts = "-ra"
+addopts = "-ra -m 'not live_tyr'"
+markers = [
+  "live_tyr: Opt-in live Tyr integration tests against real or configured MCP target (deselected by default)",
+]
 asyncio_mode = "auto"
 
 [tool.mypy]

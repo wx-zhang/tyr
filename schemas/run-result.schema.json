@@ -365,6 +365,13 @@
           "minimum": 0,
           "title": "Historyscientistruns",
           "type": "integer"
+        },
+        "maxConcurrentCases": {
+          "default": 5,
+          "maximum": 5,
+          "minimum": 1,
+          "title": "Maxconcurrentcases",
+          "type": "integer"
         }
       },
       "title": "ExperimentConfig",

@@ -90,6 +90,15 @@ beforeEach(() => {
   installFetch();
 });
 
+it("shows stored max concurrent cases on the configuration snapshot", async () => {
+  renderPage();
+
+  const concurrencyLabel = await screen.findByText("Max concurrent cases");
+  const row = concurrencyLabel.closest(".detail-row");
+  expect(row).not.toBeNull();
+  expect(row).toHaveTextContent("5");
+});
+
 it("shows stored scientist iterations on the configuration snapshot", async () => {
   renderPage();
 

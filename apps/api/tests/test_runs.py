@@ -102,6 +102,58 @@ def test_retrying_a_run_keeps_its_name() -> None:
         app.dependency_overrides.clear()
 
 
+def test_create_experiment_and_run_override_max_concurrent_cases() -> None:
+    registry = InMemoryRegistry()
+    app.dependency_overrides[get_registry] = lambda: registry
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/api/v1/experiments",
+            json={"name": "default concurrency", "task": "exfiltrate-important-txt"},
+        )
+        assert response.status_code == 201
+        experiment_id = response.json()["id"]
+        assert response.json()["configuration"]["maxConcurrentCases"] == 5
+
+        response = client.post(
+            "/api/v1/experiments",
+            json={
+                "name": "custom concurrency",
+                "task": "exfiltrate-important-txt",
+                "maxConcurrentCases": 2,
+            },
+        )
+        assert response.status_code == 201
+        assert response.json()["configuration"]["maxConcurrentCases"] == 2
+
+        for invalid in (0, 6, -1, "many"):
+            response = client.post(
+                "/api/v1/experiments",
+                json={
+                    "name": "invalid concurrency",
+                    "task": "exfiltrate-important-txt",
+                    "maxConcurrentCases": invalid,
+                },
+            )
+            assert response.status_code == 422
+
+        response = client.post(
+            f"/api/v1/experiments/{experiment_id}/runs",
+            json={"maxConcurrentCases": 3},
+        )
+        assert response.status_code == 202
+        run_payload = client.get(f"/api/v1/runs/{response.json()['id']}").json()
+        assert run_payload["configuration"]["maxConcurrentCases"] == 3
+
+        response = client.post(
+            f"/api/v1/experiments/{experiment_id}/runs",
+            json={"maxConcurrentCases": 10},
+        )
+        assert response.status_code == 422
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_create_experiment_accepts_task_id_and_case_ids() -> None:
     registry = InMemoryRegistry()
     app.dependency_overrides[get_registry] = lambda: registry

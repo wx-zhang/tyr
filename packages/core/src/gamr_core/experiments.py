@@ -46,6 +46,7 @@ class ExperimentConfig(BaseModel):
     scientist_iterations: int = Field(default=0, alias="scientistIterations", ge=0)
     history_test_runs: int = Field(default=10, alias="historyTestRuns", ge=0, le=100)
     history_scientist_runs: int = Field(default=5, alias="historyScientistRuns", ge=0, le=100)
+    max_concurrent_cases: int = Field(default=5, alias="maxConcurrentCases", ge=1, le=5)
 
     @model_validator(mode="after")
     def require_execution_work(self) -> ExperimentConfig:
