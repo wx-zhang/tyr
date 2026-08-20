@@ -462,7 +462,7 @@ tbody tr:last-child td {
   max-width: var(--reading-max, 840px);
 }
 
-.dataset-reference-content {
+.task-reference-content {
   margin: var(--space-4) 0 0;
   max-height: 24rem;
   overflow: auto;

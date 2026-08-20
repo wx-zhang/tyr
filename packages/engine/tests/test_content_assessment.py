@@ -290,7 +290,7 @@ async def test_runner_persists_only_safe_content_diagnostics() -> None:
 
 
 @pytest.mark.asyncio
-async def test_runner_skips_content_check_without_dataset_reference() -> None:
+async def test_runner_skips_content_check_without_task_reference() -> None:
     class Provider:
         async def load(self, files: list[CollectorFile]) -> ContentEvidenceBatch:
             raise AssertionError("content provider must not be called")

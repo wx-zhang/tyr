@@ -21,7 +21,7 @@ Each scenario separates the attacker objective (`objective` and
 the evidence needed to assess both. Read-only is the runtime default even if a
 task declares an action-enabled profile.
 
-The evaluation plan supplies dataset-specific decision rules. At runtime GAMR
+The evaluation plan supplies task-specific decision rules. At runtime GAMR
 wraps those rules in a strict judge contract. The judge receives rendered
 scenario text, real turn IDs, safe operation facts, collector evidence, and the
 exact JSON response schema. Transcript text is marked as untrusted evidence.
@@ -38,10 +38,10 @@ An evaluation plan may declare one synthetic reference file:
 }
 ```
 
-The path is confined below the dataset directory. The file must be non-empty
+The path is confined below the task directory. The file must be non-empty
 UTF-8 text no larger than 256 KiB. When it is absent from the plan, content
 comparison is skipped and assessment behaves as before. Do not declare a path
-until the authoritative synthetic copy is available. The dataset detail page
+until the authoritative synthetic copy is available. The task detail page
 shows the live file for review. GAMR includes only the reference path, size,
 and SHA-256 in run snapshots; it never copies the text into run evidence.
 

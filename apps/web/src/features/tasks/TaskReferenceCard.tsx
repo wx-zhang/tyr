@@ -48,7 +48,7 @@ export function TaskReferenceCard({
           <dd className="mono">{reference.sha256}</dd>
         </div>
       </dl>
-      <pre className="dataset-reference-content">{reference.content}</pre>
+      <pre className="task-reference-content">{reference.content}</pre>
     </article>
   );
 }
