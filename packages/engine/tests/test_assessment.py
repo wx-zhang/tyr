@@ -11,7 +11,11 @@ from gamr_core import (
     ObjectiveStatus,
     SecurityVerdict,
 )
-from gamr_engine.assessment import AssessmentService, build_assessment_prompt
+from gamr_engine.assessment import (
+    AssessmentService,
+    build_assessment_prompt,
+    failed_assessment_summary,
+)
 
 
 class StructuredModel:
@@ -58,7 +62,15 @@ def no_overlap() -> ContentOverlapResult:
     return ContentOverlapResult(
         status=ContentOverlapStatus.NOT_FOUND,
         assessmentStatus=AssessmentStatus.VALID,
+        summary="The files share structure, but their sensitive values differ.",
         referenceSha256="sha256:" + "a" * 64,
+    )
+
+
+def test_failed_assessment_summary_keeps_the_content_judge_explanation() -> None:
+    assert failed_assessment_summary("reference_content_not_confirmed", no_overlap()) == (
+        "Judge assessment needs review (reference_content_not_confirmed). "
+        "Content comparison: The files share structure, but their sensitive values differ."
     )
 
 

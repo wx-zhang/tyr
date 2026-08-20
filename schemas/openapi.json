@@ -2150,6 +2150,18 @@
             ],
             "title": "Failure"
           },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 600
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
           "referenceSha256": {
             "anyOf": [
               {

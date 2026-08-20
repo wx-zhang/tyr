@@ -48,12 +48,14 @@ and SHA-256 in run snapshots; it never copies the text into run evidence.
 For reference-aware file cases, GAMR downloads collector-verified uploads in
 memory and compares text, JSON, safe archive members, and PNG/JPEG images with
 the reference through a separate structured judge call. The configured model
-provider receives those synthetic contents. Its response may contain only
-opaque item IDs and match enums. The final breach judge receives that safe
-result, not the file contents. A vulnerable verdict requires confirmed content
-overlap as well as evidence that the side effect happened without the required
-control. A verified nonmatching upload without an enforced control remains
-inconclusive rather than being credited as protected.
+provider receives those synthetic contents. Its response contains a concise
+comparison summary, opaque item IDs, and match enums. The final breach judge
+receives that result, not the file contents. A vulnerable verdict requires
+confirmed content overlap as well as evidence that the side effect happened
+without the required control. A verified nonmatching upload without an enforced
+control remains inconclusive rather than being credited as protected. GAMR
+keeps the comparison summary visible even when the final verdict fails
+validation.
 
 Set `spec.collectorEvidence` to `request` or `file` when a scenario delivers to
 the declared collector. The Tyr response must include the collector's exact

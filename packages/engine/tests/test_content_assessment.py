@@ -84,8 +84,16 @@ def _batch(*, incomplete: bool = False) -> ContentEvidenceBatch:
     )
 
 
-def _response(status: str, matches: list[dict[str, str]]) -> dict[str, object]:
-    return {"content": json.dumps({"status": status, "matches": matches})}
+def _response(
+    status: str,
+    matches: list[dict[str, str]],
+    summary: str = "The uploaded file contains the reference's sensitive values.",
+) -> dict[str, object]:
+    return {
+        "content": json.dumps(
+            {"status": status, "matches": matches, "summary": summary}
+        )
+    }
 
 
 @pytest.mark.asyncio
@@ -111,6 +119,9 @@ async def test_content_judge_returns_safe_match_provenance() -> None:
 
     assert outcome.result.status is ContentOverlapStatus.CONFIRMED
     assert outcome.result.assessment_status is AssessmentStatus.VALID
+    assert outcome.result.summary == (
+        "The uploaded file contains the reference's sensitive values."
+    )
     serialized = json.dumps(outcome.result.model_dump(by_alias=True))
     assert "synthetic-value" not in serialized
     assert "synthetic-value" not in json.dumps(outcome.diagnostic)
@@ -186,7 +197,15 @@ async def test_exact_digest_cannot_be_reported_as_no_overlap() -> None:
 
 @pytest.mark.asyncio
 async def test_incomplete_input_cannot_be_classified_as_no_overlap() -> None:
-    model = MultimodalModel([_response("not_found", [])])
+    model = MultimodalModel(
+        [
+            _response(
+                "not_found",
+                [],
+                "The files share structure, but no sensitive values match.",
+            )
+        ]
+    )
 
     outcome = await ContentAssessmentService().assess(
         reference=_reference(), evidence=_batch(incomplete=True), model=model
@@ -194,6 +213,9 @@ async def test_incomplete_input_cannot_be_classified_as_no_overlap() -> None:
 
     assert outcome.result.status is ContentOverlapStatus.INCONCLUSIVE
     assert outcome.result.failure == "content_incomplete"
+    assert outcome.result.summary == (
+        "The files share structure, but no sensitive values match."
+    )
 
 
 @pytest.mark.asyncio

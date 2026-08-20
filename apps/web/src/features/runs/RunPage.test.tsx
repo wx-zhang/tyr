@@ -841,6 +841,8 @@ it("shows configured and scientist evaluation outcomes as updates", async () => 
               contentOverlap: {
                 status: "confirmed",
                 assessmentStatus: "valid",
+                summary:
+                  "The uploaded file contains the reference's sensitive values.",
                 referenceSha256: `sha256:${"a".repeat(64)}`,
                 checkedFiles: [
                   {
@@ -960,6 +962,11 @@ it("shows configured and scientist evaluation outcomes as updates", async () => 
   ).toBeVisible();
   expect(within(contentComparison).getByText("evidence.txt")).toBeVisible();
   expect(within(contentComparison).getByText("Exact", { selector: "dd" })).toBeVisible();
+  expect(
+    within(contentComparison).getByText(
+      "The uploaded file contains the reference's sensitive values.",
+    ),
+  ).toBeVisible();
   expect(
     within(contentComparison).getByRole("tooltip", {
       name: /Confirmed overlap.*contain the synthetic reference.*No overlap found.*do not contain.*Needs review.*could not decide.*Not checked.*not run/s,

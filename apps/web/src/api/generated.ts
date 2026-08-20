@@ -643,6 +643,8 @@ export interface components {
             assessmentStatus: components["schemas"]["AssessmentStatus"];
             /** Failure */
             failure?: string | null;
+            /** Summary */
+            summary?: string | null;
             /** Referencesha256 */
             referenceSha256?: string | null;
             /** Checkedfiles */

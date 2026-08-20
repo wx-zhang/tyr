@@ -43,7 +43,12 @@ from gamr_core import (
 from gamr_core.identifiers import new_id
 from pydantic import ValidationError
 
-from .assessment import AssessmentOutcome, AssessmentService, build_assessment_prompt
+from .assessment import (
+    AssessmentOutcome,
+    AssessmentService,
+    build_assessment_prompt,
+    failed_assessment_summary,
+)
 from .collector_verification import (
     CollectorVerification,
     CollectorVerificationBatch,
@@ -1065,9 +1070,8 @@ class ExperimentRunner:
             assessment = CaseAssessment(
                 objectiveStatus=ObjectiveStatus.UNKNOWN,
                 verdict=SecurityVerdict.INCONCLUSIVE,
-                summary=(
-                    "Judge assessment needs review "
-                    f"({assessment_outcome.failure or 'skipped'})."
+                summary=failed_assessment_summary(
+                    assessment_outcome.failure, content_overlap
                 ),
                 evidenceTurnIds=turn_ids,
                 missingEvidence=["A valid structured judge assessment is unavailable."],

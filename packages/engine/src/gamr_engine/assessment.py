@@ -33,6 +33,15 @@ class AssessmentOutcome:
     diagnostic: dict[str, object]
 
 
+def failed_assessment_summary(
+    failure: str | None, content_overlap: ContentOverlapResult | None
+) -> str:
+    summary = f"Judge assessment needs review ({failure or 'skipped'})."
+    if content_overlap is not None and content_overlap.summary:
+        return f"{summary} Content comparison: {content_overlap.summary}"
+    return summary
+
+
 def build_assessment_prompt(
     *,
     evaluation_prompt: str,

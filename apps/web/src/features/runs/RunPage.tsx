@@ -1142,6 +1142,12 @@ function Turn({
                     </dd>
                   </div>
                 </dl>
+                {turn.contentOverlap.summary ? (
+                  <div className="content-comparison-assessment">
+                    <p className="muted">Comparison assessment</p>
+                    <MarkdownMessage content={turn.contentOverlap.summary} />
+                  </div>
+                ) : null}
                 {turn.contentOverlap.checkedFiles?.length ? (
                   <ul
                     className="content-comparison-files"
