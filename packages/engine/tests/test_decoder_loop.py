@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Sequence
+
 import pytest
 from gamr_core import DecodingFailureCode, DecodingStatus
 from gamr_engine.content_source import VerifiedContentSnapshot
@@ -12,8 +14,7 @@ from gamr_engine.ports.sandbox import (
     Sandbox,
     SandboxEntry,
     SandboxId,
-    SandboxInfrastructureError,
-    SandboxUnavailableError,
+    SandboxIsolation,
 )
 
 
@@ -41,7 +42,7 @@ class FakeChatModel(ChatModelGateway):
 class ScriptableSandbox(Sandbox):
     def __init__(
         self,
-        isolation: str = "contained",
+        isolation: SandboxIsolation = "contained",
         exec_results: list[ExecutionResult] | None = None,
         collect_results: list[list[SandboxEntry]] | None = None,
     ) -> None:
@@ -56,10 +57,10 @@ class ScriptableSandbox(Sandbox):
         self.collected_dirs: list[str] = []
 
     @property
-    def isolation(self) -> str:
+    def isolation(self) -> SandboxIsolation:
         return self._isolation
 
-    async def start(self, entries: list[SandboxEntry] = ()) -> SandboxId:
+    async def start(self, entries: Sequence[SandboxEntry] = ()) -> SandboxId:
         sid = SandboxId(f"sandbox-{len(self.started_ids) + 1}")
         self.started_ids.append(sid)
         return sid
@@ -84,7 +85,9 @@ class ScriptableSandbox(Sandbox):
         self.closed_ids.append(sandbox_id)
 
 
-def _sample_snapshot(snapshot_id: str = "upload-001", file_id: str = "file-1") -> VerifiedContentSnapshot:
+def _sample_snapshot(
+    snapshot_id: str = "upload-001", file_id: str = "file-1"
+) -> VerifiedContentSnapshot:
     return VerifiedContentSnapshot(
         snapshot_id=snapshot_id,
         source_file_id=file_id,
@@ -98,7 +101,10 @@ def _sample_snapshot(snapshot_id: str = "upload-001", file_id: str = "file-1") -
 
 @pytest.mark.asyncio
 async def test_successful_first_program_terminates_loop() -> None:
-    source_code = "import pathlib\npathlib.Path('/workspace/output/attempt-001/upload-001/out.txt').write_text('hello')\n"
+    source_code = (
+        "import pathlib\n"
+        "pathlib.Path('/workspace/output/attempt-001/upload-001/out.txt').write_text('hello')\n"
+    )
     model = FakeChatModel([
         {
             "message": {
@@ -207,14 +213,17 @@ async def test_correction_in_same_healthy_workspace() -> None:
     assert result.provenance.status == DecodingStatus.SUCCEEDED
     assert result.provenance.attempt_count == 2
     assert len(sandbox.started_ids) == 1  # Reused same healthy sandbox
-    assert sandbox.collected_dirs == ["/workspace/output/attempt-001", "/workspace/output/attempt-002"]
+    assert sandbox.collected_dirs == [
+        "/workspace/output/attempt-001",
+        "/workspace/output/attempt-002",
+    ]
     assert sandbox.closed_ids == ["sandbox-1"]
 
 
 @pytest.mark.asyncio
 async def test_exactly_three_calls_then_attempt_exhaustion() -> None:
     source = "print('fail')\n"
-    call_msg = {
+    call_msg: dict[str, object] = {
         "message": {
             "role": "assistant",
             "content": None,

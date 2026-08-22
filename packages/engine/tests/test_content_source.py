@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 import hashlib
-from typing import Protocol
 
 import pytest
 from gamr_engine.collector_verification import CollectorFile
 from gamr_engine.content_source import (
-    ContentSourceError,
     ContentSourceMismatchError,
     VerifiedContentSnapshot,
     VerifiedContentSource,

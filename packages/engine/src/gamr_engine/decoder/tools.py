@@ -7,7 +7,9 @@ EXECUTE_PYTHON_TOOL: dict[str, Any] = {
     "type": "function",
     "function": {
         "name": "execute_python",
-        "description": "Execute Python 3.14 code using the standard library in an isolated environment.",
+        "description": (
+            "Execute Python 3.14 code using the standard library in an isolated environment."
+        ),
         "parameters": {
             "type": "object",
             "properties": {

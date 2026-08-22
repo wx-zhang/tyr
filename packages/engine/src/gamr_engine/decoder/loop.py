@@ -19,7 +19,6 @@ from ..content_prepare import DerivedContentSnapshot, prepare_derived_content_ev
 from ..content_source import VerifiedContentSnapshot
 from ..ports.models import ChatModelGateway
 from ..ports.sandbox import (
-    ExecutionResult,
     Sandbox,
     SandboxClosedError,
     SandboxEntry,

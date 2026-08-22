@@ -1,7 +1,9 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { DecodingProvenance } from "./DecodingProvenance";
-import type { ContentOverlapResult } from "../../api/generated";
+import type { components } from "../../api/generated";
+
+type DecodingProvenanceData = components["schemas"]["DecodingProvenance"];
 
 describe("DecodingProvenance", () => {
   it("renders nothing when decoding provenance is omitted or undefined (legacy)", () => {

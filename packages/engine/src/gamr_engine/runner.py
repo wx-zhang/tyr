@@ -51,11 +51,11 @@ from .collector_verification import (
 )
 from .content_evidence import AssessmentReference, ContentEvidenceProvider
 from .judge_runtime import build_judge_runtime
-from .judges.contracts import JudgeRequest, JudgeRuntime
-from .ports.sandbox import Sandbox
+from .judges.contracts import JudgeRequest
 from .judges.registry import get_judge_pipeline
 from .ports.artifacts import ActivitySink, ArtifactStore
 from .ports.models import ModelGateway
+from .ports.sandbox import Sandbox
 from .ports.targets import TargetGateway
 
 _MAX_HISTORY_TRANSCRIPT_CHARS = 4000

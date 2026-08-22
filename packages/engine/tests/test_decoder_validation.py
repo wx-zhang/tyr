@@ -1,12 +1,20 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
+
 import pytest
 from gamr_core import DecodingFailureCode, DecodingStatus
 from gamr_engine.content_source import VerifiedContentSnapshot
 from gamr_engine.decoder.agent import DecoderAgent
 from gamr_engine.ports.models import ChatModelGateway
-from gamr_engine.ports.sandbox import Sandbox, SandboxEntry, SandboxId, ExecutionResult
+from gamr_engine.ports.sandbox import (
+    ExecutionResult,
+    Sandbox,
+    SandboxEntry,
+    SandboxId,
+    SandboxIsolation,
+)
 
 
 class FakeChatModel(ChatModelGateway):
@@ -33,16 +41,16 @@ class FakeChatModel(ChatModelGateway):
 
 
 class FakeSandbox(Sandbox):
-    def __init__(self, isolation: str = "contained") -> None:
-        self._isolation = isolation
+    def __init__(self, isolation: SandboxIsolation = "contained") -> None:
+        self._isolation: SandboxIsolation = isolation
         self.started_count = 0
         self.closed_count = 0
 
     @property
-    def isolation(self) -> str:
+    def isolation(self) -> SandboxIsolation:
         return self._isolation
 
-    async def start(self, entries: list[SandboxEntry] = ()) -> SandboxId:
+    async def start(self, entries: Sequence[SandboxEntry] = ()) -> SandboxId:
         self.started_count += 1
         return SandboxId("fake-sandbox-1")
 

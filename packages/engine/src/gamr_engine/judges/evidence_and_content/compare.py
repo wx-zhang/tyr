@@ -1,17 +1,10 @@
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from gamr_core import (
-    AssessmentStatus,
-    CheckedContentFile,
-    ContentOverlapResult,
-    ContentOverlapStatus,
-)
 from gamr_engine.collector_verification import CollectorFile
-from gamr_engine.content_assessment import ContentAssessmentOutcome, ContentAssessmentService
-from gamr_engine.content_evidence import ContentEvidenceBatch
+from gamr_engine.content_assessment import ContentAssessmentService
 from gamr_engine.content_pipeline import ContentAssessmentPipeline
 from gamr_engine.content_prepare import (
     DerivedContentSnapshot,
@@ -22,10 +15,13 @@ from gamr_engine.content_source import VerifiedContentSnapshot
 
 from ..contracts import JudgeRequest, JudgeRuntime
 
+if TYPE_CHECKING:
+    from .pipeline import PipelineState
+
 _UNSAFE_ID_CHAR = re.compile(r"[^A-Za-z0-9_.-]+")
 
 
-async def compare_reference_content(state: dict[str, Any]) -> dict[str, Any]:
+async def compare_reference_content(state: PipelineState) -> dict[str, Any]:
     request: JudgeRequest = state["request"]
     runtime: JudgeRuntime = state["runtime"]
     reference = request.assessment_reference
@@ -35,7 +31,7 @@ async def compare_reference_content(state: dict[str, Any]) -> dict[str, Any]:
 
     if state.get("content_overlap") is not None:
         content_overlap = state["content_overlap"]
-        if runtime.artifacts is not None:
+        if runtime.artifacts is not None and content_overlap is not None:
             safe_id = _UNSAFE_ID_CHAR.sub("-", runtime.case_id)[:128] or "case"
             runtime.artifacts.write_json(
                 f"runs/{runtime.run_id}/content-assessments/{safe_id}.json",
@@ -54,7 +50,10 @@ async def compare_reference_content(state: dict[str, Any]) -> dict[str, Any]:
     derived_snapshots: list[DerivedContentSnapshot] = state.get("derived_snapshots", [])
 
     if decoder_action == "decoded":
-        source_map = {s.snapshot_id: next((f for f in collector_files if f.file_id == s.source_file_id), None) for s in verified_snapshots}
+        source_map = {
+            s.snapshot_id: next((f for f in collector_files if f.file_id == s.source_file_id), None)
+            for s in verified_snapshots
+        }
         valid_source_map = {k: v for k, v in source_map.items() if v is not None}
         batch = prepare_derived_content_evidence(
             collector_files, valid_source_map, derived_snapshots

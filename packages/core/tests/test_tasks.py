@@ -502,9 +502,11 @@ def test_run_result_validation_fixtures_decoding_success_failure_and_legacy() ->
     validated_failure = RunResult.model_validate(failure_payload)
     assert validated_failure.cases[0].content_overlap is not None
     assert validated_failure.cases[0].content_overlap.decoding is not None
-    assert validated_failure.cases[0].content_overlap.decoding.status.value == "failed"
-    assert validated_failure.cases[0].content_overlap.decoding.failure_code.value == "attempt_exhaustion"
-    assert validated_failure.cases[0].content_overlap.decoding.limit_flags.timed_out is True
+    decoding = validated_failure.cases[0].content_overlap.decoding
+    assert decoding.status.value == "failed"
+    assert decoding.failure_code is not None
+    assert decoding.failure_code.value == "attempt_exhaustion"
+    assert decoding.limit_flags.timed_out is True
 
     legacy_payload = {
         "$schema": "../../../schemas/run-result.schema.json",

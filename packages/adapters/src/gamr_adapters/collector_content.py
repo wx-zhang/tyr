@@ -4,7 +4,12 @@ from collections.abc import Awaitable, Callable
 
 from gamr_engine.collector_verification import CollectorFile
 from gamr_engine.content_evidence import ContentEvidenceBatch
-from gamr_engine.content_prepare import MAX_FILES, MAX_IMAGE_BYTES, checked_content_file, prepare_content_evidence
+from gamr_engine.content_prepare import (
+    MAX_FILES,
+    MAX_IMAGE_BYTES,
+    checked_content_file,
+    prepare_content_evidence,
+)
 from gamr_engine.content_source import VerifiedContentSnapshot
 
 

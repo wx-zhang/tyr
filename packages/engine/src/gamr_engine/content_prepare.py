@@ -23,7 +23,10 @@ MAX_ARCHIVE_MEMBER_BYTES = 1024 * 1024
 MAX_ARCHIVE_BYTES = 4 * 1024 * 1024
 MAX_COMPRESSION_RATIO = 100
 _TEXT_SUFFIXES = {".csv", ".json", ".md", ".markdown", ".txt", ".xml"}
-_TEXT_TYPES = {"application/json", "application/xml", "text/csv", "text/markdown", "text/plain", "text/xml"}
+_TEXT_TYPES = {
+    "application/json", "application/xml", "text/csv",
+    "text/markdown", "text/plain", "text/xml",
+}
 
 
 @dataclass(frozen=True)
@@ -34,11 +37,8 @@ class DerivedContentSnapshot:
 
 def checked_content_file(file: CollectorFile) -> CheckedContentFile:
     return CheckedContentFile(
-        fileId=file.file_id,
-        filename=file.filename,
-        contentType=file.content_type,
-        size=file.size,
-        sha256=file.sha256,
+        fileId=file.file_id, filename=file.filename,
+        contentType=file.content_type, size=file.size, sha256=file.sha256,
     )
 
 
@@ -162,7 +162,8 @@ def _prepare_single_content(
 def _archive_items(
     file_id: str, filename: str, content: bytes, uploaded_item_id: str
 ) -> list[UploadedContentItem]:
-    members = _zip_members(content) if zipfile.is_zipfile(io.BytesIO(content)) else _tar_members(content)
+    is_zip = zipfile.is_zipfile(io.BytesIO(content))
+    members = _zip_members(content) if is_zip else _tar_members(content)
     if len(members) > MAX_ARCHIVE_MEMBERS:
         raise ValueError("too_many_archive_members")
     extracted_size = sum(len(value) for _, value in members)

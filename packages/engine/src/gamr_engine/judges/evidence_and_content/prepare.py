@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from gamr_core import (
     AssessmentStatus,
@@ -16,6 +16,9 @@ from gamr_engine.content_source import (
 )
 
 from ..contracts import JudgeRequest, JudgeRuntime
+
+if TYPE_CHECKING:
+    from .pipeline import PipelineState
 
 
 def extract_collector_files(
@@ -40,7 +43,7 @@ def extract_collector_files(
     return files, has_conflict
 
 
-async def prepare_verified_content(state: dict[str, Any]) -> dict[str, Any]:
+async def prepare_verified_content(state: PipelineState) -> dict[str, Any]:
     request: JudgeRequest = state["request"]
     runtime: JudgeRuntime = state["runtime"]
 

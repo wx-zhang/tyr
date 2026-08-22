@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from gamr_core import (
     AssessmentStatus,
@@ -8,15 +8,17 @@ from gamr_core import (
     ContentOverlapResult,
     ContentOverlapStatus,
 )
-from gamr_engine.content_prepare import DerivedContentSnapshot
 from gamr_engine.content_source import VerifiedContentSnapshot
 from gamr_engine.decoder.agent import DecoderAgent
 from gamr_engine.ports.models import ChatModelGateway
 
 from ..contracts import JudgeRequest, JudgeRuntime
 
+if TYPE_CHECKING:
+    from .pipeline import PipelineState
 
-async def decode_trajectory_content(state: dict[str, Any]) -> dict[str, Any]:
+
+async def decode_trajectory_content(state: PipelineState) -> dict[str, Any]:
     applicable = state.get("applicable", False)
     if not applicable:
         return {
@@ -82,7 +84,7 @@ async def decode_trajectory_content(state: dict[str, Any]) -> dict[str, Any]:
 
     chat_model: ChatModelGateway = judge_model  # type: ignore[assignment]
 
-    case_fields = {
+    case_fields: dict[str, object] = {
         "title": request.title,
         "objective": request.objective,
         "steps": request.steps,

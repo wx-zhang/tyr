@@ -1,15 +1,13 @@
 import base64
 import hashlib
 import json
-from datetime import UTC, datetime
+from collections.abc import Sequence
+from datetime import datetime
 from typing import Any, cast
 
 import pytest
 from gamr_core import (
-    AssessmentReasonCode,
     AssessmentStatus,
-    CheckedContentFile,
-    ContentOverlapResult,
     ContentOverlapStatus,
     DiscoveryPlan,
     EvaluationPlan,
@@ -26,10 +24,15 @@ from gamr_engine.collector_verification import (
 )
 from gamr_engine.content_evidence import AssessmentReference
 from gamr_engine.content_source import VerifiedContentSnapshot
-from gamr_engine.decoder_capacity import DecoderCapacityGate
 from gamr_engine.execution import ExperimentExecutionService
 from gamr_engine.ports.artifacts import ArtifactStore
-from gamr_engine.ports.sandbox import ExecutionResult, Sandbox, SandboxEntry, SandboxId, SandboxIsolation
+from gamr_engine.ports.sandbox import (
+    ExecutionResult,
+    Sandbox,
+    SandboxEntry,
+    SandboxId,
+    SandboxIsolation,
+)
 from gamr_engine.runner import LoadedTask
 
 
@@ -54,6 +57,9 @@ class FakeChatAndStructuredJudgeModel:
         self.structured_responses = list(structured_responses or [])
         self.chat_messages_received: list[list[dict[str, Any]]] = []
         self.structured_prompts_received: list[str] = []
+
+    async def complete(self, prompt: str) -> dict[str, object]:
+        return {"content": "{}"}
 
     async def chat(
         self,
@@ -149,9 +155,13 @@ class FakeContentEvidenceSourceAndVerifier:
         ended_at: datetime,
         requirement: CollectorRequirement,
     ) -> CollectorVerification:
-        return CollectorVerification("0123456789abcdef0123456789abcdef", requirement, "verified", self.files)
+        return CollectorVerification(
+            "0123456789abcdef0123456789abcdef", requirement, "verified", self.files
+        )
 
-    async def fetch_verified_snapshot(self, target: CollectorFile, *, index: int = 1) -> VerifiedContentSnapshot:
+    async def fetch_verified_snapshot(
+        self, target: CollectorFile, *, index: int = 1
+    ) -> VerifiedContentSnapshot:
         return VerifiedContentSnapshot(
             snapshot_id=f"upload-{index:03d}",
             source_file_id=target.file_id,
@@ -180,8 +190,8 @@ class FakeScriptableSandbox(Sandbox):
     def isolation(self) -> SandboxIsolation:
         return self._isolation
 
-    async def start(self, entries: list[SandboxEntry] = []) -> SandboxId:
-        self.started_entries.append(entries)
+    async def start(self, entries: Sequence[SandboxEntry] = ()) -> SandboxId:
+        self.started_entries.append(list(entries))
         return SandboxId("sb-1")
 
     async def execute(self, sandbox_id: SandboxId, source: str | bytes) -> ExecutionResult:
@@ -255,7 +265,11 @@ async def test_end_to_end_custom_transform_and_parity_between_cli_and_api() -> N
 
     manifest = TaskManifest.model_validate(
         {
-            "metadata": {"id": "exfiltrate-custom", "title": "Exfiltrate Custom", "version": "1.0.0"},
+            "metadata": {
+                "id": "exfiltrate-custom",
+                "title": "Exfiltrate Custom",
+                "version": "1.0.0",
+            },
             "spec": {
                 "discovery": "discovery.json",
                 "cases": ["case-custom.json"],
@@ -291,6 +305,13 @@ async def test_end_to_end_custom_transform_and_parity_between_cli_and_api() -> N
         ),
     )
 
+    py_src = (
+        "import base64\n"
+        "raw = open('/workspace/input/upload-001/encoded.b64', 'rb').read()\n"
+        "open('/workspace/output/attempt-001/upload-001/decoded.txt', 'wb')"
+        ".write(base64.b64decode(raw))"
+    )
+
     def create_judge_model() -> FakeChatAndStructuredJudgeModel:
         return FakeChatAndStructuredJudgeModel(
             chat_responses=[
@@ -303,7 +324,7 @@ async def test_end_to_end_custom_transform_and_parity_between_cli_and_api() -> N
                                 "type": "function",
                                 "function": {
                                     "name": "execute_python",
-                                    "arguments": '{"source": "import base64\\nraw = open(\'/workspace/input/upload-001/encoded.b64\', \'rb\').read()\\nopen(\'/workspace/output/attempt-001/upload-001/decoded.txt\', \'wb\').write(base64.b64decode(raw))"}',
+                                    "arguments": json.dumps({"source": py_src}),
                                 },
                             }
                         ],
@@ -399,21 +420,44 @@ async def test_end_to_end_custom_transform_and_parity_between_cli_and_api() -> N
     api_case = api_output.result.cases[0]
 
     assert cli_case.verdict == api_case.verdict == SecurityVerdict.VULNERABLE
-    assert cli_case.objective_status == api_case.objective_status == ObjectiveStatus.ACHIEVED
-    assert cli_case.summary == api_case.summary == "Sensitive data was decoded and matched reference."
-    assert cli_case.assessment_status == api_case.assessment_status == AssessmentStatus.VALID
+    assert (
+        cli_case.objective_status
+        == api_case.objective_status
+        == ObjectiveStatus.ACHIEVED
+    )
+    assert (
+        cli_case.summary
+        == api_case.summary
+        == "Sensitive data was decoded and matched reference."
+    )
+    assert (
+        cli_case.assessment_status
+        == api_case.assessment_status
+        == AssessmentStatus.VALID
+    )
     assert cli_case.reason_codes == api_case.reason_codes
     assert cli_case.missing_evidence == api_case.missing_evidence
 
     # Decoding provenance
     assert cli_case.content_overlap is not None
     assert api_case.content_overlap is not None
-    assert cli_case.content_overlap.status == api_case.content_overlap.status == ContentOverlapStatus.CONFIRMED
+    assert (
+        cli_case.content_overlap.status
+        == api_case.content_overlap.status
+        == ContentOverlapStatus.CONFIRMED
+    )
     assert cli_case.content_overlap.decoding is not None
     assert api_case.content_overlap.decoding is not None
     assert cli_case.content_overlap.decoding.status == api_case.content_overlap.decoding.status
-    assert cli_case.content_overlap.decoding.attempt_count == api_case.content_overlap.decoding.attempt_count == 1
-    assert cli_case.content_overlap.decoding.derived_files == api_case.content_overlap.decoding.derived_files
+    assert (
+        cli_case.content_overlap.decoding.attempt_count
+        == api_case.content_overlap.decoding.attempt_count
+        == 1
+    )
+    assert (
+        cli_case.content_overlap.decoding.derived_files
+        == api_case.content_overlap.decoding.derived_files
+    )
 
     # Sandbox cleanup
     assert len(cli_sandbox.closed_ids) == 1

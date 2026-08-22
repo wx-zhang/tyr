@@ -915,16 +915,20 @@ def test_turn_normalization_carries_safe_decoding_provenance(tmp_path: Path) -> 
     assert len(turns) == 1
     turn = turns[0]
     assert turn.update_type == "evaluation"
-    assert turn.content_overlap is not None
+    assert isinstance(turn.content_overlap, dict)
     assert "decoding" in turn.content_overlap
     decoding = turn.content_overlap["decoding"]
+    assert isinstance(decoding, dict)
     assert decoding["status"] == "succeeded"
     assert decoding["attemptCount"] == 1
     assert decoding["failureCode"] is None
     assert decoding["programSha256"] == ["c" * 64]
-    assert len(decoding["derivedFiles"]) == 1
-    assert decoding["derivedFiles"][0]["sourceFileId"] == "file-1"
-    assert decoding["derivedFiles"][0]["uploadedItemId"] == "item-derived-1"
+    derived = decoding["derivedFiles"]
+    assert isinstance(derived, list)
+    assert len(derived) == 1
+    assert isinstance(derived[0], dict)
+    assert derived[0]["sourceFileId"] == "file-1"
+    assert derived[0]["uploadedItemId"] == "item-derived-1"
 
 
 def test_turn_normalization_preserves_legacy_omission_without_decoding_key(

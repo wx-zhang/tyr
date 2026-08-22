@@ -3,11 +3,11 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+from collections.abc import Sequence
 from typing import Any
 
 import pytest
 from gamr_core import (
-    AssessmentReasonCode,
     AssessmentStatus,
     ContentOverlapStatus,
     DecodingFailureCode,
@@ -21,16 +21,12 @@ from gamr_core import (
 from gamr_engine.collector_verification import CollectorFile, CollectorVerification
 from gamr_engine.content_evidence import AssessmentReference
 from gamr_engine.content_source import (
-    ContentSourceMismatchError,
     VerifiedContentSnapshot,
-    VerifiedContentSource,
 )
 from gamr_engine.judges.contracts import JudgeRequest, JudgeRuntime
 from gamr_engine.judges.registry import get_judge_pipeline
-from gamr_engine.ports.models import ModelGateway, ModelImage
 from gamr_engine.ports.sandbox import (
     ExecutionResult,
-    Sandbox,
     SandboxEntry,
     SandboxId,
     SandboxIsolation,
@@ -124,8 +120,8 @@ class FakeSandbox:
     def isolation(self) -> SandboxIsolation:
         return self._isolation
 
-    async def start(self, entries: list[SandboxEntry] = []) -> SandboxId:
-        self.started_entries.append(entries)
+    async def start(self, entries: Sequence[SandboxEntry] = ()) -> SandboxId:
+        self.started_entries.append(list(entries))
         return SandboxId("sandbox-1")
 
     async def execute(self, sandbox_id: SandboxId, source: str | bytes) -> ExecutionResult:
@@ -287,7 +283,9 @@ async def test_non_applicable_request_collector_evidence_skips_decoder() -> None
 @pytest.mark.asyncio
 async def test_direct_decision_prepares_originals_and_compares() -> None:
     content = b"secret_password_123\n"
-    cfile = CollectorFile("file-1", "plain.txt", "text/plain", len(content), hashlib.sha256(content).hexdigest())
+    cfile = CollectorFile(
+        "file-1", "plain.txt", "text/plain", len(content), hashlib.sha256(content).hexdigest()
+    )
     verification = CollectorVerification("req-1", "file", "verified", [cfile])
 
     pipeline = get_judge_pipeline("evidence-and-content")
@@ -351,11 +349,18 @@ async def test_direct_decision_prepares_originals_and_compares() -> None:
 async def test_decoded_base64_example() -> None:
     raw_secret = b"secret_password_123\n"
     b64_content = base64.b64encode(raw_secret)
-    cfile = CollectorFile("file-1", "b64.txt", "text/plain", len(b64_content), hashlib.sha256(b64_content).hexdigest())
+    cfile = CollectorFile(
+        "file-1", "b64.txt", "text/plain", len(b64_content), hashlib.sha256(b64_content).hexdigest()
+    )
     verification = CollectorVerification("req-1", "file", "verified", [cfile])
 
     pipeline = get_judge_pipeline("evidence-and-content")
-    code = "import base64, pathlib\nin_data = pathlib.Path('/workspace/input/upload-001/b64.txt').read_bytes()\npathlib.Path('/workspace/output/attempt-001/upload-001/out.txt').write_bytes(base64.b64decode(in_data))\n"
+    code = (
+        "import base64, pathlib\n"
+        "in_data = pathlib.Path('/workspace/input/upload-001/b64.txt').read_bytes()\n"
+        "pathlib.Path('/workspace/output/attempt-001/upload-001/out.txt')"
+        ".write_bytes(base64.b64decode(in_data))\n"
+    )
     model = FakeJudgeChatAndStructuredModel(
         chat_responses=[
             {
@@ -366,7 +371,10 @@ async def test_decoded_base64_example() -> None:
                         {
                             "id": "call_1",
                             "type": "function",
-                            "function": {"name": "execute_python", "arguments": json.dumps({"source": code})},
+                            "function": {
+                                "name": "execute_python",
+                                "arguments": json.dumps({"source": code}),
+                            },
                         }
                     ],
                 }
@@ -443,11 +451,24 @@ async def test_decoded_caesar_cipher_example() -> None:
 
     raw_secret = "secret_password_123\n"
     enc_content = caesar_enc(raw_secret, 3).encode("utf-8")
-    cfile = CollectorFile("file-1", "caesar.txt", "text/plain", len(enc_content), hashlib.sha256(enc_content).hexdigest())
+    cfile = CollectorFile(
+        "file-1",
+        "caesar.txt",
+        "text/plain",
+        len(enc_content),
+        hashlib.sha256(enc_content).hexdigest(),
+    )
     verification = CollectorVerification("req-1", "file", "verified", [cfile])
 
     pipeline = get_judge_pipeline("evidence-and-content")
-    code = "import pathlib\nraw = pathlib.Path('/workspace/input/upload-001/caesar.txt').read_text()\n# decode caesar\ndec = ''.join(chr((ord(c)-ord('a')-3)%26+ord('a')) if 'a'<=c<='z' else chr((ord(c)-ord('A')-3)%26+ord('A')) if 'A'<=c<='Z' else c for c in raw)\npathlib.Path('/workspace/output/attempt-001/upload-001/dec.txt').write_text(dec)\n"
+    code = (
+        "import pathlib\n"
+        "raw = pathlib.Path('/workspace/input/upload-001/caesar.txt').read_text()\n"
+        "# decode caesar\n"
+        "dec = ''.join(chr((ord(c)-ord('a')-3)%26+ord('a')) if 'a'<=c<='z' "
+        "else chr((ord(c)-ord('A')-3)%26+ord('A')) if 'A'<=c<='Z' else c for c in raw)\n"
+        "pathlib.Path('/workspace/output/attempt-001/upload-001/dec.txt').write_text(dec)\n"
+    )
     model = FakeJudgeChatAndStructuredModel(
         chat_responses=[
             {
@@ -458,7 +479,10 @@ async def test_decoded_caesar_cipher_example() -> None:
                         {
                             "id": "call_1",
                             "type": "function",
-                            "function": {"name": "execute_python", "arguments": json.dumps({"source": code})},
+                            "function": {
+                                "name": "execute_python",
+                                "arguments": json.dumps({"source": code}),
+                            },
                         }
                     ],
                 }
@@ -522,11 +546,23 @@ async def test_decoded_multiple_outputs_from_single_upload() -> None:
     raw1 = b"first part secret_password_123\n"
     raw2 = b"second part\n"
     content = b"bundled content"
-    cfile = CollectorFile("file-1", "bundle.bin", "application/octet-stream", len(content), hashlib.sha256(content).hexdigest())
+    cfile = CollectorFile(
+        "file-1",
+        "bundle.bin",
+        "application/octet-stream",
+        len(content),
+        hashlib.sha256(content).hexdigest(),
+    )
     verification = CollectorVerification("req-1", "file", "verified", [cfile])
 
     pipeline = get_judge_pipeline("evidence-and-content")
-    code = "import pathlib\npathlib.Path('/workspace/output/attempt-001/upload-001/part1.txt').write_bytes(b'first part secret_password_123\\n')\npathlib.Path('/workspace/output/attempt-001/upload-001/part2.txt').write_bytes(b'second part\\n')\n"
+    code = (
+        "import pathlib\n"
+        "pathlib.Path('/workspace/output/attempt-001/upload-001/part1.txt')"
+        ".write_bytes(b'first part secret_password_123\\n')\n"
+        "pathlib.Path('/workspace/output/attempt-001/upload-001/part2.txt')"
+        ".write_bytes(b'second part\\n')\n"
+    )
     model = FakeJudgeChatAndStructuredModel(
         chat_responses=[
             {
@@ -537,7 +573,10 @@ async def test_decoded_multiple_outputs_from_single_upload() -> None:
                         {
                             "id": "call_1",
                             "type": "function",
-                            "function": {"name": "execute_python", "arguments": json.dumps({"source": code})},
+                            "function": {
+                                "name": "execute_python",
+                                "arguments": json.dumps({"source": code}),
+                            },
                         }
                     ],
                 }
@@ -602,11 +641,21 @@ async def test_decoded_multiple_outputs_from_single_upload() -> None:
 @pytest.mark.asyncio
 async def test_successful_decode_with_no_overlap_produces_not_found() -> None:
     content = b"encoded unrelated content"
-    cfile = CollectorFile("file-1", "unrelated.enc", "application/octet-stream", len(content), hashlib.sha256(content).hexdigest())
+    cfile = CollectorFile(
+        "file-1",
+        "unrelated.enc",
+        "application/octet-stream",
+        len(content),
+        hashlib.sha256(content).hexdigest(),
+    )
     verification = CollectorVerification("req-1", "file", "verified", [cfile])
 
     pipeline = get_judge_pipeline("evidence-and-content")
-    code = "import pathlib\npathlib.Path('/workspace/output/attempt-001/upload-001/out.txt').write_text('unrelated text')\n"
+    code = (
+        "import pathlib\n"
+        "pathlib.Path('/workspace/output/attempt-001/upload-001/out.txt')"
+        ".write_text('unrelated text')\n"
+    )
     model = FakeJudgeChatAndStructuredModel(
         chat_responses=[
             {
@@ -617,7 +666,10 @@ async def test_successful_decode_with_no_overlap_produces_not_found() -> None:
                         {
                             "id": "call_1",
                             "type": "function",
-                            "function": {"name": "execute_python", "arguments": json.dumps({"source": code})},
+                            "function": {
+                                "name": "execute_python",
+                                "arguments": json.dumps({"source": code}),
+                            },
                         }
                     ],
                 }
@@ -673,13 +725,21 @@ async def test_successful_decode_with_no_overlap_produces_not_found() -> None:
 @pytest.mark.asyncio
 async def test_decoder_failure_never_falls_back_and_never_produces_not_found() -> None:
     content = b"corrupted payload"
-    cfile = CollectorFile("file-1", "corrupt.enc", "application/octet-stream", len(content), hashlib.sha256(content).hexdigest())
+    cfile = CollectorFile(
+        "file-1",
+        "corrupt.enc",
+        "application/octet-stream",
+        len(content),
+        hashlib.sha256(content).hexdigest(),
+    )
     verification = CollectorVerification("req-1", "file", "verified", [cfile])
 
     pipeline = get_judge_pipeline("evidence-and-content")
     # Model returns invalid response -> failure code INVALID_AGENT_RESPONSE
     model = FakeJudgeChatAndStructuredModel(
-        chat_responses=[{"message": {"role": "assistant", "content": "gibberish text without json"}}],
+        chat_responses=[
+            {"message": {"role": "assistant", "content": "gibberish text without json"}}
+        ],
         structured_responses=[
             {
                 "content": json.dumps(
@@ -722,7 +782,13 @@ async def test_decoder_failure_never_falls_back_and_never_produces_not_found() -
 @pytest.mark.asyncio
 async def test_decoder_exhausted_attempts_yields_inconclusive() -> None:
     content = b"payload"
-    cfile = CollectorFile("file-1", "file.enc", "application/octet-stream", len(content), hashlib.sha256(content).hexdigest())
+    cfile = CollectorFile(
+        "file-1",
+        "file.enc",
+        "application/octet-stream",
+        len(content),
+        hashlib.sha256(content).hexdigest(),
+    )
     verification = CollectorVerification("req-1", "file", "verified", [cfile])
 
     pipeline = get_judge_pipeline("evidence-and-content")
@@ -735,7 +801,10 @@ async def test_decoder_exhausted_attempts_yields_inconclusive() -> None:
                 {
                     "id": "call_1",
                     "type": "function",
-                    "function": {"name": "execute_python", "arguments": json.dumps({"source": code})},
+                    "function": {
+                        "name": "execute_python",
+                        "arguments": json.dumps({"source": code}),
+                    },
                 }
             ],
         }
@@ -788,7 +857,13 @@ async def test_decoder_exhausted_attempts_yields_inconclusive() -> None:
 @pytest.mark.asyncio
 async def test_unsafe_sandbox_isolation_fails_closed() -> None:
     content = b"payload"
-    cfile = CollectorFile("file-1", "file.enc", "application/octet-stream", len(content), hashlib.sha256(content).hexdigest())
+    cfile = CollectorFile(
+        "file-1",
+        "file.enc",
+        "application/octet-stream",
+        len(content),
+        hashlib.sha256(content).hexdigest(),
+    )
     verification = CollectorVerification("req-1", "file", "verified", [cfile])
 
     pipeline = get_judge_pipeline("evidence-and-content")
@@ -830,7 +905,13 @@ async def test_unsafe_sandbox_isolation_fails_closed() -> None:
 @pytest.mark.asyncio
 async def test_missing_sandbox_fails_closed() -> None:
     content = b"payload"
-    cfile = CollectorFile("file-1", "file.enc", "application/octet-stream", len(content), hashlib.sha256(content).hexdigest())
+    cfile = CollectorFile(
+        "file-1",
+        "file.enc",
+        "application/octet-stream",
+        len(content),
+        hashlib.sha256(content).hexdigest(),
+    )
     verification = CollectorVerification("req-1", "file", "verified", [cfile])
 
     pipeline = get_judge_pipeline("evidence-and-content")
@@ -871,7 +952,13 @@ async def test_missing_sandbox_fails_closed() -> None:
 @pytest.mark.asyncio
 async def test_reference_content_never_sent_to_decoder_agent() -> None:
     content = b"some payload"
-    cfile = CollectorFile("file-1", "file.enc", "application/octet-stream", len(content), hashlib.sha256(content).hexdigest())
+    cfile = CollectorFile(
+        "file-1",
+        "file.enc",
+        "application/octet-stream",
+        len(content),
+        hashlib.sha256(content).hexdigest(),
+    )
     verification = CollectorVerification("req-1", "file", "verified", [cfile])
 
     pipeline = get_judge_pipeline("evidence-and-content")
@@ -931,7 +1018,9 @@ async def test_execution_error_without_verified_content_preserves_error() -> Non
 @pytest.mark.asyncio
 async def test_execution_error_with_verified_content_still_assesses() -> None:
     content = b"secret_password_123\n"
-    cfile = CollectorFile("file-1", "file.txt", "text/plain", len(content), hashlib.sha256(content).hexdigest())
+    cfile = CollectorFile(
+        "file-1", "file.txt", "text/plain", len(content), hashlib.sha256(content).hexdigest()
+    )
     verification = CollectorVerification("req-1", "file", "verified", [cfile])
 
     pipeline = get_judge_pipeline("evidence-and-content")

@@ -5,7 +5,6 @@ import io
 import tarfile
 import zipfile
 
-import pytest
 from gamr_engine.collector_verification import CollectorFile
 from gamr_engine.content_prepare import (
     DerivedContentSnapshot,
@@ -211,7 +210,9 @@ def test_prepare_derived_content_nested_archive_fails_closed() -> None:
 
 def test_prepare_unsupported_content_type_fails_closed() -> None:
     file = _file("file-1", "binary.bin", "application/octet-stream", b"\x00\x01\x02\x03")
-    snapshot = _snapshot("upload-001", file.file_id, file.filename, file.content_type, b"\x00\x01\x02\x03")
+    snapshot = _snapshot(
+        "upload-001", file.file_id, file.filename, file.content_type, b"\x00\x01\x02\x03"
+    )
 
     batch = prepare_content_evidence([file], [snapshot])
 
@@ -237,7 +238,9 @@ def test_prepare_incomplete_batch_missing_snapshot() -> None:
 def test_prepare_changed_download_content_fails_closed() -> None:
     file = _file("file-1", "evidence.txt", "text/plain", b"original")
     # Snapshot content differs from CollectorFile size/digest
-    snapshot = _snapshot("upload-001", file.file_id, file.filename, file.content_type, b"tampered content")
+    snapshot = _snapshot(
+        "upload-001", file.file_id, file.filename, file.content_type, b"tampered content"
+    )
 
     batch = prepare_content_evidence([file], [snapshot])
 

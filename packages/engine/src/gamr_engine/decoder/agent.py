@@ -2,9 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from gamr_core import DecodingProvenance
-
-from ..content_prepare import DerivedContentSnapshot
 from ..content_source import VerifiedContentSnapshot
 from ..ports.models import ChatModelGateway
 from ..ports.sandbox import Sandbox

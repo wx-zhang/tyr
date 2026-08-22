@@ -1,12 +1,19 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
+
 import pytest
-from gamr_core import DecodingFailureCode, DecodingStatus
 from gamr_engine.content_source import VerifiedContentSnapshot
 from gamr_engine.decoder.agent import DecoderAgent
 from gamr_engine.ports.models import ChatModelGateway
-from gamr_engine.ports.sandbox import ExecutionResult, Sandbox, SandboxEntry, SandboxId
+from gamr_engine.ports.sandbox import (
+    ExecutionResult,
+    Sandbox,
+    SandboxEntry,
+    SandboxId,
+    SandboxIsolation,
+)
 
 
 class SecrecyTrackingChatModel(ChatModelGateway):
@@ -35,7 +42,7 @@ class SecrecyTrackingChatModel(ChatModelGateway):
 class ScriptableSandbox(Sandbox):
     def __init__(
         self,
-        isolation: str = "contained",
+        isolation: SandboxIsolation = "contained",
         exec_results: list[ExecutionResult] | None = None,
         collect_results: list[list[SandboxEntry]] | None = None,
     ) -> None:
@@ -46,10 +53,10 @@ class ScriptableSandbox(Sandbox):
         self.collect_count = 0
 
     @property
-    def isolation(self) -> str:
+    def isolation(self) -> SandboxIsolation:
         return self._isolation
 
-    async def start(self, entries: list[SandboxEntry] = ()) -> SandboxId:
+    async def start(self, entries: Sequence[SandboxEntry] = ()) -> SandboxId:
         return SandboxId("sandbox-secret-internal-id-12345")
 
     async def execute(self, sandbox_id: SandboxId, source: str | bytes) -> ExecutionResult:
@@ -150,7 +157,8 @@ async def test_feedback_excludes_secrets_stdout_stderr_and_internals() -> None:
 
     await agent.run()
 
-    # Verify that in turn 2, the model messages sent NEVER contain the secret stdout, stderr, exception text, or sandbox id
+    # Verify that in turn 2, the model messages sent NEVER contain the secret
+    # stdout, stderr, exception text, or sandbox id
     assert len(model.history_records) >= 2
     second_call_messages = model.history_records[1]
     serialized = json.dumps(second_call_messages)
@@ -192,9 +200,10 @@ async def test_unavailable_import_maps_to_coarse_failure_without_installer() -> 
         {"message": {"role": "assistant", "content": '{"action":"direct"}'}},
     ])
 
+    err_msg = "ModuleNotFoundError: No module named 'custom_crypto_tool'"
     sandbox = ScriptableSandbox(
         exec_results=[
-            ExecutionResult(1, "", "ModuleNotFoundError: No module named 'custom_crypto_tool'", 0.1),
+            ExecutionResult(1, "", err_msg, 0.1),
         ],
         collect_results=[[]],
     )
@@ -215,4 +224,8 @@ async def test_unavailable_import_maps_to_coarse_failure_without_installer() -> 
     tools = model.tools_seen[0]
     assert tools is not None
     assert len(tools) == 1
-    assert tools[0]["function"]["name"] == "execute_python"
+    tool_0 = tools[0]
+    assert isinstance(tool_0, dict)
+    fn = tool_0.get("function")
+    assert isinstance(fn, dict)
+    assert fn.get("name") == "execute_python"

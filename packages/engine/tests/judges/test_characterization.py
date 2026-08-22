@@ -2,19 +2,16 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Sequence
 from typing import Any
 
 import pytest
 from gamr_core import (
     AssessmentReasonCode,
     AssessmentStatus,
-    CheckedContentFile,
     ContentOverlapStatus,
-    DecodingProvenance,
-    DecodingStatus,
     EvaluationPlan,
     EvaluationReference,
-    ObjectiveStatus,
     Scenario,
     SecurityVerdict,
 )
@@ -23,7 +20,13 @@ from gamr_engine.content_evidence import AssessmentReference
 from gamr_engine.content_source import VerifiedContentSnapshot, VerifiedContentSource
 from gamr_engine.judges.contracts import JudgeRequest, JudgeRuntime
 from gamr_engine.judges.registry import get_judge_pipeline
-from gamr_engine.ports.sandbox import ExecutionResult, Sandbox, SandboxEntry, SandboxId
+from gamr_engine.ports.sandbox import (
+    ExecutionResult,
+    Sandbox,
+    SandboxEntry,
+    SandboxId,
+    SandboxIsolation,
+)
 
 
 class TrackingJudgeModel:
@@ -102,11 +105,11 @@ class TrackingSandbox(Sandbox):
         self.closed_ids: list[SandboxId] = []
 
     @property
-    def isolation(self) -> str:
+    def isolation(self) -> SandboxIsolation:
         return "contained"
 
-    async def start(self, entries: list[SandboxEntry] = []) -> SandboxId:
-        self.started_entries.append(entries)
+    async def start(self, entries: Sequence[SandboxEntry] = ()) -> SandboxId:
+        self.started_entries.append(list(entries))
         return SandboxId("sandbox-1")
 
     async def execute(self, sandbox_id: SandboxId, source: str | bytes) -> ExecutionResult:
@@ -279,7 +282,7 @@ async def test_characterization_non_file_case_makes_no_decoder_call() -> None:
 
 
 @pytest.mark.asyncio
-async def test_characterization_existing_post_decoder_comparison_and_final_assessment_retained() -> None:
+async def test_characterization_existing_post_decoder_comparison_retained() -> None:
     pipeline = get_judge_pipeline("evidence-and-content")
     content = b"secret_password_123\n"
     digest = hashlib.sha256(content).hexdigest()
@@ -351,7 +354,9 @@ async def test_characterization_existing_post_decoder_comparison_and_final_asses
             prompt="Assess.",
             reference=EvaluationReference(file="references/secret.txt", classification="synthetic"),
         ),
-        assessment_reference=AssessmentReference("secret.txt", "secret_password_123\n", digest, len(content)),
+        assessment_reference=AssessmentReference(
+            "secret.txt", "secret_password_123\n", digest, len(content)
+        ),
         phase="base",
     )
     runtime = JudgeRuntime(

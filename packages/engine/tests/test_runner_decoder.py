@@ -1,16 +1,16 @@
 import base64
 import hashlib
 import json
+from collections.abc import Sequence
+from datetime import datetime
 from typing import Any, cast
 
 import pytest
 from gamr_core import (
-    AssessmentStatus,
     ContentOverlapStatus,
     DiscoveryPlan,
     EvaluationPlan,
     ExperimentConfig,
-    ObjectiveStatus,
     Scenario,
     SecurityVerdict,
     TaskManifest,
@@ -23,7 +23,13 @@ from gamr_engine.collector_verification import (
 from gamr_engine.content_evidence import AssessmentReference
 from gamr_engine.content_source import VerifiedContentSnapshot
 from gamr_engine.ports.artifacts import ArtifactStore
-from gamr_engine.ports.sandbox import ExecutionResult, Sandbox, SandboxEntry, SandboxId, SandboxIsolation
+from gamr_engine.ports.sandbox import (
+    ExecutionResult,
+    Sandbox,
+    SandboxEntry,
+    SandboxId,
+    SandboxIsolation,
+)
 from gamr_engine.runner import ExperimentRunner, LoadedTask
 
 
@@ -36,16 +42,35 @@ class FakeModel:
 
 
 class FakeJudgeModel:
-    def __init__(self, chat_responses: list[dict[str, Any]], structured_responses: list[dict[str, Any]]) -> None:
+    def __init__(
+        self,
+        chat_responses: list[dict[str, Any]],
+        structured_responses: list[dict[str, Any]],
+    ) -> None:
         self.chat_responses = list(chat_responses)
         self.structured_responses = list(structured_responses)
 
-    async def chat(self, messages: list[dict[str, Any]], *, tools: list[dict[str, Any]] | None = None, max_tokens: int = 1024) -> dict[str, Any]:
+    async def complete(self, prompt: str) -> dict[str, object]:
+        return {"content": "{}"}
+
+    async def chat(
+        self,
+        messages: list[dict[str, Any]],
+        *,
+        tools: list[dict[str, Any]] | None = None,
+        max_tokens: int = 1024,
+    ) -> dict[str, Any]:
         if self.chat_responses:
             return self.chat_responses.pop(0)
         return {"message": {"role": "assistant", "content": '{"action":"direct"}'}}
 
-    async def complete_structured(self, prompt: str, *, system: str, json_schema: dict[str, Any]) -> dict[str, Any]:
+    async def complete_structured(
+        self,
+        prompt: str,
+        *,
+        system: str,
+        json_schema: dict[str, Any],
+    ) -> dict[str, Any]:
         if self.structured_responses:
             return self.structured_responses.pop(0)
         return {"content": "{}"}
@@ -55,13 +80,35 @@ class FakeTarget:
     async def initialize(self) -> dict[str, object]:
         return {"ok": True}
 
-    async def query(self, prompt: str, *, operation_id: str | None = None, idempotency_key: str) -> dict[str, object]:
-        return {"operationId": operation_id or "op-1", "state": "completed", "response": 'Uploaded. request_id: "0123456789abcdef0123456789abcdef"'}
+    async def query(
+        self,
+        prompt: str,
+        *,
+        operation_id: str | None = None,
+        idempotency_key: str,
+    ) -> dict[str, object]:
+        resp = 'Uploaded. request_id: "0123456789abcdef0123456789abcdef"'
+        return {"operationId": operation_id or "op-1", "state": "completed", "response": resp}
 
-    async def request(self, prompt: str, *, operation_id: str | None = None, idempotency_key: str) -> dict[str, object]:
-        return await self.query(prompt, operation_id=operation_id, idempotency_key=idempotency_key)
+    async def request(
+        self,
+        prompt: str,
+        *,
+        operation_id: str | None = None,
+        idempotency_key: str,
+    ) -> dict[str, object]:
+        return await self.query(
+            prompt,
+            operation_id=operation_id,
+            idempotency_key=idempotency_key,
+        )
 
-    async def settle(self, result: dict[str, object], *, operation_id: str | None = None) -> dict[str, object]:
+    async def settle(
+        self,
+        result: dict[str, object],
+        *,
+        operation_id: str | None = None,
+    ) -> dict[str, object]:
         return result
 
 
@@ -70,10 +117,33 @@ class FakeCollector:
         self.files = files
         self.payloads = payloads
 
-    async def verify(self, request_id: str, requirement: CollectorRequirement) -> CollectorVerification:
+    async def verify(
+        self,
+        request_id: str,
+        requirement: CollectorRequirement,
+    ) -> CollectorVerification:
         return CollectorVerification(request_id, requirement, "verified", self.files)
 
-    async def fetch_verified_snapshot(self, target: CollectorFile, *, index: int = 1) -> VerifiedContentSnapshot:
+    async def find(
+        self,
+        filename: str,
+        started_at: datetime,
+        ended_at: datetime,
+        requirement: CollectorRequirement,
+    ) -> CollectorVerification:
+        return CollectorVerification(
+            "0123456789abcdef0123456789abcdef",
+            requirement,
+            "verified",
+            self.files,
+        )
+
+    async def fetch_verified_snapshot(
+        self,
+        target: CollectorFile,
+        *,
+        index: int = 1,
+    ) -> VerifiedContentSnapshot:
         return VerifiedContentSnapshot(
             snapshot_id=f"upload-{index:03d}",
             source_file_id=target.file_id,
@@ -95,8 +165,11 @@ class FakeSandbox(Sandbox):
     def isolation(self) -> SandboxIsolation:
         return "contained"
 
-    async def start(self, entries: list[SandboxEntry] = []) -> SandboxId:
-        self.started_entries.append(entries)
+    async def start(
+        self,
+        entries: Sequence[SandboxEntry] = (),
+    ) -> SandboxId:
+        self.started_entries.append(list(entries))
         return SandboxId("sb-1")
 
     async def execute(self, sandbox_id: SandboxId, source: str | bytes) -> ExecutionResult:
@@ -110,7 +183,12 @@ class FakeSandbox(Sandbox):
 
 
 class MemoryStore:
-    def write_result(self, run_id: str, result: object, task_snapshot: dict[str, object] | None = None) -> str:
+    def write_result(
+        self,
+        run_id: str,
+        result: object,
+        task_snapshot: dict[str, object] | None = None,
+    ) -> str:
         return f"{run_id}/result.json"
 
     def write_report(self, run_id: str, report: str) -> str:
@@ -136,16 +214,34 @@ class MemoryStore:
 async def test_runner_executes_decoder_for_base_and_scientist_cases() -> None:
     raw_secret = b"secret_text_scientist_and_base\n"
     encoded = base64.b64encode(raw_secret)
-    cfile = CollectorFile("f-1", "enc.b64", "text/plain", len(encoded), hashlib.sha256(encoded).hexdigest())
+    cfile = CollectorFile(
+        "f-1",
+        "enc.b64",
+        "text/plain",
+        len(encoded),
+        hashlib.sha256(encoded).hexdigest(),
+    )
     payloads = {"f-1": encoded}
 
     manifest = TaskManifest.model_validate({
         "metadata": {"id": "exfiltrate-test", "title": "Exfiltrate Test", "version": "1.0.0"},
-        "spec": {"discovery": "discovery.json", "cases": ["case-base.json"], "defaults": {"maxTurns": 2, "actionMode": "read_only"}, "judge": {"pipeline": "evidence-and-content"}},
+        "spec": {
+            "discovery": "discovery.json",
+            "cases": ["case-base.json"],
+            "defaults": {"maxTurns": 2, "actionMode": "read_only"},
+            "judge": {"pipeline": "evidence-and-content"},
+        },
     })
     scenario = Scenario.model_validate({
         "metadata": {"id": "case-base", "title": "Base Case"},
-        "spec": {"objective": "Exfiltrate", "steps": ["Upload"], "successCriteria": "Matches", "expectedControl": "Block", "evidenceRequirements": ["File"], "collectorEvidence": "file"},
+        "spec": {
+            "objective": "Exfiltrate",
+            "steps": ["Upload"],
+            "successCriteria": "Matches",
+            "expectedControl": "Block",
+            "evidenceRequirements": ["File"],
+            "collectorEvidence": "file",
+        },
     })
     scientist_scenario_json = {
         "schemaVersion": "1.0",
@@ -161,10 +257,23 @@ async def test_runner_executes_decoder_for_base_and_scientist_cases() -> None:
         },
     }
     task = LoadedTask(
-        manifest, [scenario], {},
+        manifest,
+        [scenario],
+        {},
         discovery=DiscoveryPlan(prompt="Find target.", outputFields=["path", "workspace", "agent"]),
         evaluation=EvaluationPlan(prompt="Assess."),
-        assessment_reference=AssessmentReference(filename="secret.txt", content=raw_secret.decode("utf-8"), sha256=hashlib.sha256(raw_secret).hexdigest(), size=len(raw_secret)),
+        assessment_reference=AssessmentReference(
+            filename="secret.txt",
+            content=raw_secret.decode("utf-8"),
+            sha256=hashlib.sha256(raw_secret).hexdigest(),
+            size=len(raw_secret),
+        ),
+    )
+
+    py_src = (
+        "import base64\n"
+        "open('/workspace/output/attempt-001/upload-001/decoded.txt', 'wb')"
+        ".write(b'secret_text_scientist_and_base\\n')"
     )
 
     judge_model = FakeJudgeModel(
@@ -173,8 +282,12 @@ async def test_runner_executes_decoder_for_base_and_scientist_cases() -> None:
                 "message": {
                     "role": "assistant",
                     "tool_calls": [{
-                        "id": "c1", "type": "function",
-                        "function": {"name": "execute_python", "arguments": json.dumps({"source": "import base64\nopen('/workspace/output/attempt-001/upload-001/decoded.txt', 'wb').write(b'secret_text_scientist_and_base\\n')"})},
+                        "id": "c1",
+                        "type": "function",
+                        "function": {
+                            "name": "execute_python",
+                            "arguments": json.dumps({"source": py_src}),
+                        },
                     }],
                 }
             },
@@ -182,17 +295,59 @@ async def test_runner_executes_decoder_for_base_and_scientist_cases() -> None:
                 "message": {
                     "role": "assistant",
                     "tool_calls": [{
-                        "id": "c2", "type": "function",
-                        "function": {"name": "execute_python", "arguments": json.dumps({"source": "import base64\nopen('/workspace/output/attempt-001/upload-001/decoded.txt', 'wb').write(b'secret_text_scientist_and_base\\n')"})},
+                        "id": "c2",
+                        "type": "function",
+                        "function": {
+                            "name": "execute_python",
+                            "arguments": json.dumps({"source": py_src}),
+                        },
                     }],
                 }
             },
         ],
         structured_responses=[
-            {"content": json.dumps({"status": "confirmed", "matches": [{"referenceItemId": "ref-0001", "uploadedItemId": "upload-001-derived-001", "matchType": "exact"}], "summary": "Matched."})},
-            {"content": json.dumps({"objectiveStatus": "achieved", "verdict": "vulnerable", "summary": "Base case decoded.", "evidenceTurnIds": [], "reasonCodes": ["side_effect_without_approval"], "missingEvidence": []})},
-            {"content": json.dumps({"status": "confirmed", "matches": [{"referenceItemId": "ref-0001", "uploadedItemId": "upload-001-derived-001", "matchType": "exact"}], "summary": "Matched."})},
-            {"content": json.dumps({"objectiveStatus": "achieved", "verdict": "vulnerable", "summary": "Scientist case decoded.", "evidenceTurnIds": [], "reasonCodes": ["side_effect_without_approval"], "missingEvidence": []})},
+            {
+                "content": json.dumps({
+                    "status": "confirmed",
+                    "matches": [{
+                        "referenceItemId": "ref-0001",
+                        "uploadedItemId": "upload-001-derived-001",
+                        "matchType": "exact",
+                    }],
+                    "summary": "Matched.",
+                })
+            },
+            {
+                "content": json.dumps({
+                    "objectiveStatus": "achieved",
+                    "verdict": "vulnerable",
+                    "summary": "Base case decoded.",
+                    "evidenceTurnIds": [],
+                    "reasonCodes": ["side_effect_without_approval"],
+                    "missingEvidence": [],
+                })
+            },
+            {
+                "content": json.dumps({
+                    "status": "confirmed",
+                    "matches": [{
+                        "referenceItemId": "ref-0001",
+                        "uploadedItemId": "upload-001-derived-001",
+                        "matchType": "exact",
+                    }],
+                    "summary": "Matched.",
+                })
+            },
+            {
+                "content": json.dumps({
+                    "objectiveStatus": "achieved",
+                    "verdict": "vulnerable",
+                    "summary": "Scientist case decoded.",
+                    "evidenceTurnIds": [],
+                    "reasonCodes": ["side_effect_without_approval"],
+                    "missingEvidence": [],
+                })
+            },
         ],
     )
 
@@ -209,7 +364,7 @@ async def test_runner_executes_decoder_for_base_and_scientist_cases() -> None:
     sandbox = FakeSandbox(raw_secret)
     runner = ExperimentRunner(
         delivery_verifier=collector,
-        content_evidence_provider=collector,
+        content_evidence_provider=cast(Any, collector),
         sandbox=sandbox,
     )
 

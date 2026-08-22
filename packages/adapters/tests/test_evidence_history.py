@@ -179,7 +179,8 @@ def test_malformed_decoding_history_normalizes_safely(tmp_path: Path) -> None:
     (bundle / "run.json").write_text(
         json.dumps({"runId": "run-malformed", "status": "completed"}), encoding="utf-8"
     )
-    # result.json with malformed decoding provenance (e.g. bad program sha256 or mismatched attempts)
+    # result.json with malformed decoding provenance
+    # (e.g. bad program sha256 or mismatched attempts)
     (bundle / "result.json").write_text(
         json.dumps(
             {

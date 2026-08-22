@@ -10,6 +10,7 @@ from gamr_adapters.collector import (
     CollectorError,
     CollectorUnavailableError,
 )
+from gamr_engine.collector_verification import CollectorFile
 
 LOGIN = """
 <form method="post"><input type="hidden" name="_csrf_token" value="csrf-1"></form>
