@@ -24,7 +24,8 @@ is read from the task tree and is not a run artifact.
 `routes/experiments.py` queues validated read-only configurations, `routes/runs.py`
 serves redacted run review and SSE events, `routes/run_evidence.py` serves
 filtered activity and observed relationship projections, and
-`routes/collector_artifacts.py` serves run-confined remote-backed previews and downloads. `dependencies.py`
+`routes/collector_artifacts.py` serves run-confined remote-backed previews and downloads. `composition.py`
+wires the shared execution service with global decoder capacity gating (`GAMR_MAX_CONCURRENT_DECODERS`). `dependencies.py`
 owns run-scoped evidence authorization and browser allowlists, and `registry.py`
 is the JSON-backed filesystem registry. `case_progress.py` reduces case and finding
 activities into stable lifecycle states. `execution.py` owns the bounded in-process queue.

@@ -29,6 +29,17 @@ that executes scenarios. If it is unset, evaluation uses `TYR_LOOP_MODEL`.
 Tasks configure judge execution via `spec.judge.pipeline` in `task.json` (defaulting to
 `evidence-and-content`).
 
+The `evidence-and-content` judge automatically performs trajectory decoding analysis on
+applicable reference-aware file cases. When verified uploads require transformation or
+decoding (e.g. archives, custom encoding, or formatted text), GAMR reuses the configured
+judge model to drive a focused decoder agent. The agent executes Python code inside an isolated
+standard-library Docker sandbox, making up to three attempts within a single healthy sandbox
+session. The pipeline fails closed on decoding or sandbox failures (yielding an inconclusive
+verdict rather than false negatives). Sensitive synthetic references, credentials, stdout/stderr,
+and generated scripts are strictly excluded from decoder context and persisted artifacts; only
+safe provenance metadata is recorded. Concurrent sandbox executions are governed by
+`GAMR_MAX_CONCURRENT_DECODERS` (defaulting to 2).
+
 Evaluation plans may associate one synthetic UTF-8 reference file with a task. For
 collector-verified file cases, GAMR compares uploaded text, JSON, safe archives, and PNG/JPEG
 images with that reference before the breach judge runs. Raw contents are sent only to the
@@ -83,8 +94,8 @@ Other chat options: `--prompt "<text>"` to send an initial message, `--model` to
 
 ## Developer Python sandbox
 
-The sandbox is an engine capability for future judge workflows. Existing tasks, runs, APIs, and
-the web UI do not invoke it. `GAMR_SANDBOX_BACKEND` defaults to `docker`; build the fixed image and
+The sandbox provides ephemeral, isolated standard-library Python execution for trajectory
+decoding and developer testing. `GAMR_SANDBOX_BACKEND` defaults to `docker`; build the fixed image and
 exercise the shared lifecycle with controlled code:
 
 ```bash

@@ -50,8 +50,19 @@ until the authoritative synthetic copy is available. The task detail page
 shows the live file for review. GAMR includes only the reference path, size,
 and SHA-256 in run snapshots; it never copies the text into run evidence.
 
-For reference-aware file cases, GAMR downloads collector-verified uploads in
-memory and compares text, JSON, safe archive members, and PNG/JPEG images with
+For reference-aware file cases, GAMR automatically analyzes trajectory context
+and collector-verified uploads using the configured judge model. When uploads
+require extraction or transformation (such as encoded payloads, nested
+archives, or formatted data), a focused trajectory decoder agent can execute
+Python in a secure standard-library Docker sandbox. The decoder agent may make
+up to three execution attempts within one healthy sandbox instance. If decoding
+encounters an unrecoverable failure or attempt exhaustion, the pipeline fails
+closed: it yields an inconclusive content verdict rather than falling back to
+raw comparison or assuming protection. Sensitive synthetic reference content,
+credentials, stdout/stderr, and generated code payloads are excluded from
+decoder prompts, tool contexts, and persisted evidence; only safe structured
+provenance (such as program digests and output metadata) is retained. GAMR
+compares prepared text, JSON, safe archive members, and PNG/JPEG images with
 the reference through a separate structured judge call. The configured model
 provider receives those synthetic contents. Its response contains a concise
 comparison summary, opaque item IDs, and match enums. The final breach judge

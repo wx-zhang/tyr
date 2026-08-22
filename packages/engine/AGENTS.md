@@ -35,7 +35,7 @@ Cases waiting for bounded capacity emit `case.queued`; `case.started` is emitted
 
 ### Judge pipeline conventions
 
-Predefined judges use LangGraph StateGraph with stable node names (`compare_content`, `handle_execution_failure`, `assess_evidence`, `finalize_result`). They run without checkpointers or persistent stores.
+Predefined judges use LangGraph StateGraph with stable node names (`prepare_verified_content`, `decode_trajectory_content`, `compare_reference_content`, `preserve_execution_failure`, `assess_evidence`, `finalize_judgment`). They run without checkpointers or persistent stores. Trajectory decoding reuses the judge model with a standard-library Docker sandbox across up to three attempts per case, fails closed on errors, and is capacity-governed via `DecoderCapacityGate`. Sensitive references and credentials are strictly excluded from decoder execution.
 
 To add a predefined judge pipeline:
 1. Add the pipeline identifier literal in `gamr_core.tasks` (`JudgePipelineId`).

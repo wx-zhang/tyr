@@ -11,7 +11,7 @@ No FastAPI, Typer, filesystem, network, terminal, or vendor SDK imports. Model w
 ## Source map
 
 `tasks.py` owns task documents and template binding; `experiments.py`
-owns run/result contracts; `events.py` owns normalized run activities,
+owns run/result contracts (including decoding provenance models); `events.py` owns normalized run activities,
 participants, evidence, and transient evidence queries; `workflow.py` owns
 discovery candidates, turn decisions, and structured assessments; `states.py`
 owns transitions.

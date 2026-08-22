@@ -46,11 +46,18 @@ uv run pytest -m sandbox_docker
 ```
 
 The default `docker` sandbox backend is not probed during settings composition. Build its fixed
-Python 3.14 image before using `sandbox-run`; Docker resources carry `com.tyr.gamr.sandbox=true`
-labels for orphan diagnosis. Remove only labeled resources owned by the current GAMR process after
-an unexpected exit. The Docker backend has no restart policy and never adopts resources from a
-previous process.
+Python 3.14 image before using `sandbox-run` or running reference-aware decoding cases; Docker
+resources carry `com.tyr.gamr.sandbox=true` labels for orphan diagnosis. Trajectory decoding
+invokes the sandbox under process-wide capacity control (`GAMR_MAX_CONCURRENT_DECODERS`, defaulting to 2).
+The sandbox runs Python 3.14 with only the standard library, read-only `/input`, ephemeral `/workspace`,
+no network access, and strict limits (64 KiB code, 256 files, 64 MiB attachments, 10s execution, 1 MiB output).
+The decoder reuses one healthy sandbox instance across up to three tool calls per case. If decoding fails,
+the pipeline fails closed to inconclusive. Sensitive reference data, credentials, and raw code/outputs
+are strictly excluded from context and artifacts. Remove only labeled resources owned by the current
+GAMR process after an unexpected exit. The Docker backend has no restart policy and never adopts resources
+from a previous process.
 
 Use `GAMR_SANDBOX_BACKEND=host-unsafe` only for local controlled snippets. It is not containment:
 the child runs with the current user's host permissions. Use `disabled` to keep unrelated GAMR
-commands usable on a machine where sandbox execution is not wanted.
+commands usable on a machine where sandbox execution is not wanted. Decoder workflows in the engine
+require contained sandbox isolation and fail safely if sandbox execution is disabled or unsafe.

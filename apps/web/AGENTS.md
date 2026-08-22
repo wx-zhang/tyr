@@ -45,6 +45,7 @@ cases belong only to their iteration group and never contribute to base test-cas
 `features/runs/runHistoryPresentation.ts` derives redacted summaries, and
 `RunTurnCard.tsx` plus `RunTurnDetail.tsx` render the activity disclosure and bounded evidence.
 Evaluation details show judge status, sensitive content comparison, checked files, and missing evidence when the API supplies them.
+`features/runs/DecodingProvenance.tsx` renders structured trajectory decoding provenance (status, attempt counts, program hashes, derived files) without exposing source code or secrets.
 `features/runs/CollectorArtifacts.tsx` renders verified collector files as
 Updates entries with bounded text, Markdown, XML, and image previews plus run-scoped downloads,
 without receiving collector credentials.
@@ -52,7 +53,7 @@ without receiving collector credentials.
 Run-evidence behavior tests are split across `RunPage.test.tsx`,
 `RunPageScientist.test.tsx`, `RunPageUpdates.test.tsx`, `RunPageCancel.test.tsx`,
 `RunPageNetwork.test.tsx`, `RunPageSettings.test.tsx`, `RunHistory.test.tsx`,
-`RunHistoryInteraction.test.tsx`, `RunHistoryActivity.test.tsx`, and `useRunEvents.test.ts`. Run
+`RunHistoryInteraction.test.tsx`, `RunHistoryActivity.test.tsx`, `DecodingProvenance.test.tsx`, and `useRunEvents.test.ts`. Run
 `pnpm --dir apps/web test -- --run` for the complete deterministic web suite and
 regenerate `src/api/generated.ts` with
 `pnpm --dir apps/web generate:api`.

@@ -21,6 +21,7 @@ bounded retries, and digest-verified file, snapshot, and retained request-body d
 via the shared engine preparation service without writing an artifact copy;
 `collector_html.py` parses the admin HTML without retaining credentials or headers.
 `artifacts/query.py` owns bounded in-memory activity and relationship projections derived from bundles.
+`config.py` loads and validates configuration settings including `GAMR_MAX_CONCURRENT_DECODERS`.
 `sandbox/` owns attachment snapshots, output collection (`collect_output.py`),
 the disabled and explicitly unsafe host backends, the fixed Docker CLI backend,
 its Python 3.14 image, and bounded process support.
