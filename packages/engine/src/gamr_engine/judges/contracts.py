@@ -15,8 +15,10 @@ from gamr_core import (
     SecurityVerdict,
 )
 from gamr_engine.content_evidence import AssessmentReference, ContentEvidenceProvider
+from gamr_engine.content_source import VerifiedContentSource
 from gamr_engine.ports.artifacts import ArtifactStore
 from gamr_engine.ports.models import ModelGateway
+from gamr_engine.ports.sandbox import Sandbox
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,6 +42,8 @@ class JudgeRequest:
 class JudgeRuntime:
     judge_model: ModelGateway
     content_evidence_provider: ContentEvidenceProvider | None = None
+    verified_content_source: VerifiedContentSource | None = None
+    sandbox: Sandbox | None = None
     artifacts: ArtifactStore | None = None
     activity_sink: Callable[[str, dict[str, Any]], None] | None = None
     run_id: str = ""
