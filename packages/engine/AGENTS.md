@@ -17,6 +17,8 @@ the synthetic-reference overlap judge, `content_pipeline.py` coordinates
 verified collector content, `content_source.py` owns the verified content-source contract and snapshots,
 `content_prepare.py` owns shared preparation of original and derived content evidence,
 `decoder_capacity.py` owns the process-wide decoder-sandbox capacity gate, and
+`capacity_sandbox.py` owns decoder capacity sandbox wrapping,
+`judge_runtime.py` owns judge runtime construction helpers,
 `decoder/` owns trajectory decoding agent, prompt rendering, feedback mapping, and execution loop,
 and `content_evidence.py` owns the in-memory contracts,
 `judges/` contains predefined judge pipelines orchestrated with LangGraph StateGraph:

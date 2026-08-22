@@ -18,6 +18,7 @@ from .collector_verification import DeliveryVerifier
 from .content_evidence import ContentEvidenceProvider
 from .ports.artifacts import ActivitySink, ArtifactStore
 from .ports.models import ModelGateway
+from .ports.sandbox import Sandbox
 from .ports.targets import TargetGateway
 from .reporting import render_markdown
 from .runner import ExperimentRunner, LoadedTask, ProgressCallback
@@ -45,12 +46,14 @@ class ExperimentExecutionService:
         progress: ProgressCallback | None = None,
         delivery_verifier: DeliveryVerifier | None = None,
         content_evidence_provider: ContentEvidenceProvider | None = None,
+        sandbox: Sandbox | None = None,
     ) -> ExecutionOutput:
         result = await ExperimentRunner(
             progress=progress,
             activity_sink=activity_sink,
             delivery_verifier=delivery_verifier,
             content_evidence_provider=content_evidence_provider,
+            sandbox=sandbox,
         ).run(
             task,
             configuration,
@@ -87,12 +90,14 @@ class ExperimentExecutionService:
         progress: ProgressCallback | None = None,
         delivery_verifier: DeliveryVerifier | None = None,
         content_evidence_provider: ContentEvidenceProvider | None = None,
+        sandbox: Sandbox | None = None,
     ) -> ExecutionOutput:
         result = await ExperimentRunner(
             progress=progress,
             activity_sink=activity_sink,
             delivery_verifier=delivery_verifier,
             content_evidence_provider=content_evidence_provider,
+            sandbox=sandbox,
         ).resume_scientist(
             task,
             configuration,

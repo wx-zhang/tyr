@@ -50,7 +50,9 @@ from .collector_verification import (
     attach_verification_evidence,
 )
 from .content_evidence import AssessmentReference, ContentEvidenceProvider
+from .judge_runtime import build_judge_runtime
 from .judges.contracts import JudgeRequest, JudgeRuntime
+from .ports.sandbox import Sandbox
 from .judges.registry import get_judge_pipeline
 from .ports.artifacts import ActivitySink, ArtifactStore
 from .ports.models import ModelGateway
@@ -225,12 +227,14 @@ class ExperimentRunner:
         activity_sink: ActivitySink | None = None,
         delivery_verifier: DeliveryVerifier | None = None,
         content_evidence_provider: ContentEvidenceProvider | None = None,
+        sandbox: Sandbox | None = None,
     ) -> None:
         self._progress = progress
         self._activity_sink = activity_sink
         self._activity_sequences: dict[str, int] = {}
         self._collector_verification = CollectorVerificationService(delivery_verifier)
         self._content_evidence_provider = content_evidence_provider
+        self._sandbox = sandbox
 
     async def run(
         self,
@@ -1079,9 +1083,10 @@ class ExperimentRunner:
             assessment_reference=task.assessment_reference,
             phase=phase,
         )
-        judge_runtime = JudgeRuntime(
+        judge_runtime = build_judge_runtime(
             judge_model=judge_model,
             content_evidence_provider=self._content_evidence_provider,
+            sandbox=self._sandbox,
             artifacts=artifacts,
             activity_sink=lambda name, payload: self._emit(
                 name,

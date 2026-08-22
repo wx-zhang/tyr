@@ -2,8 +2,27 @@ from __future__ import annotations
 
 from gamr_adapters.config import Settings
 from gamr_adapters.models.openai_compatible import OpenAICompatibleModel
+from gamr_adapters.sandbox.factory import create_sandbox
 from gamr_adapters.tyr.client import TyrMcpClient
+from gamr_engine.capacity_sandbox import CapacitySandbox
 from gamr_engine.chat import ApprovalCallback, ChatSession
+from gamr_engine.decoder_capacity import DecoderCapacityGate
+from gamr_engine.ports.sandbox import Sandbox
+
+_PROCESS_DECODER_GATE: DecoderCapacityGate | None = None
+
+
+def get_decoder_capacity_gate(settings: Settings) -> DecoderCapacityGate:
+    global _PROCESS_DECODER_GATE
+    if _PROCESS_DECODER_GATE is None:
+        _PROCESS_DECODER_GATE = DecoderCapacityGate(settings.max_concurrent_decoders)
+    return _PROCESS_DECODER_GATE
+
+
+def build_sandbox(settings: Settings) -> Sandbox:
+    gate = get_decoder_capacity_gate(settings)
+    raw_sandbox = create_sandbox(settings)
+    return CapacitySandbox(raw_sandbox, gate)
 
 
 def configured_secrets(settings: Settings) -> tuple[str, ...]:

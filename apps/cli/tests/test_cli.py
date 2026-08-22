@@ -87,9 +87,9 @@ def test_experiment_run_ctrl_c_cancels_run(monkeypatch: pytest.MonkeyPatch) -> N
 
     store = FakeStore()
 
-    def fake_build(*_args: object) -> tuple[object, object, None, object, object, object]:
+    def fake_build(*_args: object) -> tuple[object, object, None, object, object, object, object]:
         model = FakeModel()
-        return store, FakeTarget(), None, model, model, model
+        return store, FakeTarget(), None, FakeStore(), model, model, model
 
     monkeypatch.setattr(cli, "Settings", FakeSettings)
     monkeypatch.setattr(cli, "build_experiment_execution", fake_build, raising=False)
@@ -309,9 +309,9 @@ def test_experiment_run_prints_result_errors(monkeypatch: pytest.MonkeyPatch) ->
             result_path=".gamr/runs/run-err/result.json",
         )
 
-    def fake_build(*_args: object) -> tuple[object, object, None, object, object, object]:
+    def fake_build(*_args: object) -> tuple[object, object, None, object, object, object, object]:
         model = FakeModel()
-        return FakeStore(), FakeTarget(), None, model, model, model
+        return FakeStore(), FakeTarget(), None, FakeStore(), model, model, model
 
     monkeypatch.setattr(cli, "Settings", FakeSettings)
     monkeypatch.setattr(cli, "build_experiment_execution", fake_build, raising=False)
@@ -383,9 +383,9 @@ def test_experiment_run_accepts_max_concurrent_cases_option(
             result_path=".gamr/runs/run-concurrency/result.json",
         )
 
-    def fake_build(*_args: object) -> tuple[object, object, None, object, object, object]:
+    def fake_build(*_args: object) -> tuple[object, object, None, object, object, object, object]:
         model = FakeModel()
-        return FakeStore(), FakeTarget(), None, model, model, model
+        return FakeStore(), FakeTarget(), None, FakeStore(), model, model, model
 
     monkeypatch.setattr(cli, "Settings", FakeSettings)
     monkeypatch.setattr(cli, "build_experiment_execution", fake_build, raising=False)

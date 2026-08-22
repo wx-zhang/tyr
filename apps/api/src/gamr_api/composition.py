@@ -5,13 +5,32 @@ from gamr_adapters.artifacts.filesystem import FilesystemArtifactStore
 from gamr_adapters.collector import CollectorClient
 from gamr_adapters.config import Settings
 from gamr_adapters.models.openai_compatible import OpenAICompatibleModel
+from gamr_adapters.sandbox.factory import create_sandbox
 from gamr_adapters.tasks.filesystem import load_task, resolve_task_directory
 from gamr_adapters.tyr.client import TyrMcpClient
 from gamr_core import RunState
 from gamr_engine import ExperimentExecutionService, ProgressEvent
+from gamr_engine.capacity_sandbox import CapacitySandbox
+from gamr_engine.decoder_capacity import DecoderCapacityGate
+from gamr_engine.ports.sandbox import Sandbox
 
 from .execution import RunExecutor
 from .registry import JsonRegistry
+
+_PROCESS_DECODER_GATE: DecoderCapacityGate | None = None
+
+
+def get_decoder_capacity_gate(settings: Settings) -> DecoderCapacityGate:
+    global _PROCESS_DECODER_GATE
+    if _PROCESS_DECODER_GATE is None:
+        _PROCESS_DECODER_GATE = DecoderCapacityGate(settings.max_concurrent_decoders)
+    return _PROCESS_DECODER_GATE
+
+
+def build_sandbox(settings: Settings) -> Sandbox:
+    gate = get_decoder_capacity_gate(settings)
+    raw_sandbox = create_sandbox(settings)
+    return CapacitySandbox(raw_sandbox, gate)
 
 
 def _advance_run_state(registry: JsonRegistry, run_id: str, event: ProgressEvent) -> None:
@@ -92,6 +111,7 @@ def build_run_executor(settings: Settings, registry: JsonRegistry) -> RunExecuto
                 selected_judge_model,
             )
         )
+        sandbox = build_sandbox(settings)
         try:
             output = await ExperimentExecutionService().execute(
                 task,
@@ -106,6 +126,7 @@ def build_run_executor(settings: Settings, registry: JsonRegistry) -> RunExecuto
                 progress=lambda event: _advance_run_state(registry, run_id, event),
                 delivery_verifier=collector,
                 content_evidence_provider=collector,
+                sandbox=sandbox,
             )
         finally:
             await target.aclose()

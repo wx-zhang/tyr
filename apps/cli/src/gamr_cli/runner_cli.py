@@ -18,9 +18,10 @@ from gamr_core import (
     RunState,
 )
 from gamr_engine import ExecutionOutput
+from gamr_engine.ports.sandbox import Sandbox
 from rich.console import Console
 
-from .composition import configured_secrets
+from .composition import build_sandbox, configured_secrets
 
 
 def collector_client(settings: Settings) -> CollectorClient | None:
@@ -72,6 +73,7 @@ def build_experiment_execution(
     FilesystemArtifactStore,
     TyrMcpClient,
     CollectorClient | None,
+    Sandbox,
     OpenAICompatibleModel,
     OpenAICompatibleModel,
     OpenAICompatibleModel,
@@ -87,6 +89,7 @@ def build_experiment_execution(
     store_cls = getattr(main_cli, "FilesystemArtifactStore", FilesystemArtifactStore)
     tyr_cls = getattr(main_cli, "TyrMcpClient", TyrMcpClient)
     model_cls = getattr(main_cli, "OpenAICompatibleModel", OpenAICompatibleModel)
+    build_sandbox_fn = getattr(main_cli, "build_sandbox", build_sandbox)
 
     artifact_store = store_cls(
         settings.artifact_root,
@@ -94,6 +97,7 @@ def build_experiment_execution(
     )
     collector = collector_client(settings)
     target = tyr_cls(settings.tyr_mcp_url, settings.tyr_mcp_token)
+    sandbox = build_sandbox_fn(settings)
     model_gateway = model_cls(
         settings.model_base_url,
         settings.model_api_key,
@@ -121,6 +125,7 @@ def build_experiment_execution(
         artifact_store,
         target,
         collector,
+        sandbox,
         model_gateway,
         scientist_model_gateway,
         judge_model_gateway,
