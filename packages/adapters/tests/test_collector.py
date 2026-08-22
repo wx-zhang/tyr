@@ -184,6 +184,40 @@ async def test_multipart_summary_does_not_invalidate_verified_file() -> None:
 
 
 @pytest.mark.asyncio
+async def test_collector_fetch_verified_snapshot_returns_opaque_snapshot() -> None:
+    content = b"snapshot payload"
+    digest = hashlib.sha256(content).hexdigest()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/admin/login") and request.method == "GET":
+            return httpx.Response(200, text=LOGIN)
+        if request.url.path.endswith("/admin/login"):
+            return httpx.Response(302, headers={"location": "/tyrcli/collector/admin/requests"})
+        if request.url.path.endswith("/file-1/download"):
+            return httpx.Response(200, content=content)
+        raise AssertionError(request.url)
+
+    async with httpx.AsyncClient(
+        transport=httpx.MockTransport(handler), follow_redirects=False
+    ) as http:
+        client = CollectorClient(
+            "https://collector.test/tyrcli/collector", "admin", "secret", http_client=http
+        )
+        file = CollectorFile("file-1", "evidence.txt", "text/plain", len(content), digest)
+        snapshot = await client.fetch_verified_snapshot(file, index=2)
+
+    assert snapshot.snapshot_id == "upload-002"
+    assert snapshot.source_file_id == "file-1"
+    assert snapshot.filename == "evidence.txt"
+    assert snapshot.content_type == "text/plain"
+    assert snapshot.size == len(content)
+    assert snapshot.sha256 == digest
+    assert snapshot.content == content
+    assert not hasattr(snapshot, "base_url")
+    assert not hasattr(snapshot, "password")
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("login_html", "post_status", "message"),
     [

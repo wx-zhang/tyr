@@ -14,6 +14,12 @@ from gamr_engine.collector_verification import (
     DeliveryUnavailableError,
 )
 from gamr_engine.content_evidence import ContentEvidenceBatch
+from gamr_engine.content_source import (
+    ContentSourceMismatchError,
+    VerifiedContentSnapshot,
+    assign_opaque_input_path,
+    validate_verified_content,
+)
 
 from .collector_content import prepare_uploaded_content
 from .collector_html import (
@@ -160,6 +166,24 @@ class CollectorClient:
 
     async def download(self, file: CollectorFile) -> bytes:
         return await self._with_http_retries("file download", lambda: self._download_file(file))
+
+    async def fetch_verified_snapshot(
+        self, target: CollectorFile, *, index: int = 1
+    ) -> VerifiedContentSnapshot:
+        content = await self.download(target)
+        try:
+            validate_verified_content(target, content)
+        except ContentSourceMismatchError as error:
+            raise CollectorError(str(error)) from error
+        return VerifiedContentSnapshot(
+            snapshot_id=assign_opaque_input_path(index),
+            source_file_id=target.file_id,
+            filename=target.filename,
+            content_type=target.content_type,
+            size=target.size,
+            sha256=target.sha256,
+            content=content,
+        )
 
     async def load(self, files: list[CollectorFile]) -> ContentEvidenceBatch:
         return await prepare_uploaded_content(files, self.download)
