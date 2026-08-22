@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -42,4 +44,8 @@ class Settings(BaseSettings):
         default=3,
         ge=1,
         validation_alias="GAMR_MAX_CONCURRENT_RUNS",
+    )
+    sandbox_backend: Literal["docker", "host-unsafe", "disabled"] = Field(
+        default="docker",
+        validation_alias="GAMR_SANDBOX_BACKEND",
     )

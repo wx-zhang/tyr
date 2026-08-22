@@ -27,19 +27,19 @@ def _bound_content_overlap(value: dict[str, Any]) -> dict[str, Any]:
 def redact_payload(value: Any, secrets: Iterable[str] = ()) -> Any:
     configured = tuple(secret for secret in secrets if secret)
     if isinstance(value, dict):
-        redacted = {
+        redacted_mapping = {
             str(key): _REDACTED
             if _SECRET_KEY.search(str(key))
             else redact_payload(item, configured)
             for key, item in value.items()
         }
-        return _bound_content_overlap(redacted)
+        return _bound_content_overlap(redacted_mapping)
     if isinstance(value, list):
         return [redact_payload(item, configured) for item in value]
     if isinstance(value, tuple):
         return [redact_payload(item, configured) for item in value]
     if isinstance(value, str):
-        redacted = _BEARER.sub("Bearer [REDACTED]", value)
+        redacted: str = _BEARER.sub("Bearer [REDACTED]", value)
         for secret in configured:
             redacted = redacted.replace(secret, _REDACTED)
         return redacted

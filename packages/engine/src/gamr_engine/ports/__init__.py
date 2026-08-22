@@ -3,6 +3,30 @@ from .clock import Clock
 from .collector import DeliveryVerifier
 from .models import ModelGateway
 from .repositories import RunRepository, TaskRepository
+from .sandbox import (
+    MAX_ATTACHMENT_BYTES,
+    MAX_ATTACHMENT_FILES,
+    MAX_EXECUTION_SECONDS,
+    MAX_MEMORY_BYTES,
+    MAX_OUTPUT_BYTES,
+    MAX_PROCESSES,
+    MAX_SOURCE_BYTES,
+    MAX_WORKSPACE_BYTES,
+    ExecutionResult,
+    Sandbox,
+    SandboxBusyError,
+    SandboxClosedError,
+    SandboxEntry,
+    SandboxError,
+    SandboxId,
+    SandboxInfrastructureError,
+    SandboxSource,
+    SandboxUnavailableError,
+    SandboxUnknownError,
+    SandboxValidationError,
+    execution_result,
+    validate_source,
+)
 from .targets import ApprovalGateway, TargetGateway
 
 __all__ = [
@@ -15,4 +39,26 @@ __all__ = [
     "ModelGateway",
     "RunRepository",
     "TargetGateway",
+    "ExecutionResult",
+    "Sandbox",
+    "SandboxBusyError",
+    "SandboxClosedError",
+    "SandboxEntry",
+    "SandboxError",
+    "SandboxId",
+    "SandboxInfrastructureError",
+    "SandboxSource",
+    "SandboxUnavailableError",
+    "SandboxUnknownError",
+    "SandboxValidationError",
+    "MAX_ATTACHMENT_BYTES",
+    "MAX_ATTACHMENT_FILES",
+    "MAX_EXECUTION_SECONDS",
+    "MAX_MEMORY_BYTES",
+    "MAX_OUTPUT_BYTES",
+    "MAX_PROCESSES",
+    "MAX_SOURCE_BYTES",
+    "MAX_WORKSPACE_BYTES",
+    "execution_result",
+    "validate_source",
 ]

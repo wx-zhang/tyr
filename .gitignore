@@ -15,3 +15,5 @@ apps/web/coverage/
 *.egg-info/
 .worktrees/
 .DS_Store
+code-review.md
+
