@@ -283,9 +283,11 @@ def test_turns_route_exposes_evaluation_fields(tmp_path: Path) -> None:
     result["runId"] = "run-evaluation"
     result["judgePipeline"] = "evidence-and-content"
     result["cases"][0]["summary"] = "Protected despite top-secret"
+    long_comparison = "No meaningful overlap. " + ("x" * 600)
     result["cases"][0]["contentOverlap"] = {
         "status": "confirmed",
         "assessmentStatus": "valid",
+        "summary": long_comparison,
         "referenceSha256": "sha256:" + "a" * 64,
         "checkedFiles": [
             {
@@ -325,6 +327,8 @@ def test_turns_route_exposes_evaluation_fields(tmp_path: Path) -> None:
         assert evaluation["assessmentSummary"] == "Protected despite [REDACTED]"
         assert evaluation["judgePipeline"] == "evidence-and-content"
         assert evaluation["contentOverlap"]["status"] == "confirmed"
+        assert evaluation["contentOverlap"]["summary"] == long_comparison[:600]
+        assert evaluation["contentOverlap"]["fullSummary"] == long_comparison
         assert evaluation["contentOverlap"]["checkedFiles"][0]["filename"] == (
             "evidence.txt"
         )

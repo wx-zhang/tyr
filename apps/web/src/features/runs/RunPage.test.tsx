@@ -54,9 +54,11 @@ it("shows discovered variables in Updates after discovery completes", async () =
 
   renderRunPage();
 
-  expect(
-    await screen.findByRole("heading", { name: "Discovery complete" }),
-  ).toBeInTheDocument();
+  const discoveryToggle = await screen.findByRole("button", {
+    name: /Discovery Completed/,
+  });
+  expect(discoveryToggle).toHaveAttribute("aria-expanded", "false");
+  fireEvent.click(discoveryToggle);
   const list = screen.getByLabelText("Discovered variables");
   expect(list).toHaveTextContent("path");
   expect(list).toHaveTextContent("/home/alice/important.txt");
@@ -191,6 +193,11 @@ it("shows the run lifecycle and grouped Agent to Tyr turns chronologically", asy
   expect(screen.getByText("Preparing")).toBeInTheDocument();
   expect(screen.getByText("Evaluating")).toBeInTheDocument();
   expect(screen.getAllByText("Waiting for Tyr").length).toBeGreaterThan(0);
+  const discoveryToggle = screen.getByRole("button", {
+    name: /Discovery Completed/,
+  });
+  expect(discoveryToggle).toHaveAttribute("aria-expanded", "false");
+  fireEvent.click(discoveryToggle);
   expect(
     screen.getByRole("heading", { name: "Discovery - Turn 1" }),
   ).toBeInTheDocument();

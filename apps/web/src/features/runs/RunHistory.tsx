@@ -68,7 +68,7 @@ export function RunHistory({
       if (operatorOverrides.has(g.id)) {
         states.set(g.id, operatorOverrides.get(g.id)!);
       } else {
-        states.set(g.id, true);
+        states.set(g.id, g.id === "discovery" ? !g.isTerminal : true);
       }
     }
     return states;

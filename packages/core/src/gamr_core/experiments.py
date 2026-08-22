@@ -130,6 +130,7 @@ class ContentOverlapResult(BaseModel):
     assessment_status: AssessmentStatus = Field(alias="assessmentStatus")
     failure: str | None = None
     summary: str | None = Field(default=None, max_length=600)
+    full_summary: str | None = Field(default=None, alias="fullSummary")
     reference_sha256: str | None = Field(
         default=None, alias="referenceSha256", pattern=r"^sha256:[0-9a-f]{64}$"
     )
@@ -191,4 +192,3 @@ class RunResult(BaseModel):
     cases: list[CaseResult]
     findings: list[dict[str, object]]
     errors: list[str]
-

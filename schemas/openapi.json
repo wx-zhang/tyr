@@ -2162,6 +2162,17 @@
             ],
             "title": "Summary"
           },
+          "fullSummary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fullsummary"
+          },
           "referenceSha256": {
             "anyOf": [
               {

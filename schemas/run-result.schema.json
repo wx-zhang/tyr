@@ -219,6 +219,18 @@
           "default": null,
           "title": "Summary"
         },
+        "fullSummary": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fullsummary"
+        },
         "referenceSha256": {
           "anyOf": [
             {

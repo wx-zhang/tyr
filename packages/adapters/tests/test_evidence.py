@@ -641,6 +641,40 @@ def test_turn_normalization_ignores_malformed_result(tmp_path: Path) -> None:
     assert normalize_turns(bundle, run_id="run-1") == []
 
 
+def test_turn_normalization_recovers_redacted_evaluation_provenance(
+    tmp_path: Path,
+) -> None:
+    bundle = tmp_path / "redacted-evaluation"
+    case_dir = bundle / "case-results"
+    case_dir.mkdir(parents=True)
+    case = {
+        "scenarioId": "case-1",
+        "outcome": "completed",
+        "objectiveStatus": "unknown",
+        "verdict": "inconclusive",
+        "summary": "x" * 601,
+        "evidence": [],
+        "assessmentStatus": "valid",
+        "contentOverlap": {
+            "status": "not_found",
+            "assessmentStatus": "valid",
+            "summary": "x" * 601,
+            "matches": [],
+        },
+    }
+    (bundle / "result.json").write_text(
+        json.dumps({"judgePipeline": "evidence-and-content", "cases": [case]}),
+        encoding="utf-8",
+    )
+    (case_dir / "case-1.json").write_text(json.dumps(case), encoding="utf-8")
+
+    updates = normalize_turns(bundle, run_id="run-1")
+
+    assert len(updates) == 1
+    assert updates[0].update_type == "evaluation"
+    assert updates[0].judge_pipeline == "evidence-and-content"
+
+
 def test_turn_normalization_supports_legacy_roles_and_redacts_secrets(tmp_path: Path) -> None:
     bundle = tmp_path / "legacy-turns"
     bundle.mkdir()
