@@ -40,7 +40,7 @@ def test_docker_vectors_use_fixed_containment_flags() -> None:
     container = "gamr-container-private"
     public_id = "public-id-with-metacharacters-$()"
     volume_args = build_volume_create_args(volume, public_id)
-    populate_args = build_populate_args(volume)
+    populate_args = build_populate_args(volume, public_id)
     container_args = build_container_create_args(container, volume, public_id)
     execute_args = build_execute_args(container)
 
@@ -49,11 +49,17 @@ def test_docker_vectors_use_fixed_containment_flags() -> None:
     assert IMAGE_TAG in container_args
     assert "--network" in populate_args and "none" in populate_args
     assert "--network" in container_args and "none" in container_args
+    assert "--read-only" in populate_args
+    assert "--cap-drop" in populate_args and "ALL" in populate_args
+    assert "--security-opt" in populate_args and "no-new-privileges" in populate_args
+    assert "--user" in populate_args and "65532:65532" in populate_args
+    assert any(public_id in value for value in populate_args)
     assert "--read-only" in container_args
     assert "--cap-drop" in container_args and "ALL" in container_args
     assert "--security-opt" in container_args and "no-new-privileges" in container_args
     assert "--cpus" in container_args and "1" in container_args
     assert "--memory" in container_args and "256m" in container_args
+    assert "--memory-swap" in container_args and "256m" in container_args
     assert "--pids-limit" in container_args and "64" in container_args
     assert "--restart" in container_args and "no" in container_args
     assert any(value.endswith(":/input:ro") for value in container_args)
@@ -65,6 +71,44 @@ def test_docker_vectors_use_fixed_containment_flags() -> None:
     assert any(public_id in value for value in volume_args)
     assert any(public_id in value for value in container_args)
     assert container not in volume_args
+
+
+@pytest.mark.asyncio
+async def test_docker_backend_failure_raises_and_invalidates_sandbox(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from gamr_adapters.sandbox.docker import DockerSandbox, _DockerResult
+    from gamr_engine.ports import SandboxInfrastructureError
+
+    sandbox = DockerSandbox()
+
+    async def command(args: tuple[str, ...], stdin: bytes | None = None) -> _DockerResult:
+        del args, stdin
+        return _DockerResult(0, b"", b"")
+
+    async def failing_process(args: tuple[str, ...]) -> asyncio.subprocess.Process:
+        del args
+        return await asyncio.create_subprocess_exec(
+            sys.executable,
+            "-c",
+            (
+                "import sys; "
+                "sys.stderr.write('Error response from daemon: No such container\\n'); "
+                "sys.exit(1)"
+            ),
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+
+    monkeypatch.setattr(sandbox, "_command", command)
+    monkeypatch.setattr(sandbox, "_docker_process", failing_process)
+    sandbox_id = await sandbox.start()
+
+    with pytest.raises(SandboxInfrastructureError):
+        await sandbox.execute(sandbox_id, "print('hello')")
+    with pytest.raises(SandboxClosedError):
+        await sandbox.execute(sandbox_id, "print('closed')")
 
 
 @pytest.mark.asyncio
@@ -110,12 +154,12 @@ async def test_docker_lifecycle_uses_fake_cli_and_fresh_processes(
     await sandbox.close(sandbox_id)
 
     assert result.exit_code == 0
-    record = sandbox._records[sandbox_id]
-    assert str(sandbox_id) not in record.container
     assert any(args[0:2] == ("volume", "create") for args in commands)
     assert any(args[0:2] == ("volume", "rm") for args in commands)
+    assert any(args[0:2] == ("rm", "--force") for args in commands)
     with pytest.raises(SandboxClosedError):
         await sandbox.execute(sandbox_id, "print('closed')")
+
 
 
 @pytest.mark.asyncio

@@ -64,6 +64,10 @@ markers = [
   "live_tyr: Opt-in live Tyr integration tests against real or configured MCP target (deselected by default)",
   "sandbox_docker: Opt-in Docker sandbox runtime tests (deselected by default)",
 ]
+filterwarnings = [
+  "ignore:host-unsafe sandboxing is not a security boundary.*:RuntimeWarning",
+  "ignore:GAMR_SANDBOX_BACKEND=host-unsafe is not a security boundary.*:RuntimeWarning",
+]
 asyncio_mode = "auto"
 
 [tool.mypy]

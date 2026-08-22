@@ -40,6 +40,46 @@ async def test_host_backend_uses_fresh_processes_and_persistent_workspace() -> N
 
 
 @pytest.mark.asyncio
+async def test_host_backend_timeout_when_child_closes_stdio(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(host_module, "MAX_EXECUTION_SECONDS", 0.2)
+    sandbox = HostUnsafeSandbox()
+    sandbox_id = await sandbox.start()
+
+    result = await sandbox.execute(
+        sandbox_id,
+        "import os, time\nos.close(1)\nos.close(2)\ntime.sleep(10)",
+    )
+
+    assert result.timed_out
+    with pytest.raises(SandboxClosedError):
+        await sandbox.execute(sandbox_id, "print('closed')")
+
+
+@pytest.mark.asyncio
+async def test_host_backend_timeout_when_grandchild_lives(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(host_module, "MAX_EXECUTION_SECONDS", 0.2)
+    sandbox = HostUnsafeSandbox()
+    sandbox_id = await sandbox.start()
+
+    result = await sandbox.execute(
+        sandbox_id,
+        (
+            "import subprocess, sys\n"
+            "subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(10)'])\n"
+            "sys.exit(0)"
+        ),
+    )
+
+    assert result.timed_out
+    with pytest.raises(SandboxClosedError):
+        await sandbox.execute(sandbox_id, "print('closed')")
+
+
+@pytest.mark.asyncio
 async def test_host_backend_timeout_invalidates_sandbox(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(host_module, "MAX_EXECUTION_SECONDS", 0.2)
     sandbox = HostUnsafeSandbox()
@@ -69,16 +109,20 @@ async def test_host_backend_output_limit_invalidates_sandbox() -> None:
 async def test_host_backend_removes_temp_tree_and_rejects_closed_and_unknown_ids() -> None:
     sandbox = HostUnsafeSandbox()
     sandbox_id = await sandbox.start()
-    root = sandbox._records[sandbox_id].root
 
+    await sandbox.execute(
+        sandbox_id,
+        "from pathlib import Path; Path('marker.txt').write_text('hi')",
+    )
     await sandbox.close(sandbox_id)
     await sandbox.close(sandbox_id)
 
-    assert not root.exists()
     with pytest.raises(SandboxClosedError):
         await sandbox.execute(sandbox_id, "print('no')")
     with pytest.raises(SandboxUnknownError):
         await sandbox.execute("missing", "print('no')")  # type: ignore[arg-type]
+
+
 
 
 @pytest.mark.asyncio

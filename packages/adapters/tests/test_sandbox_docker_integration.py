@@ -5,7 +5,7 @@ import subprocess
 
 import pytest
 from gamr_adapters.sandbox.docker import IMAGE_TAG, DockerSandbox
-from gamr_engine.ports import SandboxEntry
+from gamr_engine.ports import SandboxClosedError, SandboxEntry
 
 
 @pytest.fixture
@@ -70,3 +70,50 @@ async def test_docker_runtime_denies_network(docker_image: None) -> None:
 
     assert result.exit_code == 0
     assert result.stdout.strip() == "denied"
+
+
+@pytest.mark.sandbox_docker
+@pytest.mark.asyncio
+async def test_docker_runtime_pip_unavailable(docker_image: None) -> None:
+    sandbox = DockerSandbox()
+    sandbox_id = await sandbox.start()
+    result = await sandbox.execute(
+        sandbox_id,
+        "import sys\n"
+        "try:\n"
+        "    import pip\n"
+        "    print('pip_found')\n"
+        "except ImportError:\n"
+        "    print('pip_absent')\n",
+    )
+    await sandbox.close(sandbox_id)
+
+    assert result.exit_code == 0
+    assert result.stdout.strip() == "pip_absent"
+
+
+@pytest.mark.sandbox_docker
+@pytest.mark.asyncio
+async def test_docker_runtime_limits_and_labeled_cleanup(docker_image: None) -> None:
+    sandbox = DockerSandbox()
+    sandbox_id = await sandbox.start()
+
+    timeout_result = await sandbox.execute(
+        sandbox_id,
+        "while True: pass",
+    )
+    assert timeout_result.timed_out
+    with pytest.raises(SandboxClosedError):
+        await sandbox.execute(sandbox_id, "print('closed')")
+    await sandbox.close(sandbox_id)
+
+    ps_output = subprocess.run(
+        ["docker", "ps", "-a", "--filter", f"label=com.tyr.gamr.sandbox.id={sandbox_id}", "-q"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert not ps_output.stdout.strip()
+
+
+

@@ -54,15 +54,17 @@ async def run_bounded_process(
             _read_stream(process.stderr, capture.stderr, capture),
         )
         timed_out = False
-        while not readers.done():
-            await asyncio.sleep(0.02)
-            if capture.output_limited:
-                await terminate()
-                break
+        while True:
             if time.monotonic() - started > timeout:
                 timed_out = True
                 await terminate()
                 break
+            if capture.output_limited:
+                await terminate()
+                break
+            if readers.done() and process.returncode is not None:
+                break
+            await asyncio.sleep(0.02)
         await readers
         if process.returncode is None:
             await process.wait()

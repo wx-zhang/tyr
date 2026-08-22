@@ -4,7 +4,6 @@ import os
 import stat
 import sys
 import tarfile
-from pathlib import PurePosixPath
 
 
 def main() -> None:
@@ -26,15 +25,22 @@ def main() -> None:
 
 
 def _safe_name(name: str) -> bool:
-    path = PurePosixPath(name)
-    return (
-        bool(name)
-        and not name.startswith("/")
-        and "\\" not in name
-        and "\x00" not in name
-        and all(part not in {"", ".", ".."} for part in path.parts)
-    )
+    if not isinstance(name, str):
+        return False
+    try:
+        name.encode("utf-8")
+    except UnicodeError:
+        return False
+    if not name or name.startswith(("/", "\\")) or (len(name) > 1 and name[1] == ":"):
+        return False
+    if "\x00" in name or "\\" in name:
+        return False
+    components = name.split("/")
+    return not any(not c or c in {".", ".."} for c in components)
 
 
 if __name__ == "__main__":
     main()
+
+
+

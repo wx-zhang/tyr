@@ -9,6 +9,9 @@ from dataclasses import dataclass
 
 from gamr_engine.ports import (
     MAX_EXECUTION_SECONDS,
+    MAX_MEMORY_BYTES,
+    MAX_PROCESSES,
+    MAX_WORKSPACE_BYTES,
     ExecutionResult,
     Sandbox,
     SandboxBusyError,
@@ -42,84 +45,41 @@ def build_volume_create_args(volume: str, public_id: str) -> tuple[str, ...]:
     )
 
 
-def build_populate_args(volume: str) -> tuple[str, ...]:
+def build_populate_args(volume: str, public_id: str) -> tuple[str, ...]:
     return (
-        "run",
-        "--interactive",
-        "--rm",
-        "--network",
-        "none",
-        "--label",
-        f"{LABEL_KEY}=true",
-        "--user",
-        "0:0",
-        "--volume",
-        f"{volume}:/input:rw",
-        IMAGE_TAG,
-        "/usr/local/bin/python",
-        "/opt/gamr/populate_input.py",
+        "run", "--interactive", "--rm", "--network", "none",
+        "--label", f"{LABEL_KEY}=true", "--label", f"{LABEL_ID_KEY}={public_id}",
+        "--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
+        "--user", "65532:65532", "--volume", f"{volume}:/input:rw",
+        IMAGE_TAG, "/usr/local/bin/python", "/opt/gamr/populate_input.py",
     )
 
 
-def build_container_create_args(
-    container: str, volume: str, public_id: str
-) -> tuple[str, ...]:
+def build_container_create_args(container: str, volume: str, public_id: str) -> tuple[str, ...]:
+    memory_arg = f"{MAX_MEMORY_BYTES // (1024 * 1024)}m"
+    workspace_mount = (
+        f"/workspace:rw,noexec,nosuid,nodev,size={MAX_WORKSPACE_BYTES},"
+        "uid=65532,gid=65532,mode=700"
+    )
     return (
-        "create",
-        "--name",
-        container,
-        "--label",
-        f"{LABEL_KEY}=true",
-        "--label",
-        f"{LABEL_ID_KEY}={public_id}",
-        "--network",
-        "none",
-        "--restart",
-        "no",
-        "--read-only",
-        "--cap-drop",
-        "ALL",
-        "--security-opt",
-        "no-new-privileges",
-        "--cpus",
-        "1",
-        "--memory",
-        "256m",
-        "--pids-limit",
-        "64",
-        "--volume",
-        f"{volume}:/input:ro",
-        "--tmpfs",
-        "/workspace:rw,noexec,nosuid,nodev,size=134217728,uid=65532,gid=65532,mode=700",
-        "--env",
-        "PYTHONNOUSERSITE=1",
-        "--env",
-        "PYTHONDONTWRITEBYTECODE=1",
-        "--user",
-        "65532:65532",
-        "--workdir",
-        "/workspace",
-        IMAGE_TAG,
-        "/usr/local/bin/python",
-        "-c",
-        "import time; time.sleep(315360000)",
+        "create", "--name", container,
+        "--label", f"{LABEL_KEY}=true", "--label", f"{LABEL_ID_KEY}={public_id}",
+        "--network", "none", "--restart", "no", "--read-only",
+        "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
+        "--cpus", "1", "--memory", memory_arg, "--memory-swap", memory_arg,
+        "--pids-limit", str(MAX_PROCESSES), "--volume", f"{volume}:/input:ro",
+        "--tmpfs", workspace_mount,
+        "--env", "PYTHONNOUSERSITE=1", "--env", "PYTHONDONTWRITEBYTECODE=1",
+        "--user", "65532:65532", "--workdir", "/workspace",
+        IMAGE_TAG, "/usr/local/bin/python", "-c", "import time; time.sleep(315360000)",
     )
 
 
 def build_execute_args(container: str) -> tuple[str, ...]:
     return (
-        "exec",
-        "--interactive",
-        "--user",
-        "65532:65532",
-        "--workdir",
-        "/workspace",
-        container,
-        "/usr/local/bin/python",
-        "-I",
-        "-B",
-        "-u",
-        "-",
+        "exec", "--interactive", "--user", "65532:65532",
+        "--workdir", "/workspace", container,
+        "/usr/local/bin/python", "-I", "-B", "-u", "-",
     )
 
 
@@ -172,13 +132,11 @@ class DockerSandbox(Sandbox):
         try:
             await self._success(build_volume_create_args(volume, public_id))
             volume_created = True
-            await self._success(build_populate_args(volume), archive)
+            await self._success(build_populate_args(volume, str(public_id)), archive)
             await self._success(build_container_create_args(container, volume, public_id))
             container_created = True
             await self._success(("start", container))
-        except SandboxUnavailableError:
-            raise
-        except Exception:
+        except (SandboxUnavailableError, Exception):
             await self._remove_resources(container, volume, container_created, volume_created)
             raise
         record = _Record(public_id, volume, container)
@@ -204,6 +162,10 @@ class DockerSandbox(Sandbox):
             if terminal:
                 record.closed = True
                 await self._cleanup(record)
+            elif result.exit_code != 0 and b"Error response from daemon" in result.stderr.encode():
+                record.closed = True
+                await self._cleanup(record)
+                raise SandboxInfrastructureError("Docker execution failed")
             return result
         except asyncio.CancelledError:
             raise
@@ -272,7 +234,10 @@ class DockerSandbox(Sandbox):
         process = record.process
         if process is not None and process.returncode is None:
             process.kill()
-            await process.wait()
+            try:
+                await asyncio.wait_for(process.wait(), timeout=1.0)
+            except TimeoutError:
+                pass
 
     async def _cleanup(self, record: _Record) -> None:
         if record.cleaned:
