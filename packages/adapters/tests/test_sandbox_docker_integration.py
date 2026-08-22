@@ -94,6 +94,66 @@ async def test_docker_runtime_pip_unavailable(docker_image: None) -> None:
 
 @pytest.mark.sandbox_docker
 @pytest.mark.asyncio
+async def test_docker_runtime_collect_output(docker_image: None) -> None:
+    sandbox = DockerSandbox()
+    sandbox_id = await sandbox.start()
+
+    res = await sandbox.execute(
+        sandbox_id,
+        "import os\n"
+        "os.makedirs('/workspace/output/attempt-001/upload-001', exist_ok=True)\n"
+        "os.makedirs('/workspace/output/attempt-002/upload-001', exist_ok=True)\n"
+        "with open('/workspace/output/attempt-001/upload-001/file1.txt', 'wb') as f:\n"
+        "    f.write(b'first output')\n"
+        "with open('/workspace/output/attempt-001/upload-001/nested.bin', 'wb') as f:\n"
+        "    f.write(b'\\x00\\xff\\xfe')\n"
+        "with open('/workspace/output/attempt-002/upload-001/file2.txt', 'wb') as f:\n"
+        "    f.write(b'second output')\n",
+    )
+    assert res.exit_code == 0
+
+    attempt1_entries = await sandbox.collect_output(sandbox_id, "output/attempt-001")
+    assert len(attempt1_entries) == 2
+    assert attempt1_entries[0].path == "upload-001/file1.txt"
+    assert attempt1_entries[0].content == b"first output"
+    assert attempt1_entries[1].path == "upload-001/nested.bin"
+    assert attempt1_entries[1].content == b"\x00\xff\xfe"
+
+    attempt2_entries = await sandbox.collect_output(sandbox_id, "output/attempt-002")
+    assert len(attempt2_entries) == 1
+    assert attempt2_entries[0].path == "upload-001/file2.txt"
+    assert attempt2_entries[0].content == b"second output"
+
+    await sandbox.close(sandbox_id)
+
+
+@pytest.mark.sandbox_docker
+@pytest.mark.asyncio
+async def test_docker_runtime_collect_output_rejects_symlinks_and_limits(
+    docker_image: None,
+) -> None:
+    sandbox = DockerSandbox()
+    sandbox_id = await sandbox.start()
+
+    res = await sandbox.execute(
+        sandbox_id,
+        "import os\n"
+        "os.makedirs('/workspace/output/attempt-001', exist_ok=True)\n"
+        "with open('/workspace/secret.txt', 'w') as f:\n"
+        "    f.write('secret')\n"
+        "os.symlink('/workspace/secret.txt', '/workspace/output/attempt-001/link.txt')\n",
+    )
+    assert res.exit_code == 0
+
+    from gamr_engine.ports import SandboxValidationError
+    with pytest.raises(SandboxValidationError):
+        await sandbox.collect_output(sandbox_id, "output/attempt-001")
+
+    await sandbox.close(sandbox_id)
+
+
+@pytest.mark.sandbox_docker
+@pytest.mark.asyncio
 async def test_docker_runtime_limits_and_labeled_cleanup(docker_image: None) -> None:
     sandbox = DockerSandbox()
     sandbox_id = await sandbox.start()

@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import NewType, Protocol
+from typing import Literal, NewType, Protocol
 
 MAX_SOURCE_BYTES = 64 * 1024
 MAX_OUTPUT_BYTES = 1024 * 1024
+MAX_OUTPUT_FILES = 256
+MAX_OUTPUT_TOTAL_BYTES = 64 * 1024 * 1024
 MAX_ATTACHMENT_FILES = 256
 MAX_ATTACHMENT_BYTES = 64 * 1024 * 1024
 MAX_EXECUTION_SECONDS = 10.0
@@ -15,6 +17,7 @@ MAX_PROCESSES = 64
 
 SandboxId = NewType("SandboxId", str)
 type SandboxSource = str | bytes
+type SandboxIsolation = Literal["contained", "unsafe", "unavailable"]
 
 
 class SandboxError(RuntimeError):
@@ -107,11 +110,20 @@ def execution_result(
 
 
 class Sandbox(Protocol):
+    @property
+    def isolation(self) -> SandboxIsolation:
+        """Declared isolation level of this backend."""
+
     async def start(self, entries: Sequence[SandboxEntry] = ()) -> SandboxId:
         """Create an ephemeral sandbox and return its process-local ID."""
 
     async def execute(self, sandbox_id: SandboxId, source: SandboxSource) -> ExecutionResult:
         """Run one fresh Python process in an existing sandbox."""
+
+    async def collect_output(
+        self, sandbox_id: SandboxId, output_dir: str
+    ) -> Sequence[SandboxEntry]:
+        """Collect bounded regular files below a workspace output directory."""
 
     async def close(self, sandbox_id: SandboxId) -> None:
         """Close a sandbox; repeating close is safe."""

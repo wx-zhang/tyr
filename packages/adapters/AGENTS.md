@@ -21,8 +21,9 @@ bounded retries, and digest-verified file and retained request-body downloads;
 for the in-memory reference judge without writing an artifact copy;
 `collector_html.py` parses the admin HTML without retaining credentials or headers.
 `artifacts/query.py` owns bounded in-memory activity and relationship projections derived from bundles.
-`sandbox/` owns attachment snapshots, the disabled and explicitly unsafe host backends,
-the fixed Docker CLI backend, its Python 3.14 image, and bounded process support.
+`sandbox/` owns attachment snapshots, output collection (`collect_output.py`),
+the disabled and explicitly unsafe host backends, the fixed Docker CLI backend,
+its Python 3.14 image, and bounded process support.
 
 Canonical artifact and configured-secret regressions live in
 `packages/adapters/tests/test_artifacts.py`; normalization, projection recovery,

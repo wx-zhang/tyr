@@ -19,13 +19,16 @@ from gamr_engine.ports import (
     SandboxEntry,
     SandboxId,
     SandboxInfrastructureError,
+    SandboxIsolation,
     SandboxSource,
     SandboxUnavailableError,
     SandboxUnknownError,
+    SandboxValidationError,
     validate_source,
 )
 
 from .attachments import validate_entries
+from .collect_output import parse_collected_output
 from .process import run_bounded_process
 
 IMAGE_TAG = "gamr-sandbox:python3.14-stdlib"
@@ -56,8 +59,8 @@ def build_populate_args(volume: str, public_id: str) -> tuple[str, ...]:
 
 
 def build_container_create_args(container: str, volume: str, public_id: str) -> tuple[str, ...]:
-    memory_arg = f"{MAX_MEMORY_BYTES // (1024 * 1024)}m"
-    workspace_mount = (
+    mem = f"{MAX_MEMORY_BYTES // (1024 * 1024)}m"
+    mount = (
         f"/workspace:rw,noexec,nosuid,nodev,size={MAX_WORKSPACE_BYTES},"
         "uid=65532,gid=65532,mode=700"
     )
@@ -66,9 +69,9 @@ def build_container_create_args(container: str, volume: str, public_id: str) -> 
         "--label", f"{LABEL_KEY}=true", "--label", f"{LABEL_ID_KEY}={public_id}",
         "--network", "none", "--restart", "no", "--read-only",
         "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
-        "--cpus", "1", "--memory", memory_arg, "--memory-swap", memory_arg,
+        "--cpus", "1", "--memory", mem, "--memory-swap", mem,
         "--pids-limit", str(MAX_PROCESSES), "--volume", f"{volume}:/input:ro",
-        "--tmpfs", workspace_mount,
+        "--tmpfs", mount,
         "--env", "PYTHONNOUSERSITE=1", "--env", "PYTHONDONTWRITEBYTECODE=1",
         "--user", "65532:65532", "--workdir", "/workspace",
         IMAGE_TAG, "/usr/local/bin/python", "-c", "import time; time.sleep(315360000)",
@@ -80,6 +83,15 @@ def build_execute_args(container: str) -> tuple[str, ...]:
         "exec", "--interactive", "--user", "65532:65532",
         "--workdir", "/workspace", container,
         "/usr/local/bin/python", "-I", "-B", "-u", "-",
+    )
+
+
+def build_collect_output_args(container: str, output_dir: str) -> tuple[str, ...]:
+    return (
+        "exec", "--user", "65532:65532",
+        "--workdir", "/workspace", container,
+        "/usr/local/bin/python", "-I", "-B", "-u", "/opt/gamr/collect_output.py",
+        output_dir,
     )
 
 
@@ -117,6 +129,10 @@ class _DockerResult:
 
 
 class DockerSandbox(Sandbox):
+    @property
+    def isolation(self) -> SandboxIsolation:
+        return "contained"
+
     def __init__(self) -> None:
         self._records: dict[SandboxId, _Record] = {}
 
@@ -124,11 +140,9 @@ class DockerSandbox(Sandbox):
         validated = validate_entries(entries)
         archive = build_input_archive(validated)
         public_id = SandboxId(uuid.uuid4().hex)
-        private_suffix = uuid.uuid4().hex
-        volume = f"gamr-sandbox-volume-{private_suffix}"
-        container = f"gamr-sandbox-container-{private_suffix}"
-        volume_created = False
-        container_created = False
+        priv = uuid.uuid4().hex
+        volume, container = f"gamr-sandbox-volume-{priv}", f"gamr-sandbox-container-{priv}"
+        volume_created, container_created = False, False
         try:
             await self._success(build_volume_create_args(volume, public_id))
             volume_created = True
@@ -167,15 +181,38 @@ class DockerSandbox(Sandbox):
                 await self._cleanup(record)
                 raise SandboxInfrastructureError("Docker execution failed")
             return result
-        except asyncio.CancelledError:
-            raise
-        except (SandboxInfrastructureError, SandboxUnavailableError):
+        except (asyncio.CancelledError, SandboxInfrastructureError, SandboxUnavailableError):
             record.closed = True
             await self._cleanup(record)
             raise
         finally:
             record.process = None
             record.execution_task = None
+            record.busy = False
+
+    async def collect_output(
+        self, sandbox_id: SandboxId, output_dir: str
+    ) -> Sequence[SandboxEntry]:
+        record = self._record(sandbox_id)
+        if record.busy:
+            raise SandboxBusyError("sandbox already has an active execution")
+        record.busy = True
+        try:
+            cmd = build_collect_output_args(record.container, output_dir)
+            result = await self._command(cmd)
+            if result.returncode != 0:
+                err = result.stderr.decode("utf-8", errors="replace").strip()
+                if any(w in err for w in ("output", "unsafe", "invalid", "limit", "escapes")):
+                    raise SandboxValidationError(err)
+                raise SandboxInfrastructureError(f"Docker collection failed: {err}")
+            return parse_collected_output(result.stdout)
+        except (SandboxValidationError, SandboxBusyError, SandboxClosedError, SandboxUnknownError):
+            raise
+        except Exception as error:
+            record.closed = True
+            await self._cleanup(record)
+            raise SandboxInfrastructureError("Docker output collection failed") from error
+        finally:
             record.busy = False
 
     async def close(self, sandbox_id: SandboxId) -> None:
@@ -186,9 +223,9 @@ class DockerSandbox(Sandbox):
             return
         record.closed = True
         task = record.execution_task
-        if task is not None and task is not asyncio.current_task() and not task.done():
-            task.cancel()
         if task is not None and task is not asyncio.current_task():
+            if not task.done():
+                task.cancel()
             try:
                 await asyncio.shield(task)
             except asyncio.CancelledError:

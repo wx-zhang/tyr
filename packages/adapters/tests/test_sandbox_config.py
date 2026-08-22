@@ -46,10 +46,25 @@ async def test_disabled_backend_is_unavailable_and_close_is_idempotent(
 ) -> None:
     monkeypatch.chdir(tmp_path)
     sandbox = create_sandbox(Settings(sandbox_backend="disabled"))
+    assert sandbox.isolation == "unavailable"
 
     with pytest.raises(SandboxUnavailableError):
         await sandbox.start()
+    with pytest.raises(SandboxUnavailableError):
+        await sandbox.execute("not-created", "print(1)")  # type: ignore[arg-type]
+    with pytest.raises(SandboxUnavailableError):
+        await sandbox.collect_output("not-created", "output/attempt-001")  # type: ignore[arg-type]
     await sandbox.close("not-created")  # type: ignore[arg-type]
+
+
+def test_sandbox_isolation_descriptors() -> None:
+    docker_sandbox = create_sandbox(Settings(sandbox_backend="docker"))
+    host_sandbox = create_sandbox(Settings(sandbox_backend="host-unsafe"))
+    disabled_sandbox = create_sandbox(Settings(sandbox_backend="disabled"))
+
+    assert docker_sandbox.isolation == "contained"
+    assert host_sandbox.isolation == "unsafe"
+    assert disabled_sandbox.isolation == "unavailable"
 
 
 def test_factory_does_not_construct_docker_until_used(
