@@ -219,6 +219,18 @@
           "default": null,
           "title": "Summary"
         },
+        "fullSummary": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fullsummary"
+        },
         "referenceSha256": {
           "anyOf": [
             {
@@ -472,6 +484,19 @@
     "runId": {
       "title": "Runid",
       "type": "string"
+    },
+    "judgePipeline": {
+      "anyOf": [
+        {
+          "const": "evidence-and-content",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Judgepipeline"
     },
     "task": {
       "$ref": "#/$defs/TaskReference"

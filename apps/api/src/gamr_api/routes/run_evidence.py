@@ -167,6 +167,7 @@ class RunTurnResponse(BaseModel):
     reason_codes: list[str] = Field(default_factory=list, alias="reasonCodes")
     missing_evidence: list[str] = Field(default_factory=list, alias="missingEvidence")
     content_overlap: ContentOverlapResult | None = Field(default=None, alias="contentOverlap")
+    judge_pipeline: str | None = Field(default=None, alias="judgePipeline")
     history_case_ids: list[str] = Field(default_factory=list, alias="historyCaseIds")
     history_case_origins: list[str] = Field(default_factory=list, alias="historyCaseOrigins")
 
@@ -677,6 +678,7 @@ def turns(
                 if item.content_overlap is not None
                 else None
             ),
+            judgePipeline=item.judge_pipeline,
             historyCaseIds=list(item.history_case_ids),
             historyCaseOrigins=list(item.history_case_origins),
         )

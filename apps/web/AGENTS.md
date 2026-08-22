@@ -37,6 +37,7 @@ Test cases expose aggregate completion progress and summary-first rows. Their ac
 read oldest to newest; older completed activity is compact, while the latest or current activity
 opens by default. Collapsed rows distinguish not started, queued, running, assessing, and terminal
 work; group completion follows lifecycle progress rather than a nested activity status.
+Completed discovery groups start collapsed when the run history loads; active discovery stays open.
 Every case row starts collapsed when entering the page; operator expansion persists across updates.
 Verdict-bearing case headers show lifecycle and vulnerability outcome as separate text badges.
 Evaluation updates supply the result badge until visualization catches up. Scientist-generated

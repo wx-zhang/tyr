@@ -20,6 +20,7 @@ gamr-adapters = { workspace = true }
 dev = [
   "coverage[toml]>=7.9,<8",
   "mypy>=1.17,<2",
+  "pillow>=12.3,<13",
   "poethepoet>=0.36,<1",
   "pytest>=8.4,<9",
   "pytest-asyncio>=1.1,<2",
@@ -41,6 +42,7 @@ web-build = "pnpm --dir apps/web build"
 build = ["web-build"]
 task-validate = "gamr task validate tasks/exfiltrate-important-txt"
 check = ["lint", "typecheck", "test", "task-validate", "web-build"]
+judge-graph = "python scripts/render_judge_graph.py"
 dev = "python scripts/dev.py"
 "dev:watch" = "python scripts/dev.py --watch"
 

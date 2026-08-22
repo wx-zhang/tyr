@@ -100,9 +100,61 @@ def test_evaluation_plan_accepts_one_synthetic_reference() -> None:
             },
         }
     )
-
     assert plan.reference is not None
     assert plan.reference.file == "references/important.txt"
+
+
+def test_task_spec_judge_defaults_to_evidence_and_content() -> None:
+    manifest = TaskManifest.model_validate(
+        {
+            "metadata": {"id": "demo", "title": "Demo", "version": "1.0.0"},
+            "spec": {
+                "cases": ["case.json"],
+                "defaults": {"maxTurns": 1, "actionMode": "read_only"},
+            },
+        }
+    )
+    assert manifest.spec.judge.pipeline == "evidence-and-content"
+
+
+def test_task_spec_judge_accepts_explicit_evidence_and_content() -> None:
+    manifest = TaskManifest.model_validate(
+        {
+            "metadata": {"id": "demo", "title": "Demo", "version": "1.0.0"},
+            "spec": {
+                "judge": {"pipeline": "evidence-and-content"},
+                "cases": ["case.json"],
+                "defaults": {"maxTurns": 1, "actionMode": "read_only"},
+            },
+        }
+    )
+    assert manifest.spec.judge.pipeline == "evidence-and-content"
+
+
+@pytest.mark.parametrize(
+    "invalid_judge",
+    [
+        {"pipeline": "unknown-pipeline"},
+        {"pipeline": "gamr_engine.judges.evidence_and_content:pipeline"},
+        {"pipeline": "https://example.com/judge.py"},
+        {"pipeline": "sh -c echo"},
+        {"pipeline": "evidence-and-content", "extraField": "forbidden"},
+    ],
+)
+def test_task_spec_judge_rejects_invalid_or_extra_or_executable_values(
+    invalid_judge: dict[str, object],
+) -> None:
+    with pytest.raises(ValidationError):
+        TaskManifest.model_validate(
+            {
+                "metadata": {"id": "demo", "title": "Demo", "version": "1.0.0"},
+                "spec": {
+                    "judge": invalid_judge,
+                    "cases": ["case.json"],
+                    "defaults": {"maxTurns": 1, "actionMode": "read_only"},
+                },
+            }
+        )
 
 
 def test_evaluation_reference_rejects_non_synthetic_classification() -> None:

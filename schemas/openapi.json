@@ -2162,6 +2162,17 @@
             ],
             "title": "Summary"
           },
+          "fullSummary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fullsummary"
+          },
           "referenceSha256": {
             "anyOf": [
               {
@@ -2926,6 +2937,17 @@
                 "type": "null"
               }
             ]
+          },
+          "judgePipeline": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Judgepipeline"
           },
           "historyCaseIds": {
             "items": {

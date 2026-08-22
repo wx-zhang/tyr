@@ -1,4 +1,9 @@
-import type { ComponentPropsWithoutRef, ReactNode } from "react";
+import {
+  useId,
+  useState,
+  type ComponentPropsWithoutRef,
+  type ReactNode,
+} from "react";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -8,8 +13,14 @@ type MarkdownMessageProps = {
   content: string;
 };
 
+type ExpandableMarkdownMessageProps = MarkdownMessageProps & {
+  previewCharacters?: number;
+  expandLabel?: string;
+};
+
 function safeUrlTransform(url: string): string {
-  if (url.startsWith("#") || /^https?:\/\//i.test(url)) return defaultUrlTransform(url);
+  if (url.startsWith("#") || /^https?:\/\//i.test(url))
+    return defaultUrlTransform(url);
   return "";
 }
 
@@ -59,5 +70,38 @@ export function MarkdownMessage({ content }: MarkdownMessageProps) {
       <summary>Show full message</summary>
       <RenderedMarkdown content={content} />
     </details>
+  );
+}
+
+export function ExpandableMarkdownMessage({
+  content,
+  previewCharacters = 360,
+  expandLabel = "Show full justification",
+}: ExpandableMarkdownMessageProps) {
+  const [expanded, setExpanded] = useState(false);
+  const contentId = useId();
+  if (content.length <= previewCharacters) {
+    return <RenderedMarkdown content={content} />;
+  }
+  return (
+    <div className="expandable-message">
+      <RenderedMarkdown
+        content={`${content.slice(0, previewCharacters).trimEnd()}…`}
+      />
+      <button
+        type="button"
+        className="long-message-toggle"
+        aria-expanded={expanded}
+        aria-controls={contentId}
+        onClick={() => setExpanded((current) => !current)}
+      >
+        {expanded ? "Hide full justification" : expandLabel}
+      </button>
+      {expanded ? (
+        <div id={contentId} className="long-message-content">
+          <RenderedMarkdown content={content} />
+        </div>
+      ) : null}
+    </div>
   );
 }

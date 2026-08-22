@@ -92,6 +92,19 @@
       "title": "EvaluationReference",
       "type": "object"
     },
+    "JudgeConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "pipeline": {
+          "const": "evidence-and-content",
+          "default": "evidence-and-content",
+          "title": "Pipeline",
+          "type": "string"
+        }
+      },
+      "title": "JudgeConfig",
+      "type": "object"
+    },
     "PromptBundle": {
       "additionalProperties": false,
       "properties": {
@@ -400,6 +413,9 @@
           ],
           "default": null,
           "title": "Evaluation"
+        },
+        "judge": {
+          "$ref": "#/$defs/JudgeConfig"
         },
         "cases": {
           "items": {

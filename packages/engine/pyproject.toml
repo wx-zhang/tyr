@@ -7,7 +7,10 @@ name = "gamr-engine"
 version = "0.1.0"
 description = "GAMR experiment orchestration"
 requires-python = ">=3.14,<3.15"
-dependencies = ["gamr-core"]
+dependencies = [
+    "gamr-core",
+    "langgraph>=1.2,<2",
+]
 
 [tool.uv.sources]
 gamr-core = { workspace = true }

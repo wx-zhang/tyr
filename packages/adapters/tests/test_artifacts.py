@@ -7,6 +7,7 @@ from gamr_adapters.artifacts.evidence import BundleNormalizer
 from gamr_adapters.artifacts.filesystem import FilesystemArtifactStore, redact_payload
 from gamr_core import (
     CaseResult,
+    ContentOverlapResult,
     Evidence,
     ExecutionOutcome,
     ExperimentConfig,
@@ -29,6 +30,33 @@ def test_redact_payload_handles_keys_headers_and_configured_values() -> None:
         "nested": {"apiKey": "[REDACTED]", "message": "token=[REDACTED]"},
         "text": "Bearer [REDACTED] and [REDACTED]",
     }
+
+
+def test_redaction_keeps_content_overlap_summary_schema_valid(tmp_path: Path) -> None:
+    store = FilesystemArtifactStore(tmp_path / ".gamr", secrets=["s"])
+    store.write_json(
+        "runs/run-1/case-results/case-1.json",
+        {
+            "contentOverlap": {
+                "status": "not_found",
+                "assessmentStatus": "valid",
+                "summary": "x" * 599 + "s",
+                "matches": [],
+            }
+        },
+    )
+
+    payload = json.loads(
+        (tmp_path / ".gamr" / "runs" / "run-1" / "case-results" / "case-1.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    overlap = ContentOverlapResult.model_validate(payload["contentOverlap"])
+
+    assert len(overlap.summary or "") == 600
+    assert len(overlap.full_summary or "") == 609
+    assert "s" not in overlap.summary
+    assert "s" not in overlap.full_summary
 
 
 def test_raw_artifact_is_confined_and_redacted(tmp_path: Path) -> None:

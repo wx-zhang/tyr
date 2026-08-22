@@ -1444,6 +1444,38 @@
   text-transform: uppercase;
 }
 
+.content-comparison-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  text-align: left;
+  text-transform: inherit;
+}
+
+.content-comparison-toggle-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--accent);
+  font-size: var(--text-2xs);
+  letter-spacing: 0.04em;
+  text-transform: none;
+}
+
+.content-comparison-toggle-meta span[aria-hidden="true"] {
+  font-size: var(--text-lg);
+  line-height: 1;
+}
+
 .content-comparison .evaluation-facts {
   margin-bottom: var(--space-3);
 }
@@ -1704,6 +1736,16 @@
 .long-message summary {
   color: var(--accent);
   cursor: pointer;
+  font-weight: 500;
+}
+
+.long-message-toggle {
+  padding: 0;
+  border: 0;
+  color: var(--accent);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
   font-weight: 500;
 }
 

@@ -52,15 +52,26 @@ class TaskDefaults(BaseModel):
         return value
 
 
+JudgePipelineId = Literal["evidence-and-content"]
+
+
+class JudgeConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    pipeline: JudgePipelineId = "evidence-and-content"
+
+
 class TaskSpec(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     discovery: str | None = None
     methodology: str | None = None
     evaluation: str | None = None
+    judge: JudgeConfig = Field(default_factory=JudgeConfig)
     cases: list[str] = Field(min_length=1)
     defaults: TaskDefaults
     variables: dict[str, TaskVariable] = Field(default_factory=dict)
+
 
 
 class TaskManifest(BaseModel):

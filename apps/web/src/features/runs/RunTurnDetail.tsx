@@ -1,5 +1,6 @@
+import { useId, useState } from "react";
 import type { RunTurn } from "../../api/client";
-import { MarkdownMessage } from "./MarkdownMessage";
+import { ExpandableMarkdownMessage, MarkdownMessage } from "./MarkdownMessage";
 import {
   resolveHistoryCases,
   ScientistHistoryUsed,
@@ -41,6 +42,8 @@ export function RunTurnDetail({
   caseOriginById?: Map<string, HistoryCaseOrigin>;
   datasetCaseIds?: string[];
 }) {
+  const [contentComparisonOpen, setContentComparisonOpen] = useState(false);
+  const contentComparisonId = useId();
   const presentation = turnActivityPresentation(turn, scientistIteration);
   const evaluationResult = presentation.evaluation
     ? resultDisplay(turn.verdict, turn.objectiveStatus, turn.outcome)
@@ -48,6 +51,7 @@ export function RunTurnDetail({
   const discovered = presentation.discovery
     ? discoveryFields(turn.agentMessage ?? "")
     : [];
+  const contentOverlap = turn.contentOverlap;
 
   if (presentation.evaluation) {
     return (
@@ -77,62 +81,97 @@ export function RunTurnDetail({
                 </dd>
               </div>
             ) : null}
+            {turn.judgePipeline ? (
+              <div>
+                <dt>Pipeline</dt>
+                <dd>{label(turn.judgePipeline)}</dd>
+              </div>
+            ) : null}
           </dl>
-          {turn.contentOverlap ? (
+          {contentOverlap ? (
             <section
               className="content-comparison"
               aria-label="Sensitive content comparison"
             >
-              <h4>Sensitive content comparison</h4>
-              <dl className="evaluation-facts">
-                <div>
-                  <dt>Result</dt>
-                  <dd>{contentOverlapLabel(turn.contentOverlap.status)}</dd>
-                </div>
-                <div>
-                  <dt>Files checked</dt>
-                  <dd>{turn.contentOverlap.checkedFiles?.length ?? 0}</dd>
-                </div>
-                <div>
-                  <dt>Match types</dt>
-                  <dd>
-                    {turn.contentOverlap.matches?.length
-                      ? [
-                          ...new Set(
-                            turn.contentOverlap.matches.map(
-                              (match) => match.matchType,
-                            ),
-                          ),
-                        ]
-                          .map(label)
-                          .join(", ")
-                      : "—"}
-                  </dd>
-                </div>
-              </dl>
-              {turn.contentOverlap.summary ? (
-                <div className="content-comparison-assessment">
-                  <p className="muted">Comparison assessment</p>
-                  <MarkdownMessage content={turn.contentOverlap.summary} />
-                </div>
-              ) : null}
-              {turn.contentOverlap.checkedFiles?.length ? (
-                <ul
-                  className="content-comparison-files"
-                  aria-label="Files checked for sensitive content"
+              <h4>
+                <button
+                  type="button"
+                  className="content-comparison-toggle"
+                  aria-expanded={contentComparisonOpen}
+                  aria-controls={contentComparisonId}
+                  onClick={() =>
+                    setContentComparisonOpen((current) => !current)
+                  }
                 >
-                  {turn.contentOverlap.checkedFiles.map((file) => (
-                    <li key={`${file.fileId}-${file.sha256}`}>
-                      <span className="mono">{file.filename}</span>
-                    </li>
-                  ))}
-                </ul>
+                  <span>Sensitive content comparison</span>
+                  <span className="content-comparison-toggle-meta">
+                    {contentComparisonOpen ? "Hide details" : "Show details"}
+                    <span aria-hidden="true">
+                      {contentComparisonOpen ? "−" : "+"}
+                    </span>
+                  </span>
+                </button>
+              </h4>
+              {contentComparisonOpen ? (
+                <div
+                  id={contentComparisonId}
+                  className="content-comparison-details"
+                >
+                  <dl className="evaluation-facts">
+                    <div>
+                      <dt>Result</dt>
+                      <dd>{contentOverlapLabel(contentOverlap.status)}</dd>
+                    </div>
+                    <div>
+                      <dt>Files checked</dt>
+                      <dd>{contentOverlap.checkedFiles?.length ?? 0}</dd>
+                    </div>
+                    <div>
+                      <dt>Match types</dt>
+                      <dd>
+                        {contentOverlap.matches?.length
+                          ? [
+                              ...new Set(
+                                contentOverlap.matches.map(
+                                  (match) => match.matchType,
+                                ),
+                              ),
+                            ]
+                              .map(label)
+                              .join(", ")
+                          : "—"}
+                      </dd>
+                    </div>
+                  </dl>
+                  {contentOverlap.summary ? (
+                    <div className="content-comparison-assessment">
+                      <p className="muted">Comparison assessment</p>
+                      <MarkdownMessage
+                        content={
+                          contentOverlap.fullSummary ?? contentOverlap.summary
+                        }
+                      />
+                    </div>
+                  ) : null}
+                  {contentOverlap.checkedFiles?.length ? (
+                    <ul
+                      className="content-comparison-files"
+                      aria-label="Files checked for sensitive content"
+                    >
+                      {contentOverlap.checkedFiles.map((file) => (
+                        <li key={`${file.fileId}-${file.sha256}`}>
+                          <span className="mono">{file.filename}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
               ) : null}
             </section>
           ) : null}
           <section className="judge-assessment" aria-label="Judge assessment">
             <h4>Judge assessment</h4>
-            <MarkdownMessage
+            <ExpandableMarkdownMessage
               content={turn.assessmentSummary ?? turn.agentMessage ?? ""}
             />
             {turn.missingEvidence?.length ? (

@@ -498,6 +498,7 @@ def test_turn_normalization_includes_case_and_scientist_evaluations(tmp_path: Pa
         },
     ]
     result["summary"] = {"vulnerable": 1, "protected": 1, "inconclusive": 0}
+    result["judgePipeline"] = "evidence-and-content"
     (bundle / "result.json").write_text(json.dumps(result), encoding="utf-8")
 
     updates = normalize_turns(bundle, run_id="run-1")
@@ -509,9 +510,11 @@ def test_turn_normalization_includes_case_and_scientist_evaluations(tmp_path: Pa
     assert updates[0].assessment_summary == "The risky action was rejected."
     assert updates[0].assessment_status == "recovered"
     assert updates[0].reason_codes == ("policy_blocked_before_side_effect",)
+    assert updates[0].judge_pipeline == "evidence-and-content"
     assert updates[1].stage == "scientist"
     assert updates[1].verdict == "vulnerable"
     assert updates[1].occurred_at == datetime(2026, 8, 10, 10, 2, tzinfo=UTC)
+    assert updates[1].judge_pipeline == "evidence-and-content"
 
 
 def test_turn_normalization_interleaves_scientist_execution_and_evaluation(
@@ -636,6 +639,40 @@ def test_turn_normalization_ignores_malformed_result(tmp_path: Path) -> None:
     (bundle / "result.json").write_text("{not-json}", encoding="utf-8")
 
     assert normalize_turns(bundle, run_id="run-1") == []
+
+
+def test_turn_normalization_recovers_redacted_evaluation_provenance(
+    tmp_path: Path,
+) -> None:
+    bundle = tmp_path / "redacted-evaluation"
+    case_dir = bundle / "case-results"
+    case_dir.mkdir(parents=True)
+    case = {
+        "scenarioId": "case-1",
+        "outcome": "completed",
+        "objectiveStatus": "unknown",
+        "verdict": "inconclusive",
+        "summary": "x" * 601,
+        "evidence": [],
+        "assessmentStatus": "valid",
+        "contentOverlap": {
+            "status": "not_found",
+            "assessmentStatus": "valid",
+            "summary": "x" * 601,
+            "matches": [],
+        },
+    }
+    (bundle / "result.json").write_text(
+        json.dumps({"judgePipeline": "evidence-and-content", "cases": [case]}),
+        encoding="utf-8",
+    )
+    (case_dir / "case-1.json").write_text(json.dumps(case), encoding="utf-8")
+
+    updates = normalize_turns(bundle, run_id="run-1")
+
+    assert len(updates) == 1
+    assert updates[0].update_type == "evaluation"
+    assert updates[0].judge_pipeline == "evidence-and-content"
 
 
 def test_turn_normalization_supports_legacy_roles_and_redacts_secrets(tmp_path: Path) -> None:

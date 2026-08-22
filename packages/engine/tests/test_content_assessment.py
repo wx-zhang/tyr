@@ -1,15 +1,14 @@
 from __future__ import annotations
 
 import json
-from typing import cast
 
 import pytest
 from gamr_core import (
     AssessmentStatus,
     CheckedContentFile,
     ContentOverlapStatus,
+    EvaluationPlan,
     Scenario,
-    TaskManifest,
 )
 from gamr_engine.collector_verification import CollectorFile, CollectorVerification
 from gamr_engine.content_assessment import ContentAssessmentService
@@ -19,9 +18,9 @@ from gamr_engine.content_evidence import (
     UploadedContentItem,
 )
 from gamr_engine.content_pipeline import ContentAssessmentPipeline
-from gamr_engine.ports.artifacts import ArtifactStore
+from gamr_engine.judges.contracts import JudgeRequest, JudgeRuntime
+from gamr_engine.judges.registry import get_judge_pipeline
 from gamr_engine.ports.models import ModelImage
-from gamr_engine.runner import ExperimentRunner, LoadedTask
 
 
 class MultimodalModel:
@@ -258,33 +257,7 @@ async def test_runner_persists_only_safe_content_diagnostics() -> None:
             writes[path] = payload
             return path
 
-    manifest = TaskManifest.model_validate(
-        {
-            "metadata": {"id": "demo", "title": "Demo", "version": "1.0.0"},
-            "spec": {
-                "cases": ["case.json"],
-                "defaults": {"maxTurns": 1, "actionMode": "read_only"},
-            },
-        }
-    )
-    scenario = Scenario.model_validate(
-        {
-            "metadata": {"id": "case", "title": "Case"},
-            "spec": {
-                "objective": "Upload.",
-                "steps": ["Upload."],
-                "expectedControl": "Require approval.",
-                "evidenceRequirements": ["File."],
-                "collectorEvidence": "file",
-            },
-        }
-    )
-    task = LoadedTask(
-        manifest,
-        [scenario],
-        {},
-        assessment_reference=_reference(),
-    )
+    pipeline = ContentAssessmentPipeline(Provider())
     verification = CollectorVerification(
         "request-1",
         "file",
@@ -292,20 +265,12 @@ async def test_runner_persists_only_safe_content_diagnostics() -> None:
         [CollectorFile("file-1", "evidence.txt", "text/plain", 32, "b" * 64)],
     )
     model = MultimodalModel([_response("not_found", [])])
-    runner = ExperimentRunner(content_evidence_provider=Provider())
+    outcome = await pipeline.assess(_reference(), [verification], model)
+    artifacts = Artifacts()
+    artifacts.write_json("runs/run-1/content-assessments/case.json", outcome.diagnostic)
 
-    result = await runner._assess_content(
-        task,
-        scenario,
-        [verification],
-        model,
-        "run-1",
-        "case",
-        cast(ArtifactStore, Artifacts()),
-    )
-
-    assert result is not None
-    assert result.status is ContentOverlapStatus.NOT_FOUND
+    assert outcome.result is not None
+    assert outcome.result.status is ContentOverlapStatus.NOT_FOUND
     persisted = json.dumps(writes)
     assert "synthetic-value" not in persisted
     assert "content-assessments/case.json" in persisted
@@ -317,15 +282,7 @@ async def test_runner_skips_content_check_without_task_reference() -> None:
         async def load(self, files: list[CollectorFile]) -> ContentEvidenceBatch:
             raise AssertionError("content provider must not be called")
 
-    manifest = TaskManifest.model_validate(
-        {
-            "metadata": {"id": "demo", "title": "Demo", "version": "1.0.0"},
-            "spec": {
-                "cases": ["case.json"],
-                "defaults": {"maxTurns": 1, "actionMode": "read_only"},
-            },
-        }
-    )
+    pipeline = get_judge_pipeline("evidence-and-content")
     scenario = Scenario.model_validate(
         {
             "metadata": {"id": "case", "title": "Case"},
@@ -338,19 +295,29 @@ async def test_runner_skips_content_check_without_task_reference() -> None:
             },
         }
     )
-    runner = ExperimentRunner(content_evidence_provider=Provider())
-
-    result = await runner._assess_content(
-        LoadedTask(manifest, [scenario], {}),
-        scenario,
-        [],
-        MultimodalModel([]),
-        "run-1",
-        "case",
-        None,
+    request = JudgeRequest(
+        scenario=scenario,
+        title="Case",
+        objective="Upload.",
+        steps=["Upload."],
+        success_criteria="Criteria",
+        expected_control="Require approval.",
+        transcript=[],
+        turn_ids=[],
+        execution_error=None,
+        verifications=[],
+        evaluation_plan=EvaluationPlan(prompt="Assess."),
+        assessment_reference=None,
+        phase="base",
     )
-
-    assert result is None
+    runtime = JudgeRuntime(
+        judge_model=MultimodalModel([]),
+        content_evidence_provider=Provider(),
+        run_id="run-1",
+        case_id="case",
+    )
+    result = await pipeline.run(request, runtime)
+    assert result.content_overlap is None
 
 
 @pytest.mark.asyncio

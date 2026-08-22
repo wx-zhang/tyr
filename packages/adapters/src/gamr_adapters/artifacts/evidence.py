@@ -83,6 +83,7 @@ class NormalizedTurn:
     reason_codes: tuple[str, ...] = ()
     missing_evidence: tuple[str, ...] = ()
     content_overlap: dict[str, object] | None = None
+    judge_pipeline: str | None = None
     history_case_ids: tuple[str, ...] = ()
     history_case_origins: tuple[str, ...] = ()
 
@@ -334,12 +335,8 @@ def load_run_result(root: str | Path, secrets: Iterable[str] = ()) -> RunResult 
     if not path.is_file():
         return None
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-        result = RunResult.model_validate(payload)
-        safe_payload = redact_payload(
-            result.model_dump(by_alias=True, exclude_none=True, mode="json"), secrets
-        )
-        return RunResult.model_validate(safe_payload)
+        payload = redact_payload(json.loads(path.read_text(encoding="utf-8")), secrets)
+        return RunResult.model_validate(payload)
     except OSError, json.JSONDecodeError, UnicodeDecodeError, ValidationError:
         return None
 
@@ -484,6 +481,7 @@ def _evaluation_turn_from_case(
     case: CaseResult,
     stage: str,
     occurred_at: datetime | None,
+    judge_pipeline: str | None = None,
 ) -> NormalizedTurn:
     return NormalizedTurn(
         id=f"{run_id}-evaluation-{case.scenario_id}",
@@ -510,6 +508,7 @@ def _evaluation_turn_from_case(
             if case.content_overlap is not None
             else None
         ),
+        judge_pipeline=judge_pipeline,
     )
 
 
@@ -518,6 +517,7 @@ def _evaluation_turns_from_case_results(
     *,
     run_id: str,
     secrets: Iterable[str] = (),
+    judge_pipeline: str | None = None,
 ) -> list[NormalizedTurn]:
     directory = root / "case-results"
     if not directory.is_dir():
@@ -556,9 +556,22 @@ def _evaluation_turns_from_case_results(
                 case=case,
                 stage=stage,
                 occurred_at=occurred_at,
+                judge_pipeline=judge_pipeline,
             )
         )
     return updates
+
+
+def _stored_judge_pipeline(root: Path, secrets: Iterable[str] = ()) -> str | None:
+    path = root / "result.json"
+    if not path.is_file():
+        return None
+    try:
+        payload = redact_payload(json.loads(path.read_text(encoding="utf-8")), secrets)
+    except OSError, json.JSONDecodeError, UnicodeDecodeError:
+        return None
+    value = payload.get("judgePipeline") if isinstance(payload, dict) else None
+    return value if isinstance(value, str) and value else None
 
 
 def _evaluation_turns(
@@ -580,10 +593,16 @@ def _evaluation_turns(
                     case=case,
                     stage=stage,
                     occurred_at=occurred_at,
+                    judge_pipeline=result.judge_pipeline,
                 )
             )
         return updates
-    return _evaluation_turns_from_case_results(root, run_id=run_id, secrets=secrets)
+    return _evaluation_turns_from_case_results(
+        root,
+        run_id=run_id,
+        secrets=secrets,
+        judge_pipeline=_stored_judge_pipeline(root, secrets),
+    )
 
 
 def normalize_turns(
@@ -720,6 +739,7 @@ def normalize_turns(
             reason_codes=turn.reason_codes,
             missing_evidence=turn.missing_evidence,
             content_overlap=turn.content_overlap,
+            judge_pipeline=turn.judge_pipeline,
             history_case_ids=turn.history_case_ids,
             history_case_origins=turn.history_case_origins,
         )

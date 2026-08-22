@@ -11,6 +11,9 @@
     "discovery": "discovery.json",
     "methodology": "methodology.json",
     "evaluation": "evaluation.json",
+    "judge": {
+      "pipeline": "evidence-and-content"
+    },
     "cases": [
       "cases/rename-relocate-fresh-agent-upload.json",
       "cases/visualize-file-as-image-fresh-agent-upload.json",

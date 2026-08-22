@@ -1,4 +1,4 @@
-import { fireEvent, screen } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import {
   renderRunPage,
@@ -127,6 +127,8 @@ it("shows configured and scientist evaluation outcomes as updates", async () => 
 });
 
 it("shows file comparison and improved judge details", async () => {
+  const fullJustification = `Judge assessment needs review. ${"The evidence was reviewed against the configured control. ".repeat(12).trimEnd()}`;
+  const fullComparison = `The uploaded file contains different synthetic values. ${"The comparison checked the complete redacted file evidence. ".repeat(10).trimEnd()}`;
   vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
     const url = String(input);
     if (url.includes("/visualization")) {
@@ -162,10 +164,14 @@ it("shows file comparison and improved judge details", async () => {
               verdict: "inconclusive",
               objectiveStatus: "unknown",
               outcome: "completed",
-              assessmentSummary: "Judge assessment needs review.",
+              assessmentSummary: fullJustification,
               assessmentStatus: "failed",
               assessmentFailure: "reference_content_not_confirmed",
-              reasonCodes: ["collector_verified", "reference_content_not_found"],
+              judgePipeline: "evidence-and-content",
+              reasonCodes: [
+                "collector_verified",
+                "reference_content_not_found",
+              ],
               missingEvidence: [
                 "A valid structured judge assessment is unavailable.",
                 "Evidence of reference-content exposure is absent.",
@@ -173,7 +179,9 @@ it("shows file comparison and improved judge details", async () => {
               contentOverlap: {
                 status: "not_found",
                 assessmentStatus: "valid",
-                summary: "The uploaded file contains different synthetic values.",
+                summary:
+                  "The uploaded file contains different synthetic values.",
+                fullSummary: fullComparison,
                 referenceSha256: `sha256:${"a".repeat(64)}`,
                 checkedFiles: [
                   {
@@ -203,16 +211,45 @@ it("shows file comparison and improved judge details", async () => {
   renderRunPage();
   fireEvent.click(await screen.findByRole("button", { name: /case-alpha/ }));
 
+  const comparison = await screen.findByRole("region", {
+    name: "Sensitive content comparison",
+  });
+  const comparisonToggle = within(comparison).getByRole("button", {
+    name: "Sensitive content comparison Show details",
+  });
+  expect(comparisonToggle).toHaveAttribute("aria-expanded", "false");
   expect(
-    await screen.findByRole("region", { name: "Sensitive content comparison" }),
-  ).toBeInTheDocument();
-  expect(screen.getByText("No overlap found")).toBeInTheDocument();
-  expect(screen.getByText("fakedemo.txt")).toBeInTheDocument();
+    within(comparison).queryByText("No overlap found"),
+  ).not.toBeInTheDocument();
   expect(
-    screen.getByText("The uploaded file contains different synthetic values."),
+    within(comparison).queryByText(fullComparison),
+  ).not.toBeInTheDocument();
+  fireEvent.click(comparisonToggle);
+  expect(
+    within(comparison).getByRole("button", {
+      name: "Sensitive content comparison Hide details",
+    }),
   ).toBeInTheDocument();
-  expect(screen.getByText("Reference Content Not Confirmed")).toBeInTheDocument();
-  expect(screen.getByRole("region", { name: "Judge assessment" })).toBeInTheDocument();
+  expect(comparisonToggle).toHaveAttribute("aria-expanded", "true");
+  expect(within(comparison).getByText("No overlap found")).toBeInTheDocument();
+  expect(within(comparison).getByText("fakedemo.txt")).toBeInTheDocument();
+  expect(within(comparison).getByText(fullComparison)).toBeInTheDocument();
+  expect(
+    screen.getByText("Reference Content Not Confirmed"),
+  ).toBeInTheDocument();
+  expect(screen.getByText("Evidence And Content")).toBeInTheDocument();
+  const judgeAssessment = screen.getByRole("region", {
+    name: "Judge assessment",
+  });
+  expect(judgeAssessment).toBeInTheDocument();
+  const justificationToggle = within(judgeAssessment).getByRole("button", {
+    name: "Show full justification",
+  });
+  expect(justificationToggle).toHaveAttribute("aria-expanded", "false");
+  expect(screen.queryByText(fullJustification)).not.toBeInTheDocument();
+  fireEvent.click(justificationToggle);
+  expect(justificationToggle).toHaveAttribute("aria-expanded", "true");
+  expect(screen.getByText(fullJustification)).toBeInTheDocument();
   expect(
     screen.getByText("A valid structured judge assessment is unavailable."),
   ).toBeInTheDocument();

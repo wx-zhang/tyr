@@ -13,7 +13,7 @@ export function label(value: string | null | undefined): string {
   if (value === "ready") return "Ready";
   if (value === "skipped") return "Skipped";
   return value
-    .replaceAll("_", " ")
+    .replaceAll(/[_-]/g, " ")
     .replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
