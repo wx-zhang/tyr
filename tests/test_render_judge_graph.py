@@ -26,6 +26,29 @@ def test_render_judge_graph_valid_directory(tmp_path: Path) -> None:
         assert img.height > 0
 
 
+def test_render_judge_graph_includes_expected_nodes(tmp_path: Path) -> None:
+    from gamr_engine.judges.registry import get_judge_pipeline
+
+    judge_dir = Path("packages/engine/src/gamr_engine/judges/evidence_and_content")
+    out_dir = tmp_path / "docs" / "assets" / "judges"
+    out_dir.mkdir(parents=True)
+    target = out_dir / "evidence-and-content.png"
+
+    result_path = render_judge_graph(judge_dir, destination=target)
+    assert result_path.exists()
+
+    pipeline = get_judge_pipeline("evidence-and-content")
+    nodes = set(pipeline.graph.get_graph().nodes.keys())
+    expected_nodes = {
+        "prepare_verified_content",
+        "decode_trajectory_content",
+        "compare_reference_content",
+        "assess_evidence",
+        "finalize_judgment",
+    }
+    assert expected_nodes.issubset(nodes)
+
+
 def test_render_judge_graph_repeated_output_and_atomic_replacement(tmp_path: Path) -> None:
     judge_dir = Path("packages/engine/src/gamr_engine/judges/evidence_and_content")
     out_dir = tmp_path / "docs" / "assets" / "judges"
