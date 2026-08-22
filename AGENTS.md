@@ -15,6 +15,7 @@ Tyr is a security and governance layer for AI agents. It sits between an AI agen
 - Read-only is the default. Real actions always require explicit, recorded human approval, and secrets must never enter persisted evidence.
 - Put module-specific architecture, commands, conventions, and tests in the nearest child `AGENTS.md`; do not duplicate them here.
 - Keep every `AGENTS.md` below 300 lines and follow the root file's general pattern: purpose, scoped standards, layout or ownership, working commands, safety/testing rules, and coding standards. Omit sections that do not apply.
+- Avoid using lazy-import. Imports should be placed on top, unless it's required by the circurral dependency.
 
 ## Repository Layout
 
