@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 from gamr_adapters.config import Settings
+from pydantic import ValidationError
 
 
 def test_settings_load_provider_env_names(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -76,3 +77,38 @@ def test_settings_ignore_removed_gamr_provider_names(
     assert settings.tyr_mcp_token == ""
     assert settings.model_api_key == ""
     assert settings.model_name == ""
+
+
+def test_max_concurrent_decoders_defaults_to_two(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("GAMR_MAX_CONCURRENT_DECODERS", raising=False)
+
+    settings = Settings()
+
+    assert settings.max_concurrent_decoders == 2
+
+
+@pytest.mark.parametrize("value", [1, 2, 5, 10, 100])
+def test_max_concurrent_decoders_accepts_positive_integers(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, value: int
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("GAMR_MAX_CONCURRENT_DECODERS", str(value))
+
+    settings = Settings()
+
+    assert settings.max_concurrent_decoders == value
+
+
+@pytest.mark.parametrize("invalid_value", [0, -1, -5, "abc", "1.5", ""])
+def test_max_concurrent_decoders_rejects_zero_negative_and_non_integer(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, invalid_value: object
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("GAMR_MAX_CONCURRENT_DECODERS", str(invalid_value))
+
+    with pytest.raises(ValidationError):
+        Settings()
+

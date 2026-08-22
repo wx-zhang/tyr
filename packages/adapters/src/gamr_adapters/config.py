@@ -45,6 +45,11 @@ class Settings(BaseSettings):
         ge=1,
         validation_alias="GAMR_MAX_CONCURRENT_RUNS",
     )
+    max_concurrent_decoders: int = Field(
+        default=2,
+        ge=1,
+        validation_alias="GAMR_MAX_CONCURRENT_DECODERS",
+    )
     sandbox_backend: Literal["docker", "host-unsafe", "disabled"] = Field(
         default="docker",
         validation_alias="GAMR_SANDBOX_BACKEND",

@@ -14,7 +14,7 @@ Keep all provider and persistence access behind protocols. CLI and API use the s
 `assessment.py` builds and validates the evidence judge contract,
 `assessment_contract.py` owns its strict schema, `content_assessment.py` owns
 the synthetic-reference overlap judge, `content_pipeline.py` coordinates
-verified collector content, and `content_evidence.py` owns the in-memory contracts,
+verified collector content, `decoder_capacity.py` owns the process-wide decoder-sandbox capacity gate, and `content_evidence.py` owns the in-memory contracts,
 `judges/` contains predefined judge pipelines orchestrated with LangGraph StateGraph:
 - `judges/contracts.py`: `JudgeRequest`, `JudgeRuntime`, `JudgeResult`, and `JudgePipeline` protocol
 - `judges/registry.py`: immutable registry mapping `JudgePipelineId` to pipeline implementations
