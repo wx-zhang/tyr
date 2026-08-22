@@ -2198,6 +2198,16 @@
             },
             "type": "array",
             "title": "Matches"
+          },
+          "decoding": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DecodingProvenance"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -2217,6 +2227,137 @@
           "inconclusive"
         ],
         "title": "ContentOverlapStatus"
+      },
+      "DecodingFailureCode": {
+        "type": "string",
+        "enum": [
+          "invalid_agent_response",
+          "unknown_tool_or_input",
+          "attempt_exhaustion",
+          "sandbox_unavailable",
+          "unsafe_isolation",
+          "infrastructure_failure",
+          "timeout",
+          "output_limit",
+          "unavailable_import",
+          "empty_output",
+          "invalid_output_tree",
+          "ambiguous_lineage",
+          "preparation_failure"
+        ],
+        "title": "DecodingFailureCode"
+      },
+      "DecodingLimitFlags": {
+        "properties": {
+          "timedOut": {
+            "type": "boolean",
+            "title": "Timedout",
+            "default": false
+          },
+          "outputLimited": {
+            "type": "boolean",
+            "title": "Outputlimited",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "DecodingLimitFlags"
+      },
+      "DecodingProvenance": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/DecodingStatus"
+          },
+          "attemptCount": {
+            "type": "integer",
+            "maximum": 3.0,
+            "minimum": 0.0,
+            "title": "Attemptcount",
+            "default": 0
+          },
+          "failureCode": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DecodingFailureCode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "programSha256": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Programsha256"
+          },
+          "limitFlags": {
+            "$ref": "#/components/schemas/DecodingLimitFlags"
+          },
+          "derivedFiles": {
+            "items": {
+              "$ref": "#/components/schemas/DerivedContentFile"
+            },
+            "type": "array",
+            "title": "Derivedfiles"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "DecodingProvenance"
+      },
+      "DecodingStatus": {
+        "type": "string",
+        "enum": [
+          "succeeded",
+          "failed",
+          "skipped"
+        ],
+        "title": "DecodingStatus"
+      },
+      "DerivedContentFile": {
+        "properties": {
+          "sourceFileId": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Sourcefileid"
+          },
+          "uploadedItemId": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Uploadeditemid"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Sha256"
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Size"
+          },
+          "detectedContentType": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Detectedcontenttype"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "sourceFileId",
+          "uploadedItemId",
+          "sha256",
+          "size",
+          "detectedContentType"
+        ],
+        "title": "DerivedContentFile"
       },
       "DiscoveryField": {
         "properties": {

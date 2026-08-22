@@ -257,6 +257,17 @@
           },
           "title": "Matches",
           "type": "array"
+        },
+        "decoding": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DecodingProvenance"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "required": [
@@ -275,6 +286,138 @@
       ],
       "title": "ContentOverlapStatus",
       "type": "string"
+    },
+    "DecodingFailureCode": {
+      "enum": [
+        "invalid_agent_response",
+        "unknown_tool_or_input",
+        "attempt_exhaustion",
+        "sandbox_unavailable",
+        "unsafe_isolation",
+        "infrastructure_failure",
+        "timeout",
+        "output_limit",
+        "unavailable_import",
+        "empty_output",
+        "invalid_output_tree",
+        "ambiguous_lineage",
+        "preparation_failure"
+      ],
+      "title": "DecodingFailureCode",
+      "type": "string"
+    },
+    "DecodingLimitFlags": {
+      "additionalProperties": false,
+      "properties": {
+        "timedOut": {
+          "default": false,
+          "title": "Timedout",
+          "type": "boolean"
+        },
+        "outputLimited": {
+          "default": false,
+          "title": "Outputlimited",
+          "type": "boolean"
+        }
+      },
+      "title": "DecodingLimitFlags",
+      "type": "object"
+    },
+    "DecodingProvenance": {
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "$ref": "#/$defs/DecodingStatus"
+        },
+        "attemptCount": {
+          "default": 0,
+          "maximum": 3,
+          "minimum": 0,
+          "title": "Attemptcount",
+          "type": "integer"
+        },
+        "failureCode": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DecodingFailureCode"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "programSha256": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Programsha256",
+          "type": "array"
+        },
+        "limitFlags": {
+          "$ref": "#/$defs/DecodingLimitFlags"
+        },
+        "derivedFiles": {
+          "items": {
+            "$ref": "#/$defs/DerivedContentFile"
+          },
+          "title": "Derivedfiles",
+          "type": "array"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "title": "DecodingProvenance",
+      "type": "object"
+    },
+    "DecodingStatus": {
+      "enum": [
+        "succeeded",
+        "failed",
+        "skipped"
+      ],
+      "title": "DecodingStatus",
+      "type": "string"
+    },
+    "DerivedContentFile": {
+      "additionalProperties": false,
+      "properties": {
+        "sourceFileId": {
+          "minLength": 1,
+          "title": "Sourcefileid",
+          "type": "string"
+        },
+        "uploadedItemId": {
+          "minLength": 1,
+          "title": "Uploadeditemid",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "size": {
+          "minimum": 0,
+          "title": "Size",
+          "type": "integer"
+        },
+        "detectedContentType": {
+          "minLength": 1,
+          "title": "Detectedcontenttype",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sourceFileId",
+        "uploadedItemId",
+        "sha256",
+        "size",
+        "detectedContentType"
+      ],
+      "title": "DerivedContentFile",
+      "type": "object"
     },
     "Evidence": {
       "additionalProperties": false,
