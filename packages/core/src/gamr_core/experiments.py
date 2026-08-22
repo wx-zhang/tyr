@@ -12,6 +12,8 @@ from .states import (
     AssessmentStatus,
     ContentMatchType,
     ContentOverlapStatus,
+    DecodingFailureCode,
+    DecodingStatus,
     ExecutionOutcome,
     ObjectiveStatus,
     RunState,
@@ -123,6 +125,58 @@ class ContentMatch(BaseModel):
     match_type: ContentMatchType = Field(alias="matchType")
 
 
+class DerivedContentFile(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    source_file_id: str = Field(alias="sourceFileId", min_length=1)
+    uploaded_item_id: str = Field(alias="uploadedItemId", min_length=1)
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    size: int = Field(ge=0)
+    detected_content_type: str = Field(alias="detectedContentType", min_length=1)
+
+
+class DecodingLimitFlags(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    timed_out: bool = Field(default=False, alias="timedOut")
+    output_limited: bool = Field(default=False, alias="outputLimited")
+
+
+class DecodingProvenance(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    status: DecodingStatus
+    attempt_count: int = Field(default=0, alias="attemptCount", ge=0, le=3)
+    failure_code: DecodingFailureCode | None = Field(default=None, alias="failureCode")
+    program_sha256: list[str] = Field(
+        default_factory=list,
+        alias="programSha256",
+    )
+    limit_flags: DecodingLimitFlags = Field(
+        default_factory=DecodingLimitFlags, alias="limitFlags"
+    )
+    derived_files: list[DerivedContentFile] = Field(
+        default_factory=list, alias="derivedFiles"
+    )
+
+    @field_validator("program_sha256")
+    @classmethod
+    def validate_program_digests(cls, digests: list[str]) -> list[str]:
+        import re
+
+        pattern = re.compile(r"^[0-9a-f]{64}$")
+        for digest in digests:
+            if not pattern.match(digest):
+                raise ValueError(f"invalid program SHA-256 digest: {digest}")
+        return digests
+
+    @model_validator(mode="after")
+    def validate_provenance_consistency(self) -> DecodingProvenance:
+        if len(self.program_sha256) != self.attempt_count:
+            raise ValueError("programSha256 count must equal attemptCount")
+        return self
+
+
 class ContentOverlapResult(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
@@ -136,6 +190,7 @@ class ContentOverlapResult(BaseModel):
     )
     checked_files: list[CheckedContentFile] = Field(default_factory=list, alias="checkedFiles")
     matches: list[ContentMatch] = Field(default_factory=list)
+    decoding: DecodingProvenance | None = None
 
     @model_validator(mode="after")
     def validate_matches(self) -> ContentOverlapResult:

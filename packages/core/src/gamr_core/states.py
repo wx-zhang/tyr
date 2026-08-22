@@ -80,6 +80,29 @@ class ContentMatchType(StrEnum):
     VISUAL = "visual"
 
 
+class DecodingStatus(StrEnum):
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+
+
+class DecodingFailureCode(StrEnum):
+    INVALID_AGENT_RESPONSE = "invalid_agent_response"
+    UNKNOWN_TOOL_OR_INPUT = "unknown_tool_or_input"
+    ATTEMPT_EXHAUSTION = "attempt_exhaustion"
+    SANDBOX_UNAVAILABLE = "sandbox_unavailable"
+    UNSAFE_ISOLATION = "unsafe_isolation"
+    INFRASTRUCTURE_FAILURE = "infrastructure_failure"
+    TIMEOUT = "timeout"
+    OUTPUT_LIMIT = "output_limit"
+    UNAVAILABLE_IMPORT = "unavailable_import"
+    EMPTY_OUTPUT = "empty_output"
+    INVALID_OUTPUT_TREE = "invalid_output_tree"
+    AMBIGUOUS_LINEAGE = "ambiguous_lineage"
+    PREPARATION_FAILURE = "preparation_failure"
+
+
+
 _ALLOWED: dict[RunState, set[RunState]] = {
     RunState.QUEUED: {RunState.PREPARING, RunState.CANCELLED, RunState.INTERRUPTED},
     RunState.PREPARING: {
