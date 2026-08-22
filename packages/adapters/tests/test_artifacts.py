@@ -267,3 +267,143 @@ def test_configured_secret_stays_out_of_legacy_search_graph_and_download_views(
 
     assert secret not in json.dumps(normalized.activities, default=str)
     assert secret not in json.dumps(normalized.evidence, default=str)
+
+
+def test_redaction_preserves_safe_decoding_provenance_and_strips_sensitive_data() -> None:
+    secret = "configured-secret-token"
+    overlap_payload = {
+        "status": "confirmed",
+        "assessmentStatus": "valid",
+        "summary": f"Overlap found with {secret}",
+        "referenceSha256": "sha256:" + "a" * 64,
+        "checkedFiles": [
+            {
+                "fileId": "file-1",
+                "filename": "data.bin",
+                "contentType": "application/octet-stream",
+                "size": 128,
+                "sha256": "b" * 64,
+            }
+        ],
+        "matches": [
+            {
+                "referenceItemId": "ref-0001",
+                "uploadedItemId": "item-0001",
+                "matchType": "exact",
+            }
+        ],
+        "decoding": {
+            "status": "succeeded",
+            "attemptCount": 1,
+            "failureCode": None,
+            "programSha256": ["c" * 64],
+            "limitFlags": {"timedOut": False, "outputLimited": False},
+            "derivedFiles": [
+                {
+                    "sourceFileId": "file-1",
+                    "uploadedItemId": "item-0001",
+                    "sha256": "d" * 64,
+                    "size": 64,
+                    "detectedContentType": "text/plain",
+                }
+            ],
+            # Sensitive / ephemeral fields that should never survive or be retained
+            "generatedSource": "print('secret code')",
+            "decodedContent": "secret content bytes",
+            "stdout": "secret output",
+            "stderr": "error: secret info",
+            "exception": "SecretException: failed",
+            "sandboxId": "sbx-12345",
+            "containerName": "docker-gamr-sbx",
+            "hostPath": "/tmp/host/secret/path",
+            "apiKey": secret,
+        },
+    }
+
+    redacted = redact_payload({"contentOverlap": overlap_payload}, secrets=[secret])
+    overlap = redacted["contentOverlap"]
+
+    # Safe provenance is preserved
+    assert overlap["status"] == "confirmed"
+    assert overlap["summary"] == "Overlap found with [REDACTED]"
+    assert "decoding" in overlap
+    decoding = overlap["decoding"]
+    assert decoding["status"] == "succeeded"
+    assert decoding["attemptCount"] == 1
+    assert decoding["failureCode"] is None
+    assert decoding["programSha256"] == ["c" * 64]
+    assert decoding["limitFlags"] == {"timedOut": False, "outputLimited": False}
+    assert len(decoding["derivedFiles"]) == 1
+    assert decoding["derivedFiles"][0]["sourceFileId"] == "file-1"
+    assert decoding["derivedFiles"][0]["uploadedItemId"] == "item-0001"
+    assert decoding["derivedFiles"][0]["sha256"] == "d" * 64
+    assert decoding["derivedFiles"][0]["size"] == 64
+    assert decoding["derivedFiles"][0]["detectedContentType"] == "text/plain"
+
+    # Ephemeral / sensitive keys must be excluded
+    for forbidden in (
+        "generatedSource",
+        "decodedContent",
+        "stdout",
+        "stderr",
+        "exception",
+        "sandboxId",
+        "containerName",
+        "hostPath",
+        "apiKey",
+    ):
+        assert forbidden not in decoding
+
+    # Validates into core model
+    validated = ContentOverlapResult.model_validate(overlap)
+    assert validated.decoding is not None
+    assert validated.decoding.status.value == "succeeded"
+    assert validated.decoding.attempt_count == 1
+    assert len(validated.decoding.derived_files) == 1
+
+
+def test_redaction_handles_decoding_safe_failure_and_limit_flags() -> None:
+    secret = "super-secret-key"
+    overlap_payload = {
+        "status": "inconclusive",
+        "assessmentStatus": "failed",
+        "summary": f"Failed with {secret}",
+        "checkedFiles": [
+            {
+                "fileId": "file-1",
+                "filename": "archive.tar",
+                "contentType": "application/x-tar",
+                "size": 500,
+                "sha256": "e" * 64,
+            }
+        ],
+        "matches": [],
+        "decoding": {
+            "status": "failed",
+            "attemptCount": 2,
+            "failureCode": "timeout",
+            "programSha256": ["1" * 64, "2" * 64],
+            "limitFlags": {"timedOut": True, "outputLimited": False},
+            "derivedFiles": [],
+            "stdout": secret,
+            "exception": f"TimeoutError: {secret}",
+        },
+    }
+
+    redacted = redact_payload({"contentOverlap": overlap_payload}, secrets=[secret])
+    decoding = redacted["contentOverlap"]["decoding"]
+    assert decoding["status"] == "failed"
+    assert decoding["attemptCount"] == 2
+    assert decoding["failureCode"] == "timeout"
+    assert decoding["limitFlags"] == {"timedOut": True, "outputLimited": False}
+    assert decoding["programSha256"] == ["1" * 64, "2" * 64]
+    assert decoding["derivedFiles"] == []
+    assert "stdout" not in decoding
+    assert "exception" not in decoding
+
+    validated = ContentOverlapResult.model_validate(redacted["contentOverlap"])
+    assert validated.decoding is not None
+    assert validated.decoding.failure_code is not None
+    assert validated.decoding.failure_code.value == "timeout"
+    assert validated.decoding.limit_flags.timed_out is True
+

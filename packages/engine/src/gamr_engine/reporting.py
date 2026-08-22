@@ -24,6 +24,22 @@ def render_markdown(result: RunResult) -> str:
         f"{case.verdict} | {case.summary.replace('|', '\\|')} |"
         for case in result.cases
     )
+    decoding_cases = [
+        case for case in result.cases
+        if case.content_overlap and case.content_overlap.decoding
+    ]
+    if decoding_cases:
+        lines.extend(["", "## Trajectory Decoding", ""])
+        for case in decoding_cases:
+            assert case.content_overlap is not None
+            dec = case.content_overlap.decoding
+            assert dec is not None
+            details = [f"status `{dec.status.value}`", f"attempts {dec.attempt_count}"]
+            if dec.failure_code:
+                details.append(f"failure `{dec.failure_code.value}`")
+            if dec.derived_files:
+                details.append(f"derived files {len(dec.derived_files)}")
+            lines.append(f"- **{case.scenario_id}**: {', '.join(details)}")
     if result.errors:
         lines.extend(["", "## Errors", "", *[f"- {error}" for error in result.errors]])
     return "\n".join(lines) + "\n"

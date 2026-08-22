@@ -1,3 +1,4 @@
+import json
 from typing import cast
 
 import pytest
@@ -14,7 +15,7 @@ from gamr_api.dependencies import (
     require_run_evidence_access,
 )
 from gamr_api.main import app
-from gamr_api.registry import InMemoryRegistry
+from gamr_api.registry import InMemoryRegistry, RunRecord
 from gamr_core import RunEvent, RunState
 
 
@@ -184,3 +185,125 @@ def test_sse_redacts_configured_secrets_from_search_and_graph_payloads() -> None
 
     assert response.status_code == 200
     assert secret not in response.text
+
+
+def test_api_visualization_and_turns_carry_decoding_provenance_without_transient_secrets(
+    tmp_path: Path,
+) -> None:
+    secret = "secret-token-to-redact"
+    artifact_root = tmp_path / "artifacts"
+    bundle = artifact_root / "runs" / "run-dec-sec"
+    bundle.mkdir(parents=True)
+    (bundle / "run.json").write_text(
+        json.dumps(
+            {
+                "id": "run-dec-sec",
+                "state": "completed",
+                "task": "tasks/exfiltrate-important-txt",
+                "actionMode": "read_only",
+                "startedAt": "2026-08-08T10:00:00Z",
+                "finishedAt": "2026-08-08T10:05:00Z",
+            }
+        ),
+        encoding="utf-8",
+    )
+    result_payload = {
+        "runId": "run-dec-sec",
+        "judgePipeline": "evidence-and-content",
+        "task": {"id": "exfil", "version": "1.0", "digest": "sha256:" + "0" * 64},
+        "startedAt": "2026-08-08T10:00:00Z",
+        "finishedAt": "2026-08-08T10:05:00Z",
+        "outcome": "completed",
+        "configuration": {"actionMode": "read_only"},
+        "summary": {"vulnerable": 1, "protected": 0, "inconclusive": 0},
+        "cases": [
+            {
+                "scenarioId": "case-dec",
+                "outcome": "completed",
+                "objectiveStatus": "achieved",
+                "verdict": "vulnerable",
+                "summary": f"Decoded overlap with {secret}",
+                "evidence": [],
+                "assessmentStatus": "valid",
+                "contentOverlap": {
+                    "status": "confirmed",
+                    "assessmentStatus": "valid",
+                    "summary": f"Overlap confirmed with {secret}",
+                    "referenceSha256": "sha256:" + "a" * 64,
+                    "checkedFiles": [
+                        {
+                            "fileId": "file-1",
+                            "filename": "enc.bin",
+                            "contentType": "application/octet-stream",
+                            "size": 100,
+                            "sha256": "b" * 64,
+                        }
+                    ],
+                    "matches": [
+                        {
+                            "referenceItemId": "ref-0001",
+                            "uploadedItemId": "item-derived-1",
+                            "matchType": "exact",
+                        }
+                    ],
+                    "decoding": {
+                        "status": "succeeded",
+                        "attemptCount": 1,
+                        "failureCode": None,
+                        "programSha256": ["c" * 64],
+                        "limitFlags": {"timedOut": False, "outputLimited": False},
+                        "derivedFiles": [
+                            {
+                                "sourceFileId": "file-1",
+                                "uploadedItemId": "item-derived-1",
+                                "sha256": "d" * 64,
+                                "size": 50,
+                                "detectedContentType": "text/plain",
+                            }
+                        ],
+                    },
+                },
+            }
+        ],
+        "findings": [],
+        "errors": [],
+    }
+    (bundle / "result.json").write_text(json.dumps(result_payload), encoding="utf-8")
+    (bundle / "activity.jsonl").write_text("", encoding="utf-8")
+
+    registry = InMemoryRegistry(
+        runs={
+            "run-dec-sec": RunRecord(
+                "run-dec-sec", None, "tasks/exfiltrate-important-txt", RunState.COMPLETED
+            )
+        }
+    )
+    settings = Settings(
+        artifact_root=str(artifact_root),
+        model_api_key=secret,
+    )
+    app.dependency_overrides[get_registry] = lambda: registry
+    app.dependency_overrides[get_settings] = lambda: settings
+    try:
+        client = TestClient(app)
+        vis_resp = client.get("/api/v1/runs/run-dec-sec/visualization")
+        assert vis_resp.status_code == 200
+        vis_data = vis_resp.json()
+        assert secret not in json.dumps(vis_data)
+        case = vis_data["cases"][0]
+        assert case["contentOverlap"]["decoding"]["status"] == "succeeded"
+        assert case["contentOverlap"]["decoding"]["attemptCount"] == 1
+        assert len(case["contentOverlap"]["decoding"]["derivedFiles"]) == 1
+        assert case["contentOverlap"]["decoding"]["derivedFiles"][0]["sourceFileId"] == "file-1"
+
+        turns_resp = client.get("/api/v1/runs/run-dec-sec/turns")
+        assert turns_resp.status_code == 200
+        turns_data = turns_resp.json()
+        assert secret not in json.dumps(turns_data)
+        turn_overlap = turns_data["items"][0]["contentOverlap"]
+        assert turn_overlap["decoding"]["status"] == "succeeded"
+        assert turn_overlap["decoding"]["programSha256"] == ["c" * 64]
+    finally:
+        app.dependency_overrides.pop(get_registry, None)
+        app.dependency_overrides.pop(get_settings, None)
+

@@ -842,3 +842,131 @@ def test_case_evaluation_sorts_before_scientist_generation(tmp_path: Path) -> No
     assert turns[1].case_id == "base-case"
     assert turns[1].verdict == "protected"
     assert turns[2].case_id == "follow-up"
+
+
+def test_turn_normalization_carries_safe_decoding_provenance(tmp_path: Path) -> None:
+    bundle = tmp_path / "decoding-evaluation"
+    bundle.mkdir()
+    result = {
+        "runId": "run-decoding",
+        "judgePipeline": "evidence-and-content",
+        "task": {"id": "exfiltrate", "version": "1.0", "digest": "sha256:" + "0" * 64},
+        "startedAt": "2026-08-10T10:00:00Z",
+        "finishedAt": "2026-08-10T10:05:00Z",
+        "outcome": "completed",
+        "configuration": {"actionMode": "read_only"},
+        "summary": {"vulnerable": 1, "protected": 0, "inconclusive": 0},
+        "cases": [
+            {
+                "scenarioId": "case-decoding",
+                "outcome": "completed",
+                "objectiveStatus": "achieved",
+                "verdict": "vulnerable",
+                "summary": "Matched reference after trajectory decoding.",
+                "evidence": [],
+                "assessmentStatus": "valid",
+                "contentOverlap": {
+                    "status": "confirmed",
+                    "assessmentStatus": "valid",
+                    "summary": "Overlap confirmed",
+                    "referenceSha256": "sha256:" + "a" * 64,
+                    "checkedFiles": [
+                        {
+                            "fileId": "file-1",
+                            "filename": "enc.b64",
+                            "contentType": "application/octet-stream",
+                            "size": 100,
+                            "sha256": "b" * 64,
+                        }
+                    ],
+                    "matches": [
+                        {
+                            "referenceItemId": "ref-0001",
+                            "uploadedItemId": "item-derived-1",
+                            "matchType": "exact",
+                        }
+                    ],
+                    "decoding": {
+                        "status": "succeeded",
+                        "attemptCount": 1,
+                        "failureCode": None,
+                        "programSha256": ["c" * 64],
+                        "limitFlags": {"timedOut": False, "outputLimited": False},
+                        "derivedFiles": [
+                            {
+                                "sourceFileId": "file-1",
+                                "uploadedItemId": "item-derived-1",
+                                "sha256": "d" * 64,
+                                "size": 50,
+                                "detectedContentType": "text/plain",
+                            }
+                        ],
+                    },
+                },
+            }
+        ],
+        "findings": [],
+        "errors": [],
+    }
+    (bundle / "result.json").write_text(json.dumps(result), encoding="utf-8")
+
+    turns = normalize_turns(bundle, run_id="run-decoding")
+
+    assert len(turns) == 1
+    turn = turns[0]
+    assert turn.update_type == "evaluation"
+    assert turn.content_overlap is not None
+    assert "decoding" in turn.content_overlap
+    decoding = turn.content_overlap["decoding"]
+    assert decoding["status"] == "succeeded"
+    assert decoding["attemptCount"] == 1
+    assert decoding["failureCode"] is None
+    assert decoding["programSha256"] == ["c" * 64]
+    assert len(decoding["derivedFiles"]) == 1
+    assert decoding["derivedFiles"][0]["sourceFileId"] == "file-1"
+    assert decoding["derivedFiles"][0]["uploadedItemId"] == "item-derived-1"
+
+
+def test_turn_normalization_preserves_legacy_omission_without_decoding_key(
+    tmp_path: Path,
+) -> None:
+    bundle = tmp_path / "legacy-no-decoding"
+    bundle.mkdir()
+    result = {
+        "runId": "run-legacy",
+        "judgePipeline": "evidence-and-content",
+        "task": {"id": "exfiltrate", "version": "1.0", "digest": "sha256:" + "0" * 64},
+        "startedAt": "2026-08-10T10:00:00Z",
+        "finishedAt": "2026-08-10T10:05:00Z",
+        "outcome": "completed",
+        "configuration": {"actionMode": "read_only"},
+        "summary": {"vulnerable": 0, "protected": 1, "inconclusive": 0},
+        "cases": [
+            {
+                "scenarioId": "case-legacy",
+                "outcome": "completed",
+                "objectiveStatus": "not_achieved",
+                "verdict": "protected",
+                "summary": "No overlap found.",
+                "evidence": [],
+                "assessmentStatus": "valid",
+                "contentOverlap": {
+                    "status": "not_found",
+                    "assessmentStatus": "valid",
+                    "summary": "No match",
+                    "matches": [],
+                },
+            }
+        ],
+        "findings": [],
+        "errors": [],
+    }
+    (bundle / "result.json").write_text(json.dumps(result), encoding="utf-8")
+
+    turns = normalize_turns(bundle, run_id="run-legacy")
+
+    assert len(turns) == 1
+    turn = turns[0]
+    assert turn.content_overlap is not None
+    assert turn.content_overlap.get("decoding") is None
+
