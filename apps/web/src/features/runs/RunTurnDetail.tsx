@@ -7,6 +7,7 @@ import {
   type HistoryCaseOrigin,
 } from "./ScientistHistoryUsed";
 import { ScientistScenarioCard } from "./ScientistScenarioCard";
+import { DecodingProvenance } from "./DecodingProvenance";
 import {
   contentOverlapLabel,
   discoveryFields,
@@ -165,6 +166,7 @@ export function RunTurnDetail({
                       ))}
                     </ul>
                   ) : null}
+                  <DecodingProvenance decoding={contentOverlap.decoding} />
                 </div>
               ) : null}
             </section>
