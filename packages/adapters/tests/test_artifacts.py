@@ -53,10 +53,12 @@ def test_redaction_keeps_content_overlap_summary_schema_valid(tmp_path: Path) ->
     )
     overlap = ContentOverlapResult.model_validate(payload["contentOverlap"])
 
-    assert len(overlap.summary or "") == 600
-    assert len(overlap.full_summary or "") == 609
-    assert "s" not in overlap.summary
-    assert "s" not in overlap.full_summary
+    summary = overlap.summary or ""
+    full_summary = overlap.full_summary or ""
+    assert len(summary) == 600
+    assert len(full_summary) == 609
+    assert "s" not in summary
+    assert "s" not in full_summary
 
 
 def test_raw_artifact_is_confined_and_redacted(tmp_path: Path) -> None:

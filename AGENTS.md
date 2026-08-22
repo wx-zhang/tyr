@@ -29,15 +29,15 @@ apps/
 packages/
   core/      Domain models, JSON schemas, identifiers, findings, events, enums, and state-transition validation
   engine/    Experiment/chat orchestration, approval coordination, reporting, services, and abstract ports
-  adapters/  Tyr MCP, OpenAI-compatible models, JSON filesystem stores, and artifact storage
+  adapters/  Tyr MCP, OpenAI-compatible models, JSON filesystem stores, artifact storage, and sandbox backends
 
 tasks/
   <task>/ Versioned task.json, optional discovery.json, and cases/*.json
 
 schemas/     Generated task, run-result, and OpenAPI schemas
 docs/        Architecture, data-format, development, and scaffold specifications
-scripts/     Schema export and local development data utilities
-tests/       Cross-package fixtures, integration tests, and smoke tests
+scripts/     Schema export, local development data utilities, and sandbox developer commands
+tests/       Cross-package fixtures, integration tests, smoke tests, and sandbox runner tests
 .gamr/       Gitignored local run bundles and standalone operational state
 ```
 
@@ -64,6 +64,8 @@ uv run poe lint
 uv run poe typecheck
 uv run poe test
 uv run poe schemas
+uv run poe sandbox-build
+uv run poe sandbox-run --attach <path> --code "<source>"
 uv run poe check
 ```
 
@@ -87,6 +89,7 @@ gamr chat
 - `approval_required` is the only action-enabled mode. Never implement or use automatic approval.
 - Starting an action-enabled run requires an explicit CLI flag or web confirmation, and each Tyr action still requires a recorded human decision (Tyr-side; GAMR does not approve).
 - Live Tyr/OpenRouter tests are opt-in and marker-gated. Never run them in default tests or enable real actions merely to verify a change.
+- Sandbox Docker runtime tests are opt-in and marker-gated. Default tests use fake Docker processes or controlled host snippets.
 - Use an idempotency key for every Tyr request and approval resolution. Retry an interrupted external step only when its idempotency and checkpoint state make the retry safe.
 - Redact API keys, bearer tokens, authorization headers, and configured secret fields before writing logs, events, snapshots, raw payloads, or API responses.
 - Never trust an outer Tyr terminal state alone: delegated executions, bridge work, or a late user-visible response may still be pending. Preserve the settle-window behavior and raw diagnostic evidence.

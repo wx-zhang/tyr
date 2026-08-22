@@ -43,6 +43,8 @@ build = ["web-build"]
 task-validate = "gamr task validate tasks/exfiltrate-important-txt"
 check = ["lint", "typecheck", "test", "task-validate", "web-build"]
 judge-graph = "python scripts/render_judge_graph.py"
+sandbox-run = "python scripts/sandbox_run.py"
+sandbox-build = "python scripts/sandbox_build.py"
 dev = "python scripts/dev.py"
 "dev:watch" = "python scripts/dev.py --watch"
 
@@ -57,9 +59,10 @@ extend-ignore = ["B008"]
 
 [tool.pytest.ini_options]
 testpaths = ["packages", "apps", "tests"]
-addopts = "-ra -m 'not live_tyr'"
+addopts = "-ra -m 'not live_tyr and not sandbox_docker'"
 markers = [
   "live_tyr: Opt-in live Tyr integration tests against real or configured MCP target (deselected by default)",
+  "sandbox_docker: Opt-in Docker sandbox runtime tests (deselected by default)",
 ]
 asyncio_mode = "auto"
 

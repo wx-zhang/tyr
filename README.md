@@ -81,6 +81,39 @@ Other chat options: `--prompt "<text>"` to send an initial message, `--model` to
 `TYR_LOOP_CHAT_MODEL` (defaults to `x-ai/grok-4.5`), and `--base-url` to override
 `OPENROUTER_BASE_URL`.
 
+## Developer Python sandbox
+
+The sandbox is an engine capability for future judge workflows. Existing tasks, runs, APIs, and
+the web UI do not invoke it. `GAMR_SANDBOX_BACKEND` defaults to `docker`; build the fixed image and
+exercise the shared lifecycle with controlled code:
+
+```bash
+uv run poe sandbox-build
+uv run poe sandbox-run --attach tasks/exfiltrate-important-txt/references/important.txt \
+  --code "from pathlib import Path; print(Path('/input/important.txt').read_text())"
+```
+
+Docker runs Python 3.14 with only the standard library, no network, no host mounts, no application
+environment or credentials, a read-only `/input`, and a persistent ephemeral `/workspace`. Fixed
+limits are 64 KiB source, 256 attached files, 64 MiB attachments, 10 seconds per execution, 1 MiB
+combined output, 1 CPU, 256 MiB memory, 64 processes, and 128 MiB workspace. A timeout or output
+overflow destroys the whole sandbox. Sessions and IDs are process-local and are never persisted.
+
+`host-unsafe` is an explicitly selected fallback. It uses temporary input and workspace roots and
+strips configured secrets, but generated code can access the host with the current user's
+permissions; it is not a security boundary. `disabled` leaves unrelated GAMR features available
+and rejects sandbox starts. The runner closes each successfully started session.
+
+If GAMR exits unexpectedly, Docker resources may remain as labeled orphans. Inspect only the GAMR
+resources you own, then remove the matching container before its volume:
+
+```bash
+docker ps -a --filter label=com.tyr.gamr.sandbox=true
+docker volume ls --filter label=com.tyr.gamr.sandbox=true
+docker rm --force <labeled-container>
+docker volume rm <labeled-volume>
+```
+
 ## Optional web interface
 
 Local hot-reload (requires host Python and Node toolchains):

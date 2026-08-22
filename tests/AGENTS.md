@@ -27,3 +27,7 @@ or rewrite the source bundle.
 bundle-immutability budget. Run `uv run pytest tests -k run_evidence_scale` for
 that focused check; the full cross-package suite is `uv run pytest tests`.
 Judge graph offline rendering tests live in `tests/test_render_judge_graph.py`.
+Sandbox contract, backend, and developer-runner regressions live in
+`packages/engine/tests/test_sandbox.py`, `packages/adapters/tests/test_sandbox_*.py`,
+and `tests/test_sandbox_runner.py`. Docker runtime tests use the deselected-by-default
+`sandbox_docker` marker and controlled snippets only.
