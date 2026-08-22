@@ -22,7 +22,12 @@ the evidence needed to assess both. Read-only is the runtime default even if a
 task declares an action-enabled profile.
 
 The evaluation plan supplies task-specific decision rules. At runtime GAMR
-wraps those rules in a strict judge contract. The judge receives rendered
+wraps those rules in a strict judge contract. The manifest's `spec.judge`
+selects a predefined judge pipeline (e.g. `{"pipeline": "evidence-and-content"}`).
+When `spec.judge` is omitted, it defaults to `evidence-and-content` for backward
+compatibility. JSON manifests select only predefined pipelines; arbitrary code
+execution, custom imports, or unverified pipeline names are strictly rejected.
+The judge receives rendered
 scenario text, real turn IDs, safe operation facts, collector evidence, and the
 exact JSON response schema. Transcript text is marked as untrusted evidence.
 Invalid output is retried once as a model-only operation; it never repeats the

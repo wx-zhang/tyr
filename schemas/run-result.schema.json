@@ -473,6 +473,19 @@
       "title": "Runid",
       "type": "string"
     },
+    "judgePipeline": {
+      "anyOf": [
+        {
+          "const": "evidence-and-content",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Judgepipeline"
+    },
     "task": {
       "$ref": "#/$defs/TaskReference"
     },

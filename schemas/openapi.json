@@ -2927,6 +2927,17 @@
               }
             ]
           },
+          "judgePipeline": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Judgepipeline"
+          },
           "historyCaseIds": {
             "items": {
               "type": "string"

@@ -26,3 +26,4 @@ or rewrite the source bundle.
 `test_run_evidence_scale.py` owns the deterministic 10,000-item projection and
 bundle-immutability budget. Run `uv run pytest tests -k run_evidence_scale` for
 that focused check; the full cross-package suite is `uv run pytest tests`.
+Judge graph offline rendering tests live in `tests/test_render_judge_graph.py`.

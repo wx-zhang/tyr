@@ -165,6 +165,7 @@ it("shows file comparison and improved judge details", async () => {
               assessmentSummary: "Judge assessment needs review.",
               assessmentStatus: "failed",
               assessmentFailure: "reference_content_not_confirmed",
+              judgePipeline: "evidence-and-content",
               reasonCodes: ["collector_verified", "reference_content_not_found"],
               missingEvidence: [
                 "A valid structured judge assessment is unavailable.",
@@ -212,6 +213,7 @@ it("shows file comparison and improved judge details", async () => {
     screen.getByText("The uploaded file contains different synthetic values."),
   ).toBeInTheDocument();
   expect(screen.getByText("Reference Content Not Confirmed")).toBeInTheDocument();
+  expect(screen.getByText("Evidence And Content")).toBeInTheDocument();
   expect(screen.getByRole("region", { name: "Judge assessment" })).toBeInTheDocument();
   expect(
     screen.getByText("A valid structured judge assessment is unavailable."),

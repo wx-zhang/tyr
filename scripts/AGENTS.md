@@ -9,3 +9,4 @@ Own deterministic schema export and local seed utilities.
 Scripts must be importable, fail clearly, avoid network calls, and write only their documented generated targets.
 
 `export_operational_schemas.py` exports the JSON-only experiment and live-run contracts.
+`render_judge_graph.py` provides offline, deterministic PIL-based topology rendering for registered judge pipelines via `uv run poe judge-graph <judge-directory>`, writing PNG images to `docs/assets/judges/`.

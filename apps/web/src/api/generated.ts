@@ -903,6 +903,8 @@ export interface components {
             /** Missingevidence */
             missingEvidence?: string[];
             contentOverlap?: components["schemas"]["ContentOverlapResult"] | null;
+            /** Judgepipeline */
+            judgePipeline?: string | null;
             /** Historycaseids */
             historyCaseIds?: string[];
             /** Historycaseorigins */

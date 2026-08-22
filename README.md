@@ -26,6 +26,8 @@ Live commands need `TYR_MCP_TOKEN`, `OPENROUTER_API_KEY`, and `TYR_LOOP_MODEL` s
 
 Set `TYR_LOOP_JUDGE_MODEL` when evaluation should use a model independent from the model
 that executes scenarios. If it is unset, evaluation uses `TYR_LOOP_MODEL`.
+Tasks configure judge execution via `spec.judge.pipeline` in `task.json` (defaulting to
+`evidence-and-content`).
 
 Evaluation plans may associate one synthetic UTF-8 reference file with a task. For
 collector-verified file cases, GAMR compares uploaded text, JSON, safe archives, and PNG/JPEG

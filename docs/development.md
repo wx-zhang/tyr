@@ -6,11 +6,14 @@ corepack enable
 uv run poe web-install
 uv run gamr doctor
 uv run gamr experiment run tasks/exfiltrate-important-txt
+uv run poe judge-graph packages/engine/src/gamr_engine/judges/evidence_and_content
 uv run poe dev
 uv run poe dev:watch
 uv run poe schemas
 uv run poe check
 ```
+
+`poe judge-graph <judge-directory>` renders a deterministic PNG topology image for the specified predefined judge pipeline to `docs/assets/judges/` via atomic file replacement.
 
 `poe dev` starts the API and Vite with hot reload on the host. `poe dev:watch` also reloads Python
 changes.

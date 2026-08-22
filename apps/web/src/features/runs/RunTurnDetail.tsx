@@ -77,6 +77,12 @@ export function RunTurnDetail({
                 </dd>
               </div>
             ) : null}
+            {turn.judgePipeline ? (
+              <div>
+                <dt>Pipeline</dt>
+                <dd>{label(turn.judgePipeline)}</dd>
+              </div>
+            ) : null}
           </dl>
           {turn.contentOverlap ? (
             <section

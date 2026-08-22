@@ -16,9 +16,11 @@ flowchart LR
     Bundles --> API
 ```
 
-`gamr-core` owns validated contracts (including `ExperimentConfig.max_concurrent_cases` bounded from 1 to 5). `gamr-engine` owns workflow and shared finalization with bounded concurrent base-case execution.
+`gamr-core` owns validated contracts (including `ExperimentConfig.max_concurrent_cases` bounded from 1 to 5). `gamr-engine` owns workflow, judge pipeline orchestration via LangGraph StateGraph, and shared finalization with bounded concurrent base-case execution.
 `gamr-adapters` owns provider and filesystem I/O (including atomic per-case checkpoints under `checkpoints/cases/`). Apps compose these packages without duplicating
 experiment logic or invoking CLI subprocesses.
+
+Judge evaluation is structured as explicit, predefined pipelines in `gamr-engine` orchestrated using LangGraph `StateGraph` without checkpointing, LangSmith, or external storage. Graph execution paths are shared identically between CLI and API modes. Pipeline topology inspection is side-effect-free and can be exported to deterministic PNG assets using `uv run poe judge-graph <judge-directory>`. Future judge pipelines (such as content decoding or external interactions) plug into the engine's predefined registry without altering task evaluation guarantees or bundle persistence.
 
 One API process owns service scheduling. The default concurrency is three; additional runs wait
 FIFO. JSON is authoritative, while activity search and relationship views are derived in memory.

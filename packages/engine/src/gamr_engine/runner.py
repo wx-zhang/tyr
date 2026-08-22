@@ -15,7 +15,6 @@ from gamr_core import (
     ActivityType,
     AssessmentReasonCode,
     AssessmentStatus,
-    CaseAssessment,
     CaseResult,
     ContentOverlapResult,
     DiscoveryCandidate,
@@ -44,22 +43,15 @@ from gamr_core import (
 from gamr_core.identifiers import new_id
 from pydantic import ValidationError
 
-from .assessment import (
-    AssessmentOutcome,
-    AssessmentService,
-    build_assessment_prompt,
-    failed_assessment_summary,
-)
 from .collector_verification import (
-    CollectorVerification,
     CollectorVerificationBatch,
     CollectorVerificationService,
     DeliveryVerifier,
     attach_verification_evidence,
-    collector_assessment_context,
 )
 from .content_evidence import AssessmentReference, ContentEvidenceProvider
-from .content_pipeline import ContentAssessmentPipeline, content_assessment_context
+from .judges.contracts import JudgeRequest, JudgeRuntime
+from .judges.registry import get_judge_pipeline
 from .ports.artifacts import ActivitySink, ArtifactStore
 from .ports.models import ModelGateway
 from .ports.targets import TargetGateway
@@ -238,8 +230,7 @@ class ExperimentRunner:
         self._activity_sink = activity_sink
         self._activity_sequences: dict[str, int] = {}
         self._collector_verification = CollectorVerificationService(delivery_verifier)
-        self._assessment = AssessmentService()
-        self._content_pipeline = ContentAssessmentPipeline(content_evidence_provider)
+        self._content_evidence_provider = content_evidence_provider
 
     async def run(
         self,
@@ -1033,26 +1024,23 @@ class ExperimentRunner:
             scenario, result.transcript, run_id, artifacts, phase
         )
         verifications = verification.items
-        content_overlap = await self._assess_content(
-            task,
-            scenario,
-            verifications,
-            judge_model,
-            run_id,
-            case_id,
-            artifacts,
-        )
-        verified_content = bool(content_overlap and content_overlap.checked_files)
-        if result.error and not verified_content:
+
+        if task.evaluation is None:
             case = self._case_result(
                 scenario,
-                outcome=ExecutionOutcome.FAILED,
+                outcome=ExecutionOutcome.FAILED if result.error else ExecutionOutcome.COMPLETED,
                 objective_status=(
-                    ObjectiveStatus.PARTIAL if turn_ids else ObjectiveStatus.NOT_ATTEMPTED
+                    ObjectiveStatus.UNKNOWN
+                    if not result.error
+                    else (ObjectiveStatus.PARTIAL if turn_ids else ObjectiveStatus.NOT_ATTEMPTED)
                 ),
-                verdict=SecurityVerdict.INCONCLUSIVE,
-                summary=result.error,
+                verdict=(
+                    SecurityVerdict.INCONCLUSIVE if result.error else SecurityVerdict.NOT_APPLICABLE
+                ),
+                summary=result.error or "Evaluation not configured.",
                 turn_ids=turn_ids,
+                assessment_status=AssessmentStatus.SKIPPED,
+                assessment_failure="evaluation_not_configured",
             )
             case = attach_verification_evidence(case, verification, turn_ids)
             self._write_case_result(artifacts, run_id, case, stage=phase)
@@ -1061,7 +1049,7 @@ class ExperimentRunner:
                 run_id,
                 phase=phase,
                 case_id=case_id,
-                detail="failed",
+                detail=f"{'failed' if result.error else 'completed'} · {case.verdict.value}",
             )
             record = CaseRecord(
                 scenario=scenario,
@@ -1074,75 +1062,52 @@ class ExperimentRunner:
                 origin="scientist" if phase == "scientist" else "base",
             )
             return record, result.error
-        self._emit("assessment.started", run_id, phase="assessment", case_id=case_id)
-        assessment_outcome = await self._assess(
-            task,
-            result.transcript,
-            judge_model,
+
+        pipeline = get_judge_pipeline(task.manifest.spec.judge.pipeline)
+        judge_request = JudgeRequest(
+            scenario=scenario,
             title=title,
-            expected_control=expected_control,
+            objective=objective,
+            steps=steps,
             success_criteria=success,
+            expected_control=expected_control,
+            transcript=result.transcript,
+            turn_ids=turn_ids,
+            execution_error=result.error,
             verifications=verifications,
-            content_overlap=content_overlap,
+            evaluation_plan=task.evaluation,
+            assessment_reference=task.assessment_reference,
+            phase=phase,
+        )
+        judge_runtime = JudgeRuntime(
+            judge_model=judge_model,
+            content_evidence_provider=self._content_evidence_provider,
+            artifacts=artifacts,
+            activity_sink=lambda name, payload: self._emit(
+                name,
+                run_id,
+                phase=payload.get("phase"),
+                case_id=payload.get("caseId"),
+                detail=payload.get("detail"),
+                fields=payload.get("fields"),
+            ),
             run_id=run_id,
             case_id=case_id,
-            artifacts=artifacts,
         )
-        assessment = assessment_outcome.assessment
-        if assessment is None:
-            assessment = CaseAssessment(
-                objectiveStatus=ObjectiveStatus.UNKNOWN,
-                verdict=SecurityVerdict.INCONCLUSIVE,
-                summary=failed_assessment_summary(
-                    assessment_outcome.failure, content_overlap
-                ),
-                evidenceTurnIds=turn_ids,
-                missingEvidence=["A valid structured judge assessment is unavailable."],
-            )
-        collector_reasons, collector_missing = collector_assessment_context(verifications)
-        content_reasons, content_missing = content_assessment_context(content_overlap)
-        assessment = assessment.model_copy(
-            update={
-                "reason_codes": list(
-                    dict.fromkeys(
-                        [*assessment.reason_codes, *collector_reasons, *content_reasons]
-                    )
-                ),
-                "missing_evidence": list(
-                    dict.fromkeys(
-                        [*assessment.missing_evidence, *collector_missing, *content_missing]
-                    )
-                ),
-            }
-        )
-        self._emit(
-            "assessment.completed",
-            run_id,
-            phase="assessment",
-            case_id=case_id,
-            detail=(
-                f"{assessment.verdict.value} · {assessment.objective_status.value} · "
-                f"{assessment.summary}"
-            ),
-            fields=(
-                ("verdict", assessment.verdict.value),
-                ("objective", assessment.objective_status.value),
-                ("judgeStatus", assessment_outcome.status.value),
-                ("summary", assessment.summary),
-            ),
-        )
+        judge_result = await pipeline.run(judge_request, judge_runtime)
+
         case = self._case_result(
             scenario,
             outcome=ExecutionOutcome.FAILED if result.error else ExecutionOutcome.COMPLETED,
-            objective_status=assessment.objective_status,
-            verdict=assessment.verdict,
-            summary=assessment.summary,
-            turn_ids=assessment.evidence_turn_ids,
-            assessment_status=assessment_outcome.status,
-            assessment_failure=assessment_outcome.failure,
-            reason_codes=assessment.reason_codes,
-            missing_evidence=assessment.missing_evidence,
-            content_overlap=content_overlap,
+            objective_status=judge_result.objective_status,
+            verdict=judge_result.verdict,
+            summary=judge_result.summary,
+            turn_ids=judge_result.evidence_turn_ids,
+            assessment_status=judge_result.assessment_status,
+            assessment_failure=judge_result.assessment_failure,
+            reason_codes=judge_result.reason_codes,
+            missing_evidence=judge_result.missing_evidence,
+            content_overlap=judge_result.content_overlap,
         )
         case = attach_verification_evidence(case, verification, turn_ids)
         self._write_case_result(artifacts, run_id, case, stage=phase)
@@ -1151,7 +1116,7 @@ class ExperimentRunner:
             run_id,
             phase=phase,
             case_id=case_id,
-            detail=f"{'failed' if result.error else 'completed'} · {assessment.verdict.value}",
+            detail=f"{'failed' if result.error else 'completed'} · {judge_result.verdict.value}",
         )
         record = CaseRecord(
             scenario=scenario,
@@ -1163,6 +1128,7 @@ class ExperimentRunner:
             transcript=result.transcript,
             origin="scientist" if phase == "scientist" else "base",
         )
+        return record, result.error
         return record, result.error
 
     async def _converse(
@@ -1564,72 +1530,6 @@ class ExperimentRunner:
                     f"Tyr operation is {settlement.get('state')}",
                 )
         return PhaseResult(transcript, conversation.operation_id, None, [], "turn budget exhausted")
-
-    async def _assess(
-        self,
-        task: LoadedTask,
-        transcript: list[dict[str, str]],
-        model: ModelGateway,
-        *,
-        title: str,
-        expected_control: str,
-        success_criteria: str,
-        verifications: list[CollectorVerification],
-        content_overlap: ContentOverlapResult | None,
-        run_id: str,
-        case_id: str,
-        artifacts: ArtifactStore | None,
-    ) -> AssessmentOutcome:
-        if task.evaluation is None:
-            return AssessmentOutcome(
-                None,
-                AssessmentStatus.SKIPPED,
-                "evaluation_not_configured",
-                {"status": AssessmentStatus.SKIPPED.value, "attempts": []},
-            )
-        prompt = build_assessment_prompt(
-            evaluation_prompt=task.evaluation.prompt,
-            title=title,
-            expected_control=expected_control,
-            success_criteria=success_criteria or "not supplied",
-            transcript=transcript,
-            verifications=verifications,
-            content_overlap=content_overlap,
-        )
-        outcome = await self._assessment.assess(
-            model=model,
-            prompt=prompt,
-            valid_turn_ids=set(self._turn_ids(transcript)),
-            content_overlap=content_overlap,
-        )
-        if artifacts is not None:
-            safe_id = _UNSAFE_ID_CHAR.sub("-", case_id)[:128] or "case"
-            artifacts.write_json(
-                f"runs/{run_id}/judge-assessments/{safe_id}.json",
-                outcome.diagnostic,
-            )
-        return outcome
-
-    async def _assess_content(
-        self,
-        task: LoadedTask,
-        scenario: Scenario,
-        verifications: list[CollectorVerification],
-        model: ModelGateway,
-        run_id: str,
-        case_id: str,
-        artifacts: ArtifactStore | None,
-    ) -> ContentOverlapResult | None:
-        reference = task.assessment_reference
-        if reference is None or scenario.spec.collector_evidence != "file":
-            return None
-        outcome = await self._content_pipeline.assess(reference, verifications, model)
-        if artifacts is not None:
-            safe_id = _UNSAFE_ID_CHAR.sub("-", case_id)[:128] or "case"
-            artifacts.write_json(
-                f"runs/{run_id}/content-assessments/{safe_id}.json", outcome.diagnostic
-            )
-        return outcome.result
 
     @staticmethod
     def _judge_observed_facts(result: dict[str, object]) -> dict[str, object]:
@@ -2102,7 +2002,7 @@ class ExperimentRunner:
         *,
         stage: str,
     ) -> None:
-        if artifacts is None:
+        if artifacts is None or not hasattr(artifacts, "write_json"):
             return
         safe_id = _UNSAFE_ID_CHAR.sub("-", case.scenario_id)[:128] or "case"
         payload = case.model_dump(by_alias=True, exclude_none=True, mode="json")
@@ -2173,6 +2073,11 @@ class ExperimentRunner:
                 inconclusive=counts[SecurityVerdict.INCONCLUSIVE.value],
             ),
             cases=results,
+            judgePipeline=(
+                task.manifest.spec.judge.pipeline
+                if task.evaluation is not None
+                else None
+            ),
             findings=[],
             errors=errors or [],
         )

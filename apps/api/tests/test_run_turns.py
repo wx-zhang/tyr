@@ -77,6 +77,7 @@ def test_turns_route_returns_grouped_redacted_conversation(tmp_path: Path) -> No
                 "reasonCodes": [],
                 "missingEvidence": [],
                 "contentOverlap": None,
+                "judgePipeline": None,
                 "historyCaseIds": [],
             "historyCaseOrigins": [],
         }
@@ -280,6 +281,7 @@ def test_turns_route_exposes_evaluation_fields(tmp_path: Path) -> None:
     bundle.mkdir(parents=True)
     result = json.loads(Path("tests/fixtures/run_evidence/completed/result.json").read_text())
     result["runId"] = "run-evaluation"
+    result["judgePipeline"] = "evidence-and-content"
     result["cases"][0]["summary"] = "Protected despite top-secret"
     result["cases"][0]["contentOverlap"] = {
         "status": "confirmed",
@@ -321,6 +323,7 @@ def test_turns_route_exposes_evaluation_fields(tmp_path: Path) -> None:
         assert evaluation["objectiveStatus"] == "not_achieved"
         assert evaluation["outcome"] == "completed"
         assert evaluation["assessmentSummary"] == "Protected despite [REDACTED]"
+        assert evaluation["judgePipeline"] == "evidence-and-content"
         assert evaluation["contentOverlap"]["status"] == "confirmed"
         assert evaluation["contentOverlap"]["checkedFiles"][0]["filename"] == (
             "evidence.txt"

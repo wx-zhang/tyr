@@ -83,6 +83,7 @@ class NormalizedTurn:
     reason_codes: tuple[str, ...] = ()
     missing_evidence: tuple[str, ...] = ()
     content_overlap: dict[str, object] | None = None
+    judge_pipeline: str | None = None
     history_case_ids: tuple[str, ...] = ()
     history_case_origins: tuple[str, ...] = ()
 
@@ -484,6 +485,7 @@ def _evaluation_turn_from_case(
     case: CaseResult,
     stage: str,
     occurred_at: datetime | None,
+    judge_pipeline: str | None = None,
 ) -> NormalizedTurn:
     return NormalizedTurn(
         id=f"{run_id}-evaluation-{case.scenario_id}",
@@ -510,6 +512,7 @@ def _evaluation_turn_from_case(
             if case.content_overlap is not None
             else None
         ),
+        judge_pipeline=judge_pipeline,
     )
 
 
@@ -580,6 +583,7 @@ def _evaluation_turns(
                     case=case,
                     stage=stage,
                     occurred_at=occurred_at,
+                    judge_pipeline=result.judge_pipeline,
                 )
             )
         return updates
@@ -720,6 +724,7 @@ def normalize_turns(
             reason_codes=turn.reason_codes,
             missing_evidence=turn.missing_evidence,
             content_overlap=turn.content_overlap,
+            judge_pipeline=turn.judge_pipeline,
             history_case_ids=turn.history_case_ids,
             history_case_origins=turn.history_case_origins,
         )

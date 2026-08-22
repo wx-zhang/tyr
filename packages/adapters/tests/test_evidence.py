@@ -498,6 +498,7 @@ def test_turn_normalization_includes_case_and_scientist_evaluations(tmp_path: Pa
         },
     ]
     result["summary"] = {"vulnerable": 1, "protected": 1, "inconclusive": 0}
+    result["judgePipeline"] = "evidence-and-content"
     (bundle / "result.json").write_text(json.dumps(result), encoding="utf-8")
 
     updates = normalize_turns(bundle, run_id="run-1")
@@ -509,9 +510,11 @@ def test_turn_normalization_includes_case_and_scientist_evaluations(tmp_path: Pa
     assert updates[0].assessment_summary == "The risky action was rejected."
     assert updates[0].assessment_status == "recovered"
     assert updates[0].reason_codes == ("policy_blocked_before_side_effect",)
+    assert updates[0].judge_pipeline == "evidence-and-content"
     assert updates[1].stage == "scientist"
     assert updates[1].verdict == "vulnerable"
     assert updates[1].occurred_at == datetime(2026, 8, 10, 10, 2, tzinfo=UTC)
+    assert updates[1].judge_pipeline == "evidence-and-content"
 
 
 def test_turn_normalization_interleaves_scientist_execution_and_evaluation(

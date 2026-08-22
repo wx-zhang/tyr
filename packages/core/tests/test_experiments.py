@@ -8,6 +8,7 @@ from gamr_core import (
     ExperimentConfig,
     ExperimentRecord,
     RunRecord,
+    RunResult,
     RunSource,
     RunState,
 )
@@ -99,10 +100,107 @@ def test_content_overlap_result_contains_only_safe_provenance() -> None:
             ],
         }
     )
-
     assert result.status is ContentOverlapStatus.CONFIRMED
     assert result.matches[0].match_type is ContentMatchType.EXACT
     assert "content" not in result.model_dump(by_alias=True)
+
+
+def test_run_result_accepts_judge_pipeline_provenance() -> None:
+    created_at = datetime(2026, 8, 9, tzinfo=UTC)
+    result = RunResult.model_validate(
+        {
+            "schemaVersion": "1.0",
+            "runId": "run-1",
+            "judgePipeline": "evidence-and-content",
+            "task": {
+                "id": "exfiltrate-important-txt",
+                "version": "1.0.0",
+                "digest": "sha256:" + "a" * 64,
+            },
+            "startedAt": created_at,
+            "outcome": "completed",
+            "configuration": {"caseIds": ["case-1"]},
+            "summary": {
+                "vulnerable": 0,
+                "protected": 1,
+                "inconclusive": 0,
+            },
+            "cases": [],
+            "findings": [],
+            "errors": [],
+        }
+    )
+    assert result.judge_pipeline == "evidence-and-content"
+    dumped = result.model_dump(by_alias=True, mode="json")
+    assert dumped["judgePipeline"] == "evidence-and-content"
+
+
+def test_run_result_legacy_loading_without_judge_pipeline() -> None:
+    created_at = datetime(2026, 8, 9, tzinfo=UTC)
+    result = RunResult.model_validate(
+        {
+            "schemaVersion": "1.0",
+            "runId": "run-1",
+            "task": {
+                "id": "exfiltrate-important-txt",
+                "version": "1.0.0",
+                "digest": "sha256:" + "a" * 64,
+            },
+            "startedAt": created_at,
+            "outcome": "completed",
+            "configuration": {"caseIds": ["case-1"]},
+            "summary": {
+                "vulnerable": 0,
+                "protected": 1,
+                "inconclusive": 0,
+            },
+            "cases": [],
+            "findings": [],
+            "errors": [],
+        }
+    )
+    assert result.judge_pipeline is None
+    dumped = result.model_dump(by_alias=True, mode="json")
+    assert "judgePipeline" not in dumped or dumped["judgePipeline"] is None
+
+
+@pytest.mark.parametrize(
+    "invalid_pipeline",
+    [
+        "unknown-pipeline",
+        "gamr_engine.judges.evidence_and_content:pipeline",
+        "https://example.com/judge.py",
+        "sh -c echo",
+    ],
+)
+def test_run_result_rejects_unknown_or_executable_judge_pipeline(invalid_pipeline: str) -> None:
+    created_at = datetime(2026, 8, 9, tzinfo=UTC)
+    with pytest.raises(ValidationError):
+        RunResult.model_validate(
+            {
+                "schemaVersion": "1.0",
+                "runId": "run-1",
+                "judgePipeline": invalid_pipeline,
+                "task": {
+                    "id": "exfiltrate-important-txt",
+                    "version": "1.0.0",
+                    "digest": "sha256:" + "a" * 64,
+                },
+                "startedAt": created_at,
+                "outcome": "completed",
+                "configuration": {"caseIds": ["case-1"]},
+                "summary": {
+                    "vulnerable": 0,
+                    "protected": 1,
+                    "inconclusive": 0,
+                },
+                "cases": [],
+                "findings": [],
+                "errors": [],
+            }
+        )
+
+
 
 
 @pytest.mark.parametrize(

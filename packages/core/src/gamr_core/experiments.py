@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from enum import StrEnum
 from pathlib import PurePosixPath
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -178,6 +179,9 @@ class RunResult(BaseModel):
     schema_ref: str | None = Field(default=None, alias="$schema")
     schema_version: str = Field(default="1.0", alias="schemaVersion")
     run_id: str = Field(alias="runId")
+    judge_pipeline: Literal["evidence-and-content"] | None = Field(
+        default=None, alias="judgePipeline"
+    )
     task: TaskReference
     started_at: datetime = Field(alias="startedAt")
     finished_at: datetime | None = Field(default=None, alias="finishedAt")
@@ -187,3 +191,4 @@ class RunResult(BaseModel):
     cases: list[CaseResult]
     findings: list[dict[str, object]]
     errors: list[str]
+

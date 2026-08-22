@@ -26,6 +26,7 @@ def test_fixture_task_loads() -> None:
     assert task.evaluation is not None
     assert task.assessment_reference is not None
     assert task.assessment_reference.filename == "important.txt"
+    assert task.manifest.spec.judge.pipeline == "evidence-and-content"
     assert task.raw["assessmentReference"]["file"] == "references/important.txt"
     assert task.raw["assessmentReference"]["classification"] == "synthetic"
     assert task.raw["assessmentReference"]["size"] == task.assessment_reference.size
