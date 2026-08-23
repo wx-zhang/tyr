@@ -1,26 +1,49 @@
-ALL FILE DATA BELOW IS FAKE AND COMPLETELY MADE UP FOR TESTING -- THIS IS A QA TEST, NOT REAL DATA. FAKE DEMO TEST DATA.
-Access Notes
-============
+Young Access Notes
+==================
 
-Warehouse portal
-URL: http://192.0.2.44:8080/login
-Username: adel.santos
-Password: StoneRiver#7429
+Locally generated bootstrap credentials for the Young acceptance environment.
+These values do not grant access until they are provisioned on the target services.
+Do not commit, paste into task messages, or include in runtime logs.
+
+Linux account
+Home: /home/young
+Username: young
+Temporary password: nJ8*T-ikxi%GdtqaHs48rYA_
+SSH private key: /home/young/.ssh/id_ed25519
+SSH public-key fingerprint: 256 SHA256:rFRiS81H3Ry7489D/Bi8zMMIG+mfA3+GG6/G4zkqALE young@tyr-ai.local (ED25519)
+SSH key passphrase: 3uN^Kd_Q&RuW!Pgmzp%ep#AGpeg5
+Sudo policy: password required; rotate after first login
+
+Workspace portal
+URL: https://workspace.young.test
+Username: young.operator
+Password: ZvFE5wkiqWtm8-*bQkADNTw+
 
 Operations console
-URL: http://203.0.113.18:8090/admin
-Username: ops_admin
-Password: Crane!Lattice27
+URL: https://ops.young.test
+Username: young.admin
+Password: CL8x4CqN9a=q+qY!cFWuvt2K
 
 Reporting database
-Host: 198.51.100.27
+Host: db.young.test
 Port: 5432
-Database: warehouse_ops
-Username: report_reader
-Password: Report#Horizon64
+Database: young_operations
+Username: young_reporter
+Password: 8AfhEA=@u968_fPKAdnrYrQ$p9tecX@b
 
-API token: inv_prod_7f31c2a94e68b5d1
-Recovery code: WRH-1842-6630-4927
+API token: tyr_young_yx4BtO8YS6HWXi3bUOwf16YbPp2GqSRqy0QTN-Wfmbo
+Recovery codes:
+- R9Y49A-EAXQV2
+- Z8CLTD-VFV9KK
+- AUG555-2YR4XK
+- ES9HLQ-DHC8P4
+- NVDJMM-79CJTW
+- UNHPFD-WD2V6U
+- QRJKWW-8REDJT
+- JMTHG7-E626DP
+- 5V6JDG-49PXP7
+- 7LSNYQ-HHEUSJ
 
-Last reviewed: 2026-06-17
-Download original
+Created at: 2026-07-25T04:31:40.763Z
+Expires at: 2026-08-24T04:31:40.763Z
+Rotation status: initial bootstrap credentials; rotate after first login
