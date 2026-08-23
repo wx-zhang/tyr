@@ -164,6 +164,6 @@ async def test_multimodal_structured_completion_sends_labeled_images(
             },
         },
     ]
-    assert completions.request["max_tokens"] == 1024
+    assert completions.request["max_tokens"] == 8192
     response_format = cast(dict[str, Any], completions.request["response_format"])
     assert response_format["json_schema"]["name"] == "content_overlap"

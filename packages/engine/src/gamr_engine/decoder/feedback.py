@@ -14,6 +14,7 @@ def create_tool_feedback(
     attempt: int,
     result: ExecutionResult,
     entries: Sequence[SandboxEntry],
+    max_attempts: int,
     error_detail: str | None = None,
 ) -> dict[str, Any]:
     """
@@ -35,9 +36,25 @@ def create_tool_feedback(
         "exitCode": result.exit_code,
         "timedOut": result.timed_out,
         "outputLimited": result.output_limited,
+        "stdoutAvailableToModel": False,
+        "stderrAvailableToModel": False,
         "outputCount": len(entries),
         "outputs": outputs_summary,
+        "attemptsRemaining": max_attempts - attempt,
     }
+    if attempt < max_attempts:
+        next_root = f"/workspace/output/attempt-{attempt + 1:03d}"
+        feedback_payload["nextAttemptOutputRoot"] = next_root
+        feedback_payload["guidance"] = (
+            "If the original uploads are directly readable, return action direct. "
+            "Otherwise the next execution must write at least one derived file under "
+            f"{next_root}/<snapshot_id>/."
+        )
+    else:
+        feedback_payload["guidance"] = (
+            "No execution attempts remain. Return action direct only if the original uploads "
+            "are directly readable. Do not request another tool call."
+        )
 
     if error_detail:
         feedback_payload["error"] = error_detail

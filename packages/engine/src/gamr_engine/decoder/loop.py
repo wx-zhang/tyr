@@ -17,11 +17,13 @@ from ..content_prepare import DerivedContentSnapshot
 from ..content_source import VerifiedContentSnapshot
 from ..ports.models import ChatModelGateway
 from ..ports.sandbox import Sandbox, SandboxId
+from .direct import originals_are_directly_readable
 from .executor import (
     attempt_record,
     cleanup,
     destroy_active_sandbox,
     execute_tool_attempt,
+    finalize_after_attempts,
     record_attempt,
     start_sandbox,
 )
@@ -87,10 +89,7 @@ class DecoderExecutionLoop:
                 res = await self._step(attempt_idx)
                 if res is not None:
                     return res
-            return self._fail_closed(
-                DecodingFailureCode.ATTEMPT_EXHAUSTION,
-                attempt_count=self.max_attempts,
-            )
+            return await finalize_after_attempts(self)
         finally:
             await self._cleanup()
 
@@ -162,13 +161,26 @@ class DecoderExecutionLoop:
         try:
             payload = json.loads(stripped)
         except json.JSONDecodeError:
-            return self._fail_closed(DecodingFailureCode.INVALID_AGENT_RESPONSE)
+            payload = {}
+        if not (isinstance(payload, dict) and payload.get("action") == "direct"):
+            if originals_are_directly_readable(self.snapshots):
+                payload = {
+                    "action": "direct",
+                    "rationale": "Verified uploads are directly readable.",
+                }
 
         rationale = payload.get("rationale") if isinstance(payload, dict) else None
+        latest_execution = self.attempts[-1].execution if self.attempts else None
+        direct_allowed = not self.program_digests or (
+            latest_execution is not None
+            and latest_execution.exit_code == 0
+            and not latest_execution.timed_out
+            and not latest_execution.output_limited
+        )
         if (
             isinstance(payload, dict)
             and payload.get("action") == "direct"
-            and not self.program_digests
+            and direct_allowed
             and isinstance(rationale, str)
             and rationale.strip()
             and len(rationale) <= MAX_RATIONALE_LENGTH
@@ -181,13 +193,20 @@ class DecoderExecutionLoop:
                 programSha256=self.program_digests,
                 limitFlags=self.limit_flags,
                 derivedFiles=[],
-                attempts=[],
+                attempts=self.attempts,
             )
-            self._activity(
-                "decoder.route_selected",
-                f"Decoder selected direct evaluation: {rationale.strip()}",
-                {"decoderAction": "direct"},
-            )
+            if self.program_digests:
+                self._activity(
+                    "decoder.route_revised",
+                    f"Decoder revised execution to direct evaluation: {rationale.strip()}",
+                    {"decoderAction": "direct"},
+                )
+            else:
+                self._activity(
+                    "decoder.route_selected",
+                    f"Decoder selected direct evaluation: {rationale.strip()}",
+                    {"decoderAction": "direct"},
+                )
             return DecoderLoopResult("direct", prov, [])
 
         return self._fail_closed(DecodingFailureCode.INVALID_AGENT_RESPONSE)

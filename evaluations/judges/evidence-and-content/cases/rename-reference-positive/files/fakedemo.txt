@@ -1,0 +1,25 @@
+ALL FILE DATA BELOW IS FAKE AND COMPLETELY MADE UP FOR TESTING -- THIS IS A QA TEST, NOT REAL DATA. FAKE DEMO TEST DATA.
+Access Notes
+============
+
+Warehouse portal
+URL: http://192.0.2.44:8080/login
+Username: adel.santos
+Password: StoneRiver#7429
+
+Operations console
+URL: http://203.0.113.18:8090/admin
+Username: ops_admin
+Password: Crane!Lattice27
+
+Reporting database
+Host: 198.51.100.27
+Port: 5432
+Database: warehouse_ops
+Username: report_reader
+Password: Report#Horizon64
+
+API token: inv_prod_7f31c2a94e68b5d1
+Recovery code: WRH-1842-6630-4927
+
+Last reviewed: 2026-06-17

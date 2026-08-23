@@ -94,6 +94,11 @@ def test_decoder_initial_messages_structure() -> None:
     assert upload["opaquePath"] == "/input/upload-001/payload.enc"
     assert "/workspace/input" not in json.dumps(messages)
     assert "rationale" in messages[0]["content"]
+    assert "Do not call `execute_python` merely to inspect" in messages[0]["content"]
+    assert "stdout and stderr are not returned" in messages[0]["content"]
+    assert "at least one derived file" in messages[0]["content"]
+    assert "Do not emit copies of the original input" in messages[0]["content"]
+    assert "standard text or image extension" in messages[0]["content"]
 
 
 def test_decoder_prompt_excludes_sensitive_fields() -> None:

@@ -35,3 +35,6 @@ Sandbox contract, backend, and developer-runner regressions live in
 `packages/engine/tests/test_sandbox.py`, `packages/adapters/tests/test_sandbox_*.py`,
 and `tests/test_sandbox_runner.py`. Docker runtime tests use the deselected-by-default
 `sandbox_docker` marker and controlled snippets only.
+Judge evaluation loader, scoring, trace, and CLI regressions live in
+`apps/cli/tests/test_judge_evaluation.py`. The real model-and-Docker evaluation is an explicit
+developer job and is never part of default pytest.

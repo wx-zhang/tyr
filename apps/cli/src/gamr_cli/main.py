@@ -16,6 +16,7 @@ from rich.table import Table
 
 from .chat_cli import run_chat_loop
 from .composition import configured_secrets
+from .evaluation_cli import run_judge_evaluation_command
 from .experiment_cli import (
     resume_scientist_command,
     run_experiment_command,
@@ -33,10 +34,12 @@ app = typer.Typer(
 task_app = typer.Typer(help="Inspect and validate JSON tasks")
 experiment_app = typer.Typer(help="Create and inspect experiment runs")
 result_app = typer.Typer(help="Validate canonical run results")
+evaluate_app = typer.Typer(help="Run focused live regression evaluations")
 
 app.add_typer(task_app, name="task")
 app.add_typer(experiment_app, name="experiment")
 app.add_typer(result_app, name="result")
+app.add_typer(evaluate_app, name="evaluate")
 
 
 def _configured_secrets(settings: Settings) -> tuple[str, ...]:
@@ -211,6 +214,31 @@ def validate_result(path: Path) -> None:
         console.print(f"[red]Invalid result:[/red] {error}")
         raise typer.Exit(code=1) from error
     console.print(f"[green]Valid result[/green] {path}")
+
+
+@evaluate_app.command("judges")
+def evaluate_judges(
+    dataset: Path = typer.Option(
+        Path("evaluations/judges/evidence-and-content/dataset.json"),
+        "--dataset",
+    ),
+    model: str = typer.Option("", "--model", help="Override TYR_LOOP_JUDGE_MODEL."),
+    case_id: list[str] = typer.Option([], "--case-id", help="Select a dataset case."),
+    debug: bool = typer.Option(
+        False,
+        "--debug",
+        help="Print unredacted LLM and sandbox inputs and outputs.",
+    ),
+) -> None:
+    """Replay committed evidence through a production judge pipeline."""
+
+    try:
+        run_judge_evaluation_command(console, dataset, model, case_id, debug)
+    except typer.Exit:
+        raise
+    except Exception as error:
+        console.print(f"[red]Judge evaluation failed:[/red] {type(error).__name__}: {error}")
+        raise typer.Exit(code=1) from error
 
 
 @app.command()

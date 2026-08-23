@@ -167,6 +167,91 @@ async def test_successful_first_program_terminates_loop() -> None:
 
 
 @pytest.mark.asyncio
+async def test_valid_derived_text_survives_an_unsupported_sibling() -> None:
+    source_code = "decode uploaded content"
+    model = FakeChatModel(
+        [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": "call_1",
+                            "type": "function",
+                            "function": {
+                                "name": "execute_python",
+                                "arguments": json.dumps(
+                                    {"source": source_code, "rationale": "decode upload"}
+                                ),
+                            },
+                        }
+                    ],
+                }
+            }
+        ]
+    )
+    sandbox = ScriptableSandbox(
+        collect_results=[
+            [
+                SandboxEntry("upload-001/original.bin", b"opaque"),
+                SandboxEntry("upload-001/decoded.txt", b"decoded content"),
+            ]
+        ]
+    )
+    agent = DecoderAgent(
+        model=model,
+        sandbox=sandbox,
+        snapshots=[_sample_snapshot()],
+        task_context="task",
+        case_fields={"title": "case"},
+        evaluation_criteria="crit",
+        transcript=[],
+    )
+
+    result = await agent.run()
+
+    assert result.action == "decoded"
+    assert result.provenance.status is DecodingStatus.SUCCEEDED
+    assert [item.uploaded_item_id for item in result.provenance.derived_files] == [
+        "upload-001-derived-002"
+    ]
+
+
+@pytest.mark.asyncio
+async def test_tool_free_prose_routes_verified_plain_text_directly() -> None:
+    model = FakeChatModel(
+        [{"message": {"role": "assistant", "content": "This plain text is directly readable."}}]
+    )
+    sandbox = ScriptableSandbox()
+    snapshot = VerifiedContentSnapshot(
+        snapshot_id="upload-001",
+        source_file_id="file-1",
+        filename="notes.txt",
+        content_type="text/plain",
+        size=6,
+        sha256=hashlib.sha256(b"notes\n").hexdigest(),
+        content=b"notes\n",
+    )
+    agent = DecoderAgent(
+        model=model,
+        sandbox=sandbox,
+        snapshots=[snapshot],
+        task_context="task",
+        case_fields={"title": "case"},
+        evaluation_criteria="crit",
+        transcript=[],
+    )
+
+    result = await agent.run()
+
+    assert result.action == "direct"
+    assert result.provenance.status is DecodingStatus.SKIPPED
+    assert result.provenance.rationale == "Verified uploads are directly readable."
+    assert sandbox.started_ids == []
+
+
+@pytest.mark.asyncio
 async def test_correction_in_same_healthy_workspace() -> None:
     source1 = "print('fail 1')\n"
     source2 = "print('success 2')\n"
@@ -244,6 +329,72 @@ async def test_correction_in_same_healthy_workspace() -> None:
 
 
 @pytest.mark.asyncio
+async def test_inspection_attempt_can_revise_route_to_direct() -> None:
+    source = "print('valid UTF-8 text')\n"
+    model = FakeChatModel(
+        [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": "call_1",
+                            "type": "function",
+                            "function": {
+                                "name": "execute_python",
+                                "arguments": json.dumps(
+                                    {"source": source, "rationale": "inspect upload"}
+                                ),
+                            },
+                        }
+                    ],
+                }
+            },
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": json.dumps(
+                        {"action": "direct", "rationale": "plain text is directly readable"}
+                    ),
+                }
+            },
+        ]
+    )
+    sandbox = ScriptableSandbox(
+        exec_results=[ExecutionResult(0, "valid UTF-8 text", "", 0.1)],
+        collect_results=[[]],
+    )
+    activities: list[tuple[str, dict[str, object]]] = []
+    agent = DecoderAgent(
+        model=model,
+        sandbox=sandbox,
+        snapshots=[_sample_snapshot()],
+        task_context="task",
+        case_fields={"title": "case"},
+        evaluation_criteria="crit",
+        transcript=[],
+        activity_sink=lambda name, payload: activities.append((name, payload)),
+    )
+
+    result = await agent.run()
+
+    assert result.action == "direct"
+    assert result.provenance.status == DecodingStatus.SKIPPED
+    assert result.provenance.attempt_count == 1
+    assert result.provenance.attempts[0].execution is not None
+    assert result.provenance.attempts[0].execution.stdout.value == "valid UTF-8 text"
+    assert len(sandbox.sources_executed) == 1
+    assert [name for name, _ in activities] == [
+        "decoder.analysis_started",
+        "decoder.route_selected",
+        "decoder.attempt_started",
+        "decoder.attempt_completed",
+        "decoder.route_revised",
+    ]
+
+
+@pytest.mark.asyncio
 async def test_exactly_three_calls_then_attempt_exhaustion() -> None:
     source = "print('fail')\n"
     call_msg: dict[str, object] = {
@@ -292,7 +443,59 @@ async def test_exactly_three_calls_then_attempt_exhaustion() -> None:
     assert [item.attempt for item in result.provenance.attempts] == [1, 2, 3]
     assert all(item.execution is not None for item in result.provenance.attempts)
     assert len(sandbox.sources_executed) == 3
+    assert model.call_count == 4
     assert sandbox.closed_ids == ["sandbox-1"]
+
+
+@pytest.mark.asyncio
+async def test_third_inspection_attempt_gets_non_executing_final_turn() -> None:
+    source = "print('readable')\n"
+    tool_response: dict[str, object] = {
+        "message": {
+            "role": "assistant",
+            "content": None,
+            "tool_calls": [
+                {
+                    "id": "call",
+                    "type": "function",
+                    "function": {
+                        "name": "execute_python",
+                        "arguments": json.dumps(
+                            {"source": source, "rationale": "inspect upload"}
+                        ),
+                    },
+                }
+            ],
+        }
+    }
+    direct_response: dict[str, object] = {
+        "message": {
+            "role": "assistant",
+            "content": '{"action":"direct","rationale":"standard readable file"}',
+        }
+    }
+    model = FakeChatModel([tool_response, tool_response, tool_response, direct_response])
+    sandbox = ScriptableSandbox(
+        exec_results=[ExecutionResult(0, "readable", "", 0.1)] * 3,
+        collect_results=[[], [], []],
+    )
+    result = await DecoderAgent(
+        model=model,
+        sandbox=sandbox,
+        snapshots=[_sample_snapshot()],
+        task_context="task",
+        case_fields={"title": "case"},
+        evaluation_criteria="crit",
+        transcript=[],
+    ).run()
+
+    assert result.action == "direct"
+    assert result.provenance.attempt_count == 3
+    assert len(result.provenance.attempts) == 3
+    assert len(sandbox.sources_executed) == 3
+    final_tool_feedback = json.loads(str(model.messages_seen[3][-1]["content"]))
+    assert final_tool_feedback["attemptsRemaining"] == 0
+    assert "nextAttemptOutputRoot" not in final_tool_feedback
 
 
 @pytest.mark.asyncio

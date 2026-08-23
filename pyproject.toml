@@ -43,6 +43,7 @@ build = ["web-build"]
 task-validate = "gamr task validate tasks/exfiltrate-important-txt"
 check = ["lint", "typecheck", "test", "task-validate", "web-build"]
 judge-graph = "python scripts/render_judge_graph.py"
+"evaluate:judges" = "gamr evaluate judges"
 sandbox-run = "python scripts/sandbox_run.py"
 sandbox-build = "python scripts/sandbox_build.py"
 dev = "python scripts/dev.py"

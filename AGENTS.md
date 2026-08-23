@@ -44,10 +44,11 @@ schemas/     Generated task, run-result, and OpenAPI schemas
 docs/        Architecture, data-format, development, and scaffold specifications
 scripts/     Schema export, local development data utilities, and sandbox developer commands
 tests/       Cross-package fixtures, integration tests, smoke tests, and sandbox runner tests
+evaluations/ Small, reviewed, run-derived datasets for opt-in live judge regression
 .gamr/       Gitignored local run bundles and standalone operational state
 ```
 
-Scoped instruction files belong in `apps/`, every `apps/*` module, `packages/`, every `packages/*` module, `tasks/`, `schemas/`, `docs/`, `scripts/`, and `tests/`. A scoped file adds only subtree-specific rules and may tighten, but never weaken, this file's safety requirements. See `docs/SCAFFOLD_SPEC.md` for the ownership of each instruction file.
+Scoped instruction files belong in `apps/`, every `apps/*` module, `packages/`, every `packages/*` module, `tasks/`, `schemas/`, `docs/`, `scripts/`, `tests/`, and `evaluations/`. A scoped file adds only subtree-specific rules and may tighten, but never weaken, this file's safety requirements. See `docs/SCAFFOLD_SPEC.md` for the ownership of each instruction file.
 
 ### Module dependency rules
 
@@ -72,6 +73,7 @@ uv run poe test
 uv run poe schemas
 uv run poe sandbox-build
 uv run poe sandbox-run --attach <path> --code "<source>"
+uv run poe evaluate:judges
 uv run poe check
 ```
 
@@ -86,6 +88,7 @@ gamr task validate <task-directory>
 gamr experiment run <task-directory>
 gamr experiment show <run-id>
 gamr result validate <result.json>
+gamr evaluate judges
 gamr chat
 ```
 

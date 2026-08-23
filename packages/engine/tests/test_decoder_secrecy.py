@@ -186,6 +186,10 @@ async def test_feedback_excludes_secrets_stdout_stderr_and_internals() -> None:
     assert tool_content["attempt"] == 1
     assert "exitCode" not in tool_content or isinstance(tool_content["exitCode"], int)
     assert "outputs" in tool_content or "outputCount" in tool_content
+    assert tool_content["stdoutAvailableToModel"] is False
+    assert tool_content["stderrAvailableToModel"] is False
+    assert tool_content["nextAttemptOutputRoot"] == "/workspace/output/attempt-002"
+    assert "direct" in tool_content["guidance"]
 
 
 @pytest.mark.asyncio

@@ -63,7 +63,9 @@ credentials, and raw tool transcripts are excluded from decoder prompts, tool co
 evidence. The decoder uses the canonical `/input/<opaque-id>/<filename>` path and matching relative
 attachment destination. Safe reviewer provenance retains the concise route rationale, redacted source,
 program digests, bounded execution result states, explicit suppressed/empty/unavailable streams, and
-source-to-derived lineage. GAMR
+source-to-derived lineage. Sandbox stdout and stderr are not returned to the decoder model. A sandbox
+execution completes decoding only by producing derived files in its exact attempt directory. The model
+can revise an inspection route to direct evaluation without losing the recorded attempt. GAMR
 compares prepared text, JSON, safe archive members, and PNG/JPEG images with
 the reference through a separate structured judge call. The configured model
 provider receives those synthetic contents. Its response contains a concise

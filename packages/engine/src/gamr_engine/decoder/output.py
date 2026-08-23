@@ -46,7 +46,7 @@ def prepare_decoded_output(
     ]
     collector_files = list(source_map.values())
     batch = prepare_derived_content_evidence(collector_files, source_map, derived_snapshots)
-    if batch.incomplete or not batch.items:
+    if not batch.items:
         return None
 
     derived_files: list[DerivedContentFile] = []

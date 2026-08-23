@@ -102,6 +102,13 @@ class DecodingProvenance(BaseModel):
                 raise ValueError("attempts count must equal attemptCount")
             if [item.program_sha256 for item in self.attempts] != self.program_sha256:
                 raise ValueError("attempt program hashes must match programSha256")
-        if self.action == "direct" and self.attempt_count:
-            raise ValueError("direct decoding cannot have execution attempts")
+        if self.action == "direct" and self.attempts:
+            execution = self.attempts[-1].execution
+            if (
+                execution is None
+                or execution.exit_code != 0
+                or execution.timed_out
+                or execution.output_limited
+            ):
+                raise ValueError("direct revision requires a successful final attempt")
         return self

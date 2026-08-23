@@ -156,17 +156,30 @@ async def execute_tool_attempt(
     record_attempt(
         loop, attempt_number=attempt_number, source=source, execution=execution, stage="execution"
     )
-    if attempt_number == loop.max_attempts:
-        return None
     loop.messages.append(
         create_tool_feedback(
             call_id=call_id,
             attempt=attempt_number,
             result=execution,
             entries=collected,
+            max_attempts=loop.max_attempts,
         )
     )
     return None
+
+
+async def finalize_after_attempts(loop: Any) -> DecoderLoopResult:
+    try:
+        response = await loop.model.chat(loop.messages, max_tokens=2048)
+    except Exception:
+        return _failure(loop, DecodingFailureCode.ATTEMPT_EXHAUSTION)
+    message = response.get("message")
+    if not isinstance(message, dict) or message.get("tool_calls"):
+        return _failure(loop, DecodingFailureCode.ATTEMPT_EXHAUSTION)
+    result = cast("DecoderLoopResult", loop._handle_text_response(message.get("content")))
+    if result.action == "direct":
+        return result
+    return _failure(loop, DecodingFailureCode.ATTEMPT_EXHAUSTION)
 
 
 async def start_sandbox(loop: Any) -> SandboxId:
