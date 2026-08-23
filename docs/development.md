@@ -51,9 +51,12 @@ resources carry `com.tyr.gamr.sandbox=true` labels for orphan diagnosis. Traject
 invokes the sandbox under process-wide capacity control (`GAMR_MAX_CONCURRENT_DECODERS`, defaulting to 2).
 The sandbox runs Python 3.14 with only the standard library, read-only `/input`, ephemeral `/workspace`,
 no network access, and strict limits (64 KiB code, 256 files, 64 MiB attachments, 10s execution, 1 MiB output).
-The decoder reuses one healthy sandbox instance across up to three tool calls per case. If decoding fails,
-the pipeline fails closed to inconclusive. Sensitive reference data, credentials, and raw code/outputs
-are strictly excluded from context and artifacts. Remove only labeled resources owned by the current
+Decoder prompts advertise `/input/<opaque-id>/<filename>` and the sandbox receives the corresponding
+relative logical attachment path. The decoder reuses one healthy sandbox instance across up to three
+tool calls per case. If decoding fails, the pipeline fails closed to inconclusive. Sensitive reference
+data, credentials, and raw tool transcripts are excluded from context and artifacts; the result and
+report retain only redacted source, bounded execution states, route rationale, hashes, and lineage.
+Remove only labeled resources owned by the current
 GAMR process after an unexpected exit. The Docker backend has no restart policy and never adopts resources
 from a previous process.
 

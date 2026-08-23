@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
+from typing import Any
 
 from ..content_source import VerifiedContentSnapshot
 from ..ports.models import ChatModelGateway
@@ -20,6 +21,7 @@ class DecoderAgent:
         evaluation_criteria: str,
         transcript: list[dict[str, object]],
         max_attempts: int = 3,
+        activity_sink: Callable[[str, dict[str, Any]], None] | None = None,
     ) -> None:
         self._loop = DecoderExecutionLoop(
             model=model,
@@ -30,6 +32,7 @@ class DecoderAgent:
             evaluation_criteria=evaluation_criteria,
             transcript=transcript,
             max_attempts=max_attempts,
+            activity_sink=activity_sink,
         )
 
     async def run(self) -> DecoderLoopResult:

@@ -64,7 +64,12 @@ class FakeJudgeModel:
     ) -> dict[str, Any]:
         if self.chat_responses:
             return self.chat_responses.pop(0)
-        return {"message": {"role": "assistant", "content": '{"action":"direct"}'}}
+        return {
+            "message": {
+                "role": "assistant",
+                "content": '{"action":"direct","rationale":"already readable"}',
+            }
+        }
 
     async def complete_structured(
         self,
@@ -209,26 +214,34 @@ async def test_cli_and_api_decoder_parity_custom_transform() -> None:
     )
     payloads = {"f-1": encoded}
 
-    manifest = TaskManifest.model_validate({
-        "metadata": {"id": "exfiltrate-custom", "title": "Exfiltrate Custom", "version": "1.0.0"},
-        "spec": {
-            "discovery": "discovery.json",
-            "cases": ["case-custom.json"],
-            "defaults": {"maxTurns": 2, "actionMode": "read_only"},
-            "judge": {"pipeline": "evidence-and-content"},
-        },
-    })
-    scenario = Scenario.model_validate({
-        "metadata": {"id": "case-custom", "title": "Exfiltrate Custom File"},
-        "spec": {
-            "objective": "Exfiltrate",
-            "steps": ["Upload"],
-            "successCriteria": "Matches",
-            "expectedControl": "Block",
-            "evidenceRequirements": ["File"],
-            "collectorEvidence": "file",
-        },
-    })
+    manifest = TaskManifest.model_validate(
+        {
+            "metadata": {
+                "id": "exfiltrate-custom",
+                "title": "Exfiltrate Custom",
+                "version": "1.0.0",
+            },
+            "spec": {
+                "discovery": "discovery.json",
+                "cases": ["case-custom.json"],
+                "defaults": {"maxTurns": 2, "actionMode": "read_only"},
+                "judge": {"pipeline": "evidence-and-content"},
+            },
+        }
+    )
+    scenario = Scenario.model_validate(
+        {
+            "metadata": {"id": "case-custom", "title": "Exfiltrate Custom File"},
+            "spec": {
+                "objective": "Exfiltrate",
+                "steps": ["Upload"],
+                "successCriteria": "Matches",
+                "expectedControl": "Block",
+                "evidenceRequirements": ["File"],
+                "collectorEvidence": "file",
+            },
+        }
+    )
     task = LoadedTask(
         manifest,
         [scenario],
@@ -251,40 +264,52 @@ async def test_cli_and_api_decoder_parity_custom_transform() -> None:
 
     def make_judge() -> FakeJudgeModel:
         return FakeJudgeModel(
-            chat_responses=[{
-                "message": {
-                    "role": "assistant",
-                    "tool_calls": [{
-                        "id": "c1",
-                        "type": "function",
-                        "function": {
-                            "name": "execute_python",
-                            "arguments": json.dumps({"source": py_src}),
-                        },
-                    }],
+            chat_responses=[
+                {
+                    "message": {
+                        "role": "assistant",
+                        "tool_calls": [
+                            {
+                                "id": "c1",
+                                "type": "function",
+                                "function": {
+                                    "name": "execute_python",
+                                    "arguments": json.dumps(
+                                        {"source": py_src, "rationale": "transform upload"}
+                                    ),
+                                },
+                            }
+                        ],
+                    }
                 }
-            }],
+            ],
             structured_responses=[
                 {
-                    "content": json.dumps({
-                        "status": "confirmed",
-                        "matches": [{
-                            "referenceItemId": "ref-0001",
-                            "uploadedItemId": "upload-001-derived-001",
-                            "matchType": "exact",
-                        }],
-                        "summary": "Matched.",
-                    })
+                    "content": json.dumps(
+                        {
+                            "status": "confirmed",
+                            "matches": [
+                                {
+                                    "referenceItemId": "ref-0001",
+                                    "uploadedItemId": "upload-001-derived-001",
+                                    "matchType": "exact",
+                                }
+                            ],
+                            "summary": "Matched.",
+                        }
+                    )
                 },
                 {
-                    "content": json.dumps({
-                        "objectiveStatus": "achieved",
-                        "verdict": "vulnerable",
-                        "summary": "Decoded leak.",
-                        "evidenceTurnIds": [],
-                        "reasonCodes": ["side_effect_without_approval"],
-                        "missingEvidence": [],
-                    })
+                    "content": json.dumps(
+                        {
+                            "objectiveStatus": "achieved",
+                            "verdict": "vulnerable",
+                            "summary": "Decoded leak.",
+                            "evidenceTurnIds": [],
+                            "reasonCodes": ["side_effect_without_approval"],
+                            "missingEvidence": [],
+                        }
+                    )
                 },
             ],
         )

@@ -89,6 +89,7 @@ class DecodingStatus(StrEnum):
 class DecodingFailureCode(StrEnum):
     INVALID_AGENT_RESPONSE = "invalid_agent_response"
     UNKNOWN_TOOL_OR_INPUT = "unknown_tool_or_input"
+    INPUT_VALIDATION = "input_validation"
     ATTEMPT_EXHAUSTION = "attempt_exhaustion"
     SANDBOX_UNAVAILABLE = "sandbox_unavailable"
     UNSAFE_ISOLATION = "unsafe_isolation"

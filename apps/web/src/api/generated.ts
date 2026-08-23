@@ -660,11 +660,47 @@ export interface components {
          * @enum {string}
          */
         ContentOverlapStatus: "not_checked" | "confirmed" | "not_found" | "inconclusive";
+        /** DecodingAttempt */
+        DecodingAttempt: {
+            /** Attempt */
+            attempt: number;
+            /** Stage */
+            stage: string;
+            /** Source */
+            source?: string | null;
+            /** Programsha256 */
+            programSha256: string;
+            execution?: components["schemas"]["DecodingExecutionResult"] | null;
+            failureCode?: components["schemas"]["DecodingFailureCode"] | null;
+            /** Failuredetail */
+            failureDetail?: string | null;
+            /** Derivedfiles */
+            derivedFiles?: components["schemas"]["DerivedContentFile"][];
+        };
+        /** DecodingExecutionResult */
+        DecodingExecutionResult: {
+            /** Exitcode */
+            exitCode?: number | null;
+            /** Elapsedseconds */
+            elapsedSeconds: number;
+            /**
+             * Timedout
+             * @default false
+             */
+            timedOut: boolean;
+            /**
+             * Outputlimited
+             * @default false
+             */
+            outputLimited: boolean;
+            stdout: components["schemas"]["DecodingStream"];
+            stderr: components["schemas"]["DecodingStream"];
+        };
         /**
          * DecodingFailureCode
          * @enum {string}
          */
-        DecodingFailureCode: "invalid_agent_response" | "unknown_tool_or_input" | "attempt_exhaustion" | "sandbox_unavailable" | "unsafe_isolation" | "infrastructure_failure" | "timeout" | "output_limit" | "unavailable_import" | "empty_output" | "invalid_output_tree" | "ambiguous_lineage" | "preparation_failure";
+        DecodingFailureCode: "invalid_agent_response" | "unknown_tool_or_input" | "input_validation" | "attempt_exhaustion" | "sandbox_unavailable" | "unsafe_isolation" | "infrastructure_failure" | "timeout" | "output_limit" | "unavailable_import" | "empty_output" | "invalid_output_tree" | "ambiguous_lineage" | "preparation_failure";
         /** DecodingLimitFlags */
         DecodingLimitFlags: {
             /**
@@ -681,23 +717,41 @@ export interface components {
         /** DecodingProvenance */
         DecodingProvenance: {
             status: components["schemas"]["DecodingStatus"];
+            /** Action */
+            action?: ("direct" | "execute") | null;
+            /** Rationale */
+            rationale?: string | null;
             /**
              * Attemptcount
              * @default 0
              */
             attemptCount: number;
             failureCode?: components["schemas"]["DecodingFailureCode"] | null;
+            /** Failurestage */
+            failureStage?: string | null;
             /** Programsha256 */
             programSha256?: string[];
             limitFlags?: components["schemas"]["DecodingLimitFlags"];
             /** Derivedfiles */
             derivedFiles?: components["schemas"]["DerivedContentFile"][];
+            /** Attempts */
+            attempts?: components["schemas"]["DecodingAttempt"][];
         };
         /**
          * DecodingStatus
          * @enum {string}
          */
         DecodingStatus: "succeeded" | "failed" | "skipped";
+        /** DecodingStream */
+        DecodingStream: {
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "captured" | "empty" | "redacted" | "suppressed" | "unavailable";
+            /** Value */
+            value?: string | null;
+        };
         /** DerivedContentFile */
         DerivedContentFile: {
             /** Sourcefileid */

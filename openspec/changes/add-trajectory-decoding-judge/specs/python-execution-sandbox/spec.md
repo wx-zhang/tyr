@@ -1,5 +1,20 @@
 ## ADDED Requirements
 
+### Requirement: Canonical decoder input mapping
+Decoder callers SHALL provide relative logical attachment destinations. The contained sandbox SHALL map each logical destination below the read-only `/input` runtime root without allowing an absolute destination, traversal, destination conflict, or caller-selected host path. A decoder prompt, its input validator, and the sandbox runtime MUST use the same `/input/<logical-destination>` path.
+
+#### Scenario: Decoder attaches a verified upload
+- **WHEN** the decoder supplies the relative logical destination `<opaque-id>/<filename>`
+- **THEN** generated Python can read the immutable upload only at `/input/<opaque-id>/<filename>`
+
+#### Scenario: Decoder supplies an absolute attachment destination
+- **WHEN** a decoder integration supplies `/workspace/input/<opaque-id>/<filename>` or another absolute logical destination
+- **THEN** validation rejects it as an input-contract failure before Docker startup and does not classify the failure as Docker infrastructure failure
+
+#### Scenario: Composed Docker decoder path
+- **WHEN** a contained decoder integration starts with a verified upload and executes a program that reads its advertised opaque input path
+- **THEN** a real Docker sandbox starts, the program reads the expected immutable bytes, its output is collected, and all resources are removed at close
+
 ### Requirement: Confined workspace output collection
 The sandbox capability SHALL allow a caller to collect a bounded snapshot of regular files below a designated workspace output directory after Python execution is no longer active. Collection MUST return logical relative paths and bytes without exposing the container name, volume name, host paths, or files outside that directory. The snapshot MUST contain at most 256 regular files and at most 64 MiB in total.
 
@@ -39,3 +54,14 @@ When `evidence-and-content` executes model-generated Python, GAMR SHALL require 
 #### Scenario: Docker execution fails
 - **WHEN** Docker startup, communication, execution, output collection, or cleanup fails
 - **THEN** GAMR reports a safe sandbox failure and does not retry through host execution
+
+### Requirement: Stage-specific sandbox failure reporting
+The generated-code integration SHALL distinguish input validation, capacity admission, Docker startup, execution, output collection, output validation, and cleanup failures. It SHALL preserve a bounded safe stage and failure category for canonical decoder provenance and activities while keeping raw commands, paths, container identifiers, uploaded content, decoded content, and unsanitized daemon or process messages ephemeral.
+
+#### Scenario: Attachment validation fails
+- **WHEN** a logical decoder attachment violates the sandbox input contract
+- **THEN** GAMR records an input-validation failure and does not report that Docker startup or Python execution occurred
+
+#### Scenario: Docker command fails safely
+- **WHEN** a Docker lifecycle command fails after valid attachments were accepted
+- **THEN** GAMR records the applicable startup, execution, collection, or cleanup stage with a safe diagnostic category and no raw daemon message

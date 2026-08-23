@@ -1,5 +1,13 @@
 """Pure domain contracts for GAMR."""
 
+from .decoding import (
+    DecodingAttempt,
+    DecodingExecutionResult,
+    DecodingLimitFlags,
+    DecodingProvenance,
+    DecodingStream,
+    DerivedContentFile,
+)
 from .events import (
     ActivityId,
     ActivityType,
@@ -20,9 +28,6 @@ from .experiments import (
     CheckedContentFile,
     ContentMatch,
     ContentOverlapResult,
-    DecodingLimitFlags,
-    DecodingProvenance,
-    DerivedContentFile,
     Evidence,
     ExperimentConfig,
     ExperimentRecord,
@@ -73,9 +78,12 @@ __all__ = [
     "ContentOverlapResult",
     "ContentOverlapStatus",
     "DecodingFailureCode",
+    "DecodingAttempt",
+    "DecodingExecutionResult",
     "DecodingLimitFlags",
     "DecodingProvenance",
     "DecodingStatus",
+    "DecodingStream",
     "DerivedContentFile",
     "CaseAssessment",
     "AssessmentReasonCode",

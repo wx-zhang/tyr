@@ -888,6 +888,8 @@ def test_turn_normalization_carries_safe_decoding_provenance(tmp_path: Path) -> 
                     ],
                     "decoding": {
                         "status": "succeeded",
+                        "action": "execute",
+                        "rationale": "The wrapper needs a standard-library transform.",
                         "attemptCount": 1,
                         "failureCode": None,
                         "programSha256": ["c" * 64],
@@ -901,6 +903,21 @@ def test_turn_normalization_carries_safe_decoding_provenance(tmp_path: Path) -> 
                                 "detectedContentType": "text/plain",
                             }
                         ],
+                        "attempts": [{
+                            "attempt": 1,
+                            "stage": "output_validation",
+                            "source": "print('safe')",
+                            "programSha256": "c" * 64,
+                            "execution": {
+                                "exitCode": 0,
+                                "elapsedSeconds": 0.1,
+                                "timedOut": False,
+                                "outputLimited": False,
+                                "stdout": {"state": "captured", "value": "ok"},
+                                "stderr": {"state": "empty"},
+                            },
+                            "derivedFiles": [],
+                        }],
                     },
                 },
             }
@@ -920,9 +937,15 @@ def test_turn_normalization_carries_safe_decoding_provenance(tmp_path: Path) -> 
     decoding = turn.content_overlap["decoding"]
     assert isinstance(decoding, dict)
     assert decoding["status"] == "succeeded"
+    assert decoding["action"] == "execute"
+    assert decoding["rationale"] == "The wrapper needs a standard-library transform."
     assert decoding["attemptCount"] == 1
     assert decoding["failureCode"] is None
     assert decoding["programSha256"] == ["c" * 64]
+    assert decoding["attempts"][0]["source"] == "print('safe')"
+    assert decoding["attempts"][0]["execution"]["stdout"] == {
+        "state": "captured", "value": "ok"
+    }
     derived = decoding["derivedFiles"]
     assert isinstance(derived, list)
     assert len(derived) == 1
@@ -973,4 +996,3 @@ def test_turn_normalization_preserves_legacy_omission_without_decoding_key(
     turn = turns[0]
     assert turn.content_overlap is not None
     assert turn.content_overlap.get("decoding") is None
-

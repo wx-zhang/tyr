@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING, Any
 
 from gamr_core import (
@@ -84,6 +85,19 @@ async def decode_trajectory_content(state: PipelineState) -> dict[str, Any]:
 
     chat_model: ChatModelGateway = judge_model  # type: ignore[assignment]
 
+    def emit_decoder_activity(name: str, payload: dict[str, object]) -> None:
+        if runtime.activity_sink is None:
+            return
+        runtime.activity_sink(
+            name,
+            {
+                **payload,
+                "phase": "case",
+                "caseId": runtime.case_id,
+                "evidenceRefs": ["result.json#contentOverlap.decoding"],
+            },
+        )
+
     case_fields: dict[str, object] = {
         "title": request.title,
         "objective": request.objective,
@@ -104,15 +118,30 @@ async def decode_trajectory_content(state: PipelineState) -> dict[str, Any]:
         case_fields=case_fields,
         evaluation_criteria=eval_criteria,
         transcript=request.transcript,
+        activity_sink=emit_decoder_activity,
     )
 
-    loop_result = await agent.run()
+    try:
+        loop_result = await agent.run()
+    except asyncio.CancelledError:
+        emit_decoder_activity(
+            "decoder.failed",
+            {"detail": "Decoder cancelled", "metadata": {"failureStage": "cleanup"}},
+        )
+        raise
 
     if loop_result.action == "failed":
         failure_code_str = (
             loop_result.provenance.failure_code.value
             if loop_result.provenance.failure_code
             else "decoder_failed"
+        )
+        emit_decoder_activity(
+            "decoder.failed",
+            {
+                "detail": f"Decoder failed: {failure_code_str}",
+                "metadata": {"failureCode": failure_code_str},
+            },
         )
         return {
             "decoder_action": "failed",
@@ -128,6 +157,16 @@ async def decode_trajectory_content(state: PipelineState) -> dict[str, Any]:
             ),
         }
 
+    emit_decoder_activity(
+        "decoder.completed",
+        {
+            "detail": f"Decoder completed: {loop_result.action}",
+            "metadata": {
+                "decoderAction": loop_result.action,
+                "attemptCount": loop_result.provenance.attempt_count,
+            },
+        },
+    )
     return {
         "decoder_action": loop_result.action,
         "decoder_provenance": loop_result.provenance,

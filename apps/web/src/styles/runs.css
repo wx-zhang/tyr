@@ -2372,6 +2372,33 @@
   font: var(--text-code) / var(--leading-code) var(--font-mono);
 }
 
+.decoding-source pre,
+.decoding-stream-value {
+  display: block;
+  max-width: 100%;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: var(--text-code) / var(--leading-code) var(--font-mono);
+}
+
+.decoding-attempts ol,
+.decoding-program-hashes ul {
+  margin: 0;
+  padding-left: var(--space-5);
+}
+
+.decoding-attempts details {
+  margin-top: var(--space-2);
+  border: var(--border-w) solid var(--border);
+  padding: var(--space-2) var(--space-3);
+}
+
+.decoding-attempts summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
 @media (max-width: 600px) {
   .collector-file-list li,
   .collector-preview-dialog > header {

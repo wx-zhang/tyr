@@ -36,7 +36,12 @@ class SecrecyTrackingChatModel(ChatModelGateway):
             res = self.responses[self.call_count]
             self.call_count += 1
             return res
-        return {"message": {"role": "assistant", "content": '{"action":"direct"}'}}
+        return {
+            "message": {
+                "role": "assistant",
+                "content": '{"action":"direct","rationale":"already readable"}',
+            }
+        }
 
 
 class ScriptableSandbox(Sandbox):
@@ -99,40 +104,46 @@ async def test_feedback_excludes_secrets_stdout_stderr_and_internals() -> None:
     source1 = "import non_existent_package\nprint('do something')\n"
     source2 = "print('second attempt')\n"
 
-    model = SecrecyTrackingChatModel([
-        {
-            "message": {
-                "role": "assistant",
-                "content": None,
-                "tool_calls": [
-                    {
-                        "id": "call_1",
-                        "type": "function",
-                        "function": {
-                            "name": "execute_python",
-                            "arguments": json.dumps({"source": source1}),
-                        },
-                    }
-                ],
-            }
-        },
-        {
-            "message": {
-                "role": "assistant",
-                "content": None,
-                "tool_calls": [
-                    {
-                        "id": "call_2",
-                        "type": "function",
-                        "function": {
-                            "name": "execute_python",
-                            "arguments": json.dumps({"source": source2}),
-                        },
-                    }
-                ],
-            }
-        },
-    ])
+    model = SecrecyTrackingChatModel(
+        [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": "call_1",
+                            "type": "function",
+                            "function": {
+                                "name": "execute_python",
+                                "arguments": json.dumps(
+                                    {"source": source1, "rationale": "transform upload"}
+                                ),
+                            },
+                        }
+                    ],
+                }
+            },
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": "call_2",
+                            "type": "function",
+                            "function": {
+                                "name": "execute_python",
+                                "arguments": json.dumps(
+                                    {"source": source2, "rationale": "correct transform"}
+                                ),
+                            },
+                        }
+                    ],
+                }
+            },
+        ]
+    )
 
     sandbox = ScriptableSandbox(
         exec_results=[
@@ -180,25 +191,34 @@ async def test_feedback_excludes_secrets_stdout_stderr_and_internals() -> None:
 @pytest.mark.asyncio
 async def test_unavailable_import_maps_to_coarse_failure_without_installer() -> None:
     source1 = "import custom_crypto_tool\n"
-    model = SecrecyTrackingChatModel([
-        {
-            "message": {
-                "role": "assistant",
-                "content": None,
-                "tool_calls": [
-                    {
-                        "id": "call_1",
-                        "type": "function",
-                        "function": {
-                            "name": "execute_python",
-                            "arguments": json.dumps({"source": source1}),
-                        },
-                    }
-                ],
-            }
-        },
-        {"message": {"role": "assistant", "content": '{"action":"direct"}'}},
-    ])
+    model = SecrecyTrackingChatModel(
+        [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": "call_1",
+                            "type": "function",
+                            "function": {
+                                "name": "execute_python",
+                                "arguments": json.dumps(
+                                    {"source": source1, "rationale": "transform upload"}
+                                ),
+                            },
+                        }
+                    ],
+                }
+            },
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": '{"action":"direct","rationale":"already readable"}',
+                }
+            },
+        ]
+    )
 
     err_msg = "ModuleNotFoundError: No module named 'custom_crypto_tool'"
     sandbox = ScriptableSandbox(

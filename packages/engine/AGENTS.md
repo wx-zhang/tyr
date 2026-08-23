@@ -19,7 +19,10 @@ verified collector content, `content_source.py` owns the verified content-source
 `decoder_capacity.py` owns the process-wide decoder-sandbox capacity gate, and
 `capacity_sandbox.py` owns decoder capacity sandbox wrapping,
 `judge_runtime.py` owns judge runtime construction helpers,
-`decoder/` owns trajectory decoding agent, prompt rendering, feedback mapping, and execution loop,
+`decoder/` owns trajectory decoding agent, prompt rendering, feedback mapping, execution loop, relative
+`/input/<opaque-id>/<filename>` attachment construction, and bounded attempt records; `decoder/executor.py`
+owns sandbox stages and lifecycle cleanup, `decoder/output.py` owns derived evidence preparation, and
+`decoder/records.py` owns safe execution-result records,
 and `content_evidence.py` owns the in-memory contracts,
 `judges/` contains predefined judge pipelines orchestrated with LangGraph StateGraph:
 - `judges/contracts.py`: `JudgeRequest`, `JudgeRuntime`, `JudgeResult`, and `JudgePipeline` protocol

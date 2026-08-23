@@ -44,6 +44,11 @@ def test_input_archive_contains_only_validated_logical_files() -> None:
         assert handle.extractfile(members[0]).read() == b"hello"  # type: ignore[union-attr]
 
 
+def test_decoder_absolute_input_destination_is_rejected_before_docker() -> None:
+    with pytest.raises(SandboxValidationError, match="relative"):
+        build_input_archive([SandboxEntry("/workspace/input/upload-001/data.txt", b"x")])
+
+
 def test_docker_vectors_use_fixed_containment_flags() -> None:
     volume = "gamr-volume-private"
     container = "gamr-container-private"
@@ -336,4 +341,3 @@ async def test_docker_collect_output_failure_cleans_up(monkeypatch: pytest.Monke
 
     with pytest.raises(SandboxValidationError):
         await sandbox.collect_output(sandbox_id, "output/attempt-001")
-

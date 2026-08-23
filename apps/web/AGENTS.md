@@ -45,7 +45,10 @@ cases belong only to their iteration group and never contribute to base test-cas
 `features/runs/runHistoryPresentation.ts` derives redacted summaries, and
 `RunTurnCard.tsx` plus `RunTurnDetail.tsx` render the activity disclosure and bounded evidence.
 Evaluation details show judge status, sensitive content comparison, checked files, and missing evidence when the API supplies them.
-`features/runs/DecodingProvenance.tsx` renders structured trajectory decoding provenance (status, attempt counts, program hashes, derived files) without exposing source code or secrets.
+`features/runs/DecodingProvenance.tsx` renders structured trajectory decoding provenance (status,
+route rationale, redacted source, attempt hashes, bounded execution result states, and derived files)
+without exposing secrets, decoded bytes, sandbox identity, or unsafe streams. Decoder lifecycle activity
+rows remain compact and reference the canonical provenance instead of duplicating source or process output.
 `features/runs/CollectorArtifacts.tsx` renders verified collector files as
 Updates entries with bounded text, Markdown, XML, and image previews plus run-scoped downloads,
 without receiving collector credentials.

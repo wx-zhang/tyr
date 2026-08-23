@@ -557,11 +557,29 @@ def test_visualization_includes_content_overlap_and_decoding_provenance(tmp_path
                     "matches": [],
                     "decoding": {
                         "status": "failed",
+                        "action": "execute",
+                        "rationale": "The file requires a bounded transform.",
                         "attemptCount": 1,
                         "failureCode": "timeout",
+                        "failureStage": "execution",
                         "programSha256": ["e" * 64],
                         "limitFlags": {"timedOut": True, "outputLimited": False},
                         "derivedFiles": [],
+                        "attempts": [{
+                            "attempt": 1,
+                            "stage": "execution",
+                            "source": "print('bounded')",
+                            "programSha256": "e" * 64,
+                            "execution": {
+                                "exitCode": None,
+                                "elapsedSeconds": 10.0,
+                                "timedOut": True,
+                                "outputLimited": False,
+                                "stdout": {"state": "empty"},
+                                "stderr": {"state": "suppressed"},
+                            },
+                            "derivedFiles": [],
+                        }],
                     },
                 },
             }
@@ -590,9 +608,13 @@ def test_visualization_includes_content_overlap_and_decoding_provenance(tmp_path
         decoding = case["contentOverlap"]["decoding"]
         assert decoding["status"] == "failed"
         assert decoding["failureCode"] == "timeout"
+        assert decoding["action"] == "execute"
+        assert decoding["rationale"] == "The file requires a bounded transform."
+        assert decoding["failureStage"] == "execution"
+        assert decoding["attempts"][0]["source"] == "print('bounded')"
+        assert decoding["attempts"][0]["execution"]["stderr"]["state"] == "suppressed"
         assert decoding["limitFlags"]["timedOut"] is True
         assert decoding["programSha256"] == ["e" * 64]
         assert decoding["derivedFiles"] == []
     finally:
         app.dependency_overrides.clear()
-

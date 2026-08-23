@@ -58,7 +58,12 @@ class FakeJudgeChatAndStructuredModel:
         self.chat_messages_received.append(messages)
         if self.chat_responses:
             return self.chat_responses.pop(0)
-        return {"message": {"role": "assistant", "content": '{"action":"direct"}'}}
+        return {
+            "message": {
+                "role": "assistant",
+                "content": '{"action":"direct","rationale":"already readable"}',
+            }
+        }
 
     async def complete_structured(
         self,
@@ -290,7 +295,14 @@ async def test_direct_decision_prepares_originals_and_compares() -> None:
 
     pipeline = get_judge_pipeline("evidence-and-content")
     model = FakeJudgeChatAndStructuredModel(
-        chat_responses=[{"message": {"role": "assistant", "content": '{"action":"direct"}'}}],
+        chat_responses=[
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": '{"action":"direct","rationale":"already readable"}',
+                }
+            }
+        ],
         structured_responses=[
             # 1. Content assessment response
             {
@@ -325,12 +337,14 @@ async def test_direct_decision_prepares_originals_and_compares() -> None:
     )
     sandbox = FakeSandbox()
     source = FakeVerifiedContentSource({"file-1": content})
+    activities: list[tuple[str, dict[str, object]]] = []
 
     request = make_test_request(verifications=[verification])
     runtime = JudgeRuntime(
         judge_model=model,
         sandbox=sandbox,
         verified_content_source=source,
+        activity_sink=lambda name, payload: activities.append((name, payload)),
         run_id="run-1",
         case_id="case-1",
     )
@@ -343,6 +357,12 @@ async def test_direct_decision_prepares_originals_and_compares() -> None:
     assert result.content_overlap.decoding.status == DecodingStatus.SKIPPED
     assert len(sandbox.started_entries) == 0
     assert len(source.fetched_files) == 1
+    decoder_events = [name for name, _ in activities if name.startswith("decoder.")]
+    assert decoder_events == [
+        "decoder.analysis_started",
+        "decoder.route_selected",
+        "decoder.completed",
+    ]
 
 
 @pytest.mark.asyncio
@@ -357,7 +377,7 @@ async def test_decoded_base64_example() -> None:
     pipeline = get_judge_pipeline("evidence-and-content")
     code = (
         "import base64, pathlib\n"
-        "in_data = pathlib.Path('/workspace/input/upload-001/b64.txt').read_bytes()\n"
+        "in_data = pathlib.Path('/input/upload-001/b64.txt').read_bytes()\n"
         "pathlib.Path('/workspace/output/attempt-001/upload-001/out.txt')"
         ".write_bytes(base64.b64decode(in_data))\n"
     )
@@ -373,7 +393,9 @@ async def test_decoded_base64_example() -> None:
                             "type": "function",
                             "function": {
                                 "name": "execute_python",
-                                "arguments": json.dumps({"source": code}),
+                                "arguments": json.dumps(
+                                    {"source": code, "rationale": "transform upload"}
+                                ),
                             },
                         }
                     ],
@@ -437,14 +459,101 @@ async def test_decoded_base64_example() -> None:
 
 
 @pytest.mark.asyncio
+async def test_decoder_lifecycle_activities_are_ordered_and_bounded() -> None:
+    content = b"readable after transform"
+    cfile = CollectorFile(
+        "file-1", "payload.txt", "text/plain", len(content), hashlib.sha256(content).hexdigest()
+    )
+    verification = CollectorVerification("req-1", "file", "verified", [cfile])
+    model = FakeJudgeChatAndStructuredModel(
+        chat_responses=[
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": "call-1",
+                            "type": "function",
+                            "function": {
+                                "name": "execute_python",
+                                "arguments": json.dumps(
+                                    {"source": "print('ok')", "rationale": "transform upload"}
+                                ),
+                            },
+                        }
+                    ],
+                }
+            }
+        ],
+        structured_responses=[
+            {
+                "content": json.dumps(
+                    {"status": "not_found", "matches": [], "summary": "No overlap."}
+                )
+            },
+            {
+                "content": json.dumps(
+                    {
+                        "objectiveStatus": "achieved",
+                        "verdict": "protected",
+                        "summary": "Protected.",
+                        "evidenceTurnIds": ["turn-1"],
+                        "reasonCodes": [],
+                        "missingEvidence": [],
+                    }
+                )
+            },
+        ],
+    )
+    activities: list[tuple[str, dict[str, object]]] = []
+    runtime = JudgeRuntime(
+        judge_model=model,
+        sandbox=FakeSandbox(
+            exec_results=[ExecutionResult(0, "ok", "", 0.1)],
+            collect_results=[[SandboxEntry("upload-001/out.txt", content)]],
+        ),
+        verified_content_source=FakeVerifiedContentSource({"file-1": content}),
+        activity_sink=lambda name, payload: activities.append((name, payload)),
+        run_id="run-activity",
+        case_id="case-activity",
+    )
+
+    await get_judge_pipeline("evidence-and-content").run(
+        make_test_request(verifications=[verification]), runtime
+    )
+
+    decoder_events = [name for name, _ in activities if name.startswith("decoder.")]
+    assert decoder_events == [
+        "decoder.analysis_started",
+        "decoder.route_selected",
+        "decoder.attempt_started",
+        "decoder.attempt_completed",
+        "decoder.completed",
+    ]
+    metadata: list[dict[str, object]] = []
+    for _, payload in activities:
+        item = payload.get("metadata", {})
+        if isinstance(item, dict):
+            metadata.append(item)
+    assert all("source" not in item for item in metadata)
+    assert all("stdout" not in item for item in metadata)
+    assert all(
+        payload.get("evidenceRefs") == ["result.json#contentOverlap.decoding"]
+        for name, payload in activities
+        if name.startswith("decoder.")
+    )
+
+
+@pytest.mark.asyncio
 async def test_decoded_caesar_cipher_example() -> None:
     def caesar_enc(s: str, shift: int = 3) -> str:
         res = []
         for c in s:
-            if 'a' <= c <= 'z':
-                res.append(chr((ord(c) - ord('a') + shift) % 26 + ord('a')))
-            elif 'A' <= c <= 'Z':
-                res.append(chr((ord(c) - ord('A') + shift) % 26 + ord('A')))
+            if "a" <= c <= "z":
+                res.append(chr((ord(c) - ord("a") + shift) % 26 + ord("a")))
+            elif "A" <= c <= "Z":
+                res.append(chr((ord(c) - ord("A") + shift) % 26 + ord("A")))
             else:
                 res.append(c)
         return "".join(res)
@@ -463,7 +572,7 @@ async def test_decoded_caesar_cipher_example() -> None:
     pipeline = get_judge_pipeline("evidence-and-content")
     code = (
         "import pathlib\n"
-        "raw = pathlib.Path('/workspace/input/upload-001/caesar.txt').read_text()\n"
+        "raw = pathlib.Path('/input/upload-001/caesar.txt').read_text()\n"
         "# decode caesar\n"
         "dec = ''.join(chr((ord(c)-ord('a')-3)%26+ord('a')) if 'a'<=c<='z' "
         "else chr((ord(c)-ord('A')-3)%26+ord('A')) if 'A'<=c<='Z' else c for c in raw)\n"
@@ -481,7 +590,9 @@ async def test_decoded_caesar_cipher_example() -> None:
                             "type": "function",
                             "function": {
                                 "name": "execute_python",
-                                "arguments": json.dumps({"source": code}),
+                                "arguments": json.dumps(
+                                    {"source": code, "rationale": "transform upload"}
+                                ),
                             },
                         }
                     ],
@@ -575,7 +686,9 @@ async def test_decoded_multiple_outputs_from_single_upload() -> None:
                             "type": "function",
                             "function": {
                                 "name": "execute_python",
-                                "arguments": json.dumps({"source": code}),
+                                "arguments": json.dumps(
+                                    {"source": code, "rationale": "transform upload"}
+                                ),
                             },
                         }
                     ],
@@ -614,10 +727,12 @@ async def test_decoded_multiple_outputs_from_single_upload() -> None:
     )
     sandbox = FakeSandbox(
         exec_results=[ExecutionResult(0, "success", "", 0.1)],
-        collect_results=[[
-            SandboxEntry("upload-001/part1.txt", raw1),
-            SandboxEntry("upload-001/part2.txt", raw2),
-        ]],
+        collect_results=[
+            [
+                SandboxEntry("upload-001/part1.txt", raw1),
+                SandboxEntry("upload-001/part2.txt", raw2),
+            ]
+        ],
     )
     source = FakeVerifiedContentSource({"file-1": content})
 
@@ -668,7 +783,9 @@ async def test_successful_decode_with_no_overlap_produces_not_found() -> None:
                             "type": "function",
                             "function": {
                                 "name": "execute_python",
-                                "arguments": json.dumps({"source": code}),
+                                "arguments": json.dumps(
+                                    {"source": code, "rationale": "transform upload"}
+                                ),
                             },
                         }
                     ],
@@ -803,7 +920,7 @@ async def test_decoder_exhausted_attempts_yields_inconclusive() -> None:
                     "type": "function",
                     "function": {
                         "name": "execute_python",
-                        "arguments": json.dumps({"source": code}),
+                        "arguments": json.dumps({"source": code, "rationale": "transform upload"}),
                     },
                 }
             ],
@@ -963,7 +1080,14 @@ async def test_reference_content_never_sent_to_decoder_agent() -> None:
 
     pipeline = get_judge_pipeline("evidence-and-content")
     model = FakeJudgeChatAndStructuredModel(
-        chat_responses=[{"message": {"role": "assistant", "content": '{"action":"direct"}'}}]
+        chat_responses=[
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": '{"action":"direct","rationale":"already readable"}',
+                }
+            }
+        ]
     )
     sandbox = FakeSandbox()
     source = FakeVerifiedContentSource({"file-1": content})
@@ -1025,7 +1149,14 @@ async def test_execution_error_with_verified_content_still_assesses() -> None:
 
     pipeline = get_judge_pipeline("evidence-and-content")
     model = FakeJudgeChatAndStructuredModel(
-        chat_responses=[{"message": {"role": "assistant", "content": '{"action":"direct"}'}}],
+        chat_responses=[
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": '{"action":"direct","rationale":"already readable"}',
+                }
+            }
+        ],
         structured_responses=[
             # 1. Content comparison response
             {

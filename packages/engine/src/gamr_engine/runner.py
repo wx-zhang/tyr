@@ -1095,6 +1095,8 @@ class ExperimentRunner:
                 case_id=payload.get("caseId"),
                 detail=payload.get("detail"),
                 fields=payload.get("fields"),
+                metadata_extra=payload.get("metadata"),
+                evidence_refs=payload.get("evidenceRefs", ()),
             ),
             run_id=run_id,
             case_id=case_id,
@@ -1762,7 +1764,8 @@ class ExperimentRunner:
         detail: str | None = None,
         fields: tuple[tuple[str, str], ...] | None = None,
         related_case_ids: tuple[str, ...] = (),
-        metadata_extra: dict[str, str] | None = None,
+        metadata_extra: dict[str, object] | None = None,
+        evidence_refs: tuple[str, ...] | list[str] = (),
     ) -> None:
         sink = self._activity_sink
         if sink is not None:
@@ -1802,6 +1805,7 @@ class ExperimentRunner:
                         else EvidenceType.EVENT
                     ),
                     relatedCaseIds=list(related_case_ids),
+                    evidenceRefs=list(evidence_refs),
                     metadata=metadata,
                 )
                 try:

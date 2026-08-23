@@ -91,10 +91,9 @@ def test_decoder_initial_messages_structure() -> None:
     assert upload["contentType"] == "application/octet-stream"
     assert upload["size"] == len(b"SECRET_BYTES")
     assert upload["sha256"] == "0" * 64
-    assert (
-        upload["opaquePath"] == "/workspace/input/upload-001/payload.enc"
-        or "upload-001" in upload["opaquePath"]
-    )
+    assert upload["opaquePath"] == "/input/upload-001/payload.enc"
+    assert "/workspace/input" not in json.dumps(messages)
+    assert "rationale" in messages[0]["content"]
 
 
 def test_decoder_prompt_excludes_sensitive_fields() -> None:

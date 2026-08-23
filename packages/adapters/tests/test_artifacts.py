@@ -407,3 +407,62 @@ def test_redaction_handles_decoding_safe_failure_and_limit_flags() -> None:
     assert validated.decoding.failure_code.value == "timeout"
     assert validated.decoding.limit_flags.timed_out is True
 
+
+def test_redaction_preserves_reviewer_attempt_details_and_suppresses_unsafe_streams() -> None:
+    source = (
+        "from pathlib import Path\nprint('configured-secret')\nPath('/tmp/host.txt').read_text()"
+    )
+    payload = {
+        "status": "succeeded",
+        "action": "execute",
+        "rationale": "The upload uses a reversible wrapper.",
+        "attemptCount": 1,
+        "programSha256": ["a" * 64],
+        "limitFlags": {"timedOut": False, "outputLimited": False},
+        "derivedFiles": [],
+        "attempts": [
+            {
+                "attempt": 1,
+                "stage": "output_validation",
+                "source": source,
+                "programSha256": "a" * 64,
+                "execution": {
+                    "exitCode": 0,
+                    "elapsedSeconds": 0.4,
+                    "timedOut": False,
+                    "outputLimited": False,
+                    "stdout": {"state": "captured", "value": "decoded [configured-secret]"},
+                    "stderr": {
+                        "state": "captured",
+                        "value": "Traceback at /tmp/host.txt",
+                    },
+                },
+                "derivedFiles": [],
+            }
+        ],
+    }
+
+    redacted = redact_payload(
+        {
+            "contentOverlap": {
+                "status": "not_found",
+                "assessmentStatus": "valid",
+                "matches": [],
+                "decoding": payload,
+            }
+        },
+        secrets=["configured-secret"],
+    )
+    decoding = redacted["contentOverlap"]["decoding"]
+    attempt = decoding["attempts"][0]
+
+    assert decoding["action"] == "execute"
+    assert decoding["rationale"] == "The upload uses a reversible wrapper."
+    assert "configured-secret" not in attempt["source"]
+    assert "/tmp/host.txt" not in attempt["source"]
+    assert attempt["execution"]["stdout"] == {"state": "captured", "value": "decoded [[REDACTED]]"}
+    assert attempt["execution"]["stderr"] == {"state": "suppressed"}
+
+    validated = ContentOverlapResult.model_validate(redacted["contentOverlap"])
+    assert validated.decoding is not None
+    assert validated.decoding.attempts[0].program_sha256 == "a" * 64

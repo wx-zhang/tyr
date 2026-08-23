@@ -126,4 +126,49 @@ describe("DecodingProvenance", () => {
     expect(textContent).not.toContain("/var/run/docker");
     expect(textContent).not.toContain("/tmp/gamr");
   });
+
+  it("discloses the bounded route rationale, code, hash, result, and stream states", () => {
+    render(
+      <DecodingProvenance
+        decoding={{
+          status: "succeeded",
+          action: "execute",
+          rationale: "The file is wrapped and needs a standard-library transform.",
+          attemptCount: 1,
+          failureStage: null,
+          programSha256: ["a".repeat(64)],
+          attempts: [
+            {
+              attempt: 1,
+              stage: "output_validation",
+              source: "print('decoded')",
+              programSha256: "a".repeat(64),
+              execution: {
+                exitCode: 0,
+                elapsedSeconds: 0.125,
+                timedOut: false,
+                outputLimited: false,
+                stdout: { state: "captured", value: "ok" },
+                stderr: { state: "suppressed" },
+              },
+              derivedFiles: [],
+            },
+          ],
+        }}
+      />,
+    );
+
+    const section = screen.getByRole("region", {
+      name: "Trajectory decoding provenance",
+    });
+    expect(within(section).getByText("Execute")).toBeInTheDocument();
+    expect(within(section).getByText(/file is wrapped/)).toBeInTheDocument();
+    expect(within(section).getByText(`Attempt 1: ${"a".repeat(64)}`)).toBeInTheDocument();
+    expect(within(section).getByText("Decoder attempts")).toBeInTheDocument();
+    expect(within(section).getByText("Executed code")).toBeInTheDocument();
+    expect(within(section).getByText("print('decoded')")).toBeInTheDocument();
+    expect(within(section).getByText("Exit 0")).toBeInTheDocument();
+    expect(within(section).getByText("ok")).toBeInTheDocument();
+    expect(within(section).getByText("Suppressed")).toBeInTheDocument();
+  });
 });

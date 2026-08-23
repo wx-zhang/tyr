@@ -15,6 +15,7 @@ from gamr_engine.ports.sandbox import (
     SandboxEntry,
     SandboxId,
     SandboxIsolation,
+    SandboxValidationError,
 )
 
 
@@ -36,7 +37,12 @@ class FakeChatModel(ChatModelGateway):
             res = self.responses[self.call_count]
             self.call_count += 1
             return res
-        return {"message": {"role": "assistant", "content": '{"action":"direct"}'}}
+        return {
+            "message": {
+                "role": "assistant",
+                "content": '{"action":"direct","rationale":"already readable"}',
+            }
+        }
 
 
 class ScriptableSandbox(Sandbox):
@@ -105,24 +111,28 @@ async def test_successful_first_program_terminates_loop() -> None:
         "import pathlib\n"
         "pathlib.Path('/workspace/output/attempt-001/upload-001/out.txt').write_text('hello')\n"
     )
-    model = FakeChatModel([
-        {
-            "message": {
-                "role": "assistant",
-                "content": None,
-                "tool_calls": [
-                    {
-                        "id": "call_1",
-                        "type": "function",
-                        "function": {
-                            "name": "execute_python",
-                            "arguments": json.dumps({"source": source_code}),
-                        },
-                    }
-                ],
+    model = FakeChatModel(
+        [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": "call_1",
+                            "type": "function",
+                            "function": {
+                                "name": "execute_python",
+                                "arguments": json.dumps(
+                                    {"source": source_code, "rationale": "transform upload"}
+                                ),
+                            },
+                        }
+                    ],
+                }
             }
-        }
-    ])
+        ]
+    )
     sandbox = ScriptableSandbox(
         exec_results=[ExecutionResult(0, "success", "", 0.1)],
         collect_results=[[SandboxEntry("upload-001/out.txt", b"hello")]],
@@ -142,10 +152,17 @@ async def test_successful_first_program_terminates_loop() -> None:
     assert result.action == "decoded"
     assert result.provenance.status == DecodingStatus.SUCCEEDED
     assert result.provenance.attempt_count == 1
+    assert result.provenance.rationale == "transform upload"
     assert result.provenance.program_sha256 == [hashlib.sha256(source_code.encode()).hexdigest()]
+    attempt = result.provenance.attempts[0]
+    assert attempt.source == source_code
+    assert attempt.execution is not None
+    assert attempt.execution.stdout.state == "captured"
+    assert attempt.execution.stdout.value == "success"
+    assert attempt.execution.stderr.state == "empty"
     assert len(result.provenance.derived_files) == 1
     assert result.provenance.derived_files[0].uploaded_item_id == "upload-001-derived-001"
-    assert sandbox.collected_dirs == ["/workspace/output/attempt-001"]
+    assert sandbox.collected_dirs == ["output/attempt-001"]
     assert sandbox.closed_ids == ["sandbox-1"]
 
 
@@ -153,40 +170,46 @@ async def test_successful_first_program_terminates_loop() -> None:
 async def test_correction_in_same_healthy_workspace() -> None:
     source1 = "print('fail 1')\n"
     source2 = "print('success 2')\n"
-    model = FakeChatModel([
-        {
-            "message": {
-                "role": "assistant",
-                "content": None,
-                "tool_calls": [
-                    {
-                        "id": "call_1",
-                        "type": "function",
-                        "function": {
-                            "name": "execute_python",
-                            "arguments": json.dumps({"source": source1}),
-                        },
-                    }
-                ],
-            }
-        },
-        {
-            "message": {
-                "role": "assistant",
-                "content": None,
-                "tool_calls": [
-                    {
-                        "id": "call_2",
-                        "type": "function",
-                        "function": {
-                            "name": "execute_python",
-                            "arguments": json.dumps({"source": source2}),
-                        },
-                    }
-                ],
-            }
-        },
-    ])
+    model = FakeChatModel(
+        [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": "call_1",
+                            "type": "function",
+                            "function": {
+                                "name": "execute_python",
+                                "arguments": json.dumps(
+                                    {"source": source1, "rationale": "transform upload"}
+                                ),
+                            },
+                        }
+                    ],
+                }
+            },
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": "call_2",
+                            "type": "function",
+                            "function": {
+                                "name": "execute_python",
+                                "arguments": json.dumps(
+                                    {"source": source2, "rationale": "correct transform"}
+                                ),
+                            },
+                        }
+                    ],
+                }
+            },
+        ]
+    )
     sandbox = ScriptableSandbox(
         exec_results=[
             ExecutionResult(1, "", "syntax error", 0.1),
@@ -214,8 +237,8 @@ async def test_correction_in_same_healthy_workspace() -> None:
     assert result.provenance.attempt_count == 2
     assert len(sandbox.started_ids) == 1  # Reused same healthy sandbox
     assert sandbox.collected_dirs == [
-        "/workspace/output/attempt-001",
-        "/workspace/output/attempt-002",
+        "output/attempt-001",
+        "output/attempt-002",
     ]
     assert sandbox.closed_ids == ["sandbox-1"]
 
@@ -233,7 +256,9 @@ async def test_exactly_three_calls_then_attempt_exhaustion() -> None:
                     "type": "function",
                     "function": {
                         "name": "execute_python",
-                        "arguments": json.dumps({"source": source}),
+                        "arguments": json.dumps(
+                            {"source": source, "rationale": "transform upload"}
+                        ),
                     },
                 }
             ],
@@ -264,6 +289,8 @@ async def test_exactly_three_calls_then_attempt_exhaustion() -> None:
     assert result.provenance.status == DecodingStatus.FAILED
     assert result.provenance.failure_code == DecodingFailureCode.ATTEMPT_EXHAUSTION
     assert result.provenance.attempt_count == 3
+    assert [item.attempt for item in result.provenance.attempts] == [1, 2, 3]
+    assert all(item.execution is not None for item in result.provenance.attempts)
     assert len(sandbox.sources_executed) == 3
     assert sandbox.closed_ids == ["sandbox-1"]
 
@@ -272,40 +299,46 @@ async def test_exactly_three_calls_then_attempt_exhaustion() -> None:
 async def test_terminal_timeout_destroys_and_replaces_sandbox() -> None:
     source1 = "while True: pass\n"
     source2 = "print('fixed')\n"
-    model = FakeChatModel([
-        {
-            "message": {
-                "role": "assistant",
-                "content": None,
-                "tool_calls": [
-                    {
-                        "id": "call_1",
-                        "type": "function",
-                        "function": {
-                            "name": "execute_python",
-                            "arguments": json.dumps({"source": source1}),
-                        },
-                    }
-                ],
-            }
-        },
-        {
-            "message": {
-                "role": "assistant",
-                "content": None,
-                "tool_calls": [
-                    {
-                        "id": "call_2",
-                        "type": "function",
-                        "function": {
-                            "name": "execute_python",
-                            "arguments": json.dumps({"source": source2}),
-                        },
-                    }
-                ],
-            }
-        },
-    ])
+    model = FakeChatModel(
+        [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": "call_1",
+                            "type": "function",
+                            "function": {
+                                "name": "execute_python",
+                                "arguments": json.dumps(
+                                    {"source": source1, "rationale": "transform upload"}
+                                ),
+                            },
+                        }
+                    ],
+                }
+            },
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": "call_2",
+                            "type": "function",
+                            "function": {
+                                "name": "execute_python",
+                                "arguments": json.dumps(
+                                    {"source": source2, "rationale": "correct transform"}
+                                ),
+                            },
+                        }
+                    ],
+                }
+            },
+        ]
+    )
     sandbox = ScriptableSandbox(
         exec_results=[
             ExecutionResult(None, "", "timed out", 10.0, timed_out=True),
@@ -337,24 +370,28 @@ async def test_terminal_timeout_destroys_and_replaces_sandbox() -> None:
 
 @pytest.mark.asyncio
 async def test_unsafe_isolation_fails_without_host_fallback() -> None:
-    model = FakeChatModel([
-        {
-            "message": {
-                "role": "assistant",
-                "content": None,
-                "tool_calls": [
-                    {
-                        "id": "call_1",
-                        "type": "function",
-                        "function": {
-                            "name": "execute_python",
-                            "arguments": json.dumps({"source": "print(1)"}),
-                        },
-                    }
-                ],
+    model = FakeChatModel(
+        [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": "call_1",
+                            "type": "function",
+                            "function": {
+                                "name": "execute_python",
+                                "arguments": json.dumps(
+                                    {"source": "print(1)", "rationale": "transform upload"}
+                                ),
+                            },
+                        }
+                    ],
+                }
             }
-        }
-    ])
+        ]
+    )
     sandbox = ScriptableSandbox(isolation="unsafe")
     agent = DecoderAgent(
         model=model,
@@ -376,24 +413,28 @@ async def test_unsafe_isolation_fails_without_host_fallback() -> None:
 
 @pytest.mark.asyncio
 async def test_sandbox_unavailable_fails_closed() -> None:
-    model = FakeChatModel([
-        {
-            "message": {
-                "role": "assistant",
-                "content": None,
-                "tool_calls": [
-                    {
-                        "id": "call_1",
-                        "type": "function",
-                        "function": {
-                            "name": "execute_python",
-                            "arguments": json.dumps({"source": "print(1)"}),
-                        },
-                    }
-                ],
+    model = FakeChatModel(
+        [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": "call_1",
+                            "type": "function",
+                            "function": {
+                                "name": "execute_python",
+                                "arguments": json.dumps(
+                                    {"source": "print(1)", "rationale": "transform upload"}
+                                ),
+                            },
+                        }
+                    ],
+                }
             }
-        }
-    ])
+        ]
+    )
     sandbox = ScriptableSandbox(isolation="unavailable")
     agent = DecoderAgent(
         model=model,
@@ -411,3 +452,50 @@ async def test_sandbox_unavailable_fails_closed() -> None:
     assert result.provenance.status == DecodingStatus.FAILED
     assert result.provenance.failure_code == DecodingFailureCode.SANDBOX_UNAVAILABLE
     assert sandbox.started_ids == []
+
+
+class InputRejectingSandbox(ScriptableSandbox):
+    async def start(self, entries: Sequence[SandboxEntry] = ()) -> SandboxId:
+        raise SandboxValidationError("absolute attachment destination")
+
+
+@pytest.mark.asyncio
+async def test_absolute_attachment_failure_is_input_validation_before_startup() -> None:
+    source = "print('decode')"
+    model = FakeChatModel(
+        [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": "call-1",
+                            "type": "function",
+                            "function": {
+                                "name": "execute_python",
+                                "arguments": json.dumps(
+                                    {"source": source, "rationale": "transform upload"}
+                                ),
+                            },
+                        }
+                    ],
+                }
+            }
+        ]
+    )
+    sandbox = InputRejectingSandbox()
+
+    result = await DecoderAgent(
+        model=model,
+        sandbox=sandbox,
+        snapshots=[_sample_snapshot()],
+        task_context="task",
+        case_fields={"title": "case"},
+        evaluation_criteria="crit",
+        transcript=[],
+    ).run()
+
+    assert result.provenance.failure_code == DecodingFailureCode.INPUT_VALIDATION
+    assert result.provenance.failure_stage == "input_validation"
+    assert result.provenance.attempts[0].failure_code == DecodingFailureCode.INPUT_VALIDATION

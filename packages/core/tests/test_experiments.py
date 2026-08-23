@@ -5,10 +5,13 @@ from gamr_core import (
     ContentMatchType,
     ContentOverlapResult,
     ContentOverlapStatus,
+    DecodingAttempt,
+    DecodingExecutionResult,
     DecodingFailureCode,
     DecodingLimitFlags,
     DecodingProvenance,
     DecodingStatus,
+    DecodingStream,
     DerivedContentFile,
     ExperimentConfig,
     ExperimentRecord,
@@ -110,6 +113,41 @@ def test_content_overlap_result_contains_only_safe_provenance() -> None:
     assert "content" not in result.model_dump(by_alias=True)
 
 
+def test_decoding_provenance_round_trips_route_attempt_and_execution_details() -> None:
+    digest = "a" * 64
+    provenance = DecodingProvenance(
+        status=DecodingStatus.SUCCEEDED,
+        action="execute",
+        rationale="The wrapper must be removed before comparison.",
+        attemptCount=1,
+        programSha256=[digest],
+        attempts=[
+            DecodingAttempt(
+                attempt=1,
+                stage="output_validation",
+                source="print('decode')",
+                programSha256=digest,
+                execution=DecodingExecutionResult(
+                    exitCode=0,
+                    elapsedSeconds=0.25,
+                    stdout=DecodingStream(state="captured", value="ok"),
+                    stderr=DecodingStream(state="empty"),
+                ),
+            )
+        ],
+    )
+
+    dumped = provenance.model_dump(by_alias=True, mode="json")
+    assert dumped["rationale"] == "The wrapper must be removed before comparison."
+    assert dumped["attempts"][0]["execution"]["stdout"] == {"state": "captured", "value": "ok"}
+    assert DecodingProvenance.model_validate(dumped) == provenance
+
+
+def test_decoding_stream_states_reject_values_for_non_captured_streams() -> None:
+    with pytest.raises(ValidationError):
+        DecodingStream(state="suppressed", value="secret")
+
+
 def test_run_result_accepts_judge_pipeline_provenance() -> None:
     created_at = datetime(2026, 8, 9, tzinfo=UTC)
     result = RunResult.model_validate(
@@ -204,8 +242,6 @@ def test_run_result_rejects_unknown_or_executable_judge_pipeline(invalid_pipelin
                 "errors": [],
             }
         )
-
-
 
 
 @pytest.mark.parametrize(
@@ -549,4 +585,3 @@ def test_legacy_content_overlap_result_without_decoding_provenance() -> None:
     assert result.decoding is None
     dumped = result.model_dump(by_alias=True, mode="json")
     assert dumped.get("decoding") is None
-

@@ -35,9 +35,12 @@ decoding (e.g. archives, custom encoding, or formatted text), GAMR reuses the co
 judge model to drive a focused decoder agent. The agent executes Python code inside an isolated
 standard-library Docker sandbox, making up to three attempts within a single healthy sandbox
 session. The pipeline fails closed on decoding or sandbox failures (yielding an inconclusive
-verdict rather than false negatives). Sensitive synthetic references, credentials, stdout/stderr,
-and generated scripts are strictly excluded from decoder context and persisted artifacts; only
-safe provenance metadata is recorded. Concurrent sandbox executions are governed by
+verdict rather than false negatives). Sensitive synthetic references, credentials, and raw tool
+transcripts are strictly excluded from decoder context and persisted artifacts. Reviewer-visible
+provenance records the concise route rationale, redacted executed source, program SHA-256, bounded
+exit/timing/output states, explicit suppressed streams, and derived-file lineage. Decoder input is
+always advertised as `/input/<opaque-id>/<filename>` and attached with the matching relative logical
+path. Concurrent sandbox executions are governed by
 `GAMR_MAX_CONCURRENT_DECODERS` (defaulting to 2).
 
 Evaluation plans may associate one synthetic UTF-8 reference file with a task. For

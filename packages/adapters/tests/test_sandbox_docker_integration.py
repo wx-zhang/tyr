@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import shutil
 import subprocess
 
 import pytest
 from gamr_adapters.sandbox.docker import IMAGE_TAG, DockerSandbox
+from gamr_engine.content_source import VerifiedContentSnapshot
+from gamr_engine.decoder.agent import DecoderAgent
 from gamr_engine.ports import SandboxClosedError, SandboxEntry
+from gamr_engine.ports.models import ChatModelGateway
 
 
 @pytest.fixture
@@ -49,6 +54,70 @@ async def test_docker_runtime_isolated_input_workspace_and_environment(docker_im
     assert first.exit_code == 0
     assert second.exit_code == 0
     await sandbox.close(sandbox_id)
+
+
+class _DecoderModel(ChatModelGateway):
+    async def chat(
+        self,
+        messages: list[dict[str, object]],
+        *,
+        tools: list[dict[str, object]] | None = None,
+        max_tokens: int = 1024,
+    ) -> dict[str, object]:
+        del messages, tools, max_tokens
+        source = (
+            "from pathlib import Path\n"
+            "Path('/workspace/output/attempt-001/upload-001').mkdir(parents=True)\n"
+            "raw = Path('/input/upload-001/encoded.txt').read_text()\n"
+            "Path('/workspace/output/attempt-001/upload-001/decoded.txt').write_text(raw.upper())\n"
+        )
+        return {
+            "message": {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {
+                        "id": "call-1",
+                        "type": "function",
+                        "function": {
+                            "name": "execute_python",
+                            "arguments": json.dumps(
+                                {"source": source, "rationale": "transform upload"}
+                            ),
+                        },
+                    }
+                ],
+            }
+        }
+
+
+@pytest.mark.sandbox_docker
+@pytest.mark.asyncio
+async def test_decoder_composed_docker_path_uses_advertised_input(docker_image: None) -> None:
+    content = b"encoded content"
+    snapshot = VerifiedContentSnapshot(
+        snapshot_id="upload-001",
+        source_file_id="file-1",
+        filename="encoded.txt",
+        content_type="text/plain",
+        size=len(content),
+        sha256=hashlib.sha256(content).hexdigest(),
+        content=content,
+    )
+    sandbox = DockerSandbox()
+    result = await DecoderAgent(
+        model=_DecoderModel(),
+        sandbox=sandbox,
+        snapshots=[snapshot],
+        task_context="decode",
+        case_fields={"title": "case"},
+        evaluation_criteria="decode",
+        transcript=[],
+    ).run()
+
+    assert result.action == "decoded"
+    assert result.provenance.attempt_count == 1
+    assert result.derived_snapshots[0].content == b"ENCODED CONTENT"
 
 
 @pytest.mark.sandbox_docker
@@ -146,6 +215,7 @@ async def test_docker_runtime_collect_output_rejects_symlinks_and_limits(
     assert res.exit_code == 0
 
     from gamr_engine.ports import SandboxValidationError
+
     with pytest.raises(SandboxValidationError):
         await sandbox.collect_output(sandbox_id, "output/attempt-001")
 
@@ -174,6 +244,3 @@ async def test_docker_runtime_limits_and_labeled_cleanup(docker_image: None) -> 
         check=True,
     )
     assert not ps_output.stdout.strip()
-
-
-

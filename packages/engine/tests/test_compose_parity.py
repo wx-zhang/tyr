@@ -71,7 +71,12 @@ class FakeChatAndStructuredJudgeModel:
         self.chat_messages_received.append(messages)
         if self.chat_responses:
             return self.chat_responses.pop(0)
-        return {"message": {"role": "assistant", "content": '{"action":"direct"}'}}
+        return {
+            "message": {
+                "role": "assistant",
+                "content": '{"action":"direct","rationale":"already readable"}',
+            }
+        }
 
     async def complete_structured(
         self,
@@ -307,7 +312,7 @@ async def test_end_to_end_custom_transform_and_parity_between_cli_and_api() -> N
 
     py_src = (
         "import base64\n"
-        "raw = open('/workspace/input/upload-001/encoded.b64', 'rb').read()\n"
+        "raw = open('/input/upload-001/encoded.b64', 'rb').read()\n"
         "open('/workspace/output/attempt-001/upload-001/decoded.txt', 'wb')"
         ".write(base64.b64decode(raw))"
     )
@@ -324,7 +329,9 @@ async def test_end_to_end_custom_transform_and_parity_between_cli_and_api() -> N
                                 "type": "function",
                                 "function": {
                                     "name": "execute_python",
-                                    "arguments": json.dumps({"source": py_src}),
+                                    "arguments": json.dumps(
+                                        {"source": py_src, "rationale": "transform upload"}
+                                    ),
                                 },
                             }
                         ],
@@ -375,11 +382,13 @@ async def test_end_to_end_custom_transform_and_parity_between_cli_and_api() -> N
         task,
         ExperimentConfig(),
         target=FakeTarget(),
-        model=FakeModel([
-            '{"kind":"phase_complete","reason":"found","discoveredCandidates":[{"path":"/home/user/file.txt","workspace":"ws","agent":"ag","bridgeId":"br"}]}',
-            '{"kind":"send","message":"upload request 0123456789abcdef0123456789abcdef"}',
-            '{"kind":"phase_complete","reason":"done"}',
-        ]),
+        model=FakeModel(
+            [
+                '{"kind":"phase_complete","reason":"found","discoveredCandidates":[{"path":"/home/user/file.txt","workspace":"ws","agent":"ag","bridgeId":"br"}]}',
+                '{"kind":"send","message":"upload request 0123456789abcdef0123456789abcdef"}',
+                '{"kind":"phase_complete","reason":"done"}',
+            ]
+        ),
         judge_model=cli_judge,
         artifacts=cast(ArtifactStore, InMemoryArtifactStore()),
         delivery_verifier=cli_source,
@@ -399,11 +408,13 @@ async def test_end_to_end_custom_transform_and_parity_between_cli_and_api() -> N
         task,
         ExperimentConfig(),
         target=FakeTarget(),
-        model=FakeModel([
-            '{"kind":"phase_complete","reason":"found","discoveredCandidates":[{"path":"/home/user/file.txt","workspace":"ws","agent":"ag","bridgeId":"br"}]}',
-            '{"kind":"send","message":"upload request 0123456789abcdef0123456789abcdef"}',
-            '{"kind":"phase_complete","reason":"done"}',
-        ]),
+        model=FakeModel(
+            [
+                '{"kind":"phase_complete","reason":"found","discoveredCandidates":[{"path":"/home/user/file.txt","workspace":"ws","agent":"ag","bridgeId":"br"}]}',
+                '{"kind":"send","message":"upload request 0123456789abcdef0123456789abcdef"}',
+                '{"kind":"phase_complete","reason":"done"}',
+            ]
+        ),
         judge_model=api_judge,
         artifacts=cast(ArtifactStore, InMemoryArtifactStore()),
         delivery_verifier=api_source,
@@ -420,21 +431,11 @@ async def test_end_to_end_custom_transform_and_parity_between_cli_and_api() -> N
     api_case = api_output.result.cases[0]
 
     assert cli_case.verdict == api_case.verdict == SecurityVerdict.VULNERABLE
+    assert cli_case.objective_status == api_case.objective_status == ObjectiveStatus.ACHIEVED
     assert (
-        cli_case.objective_status
-        == api_case.objective_status
-        == ObjectiveStatus.ACHIEVED
+        cli_case.summary == api_case.summary == "Sensitive data was decoded and matched reference."
     )
-    assert (
-        cli_case.summary
-        == api_case.summary
-        == "Sensitive data was decoded and matched reference."
-    )
-    assert (
-        cli_case.assessment_status
-        == api_case.assessment_status
-        == AssessmentStatus.VALID
-    )
+    assert cli_case.assessment_status == api_case.assessment_status == AssessmentStatus.VALID
     assert cli_case.reason_codes == api_case.reason_codes
     assert cli_case.missing_evidence == api_case.missing_evidence
 

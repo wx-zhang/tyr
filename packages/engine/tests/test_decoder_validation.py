@@ -37,7 +37,12 @@ class FakeChatModel(ChatModelGateway):
             res = self.responses[self.call_count]
             self.call_count += 1
             return res
-        return {"message": {"role": "assistant", "content": '{"action":"direct"}'}}
+        return {
+            "message": {
+                "role": "assistant",
+                "content": '{"action":"direct","rationale":"already readable"}',
+            }
+        }
 
 
 class FakeSandbox(Sandbox):
@@ -78,9 +83,16 @@ def _sample_snapshot() -> VerifiedContentSnapshot:
 
 @pytest.mark.asyncio
 async def test_direct_decision_skips_sandbox() -> None:
-    model = FakeChatModel([
-        {"message": {"role": "assistant", "content": '{"action":"direct"}'}}
-    ])
+    model = FakeChatModel(
+        [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": '{"action":"direct","rationale":"already readable"}',
+                }
+            }
+        ]
+    )
     sandbox = FakeSandbox()
     agent = DecoderAgent(
         model=model,
@@ -101,24 +113,26 @@ async def test_direct_decision_skips_sandbox() -> None:
 
 @pytest.mark.asyncio
 async def test_malformed_arguments_fails_closed_without_sandbox() -> None:
-    model = FakeChatModel([
-        {
-            "message": {
-                "role": "assistant",
-                "content": None,
-                "tool_calls": [
-                    {
-                        "id": "call_1",
-                        "type": "function",
-                        "function": {
-                            "name": "execute_python",
-                            "arguments": "{bad_json",
-                        },
-                    }
-                ],
+    model = FakeChatModel(
+        [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": "call_1",
+                            "type": "function",
+                            "function": {
+                                "name": "execute_python",
+                                "arguments": "{bad_json",
+                            },
+                        }
+                    ],
+                }
             }
-        }
-    ])
+        ]
+    )
     sandbox = FakeSandbox()
     agent = DecoderAgent(
         model=model,
@@ -141,24 +155,28 @@ async def test_malformed_arguments_fails_closed_without_sandbox() -> None:
 @pytest.mark.asyncio
 async def test_oversized_source_fails_closed_without_sandbox() -> None:
     huge_source = "x = 1\n" * 20000  # > 64 KB
-    model = FakeChatModel([
-        {
-            "message": {
-                "role": "assistant",
-                "content": None,
-                "tool_calls": [
-                    {
-                        "id": "call_1",
-                        "type": "function",
-                        "function": {
-                            "name": "execute_python",
-                            "arguments": json.dumps({"source": huge_source}),
-                        },
-                    }
-                ],
+    model = FakeChatModel(
+        [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": "call_1",
+                            "type": "function",
+                            "function": {
+                                "name": "execute_python",
+                                "arguments": json.dumps(
+                                    {"source": huge_source, "rationale": "transform upload"}
+                                ),
+                            },
+                        }
+                    ],
+                }
             }
-        }
-    ])
+        ]
+    )
     sandbox = FakeSandbox()
     agent = DecoderAgent(
         model=model,
@@ -180,24 +198,26 @@ async def test_oversized_source_fails_closed_without_sandbox() -> None:
 
 @pytest.mark.asyncio
 async def test_unknown_tool_fails_closed_without_sandbox() -> None:
-    model = FakeChatModel([
-        {
-            "message": {
-                "role": "assistant",
-                "content": None,
-                "tool_calls": [
-                    {
-                        "id": "call_1",
-                        "type": "function",
-                        "function": {
-                            "name": "execute_bash",
-                            "arguments": json.dumps({"cmd": "ls"}),
-                        },
-                    }
-                ],
+    model = FakeChatModel(
+        [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": "call_1",
+                            "type": "function",
+                            "function": {
+                                "name": "execute_bash",
+                                "arguments": json.dumps({"cmd": "ls"}),
+                            },
+                        }
+                    ],
+                }
             }
-        }
-    ])
+        ]
+    )
     sandbox = FakeSandbox()
     agent = DecoderAgent(
         model=model,
@@ -219,32 +239,38 @@ async def test_unknown_tool_fails_closed_without_sandbox() -> None:
 
 @pytest.mark.asyncio
 async def test_parallel_tool_calls_rejected_without_sandbox() -> None:
-    model = FakeChatModel([
-        {
-            "message": {
-                "role": "assistant",
-                "content": None,
-                "tool_calls": [
-                    {
-                        "id": "call_1",
-                        "type": "function",
-                        "function": {
-                            "name": "execute_python",
-                            "arguments": json.dumps({"source": "print(1)"}),
+    model = FakeChatModel(
+        [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": "call_1",
+                            "type": "function",
+                            "function": {
+                                "name": "execute_python",
+                                "arguments": json.dumps(
+                                    {"source": "print(1)", "rationale": "transform upload"}
+                                ),
+                            },
                         },
-                    },
-                    {
-                        "id": "call_2",
-                        "type": "function",
-                        "function": {
-                            "name": "execute_python",
-                            "arguments": json.dumps({"source": "print(2)"}),
+                        {
+                            "id": "call_2",
+                            "type": "function",
+                            "function": {
+                                "name": "execute_python",
+                                "arguments": json.dumps(
+                                    {"source": "print(2)", "rationale": "transform upload"}
+                                ),
+                            },
                         },
-                    },
-                ],
+                    ],
+                }
             }
-        }
-    ])
+        ]
+    )
     sandbox = FakeSandbox()
     agent = DecoderAgent(
         model=model,
@@ -266,9 +292,9 @@ async def test_parallel_tool_calls_rejected_without_sandbox() -> None:
 
 @pytest.mark.asyncio
 async def test_model_refusal_or_empty_response_fails_closed() -> None:
-    model = FakeChatModel([
-        {"message": {"role": "assistant", "content": ""}, "refusal": "Cannot assist with coding"}
-    ])
+    model = FakeChatModel(
+        [{"message": {"role": "assistant", "content": ""}, "refusal": "Cannot assist with coding"}]
+    )
     sandbox = FakeSandbox()
     agent = DecoderAgent(
         model=model,
@@ -290,9 +316,9 @@ async def test_model_refusal_or_empty_response_fails_closed() -> None:
 
 @pytest.mark.asyncio
 async def test_invalid_final_response_json_fails_closed() -> None:
-    model = FakeChatModel([
-        {"message": {"role": "assistant", "content": "I am done, no files needed."}}
-    ])
+    model = FakeChatModel(
+        [{"message": {"role": "assistant", "content": "I am done, no files needed."}}]
+    )
     sandbox = FakeSandbox()
     agent = DecoderAgent(
         model=model,

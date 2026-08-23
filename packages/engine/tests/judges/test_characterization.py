@@ -54,7 +54,12 @@ class TrackingJudgeModel:
         self.chat_calls.append(messages)
         if self.chat_responses:
             return self.chat_responses.pop(0)
-        return {"message": {"role": "assistant", "content": '{"action":"direct"}'}}
+        return {
+            "message": {
+                "role": "assistant",
+                "content": '{"action":"direct","rationale":"already readable"}',
+            }
+        }
 
     async def complete_structured(
         self,
@@ -290,7 +295,14 @@ async def test_characterization_existing_post_decoder_comparison_retained() -> N
     verification = CollectorVerification("req-1", "file", "verified", [cfile])
 
     model = TrackingJudgeModel(
-        chat_responses=[{"message": {"role": "assistant", "content": '{"action":"direct"}'}}],
+        chat_responses=[
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": '{"action":"direct","rationale":"already readable"}',
+                }
+            }
+        ],
         structured_responses=[
             # Content comparison
             {

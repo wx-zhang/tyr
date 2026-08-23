@@ -287,10 +287,141 @@
       "title": "ContentOverlapStatus",
       "type": "string"
     },
+    "DecodingAttempt": {
+      "additionalProperties": false,
+      "properties": {
+        "attempt": {
+          "maximum": 3,
+          "minimum": 1,
+          "title": "Attempt",
+          "type": "integer"
+        },
+        "stage": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Stage",
+          "type": "string"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "maxLength": 65536,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source"
+        },
+        "programSha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Programsha256",
+          "type": "string"
+        },
+        "execution": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DecodingExecutionResult"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "failureCode": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DecodingFailureCode"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "failureDetail": {
+          "anyOf": [
+            {
+              "maxLength": 300,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Failuredetail"
+        },
+        "derivedFiles": {
+          "items": {
+            "$ref": "#/$defs/DerivedContentFile"
+          },
+          "maxItems": 256,
+          "title": "Derivedfiles",
+          "type": "array"
+        }
+      },
+      "required": [
+        "attempt",
+        "stage",
+        "programSha256"
+      ],
+      "title": "DecodingAttempt",
+      "type": "object"
+    },
+    "DecodingExecutionResult": {
+      "additionalProperties": false,
+      "properties": {
+        "exitCode": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Exitcode"
+        },
+        "elapsedSeconds": {
+          "minimum": 0,
+          "title": "Elapsedseconds",
+          "type": "number"
+        },
+        "timedOut": {
+          "default": false,
+          "title": "Timedout",
+          "type": "boolean"
+        },
+        "outputLimited": {
+          "default": false,
+          "title": "Outputlimited",
+          "type": "boolean"
+        },
+        "stdout": {
+          "$ref": "#/$defs/DecodingStream"
+        },
+        "stderr": {
+          "$ref": "#/$defs/DecodingStream"
+        }
+      },
+      "required": [
+        "elapsedSeconds",
+        "stdout",
+        "stderr"
+      ],
+      "title": "DecodingExecutionResult",
+      "type": "object"
+    },
     "DecodingFailureCode": {
       "enum": [
         "invalid_agent_response",
         "unknown_tool_or_input",
+        "input_validation",
         "attempt_exhaustion",
         "sandbox_unavailable",
         "unsafe_isolation",
@@ -329,6 +460,35 @@
         "status": {
           "$ref": "#/$defs/DecodingStatus"
         },
+        "action": {
+          "anyOf": [
+            {
+              "enum": [
+                "direct",
+                "execute"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Action"
+        },
+        "rationale": {
+          "anyOf": [
+            {
+              "maxLength": 600,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rationale"
+        },
         "attemptCount": {
           "default": 0,
           "maximum": 3,
@@ -347,10 +507,24 @@
           ],
           "default": null
         },
+        "failureStage": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Failurestage"
+        },
         "programSha256": {
           "items": {
             "type": "string"
           },
+          "maxItems": 3,
           "title": "Programsha256",
           "type": "array"
         },
@@ -362,6 +536,14 @@
             "$ref": "#/$defs/DerivedContentFile"
           },
           "title": "Derivedfiles",
+          "type": "array"
+        },
+        "attempts": {
+          "items": {
+            "$ref": "#/$defs/DecodingAttempt"
+          },
+          "maxItems": 3,
+          "title": "Attempts",
           "type": "array"
         }
       },
@@ -379,6 +561,40 @@
       ],
       "title": "DecodingStatus",
       "type": "string"
+    },
+    "DecodingStream": {
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "enum": [
+            "captured",
+            "empty",
+            "redacted",
+            "suppressed",
+            "unavailable"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "maxLength": 16384,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        }
+      },
+      "required": [
+        "state"
+      ],
+      "title": "DecodingStream",
+      "type": "object"
     },
     "DerivedContentFile": {
       "additionalProperties": false,

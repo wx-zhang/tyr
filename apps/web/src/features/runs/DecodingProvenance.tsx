@@ -10,7 +10,25 @@ export function DecodingProvenance({ decoding }: DecodingProvenanceProps) {
     return null;
   }
 
-  const { status, attemptCount, failureCode, limitFlags, derivedFiles } = decoding;
+  const {
+    status,
+    action,
+    rationale,
+    attemptCount,
+    failureCode,
+    failureStage,
+    programSha256,
+    limitFlags,
+    derivedFiles,
+    attempts,
+  } = decoding;
+
+  const streamValue = (stream: components["schemas"]["DecodingStream"]) => {
+    if (stream.state === "captured" && stream.value) {
+      return <code className="decoding-stream-value">{stream.value}</code>;
+    }
+    return <span>{label(stream.state)}</span>;
+  };
 
   return (
     <section
@@ -27,6 +45,16 @@ export function DecodingProvenance({ decoding }: DecodingProvenanceProps) {
           <dt>Attempts</dt>
           <dd>{attemptCount}</dd>
         </div>
+        <div>
+          <dt>Route</dt>
+          <dd>{action ? label(action) : "Unavailable"}</dd>
+        </div>
+        {failureStage ? (
+          <div>
+            <dt>Failure stage</dt>
+            <dd>{label(failureStage)}</dd>
+          </div>
+        ) : null}
         {failureCode ? (
           <div>
             <dt>Failure code</dt>
@@ -46,6 +74,80 @@ export function DecodingProvenance({ decoding }: DecodingProvenanceProps) {
           </div>
         ) : null}
       </dl>
+
+      {rationale ? (
+        <div className="decoding-rationale">
+          <p className="muted">Why this route</p>
+          <p>{rationale}</p>
+        </div>
+      ) : null}
+
+      {programSha256?.length ? (
+        <div className="decoding-program-hashes">
+          <p className="muted">Program SHA-256</p>
+          <ul aria-label="Decoder program hashes">
+            {programSha256.map((hash, index) => (
+              <li key={`${hash}-${index}`} className="mono">
+                Attempt {index + 1}: {hash}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      {attempts?.length ? (
+        <div className="decoding-attempts">
+          <p className="muted">Decoder attempts</p>
+          <ol aria-label="Decoder attempts">
+            {attempts.map((attempt) => (
+              <li key={`${attempt.attempt}-${attempt.programSha256}`}>
+                <details>
+                  <summary>
+                    Attempt {attempt.attempt}: {label(attempt.stage)}
+                  </summary>
+                  {attempt.source ? (
+                    <div className="decoding-source">
+                      <p className="muted">Executed code</p>
+                      <pre>{attempt.source}</pre>
+                    </div>
+                  ) : null}
+                  {attempt.execution ? (
+                    <dl className="evaluation-facts decoding-execution-result">
+                      <div>
+                        <dt>Result</dt>
+                        <dd>
+                          {attempt.execution.exitCode === null
+                            ? "Unavailable"
+                            : `Exit ${attempt.execution.exitCode}`}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Elapsed</dt>
+                        <dd>{attempt.execution.elapsedSeconds.toFixed(3)}s</dd>
+                      </div>
+                      <div>
+                        <dt>stdout</dt>
+                        <dd>{streamValue(attempt.execution.stdout)}</dd>
+                      </div>
+                      <div>
+                        <dt>stderr</dt>
+                        <dd>{streamValue(attempt.execution.stderr)}</dd>
+                      </div>
+                    </dl>
+                  ) : (
+                    <p className="muted">Execution result unavailable.</p>
+                  )}
+                  {attempt.failureCode ? (
+                    <p className="decoding-attempt-failure">
+                      Failure: {label(attempt.failureCode)}
+                    </p>
+                  ) : null}
+                </details>
+              </li>
+            ))}
+          </ol>
+        </div>
+      ) : null}
 
       {status === "succeeded" && derivedFiles && derivedFiles.length > 0 ? (
         <div className="decoding-derived-files">

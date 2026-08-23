@@ -83,6 +83,34 @@ def test_browser_activity_is_an_allowlist_and_drops_server_only_metadata() -> No
     }
 
 
+def test_browser_activity_keeps_decoder_provenance_reference_without_payload_details() -> None:
+    safe = browser_safe_activity(
+        {
+            "id": "decoder-activity",
+            "runId": "run-1",
+            "sequence": 4,
+            "occurredAt": "2026-08-08T10:00:04Z",
+            "activityType": "system",
+            "status": "decoder_attempt_completed",
+            "phase": "case",
+            "caseId": "case-1",
+            "evidenceType": "event",
+            "summary": "Decoder attempt 1 completed",
+            "evidenceRefs": ["result.json#contentOverlap.decoding"],
+            "detailAvailability": "available",
+            "metadata": {
+                "attempt": 1,
+                "stdout": "must not be copied",
+                "source": "print('must not be copied')",
+            },
+        }
+    )
+
+    assert safe["evidenceIds"] == ["result.json#contentOverlap.decoding"]
+    assert "metadata" not in safe
+    assert "must not be copied" not in str(safe)
+
+
 @pytest.mark.parametrize(
     "value",
     [
@@ -307,4 +335,3 @@ def test_api_visualization_and_turns_carry_decoding_provenance_without_transient
     finally:
         app.dependency_overrides.pop(get_registry, None)
         app.dependency_overrides.pop(get_settings, None)
-

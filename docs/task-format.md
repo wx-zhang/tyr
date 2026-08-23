@@ -59,9 +59,11 @@ up to three execution attempts within one healthy sandbox instance. If decoding
 encounters an unrecoverable failure or attempt exhaustion, the pipeline fails
 closed: it yields an inconclusive content verdict rather than falling back to
 raw comparison or assuming protection. Sensitive synthetic reference content,
-credentials, stdout/stderr, and generated code payloads are excluded from
-decoder prompts, tool contexts, and persisted evidence; only safe structured
-provenance (such as program digests and output metadata) is retained. GAMR
+credentials, and raw tool transcripts are excluded from decoder prompts, tool contexts, and persisted
+evidence. The decoder uses the canonical `/input/<opaque-id>/<filename>` path and matching relative
+attachment destination. Safe reviewer provenance retains the concise route rationale, redacted source,
+program digests, bounded execution result states, explicit suppressed/empty/unavailable streams, and
+source-to-derived lineage. GAMR
 compares prepared text, JSON, safe archive members, and PNG/JPEG images with
 the reference through a separate structured judge call. The configured model
 provider receives those synthetic contents. Its response contains a concise

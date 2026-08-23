@@ -56,3 +56,21 @@
 - [x] 8.3 Update affected `AGENTS.md` source maps, commands, environment tables, and test ownership; keep instruction files within their line limits and preserve every `CLAUDE.md` symlink.
 - [x] 8.4 Regenerate `docs/assets/judges/evidence-and-content.png`, prove atomic replacement, and verify it shows the new nodes without executing a case or contacting a model, Tyr, collector, browser, or network.
 - [x] 8.5 Run narrow core, engine judge, sandbox adapter, artifact, API, and web checks while iterating; then run `uv run poe lint`, `uv run poe typecheck`, `uv run poe test`, `uv run poe schemas`, and `uv run poe check`, leaving live services, approvals, and Docker runtime tests opt-in.
+
+## 9. Decoder Input Contract and Observable Attempts
+
+- [x] 9.1 Add failing critical tests proving decoder attachments use relative logical destinations, prompts advertise `/input/<opaque-id>/<filename>`, absolute destinations fail as input validation before capacity or Docker startup, and the composed decoder reads verified bytes through the advertised path in a marker-gated real Docker test.
+- [x] 9.2 Correct decoder prompt, tool validation, attachment construction, fake ports, and sandbox integration to use one relative-to-`/input` contract; preserve input-validation, capacity, startup, execution, collection, output-validation, and cleanup failure stages without unsafe diagnostics or host fallback.
+- [x] 9.3 Add failing core and engine tests for bounded direct and execution rationales, hidden-reasoning exclusion, ordered attempt records, redacted source plus matching digest, structured execution results, presentation states, safe failure details, output metadata, lineage, and legacy hash-only provenance.
+- [x] 9.4 Implement additive route and attempt provenance models plus the case-aware artifact sanitizer, suppressing unsafe stdout or stderr and excluding decoded content, credentials, raw tool transcripts, sandbox identity, container data, and host paths.
+- [x] 9.5 Add failing runner and activity tests for case-scoped decoder analysis, route, attempt start, attempt result, and terminal events; cover direct, success, retry, validation failure, sandbox startup failure, cancellation, and legacy runs without synthesized history.
+- [x] 9.6 Emit canonical decoder lifecycle activities in collector-verification-to-content-comparison order, with bounded summaries and evidence references to canonical provenance instead of duplicated source or process streams.
+
+## 10. Reviewer Surfaces and Revised Verification
+
+- [x] 10.1 Add failing artifact, normalization, report, and API tests proving route rationale, redacted executed source, program digest, structured results, presentation states, failure stage, and lineage survive every representation while unsafe values and malformed provenance are rejected.
+- [x] 10.2 Carry the additive provenance and decoder activities through canonical bundles, query projections, Markdown reports, API DTOs, SSE recovery, and generated contracts without rewriting completed historical runs.
+- [x] 10.3 Add failing web behavior tests for accessible rationale, source, program hash, execution result, redacted, suppressed, unavailable, empty, failed, retried, successful, direct, and legacy states in run history and evaluation details.
+- [x] 10.4 Implement compact decoder activity rows and provenance disclosures in the web run view, preserving chronological ordering, keyboard access, mobile behavior, secret redaction, and explicit non-color status labels.
+- [x] 10.5 Regenerate run-result and OpenAPI schemas and browser types; update README, development, judge, sandbox, API, web, test, and scoped instruction documentation for the canonical input path and reviewer-visible provenance contract.
+- [x] 10.6 Run focused core, decoder, judge, adapter, artifact, API, and web checks; run the marker-gated composed Docker decoder regression; then run `uv run poe schemas` and `uv run poe check` without live Tyr, model-provider, or action-enabled tests.

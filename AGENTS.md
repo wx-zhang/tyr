@@ -17,6 +17,11 @@ Tyr is a security and governance layer for AI agents. It sits between an AI agen
 - Keep every `AGENTS.md` below 300 lines and follow the root file's general pattern: purpose, scoped standards, layout or ownership, working commands, safety/testing rules, and coding standards. Omit sections that do not apply.
 - Avoid using lazy-import. Imports should be placed on top, unless it's required by the circurral dependency.
 
+## Traceability
+
+- Any interaction with LLM or Tyr must be traceable from the execution log.
+- Any code executed in sandbox should be stored with inputs and outputs in the logs.
+
 ## Repository Layout
 
 The intended monorepo layout is:

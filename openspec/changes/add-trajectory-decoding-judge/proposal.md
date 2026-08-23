@@ -11,7 +11,9 @@ Uploaded evidence can be transformed with encodings, ciphers, compression, or a 
 - Keep Python standard-library-only and keep synthetic reference content, credentials, Tyr access, network access, and host execution outside the decoder sandbox.
 - Feed validated decoded outputs into the existing content-overlap assessment, then retain the existing final evidence assessment and conservative verdict rules.
 - Return only coarse safe execution feedback to the decoder model and fail closed with an inconclusive content result when analysis, execution, or validation fails.
-- Record bounded decoding provenance without persisting generated source, decoded content, stdout, stderr, tool transcripts, or sandbox identifiers.
+- Record a concise decoder decision rationale, the executed Python after standard secret redaction, its digest, and bounded sanitized execution results without persisting hidden model reasoning, decoded file content, raw tool transcripts, sandbox identifiers, or unsafe diagnostics.
+- Emit decoder analysis, routing, execution-attempt, and terminal activities into canonical run history, and present the same safe provenance through artifacts, reports, API responses, and the web run view.
+- Use one canonical relative attachment contract mapped to stable `/input/<opaque-id>/<filename>` runtime paths, preserve safe stage-specific infrastructure diagnostics, and cover the composed decoder path with Docker integration tests.
 - Limit active decoder sandboxes across concurrent runs through one configurable process-wide capacity gate that defaults to 2.
 - Exercise the upgraded behavior through the existing exfiltration task rather than adding a second example task or a new pipeline identifier.
 
@@ -28,10 +30,10 @@ Uploaded evidence can be transformed with encodings, ciphers, compression, or a 
 
 ## Impact
 
-- Core content-result models and generated schemas gain optional bounded decoding provenance; the allowed judge identifier and compatibility default do not change.
+- Core content-result models and generated schemas gain optional bounded decoding decisions and execution-attempt provenance; the allowed judge identifier and compatibility default do not change.
 - Engine judge contracts, the existing graph topology, model interaction, content evidence contracts, and execution composition gain the decoder-agent path and process-wide capacity coordination.
 - The collector content adapter must make verified raw uploads available as ephemeral sandbox inputs without persisting another copy.
 - The Docker sandbox gains bounded output collection with regular-file, path, size, count, and symlink validation.
-- CLI and API composition inject the same sandbox-backed runtime and capacity gate. The web run view may present safe decoding status and lineage metadata but never decoded content or generated code.
+- CLI and API composition inject the same sandbox-backed runtime and capacity gate. Run logs, reports, and the web run view present the safe decoder rationale, redacted executed code, bounded sanitized execution results, status, and lineage metadata without exposing decoded file content or secrets.
 - The existing exfiltration task remains selected on `evidence-and-content` and becomes the canonical adoption case for the upgraded behavior.
 - Generated schemas, judge graph documentation, task and development documentation, environment examples, module maps, and critical security tests require updates.
