@@ -13,6 +13,7 @@ from gamr_core import (
     SandboxExecutionPreview,
     SandboxOperationEvent,
     SandboxOperationState,
+    SandboxOutputFile,
     SandboxPreviewText,
 )
 from pydantic import ValidationError
@@ -148,6 +149,29 @@ def test_sandbox_operation_event_accepts_bounded_camel_case_contract() -> None:
     assert event.model_dump(by_alias=True)["operationId"] == "sandbox-operation-1"
     assert event.model_dump(by_alias=True)["programSha256"] == "a" * 64
 
+
+def test_sandbox_operation_event_accepts_output_files() -> None:
+    event = SandboxOperationEvent(
+        operationId="sandbox-operation-1",
+        state=SandboxOperationState.COLLECTION_COMPLETED,
+        generation=1,
+        attempt=1,
+        outputCount=1,
+        outputFiles=[
+            SandboxOutputFile(
+                path="upload-001/decoded.txt",
+                size=12,
+                sha256="c" * 64,
+                contentType="text/plain",
+                content=SandboxPreviewText(state="captured", value="hello world"),
+            )
+        ],
+    )
+    assert event.output_files is not None
+    assert len(event.output_files) == 1
+    assert event.output_files[0].path == "upload-001/decoded.txt"
+    assert event.output_files[0].content is not None
+    assert event.output_files[0].content.value == "hello world"
 
 def test_sandbox_execution_preview_requires_structured_streams() -> None:
     execution = SandboxExecutionPreview(

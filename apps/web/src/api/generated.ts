@@ -1105,6 +1105,8 @@ export interface components {
             execution?: components["schemas"]["SandboxExecutionPreview"] | null;
             /** Outputcount */
             outputCount?: number | null;
+            /** Outputfiles */
+            outputFiles?: components["schemas"]["SandboxOutputFile"][] | null;
             /** Failurecode */
             failureCode?: string | null;
         };
@@ -1128,6 +1130,8 @@ export interface components {
             execution?: components["schemas"]["SandboxExecutionPreview"] | null;
             /** Outputcount */
             outputCount?: number | null;
+            /** Outputfiles */
+            outputFiles?: components["schemas"]["SandboxOutputFile"][] | null;
             /** Failurecode */
             failureCode?: string | null;
             /** Failuredetail */
@@ -1154,6 +1158,18 @@ export interface components {
          * @enum {string}
          */
         SandboxOperationState: "requested" | "ready" | "execution_started" | "execution_completed" | "collection_started" | "collection_completed" | "closing" | "closed" | "completed" | "failed" | "cancelled";
+        /** SandboxOutputFile */
+        SandboxOutputFile: {
+            /** Path */
+            path: string;
+            /** Size */
+            size: number;
+            /** Sha256 */
+            sha256: string;
+            /** Contenttype */
+            contentType: string;
+            content?: components["schemas"]["SandboxPreviewText"] | null;
+        };
         /** SandboxPreviewText */
         SandboxPreviewText: {
             /**

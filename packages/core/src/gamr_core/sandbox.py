@@ -68,6 +68,15 @@ class SandboxExecutionPreview(BaseModel):
                 raise ValueError("execution preview streams are limited to 16384 characters")
         return self
 
+class SandboxOutputFile(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    path: str = Field(min_length=1, max_length=500)
+    size: int = Field(ge=0)
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    content_type: str = Field(alias="contentType", min_length=1, max_length=100)
+    content: SandboxPreviewText | None = None
+
 
 class SandboxOperationEvent(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
@@ -83,6 +92,9 @@ class SandboxOperationEvent(BaseModel):
     source: SandboxPreviewText | None = None
     execution: SandboxExecutionPreview | None = None
     output_count: int | None = Field(default=None, alias="outputCount", ge=0, le=256)
+    output_files: list[SandboxOutputFile] | None = Field(
+        default=None, alias="outputFiles", max_length=256
+    )
     failure_code: str | None = Field(default=None, alias="failureCode", max_length=100)
     failure_detail: str | None = Field(default=None, alias="failureDetail", max_length=300)
 
@@ -101,11 +113,14 @@ class SandboxOperationEvent(BaseModel):
             raise ValueError("execution is only valid on execution completion or failure")
         if self.source is not None and self.state not in source_states:
             raise ValueError("source is only valid on execution start, completion, or failure")
-        if self.output_count is not None and self.state not in {
+        collection_states = {
             SandboxOperationState.COLLECTION_COMPLETED,
             SandboxOperationState.EXECUTION_COMPLETED,
-        }:
+        }
+        if self.output_count is not None and self.state not in collection_states:
             raise ValueError("output count is only valid after execution or collection")
+        if self.output_files is not None and self.state not in collection_states:
+            raise ValueError("output files are only valid after execution or collection")
         if self.state is SandboxOperationState.EXECUTION_STARTED and self.attempt is None:
             raise ValueError("execution start requires an attempt")
         return self
@@ -123,6 +138,9 @@ class SandboxOperationAttempt(BaseModel):
     source: SandboxPreviewText | None = None
     execution: SandboxExecutionPreview | None = None
     output_count: int | None = Field(default=None, alias="outputCount", ge=0, le=256)
+    output_files: list[SandboxOutputFile] | None = Field(
+        default=None, alias="outputFiles", max_length=256
+    )
     failure_code: str | None = Field(default=None, alias="failureCode", max_length=100)
 
 

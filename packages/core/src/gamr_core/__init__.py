@@ -43,6 +43,7 @@ from .sandbox import (
     SandboxOperationEvent,
     SandboxOperationPreview,
     SandboxOperationState,
+    SandboxOutputFile,
     SandboxPreviewText,
 )
 from .states import (
@@ -135,6 +136,7 @@ __all__ = [
     "SandboxOperationEvent",
     "SandboxOperationPreview",
     "SandboxOperationState",
+    "SandboxOutputFile",
     "SandboxPreviewText",
     "RunState",
     "PromptBundle",

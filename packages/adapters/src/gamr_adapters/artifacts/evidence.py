@@ -706,15 +706,17 @@ def _fold_sandbox_event(session: _SandboxSession, event: SandboxOperationEvent) 
         )
     fields: dict[str, object] = {"generation": event.generation}
     if event.program_sha256 is not None:
-        fields["programSha256"] = event.program_sha256
+        fields["program_sha256"] = event.program_sha256
     if event.source is not None:
         fields["source"] = event.source
     if event.execution is not None:
         fields["execution"] = event.execution
     if event.output_count is not None:
-        fields["outputCount"] = event.output_count
+        fields["output_count"] = event.output_count
+    if event.output_files is not None:
+        fields["output_files"] = event.output_files
     if event.failure_code is not None:
-        fields["failureCode"] = event.failure_code
+        fields["failure_code"] = event.failure_code
     if event.state is SandboxOperationState.EXECUTION_COMPLETED:
         fields["state"] = "completed"
     elif event.state is SandboxOperationState.FAILED:

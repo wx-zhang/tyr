@@ -3606,6 +3606,21 @@
             ],
             "title": "Outputcount"
           },
+          "outputFiles": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SandboxOutputFile"
+                },
+                "type": "array",
+                "maxItems": 256
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outputfiles"
+          },
           "failureCode": {
             "anyOf": [
               {
@@ -3709,6 +3724,21 @@
               }
             ],
             "title": "Outputcount"
+          },
+          "outputFiles": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SandboxOutputFile"
+                },
+                "type": "array",
+                "maxItems": 256
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outputfiles"
           },
           "failureCode": {
             "anyOf": [
@@ -3826,6 +3856,51 @@
           "cancelled"
         ],
         "title": "SandboxOperationState"
+      },
+      "SandboxOutputFile": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Path"
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Size"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Sha256"
+          },
+          "contentType": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Contenttype"
+          },
+          "content": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SandboxPreviewText"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "path",
+          "size",
+          "sha256",
+          "contentType"
+        ],
+        "title": "SandboxOutputFile"
       },
       "SandboxPreviewText": {
         "properties": {

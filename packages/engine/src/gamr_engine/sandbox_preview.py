@@ -8,6 +8,7 @@ from gamr_core import (
     SandboxExecutionPreview,
     SandboxOperationEvent,
     SandboxOperationState,
+    SandboxOutputFile,
     SandboxPreviewText,
 )
 from gamr_core.identifiers import new_id
@@ -119,10 +120,15 @@ class ObservedSandbox:
         except Exception as error:
             self._fail(error, attempt=self._attempt)
             raise
+        output_files = [
+            _output_file_preview(entry, self._sensitive_values, self._configured_secrets)
+            for entry in entries
+        ]
         self._emit(
             SandboxOperationState.COLLECTION_COMPLETED,
             attempt=self._attempt,
             output_count=len(entries),
+            output_files=output_files,
         )
         return entries
 
@@ -206,9 +212,56 @@ def _source_preview(value: str, configured_secrets: Sequence[str]) -> SandboxPre
 
 def _stream_preview(
     value: str,
-    sensitive_values: Sequence[str],
+    sensitive_values: Sequence[str | bytes],
     configured_secrets: Sequence[str],
 ) -> SandboxPreviewText:
     if not value:
         return SandboxPreviewText(state="empty")
     return SandboxPreviewText(state="captured", value=value[:16_384])
+def _detect_content_type(path: str, content: bytes) -> str:
+    if content.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if content.startswith(b"\xff\xd8"):
+        return "image/jpeg"
+    ext = path.rsplit(".", 1)[-1].lower() if "." in path else ""
+    ext_map = {
+        "json": "application/json",
+        "xml": "application/xml",
+        "csv": "text/csv",
+        "md": "text/markdown",
+        "markdown": "text/markdown",
+        "txt": "text/plain",
+        "html": "text/html",
+        "py": "text/x-python",
+        "sh": "text/x-shellscript",
+    }
+    if ext in ext_map:
+        return ext_map[ext]
+    try:
+        content.decode("utf-8")
+        return "text/plain"
+    except UnicodeDecodeError:
+        return "application/octet-stream"
+
+
+def _output_file_preview(
+    entry: SandboxEntry,
+    sensitive_values: Sequence[str | bytes],
+    configured_secrets: Sequence[str],
+) -> SandboxOutputFile:
+    sha256 = hashlib.sha256(entry.content).hexdigest()
+    content_type = _detect_content_type(entry.path, entry.content)
+    content_preview: SandboxPreviewText | None = None
+    if content_type.startswith("text/") or content_type in {"application/json", "application/xml"}:
+        try:
+            text_value = entry.content.decode("utf-8-sig")
+            content_preview = _stream_preview(text_value, sensitive_values, configured_secrets)
+        except UnicodeDecodeError:
+            content_preview = SandboxPreviewText(state="unavailable")
+    return SandboxOutputFile(
+        path=entry.path,
+        size=len(entry.content),
+        sha256=sha256,
+        contentType=content_type,
+        content=content_preview,
+    )

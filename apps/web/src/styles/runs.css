@@ -1077,11 +1077,11 @@
 }
 
 .sandbox-source,
-.sandbox-execution {
+.sandbox-execution,
+.sandbox-output-artifacts {
   border-top: var(--border-w) solid var(--border);
   padding: var(--space-3);
 }
-
 .sandbox-subheading {
   margin: 0 0 var(--space-1);
   color: var(--text-muted);
@@ -1141,6 +1141,42 @@
 }
 .sandbox-failure {
   color: var(--danger);
+}
+
+.sandbox-file-list {
+  display: grid;
+  gap: var(--space-2);
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+}
+
+.sandbox-file-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  border-top: var(--border-w) solid var(--border);
+  padding-top: var(--space-2);
+}
+
+.sandbox-file-info {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: var(--text-xs);
+}
+
+.sandbox-file-path {
+  font-weight: 600;
+}
+
+.sandbox-file-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: var(--space-2);
 }
 
 .sandbox-source .token.comment {

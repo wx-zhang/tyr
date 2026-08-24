@@ -101,7 +101,11 @@ async def test_observed_sandbox_records_one_logical_session_without_backend_id()
     assert events[2].attempt == 1
     assert events[2].source is not None
     assert events[3].execution is not None
-
+    assert events[5].output_count == 1
+    assert events[5].output_files is not None
+    assert events[5].output_files[0].path == "result.txt"
+    assert events[5].output_files[0].content is not None
+    assert events[5].output_files[0].content.value == "ok"
 
 @pytest.mark.asyncio
 async def test_observed_sandbox_tracks_replacement_generations_and_attempts() -> None:

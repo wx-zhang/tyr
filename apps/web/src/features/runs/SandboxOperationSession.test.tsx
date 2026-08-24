@@ -1,8 +1,7 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { SandboxOperationSession } from "./SandboxOperationSession";
 import type { components } from "../../api/generated";
-
 type Preview = components["schemas"]["SandboxOperationPreview"];
 
 const preview: Preview = {
@@ -110,5 +109,53 @@ describe("SandboxOperationSession", () => {
     expect(screen.getByText("Attempt 2")).toBeInTheDocument();
     expect(screen.queryByText("secret-value")).not.toBeInTheDocument();
     expect(screen.getAllByText("Suppressed")).toHaveLength(1);
+  });
+
+  it("renders output artifacts and opens artifact preview modal when clicked", () => {
+    const previewWithOutputs: Preview = {
+      ...preview,
+      attempts: [
+        {
+          ...preview.attempts![0],
+          outputFiles: [
+            {
+              path: "upload-001/decoded.txt",
+              size: 24,
+              sha256: "b".repeat(64),
+              contentType: "text/plain",
+              content: { state: "captured", value: "Decoded secret content" },
+            },
+          ],
+        },
+      ],
+    };
+
+    render(<SandboxOperationSession preview={previewWithOutputs} />);
+
+    expect(screen.getByText("Output artifacts (1)")).toBeInTheDocument();
+    expect(screen.getByText("upload-001/decoded.txt")).toBeInTheDocument();
+    expect(screen.getByText(/text\/plain/)).toBeInTheDocument();
+
+    const previewBtn = screen.getByRole("button", {
+      name: "Preview upload-001/decoded.txt",
+    });
+    expect(previewBtn).toBeInTheDocument();
+
+    // Open modal
+    fireEvent.click(previewBtn);
+    expect(
+      screen.getByRole("dialog", {
+        name: "Preview upload-001/decoded.txt",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Decoded secret content")).toBeInTheDocument();
+
+    // Close modal
+    fireEvent.click(screen.getByRole("button", { name: "Close preview" }));
+    expect(
+      screen.queryByRole("dialog", {
+        name: "Preview upload-001/decoded.txt",
+      }),
+    ).not.toBeInTheDocument();
   });
 });
