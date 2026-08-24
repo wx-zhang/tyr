@@ -1972,6 +1972,9 @@
 
 .markdown-message pre {
   overflow-x: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   border: var(--border-w) solid var(--border);
   border-radius: var(--radius-sm);
   padding: var(--space-3);
@@ -1979,9 +1982,17 @@
   color: var(--text-secondary);
 }
 
+.markdown-message pre code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 .markdown-message code {
   font-family: var(--font-mono);
   font-size: var(--text-code);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .markdown-message .token.deleted {

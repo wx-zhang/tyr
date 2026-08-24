@@ -21,6 +21,20 @@ describe("MarkdownMessage", () => {
       "+ received",
     );
   });
+
+  it("renders fenced code block in pre and code elements", () => {
+    const { container } = render(
+      <MarkdownMessage
+        content={"```json\n{\"long_key\": \"very_long_value_that_needs_wrapping\"}\n```"}
+      />,
+    );
+
+    const pre = container.querySelector("pre");
+    const code = container.querySelector("code");
+    expect(pre).toBeInTheDocument();
+    expect(code).toBeInTheDocument();
+    expect(pre).toContainElement(code);
+  });
 });
 
 describe("ExpandableMarkdownMessage", () => {
