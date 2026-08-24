@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 
 import pytest
 from gamr_core import (
+    AssessmentStatus,
     ContentMatchType,
     ContentOverlapResult,
     ContentOverlapStatus,
@@ -111,6 +112,18 @@ def test_content_overlap_result_contains_only_safe_provenance() -> None:
     assert result.status is ContentOverlapStatus.CONFIRMED
     assert result.matches[0].match_type is ContentMatchType.EXACT
     assert "content" not in result.model_dump(by_alias=True)
+
+
+def test_content_overlap_result_accepts_detailed_markdown_summary() -> None:
+    summary = "### Differences\n\n```diff\n" + ("- expected\n+ received\n" * 80) + "```"
+
+    result = ContentOverlapResult(
+        status=ContentOverlapStatus.NOT_FOUND,
+        assessmentStatus=AssessmentStatus.VALID,
+        summary=summary,
+    )
+
+    assert result.summary == summary
 
 
 def test_decoding_provenance_round_trips_route_attempt_and_execution_details() -> None:

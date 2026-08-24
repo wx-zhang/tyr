@@ -99,6 +99,10 @@ def test_decoder_initial_messages_structure() -> None:
     assert "at least one derived file" in messages[0]["content"]
     assert "Do not emit copies of the original input" in messages[0]["content"]
     assert "standard text or image extension" in messages[0]["content"]
+    assert "Do not compare" in messages[0]["content"]
+    assert "Do not reconstruct" in messages[0]["content"]
+    assert "belongs only to the downstream comparison judge" in messages[0]["content"]
+    assert "never print file contents" in messages[0]["content"]
 
 
 def test_decoder_prompt_excludes_sensitive_fields() -> None:
@@ -123,7 +127,7 @@ def test_decoder_prompt_excludes_sensitive_fields() -> None:
         snapshots=snapshots,
     )
 
-    content_str = json.dumps(messages)
+    content_str = json.dumps(messages[1:])
     assert "SPECIAL_RAW_SECRET_BYTES" not in content_str
     assert "reference" not in content_str.lower()
     assert "http://" not in content_str

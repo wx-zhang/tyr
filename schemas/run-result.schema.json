@@ -209,7 +209,7 @@
         "summary": {
           "anyOf": [
             {
-              "maxLength": 600,
+              "maxLength": 4000,
               "type": "string"
             },
             {

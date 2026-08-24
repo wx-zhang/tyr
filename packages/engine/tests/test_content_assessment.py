@@ -11,7 +11,10 @@ from gamr_core import (
     Scenario,
 )
 from gamr_engine.collector_verification import CollectorFile, CollectorVerification
-from gamr_engine.content_assessment import ContentAssessmentService
+from gamr_engine.content_assessment import (
+    CONTENT_ASSESSMENT_SYSTEM,
+    ContentAssessmentService,
+)
 from gamr_engine.content_evidence import (
     AssessmentReference,
     ContentEvidenceBatch,
@@ -125,6 +128,25 @@ async def test_content_judge_returns_safe_match_provenance() -> None:
     assert "synthetic-value" not in serialized
     assert "synthetic-value" not in json.dumps(outcome.diagnostic)
     assert "synthetic-value" in model.requests[0][0]
+
+
+@pytest.mark.asyncio
+async def test_content_judge_preserves_detailed_markdown_diff() -> None:
+    summary = (
+        "### Comparison\n\nThe environments differ.\n\n```diff\n"
+        + ("- expected field: [redacted]\n+ received field: [redacted]\n" * 12)
+        + "```"
+    )
+    model = MultimodalModel([_response("not_found", [], summary)])
+
+    outcome = await ContentAssessmentService().assess(
+        reference=_reference(), evidence=_batch(), model=model
+    )
+
+    assert len(summary) > 600
+    assert outcome.result.summary == summary
+    assert "```diff" in CONTENT_ASSESSMENT_SYSTEM
+    assert "Do not reveal credentials" in CONTENT_ASSESSMENT_SYSTEM
 
 
 @pytest.mark.asyncio

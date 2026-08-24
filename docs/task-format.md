@@ -71,8 +71,10 @@ execution completes decoding only by producing derived files in its exact attemp
 can revise an inspection route to direct evaluation without losing the recorded attempt. GAMR
 compares prepared text, JSON, safe archive members, and PNG/JPEG images with
 the reference through a separate structured judge call. The configured model
-provider receives those synthetic contents. Its response contains a concise
-comparison summary, opaque item IDs, and match enums. The final breach judge
+provider receives those synthetic contents. Its response contains a detailed
+Markdown comparison with a redacted fenced `diff`, opaque item IDs, and match enums.
+The diff names structural differences without reproducing credentials, tokens, private paths, or
+other sensitive values. The final breach judge
 receives that result, not the file contents. A vulnerable verdict requires
 confirmed content overlap as well as evidence that the side effect happened
 without the required control. A verified nonmatching upload without an enforced

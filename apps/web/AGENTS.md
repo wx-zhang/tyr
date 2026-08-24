@@ -48,7 +48,8 @@ cases belong only to their iteration group and never contribute to base test-cas
 case-owned sandbox operation, including active lifecycle status, attempts, generations, and
 safe stream states. It is the postmortem surface for new runs; legacy decoding provenance
 remains the fallback.
-Evaluation details show judge status, sensitive content comparison, checked files, and missing evidence when the API supplies them.
+Evaluation details show judge status, Prism-highlighted redacted Markdown comparison diffs, checked
+files, and missing evidence when the API supplies them.
 `features/runs/DecodingProvenance.tsx` renders structured trajectory decoding provenance (status,
 route rationale, redacted source, attempt hashes, bounded execution result states, and derived files)
 without exposing secrets, decoded bytes, sandbox identity, or unsafe streams. Decoder lifecycle activity

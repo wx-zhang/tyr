@@ -1984,6 +1984,23 @@
   font-size: var(--text-code);
 }
 
+.markdown-message .token.deleted {
+  display: block;
+  background: var(--danger-tint);
+  color: var(--danger);
+}
+
+.markdown-message .token.inserted {
+  display: block;
+  background: var(--success-tint);
+  color: var(--success);
+}
+
+.markdown-message .token.coord,
+.markdown-message .token.prefix {
+  color: var(--text-muted);
+}
+
 .markdown-message :not(pre) > code {
   border-radius: var(--radius-xs);
   padding: var(--space-0-5) var(--space-1);

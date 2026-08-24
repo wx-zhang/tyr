@@ -4,6 +4,8 @@ import {
   type ComponentPropsWithoutRef,
   type ReactNode,
 } from "react";
+import Prism from "prismjs";
+import "prismjs/components/prism-diff";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -37,6 +39,31 @@ function MessageHeading({ children }: { children?: ReactNode }) {
   return <h4>{children}</h4>;
 }
 
+function HighlightedCode({
+  className,
+  children,
+  ...props
+}: ComponentPropsWithoutRef<"code">) {
+  const language = /language-([\w-]+)/.exec(className ?? "")?.[1];
+  const grammar = language ? Prism.languages[language] : undefined;
+  if (!language || !grammar) {
+    return (
+      <code {...props} className={className}>
+        {children}
+      </code>
+    );
+  }
+  const source = String(children).replace(/\n$/, "");
+  const highlighted = Prism.highlight(source, grammar, language);
+  return (
+    <code
+      {...props}
+      className={className}
+      dangerouslySetInnerHTML={{ __html: highlighted }}
+    />
+  );
+}
+
 function RenderedMarkdown({ content }: MarkdownMessageProps) {
   return (
     <div className="markdown-message">
@@ -52,6 +79,7 @@ function RenderedMarkdown({ content }: MarkdownMessageProps) {
           h4: MessageHeading,
           h5: MessageHeading,
           h6: MessageHeading,
+          code: HighlightedCode,
           img: ({ alt }) => <span>{alt ?? "Image omitted"}</span>,
         }}
       >

@@ -13,7 +13,7 @@ def parse_content_payload(content: str) -> Any:
     status = payload.get("status")
     summary = payload.get("summary")
     if isinstance(summary, str):
-        summary = summary.strip()[:600]
+        summary = summary.strip()[:4000]
     matches = payload.get("matches")
     if status != "confirmed":
         matches = []
