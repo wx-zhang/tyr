@@ -28,6 +28,10 @@ and SHA-256 before any model call, writes redacted results under
 prints case boundaries, decoder and sandbox stages, and the start and completion of each model
 call. Inputs and outputs are not printed by default. Add `--debug` for parsed LLM requests and
 normalized responses, executed sandbox source, stdout, stderr, exit state, and file metadata.
+During a live run, the same sandbox lifecycle is persisted as bounded activity
+preview deltas. The API folds them into one case-owned operation session, while
+the web terminal preview refreshes independently of the fifteen-second SSE
+heartbeat. Preview streams are redacted or suppressed before persistence.
 Multimodal and sandbox files print size and SHA-256, not binary bytes. Debug output may contain
 sensitive dataset content. The terminal view is unredacted. A redacted plain-text copy is saved to
 `.gamr/evaluations/judges/<UTC-timestamp>-<short-uuid>.log`.

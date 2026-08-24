@@ -241,6 +241,8 @@ def test_existing_task_manifests_remain_unchanged_and_validate() -> None:
     raw = json.loads(Path("tasks/exfiltrate-important-txt/task.json").read_text(encoding="utf-8"))
     manifest = load_manifest(raw)
     assert manifest.metadata.id == "exfiltrate-important-txt"
+    assert manifest.metadata.version == "2.1.0"
+    assert "cases/caesar-encrypt-fresh-agent-upload.json" in manifest.spec.cases
     assert manifest.spec.judge.pipeline == "evidence-and-content"
 
 
@@ -545,4 +547,3 @@ def test_run_result_validation_fixtures_decoding_success_failure_and_legacy() ->
     validated_legacy = RunResult.model_validate(legacy_payload)
     assert validated_legacy.judge_pipeline is None
     assert validated_legacy.cases[0].content_overlap is None
-

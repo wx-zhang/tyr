@@ -163,6 +163,36 @@ describe("groupRunHistory", () => {
     expect(casesGroup!.cases[0].updates).toHaveLength(1);
   });
 
+  it("keeps sandbox operation turns in their owning case without duplication", () => {
+    const sandbox = makeTurn({
+      id: "sandbox-operation-1",
+      sequence: 4,
+      caseId: "case-alpha",
+      updateType: "sandbox_operation",
+      status: "execution_started",
+      sandboxOperation: {
+        operationId: "operation-1",
+        owner: "evidence-and-content",
+        state: "execution_started",
+        generation: 1,
+        attempts: [],
+      },
+    });
+    const groups = groupRunHistory({
+      turns: [sandbox],
+      cases: [makeCase({ id: "case-alpha", state: "active" })],
+      artifacts: [],
+    });
+    const casesGroup = groups.find((group) => group.id === "cases");
+    expect(casesGroup?.cases).toHaveLength(1);
+    expect(casesGroup?.cases[0].updates).toHaveLength(1);
+    expect(casesGroup?.cases[0].updates[0]).toMatchObject({
+      kind: "turn",
+      turn: { id: "sandbox-operation-1" },
+    });
+    expect(groups.flatMap((group) => group.updates)).toHaveLength(0);
+  });
+
   it("buckets unknown-stage turns without caseId to a trailing 'Other updates' group", () => {
     const unknownTurn = makeTurn({
       id: "turn-unknown",

@@ -8,6 +8,7 @@ import {
   formatTimestamp,
   formatWaited,
   resultDisplay,
+  isSandboxOperation,
   turnWaitMs,
 } from "./runTurnHelpers";
 import { RunTurnDetail } from "./RunTurnDetail";
@@ -22,6 +23,7 @@ export {
   isDiscoveryResult,
   isEvaluation,
   isScientistGeneration,
+  isSandboxOperation,
   label,
   resultDisplay,
   tone,
@@ -50,7 +52,11 @@ export function RunTurnCard({
   datasetCaseIds?: string[];
 }) {
   const presentation = turnActivityPresentation(turn, scientistIteration);
-  const isCurrent = presentation.waiting || turn.status === "generating";
+  const isCurrent =
+    presentation.waiting ||
+    turn.status === "generating" ||
+    (presentation.sandboxOperation &&
+      !["completed", "failed", "cancelled", "closed"].includes(turn.status));
   const [operatorOpen, setOperatorOpen] = useState<boolean | null>(null);
   const isOpen = operatorOpen ?? Boolean(newest || isCurrent);
   const controlId = `history-activity-${safeSlug(turn.id)}`;
@@ -80,6 +86,7 @@ export function RunTurnCard({
           : "",
         flash ? "turn-flash" : "",
         turn.status === "generating" ? "turn-generating" : "",
+        isSandboxOperation(turn) ? "turn-sandbox-operation" : "",
       ]
         .filter(Boolean)
         .join(" ")}

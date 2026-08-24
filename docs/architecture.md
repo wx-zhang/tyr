@@ -28,6 +28,12 @@ The filesystem and scheduler boundaries stay narrow so a demonstrated future dep
 replace either without changing the engine.
 
 The web run history groups persisted updates by phase and case without changing bundle order.
+Sandbox-capable judge invocations are wrapped by the engine's pipeline-neutral
+`ObservedSandbox`. It emits typed, append-only lifecycle deltas with an opaque
+logical operation ID, attempt number, and sandbox generation. The adapter folds
+those deltas by case and operation into one normalized session turn; the API and
+web consume that projection without exposing backend container IDs or raw
+unsanitized streams. Decoder provenance remains the legacy fallback.
 Test-case activity is presented oldest to newest. Case rows expose aggregate completion and the
 precise pending, queued, running, assessing, or terminal lifecycle. Discovery and case-group
 completion follows lifecycle progress rather than the last nested activity status. Collapsed rows

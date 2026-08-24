@@ -8,6 +8,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from .sandbox import SandboxOperationEvent
 from .states import RunState
 
 ActivityId = str
@@ -119,6 +120,7 @@ class RunActivity(BaseModel):
         default=Availability.AVAILABLE, alias="detailAvailability"
     )
     metadata: dict[str, object] = Field(default_factory=dict)
+    sandbox_event: SandboxOperationEvent | None = Field(default=None, alias="sandboxEvent")
 
     @field_validator("occurred_at")
     @classmethod

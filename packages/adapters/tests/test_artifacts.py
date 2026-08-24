@@ -32,6 +32,33 @@ def test_redact_payload_handles_keys_headers_and_configured_values() -> None:
     }
 
 
+def test_redact_payload_bounds_and_sanitizes_sandbox_event() -> None:
+    redacted = redact_payload(
+        {
+            "sandboxEvent": {
+                "operationId": "operation-1",
+                "state": "execution_completed",
+                "generation": 1,
+                "source": {"state": "captured", "value": "open('/home/alice/input')"},
+                "execution": {
+                    "exitCode": 0,
+                    "elapsedSeconds": 0.1,
+                    "stdout": {"state": "captured", "value": "Bearer configured-secret"},
+                    "stderr": {"state": "empty"},
+                },
+            }
+        },
+        ["configured-secret"],
+    )
+
+    event = redacted["sandboxEvent"]
+    assert event["source"]["value"] == "open('[REDACTED_PATH]')"
+    assert event["execution"]["stdout"] == {
+        "state": "captured",
+        "value": "Bearer [REDACTED]",
+    }
+
+
 def test_redaction_keeps_content_overlap_summary_schema_valid(tmp_path: Path) -> None:
     store = FilesystemArtifactStore(tmp_path / ".gamr", secrets=["s"])
     store.write_json(

@@ -22,7 +22,7 @@ Use local development auth only in the scaffold. Never expose Tyr/model credenti
 live evaluation-reference metadata and content for task review. That content
 is read from the task tree and is not a run artifact.
 `routes/experiments.py` queues validated read-only configurations, `routes/runs.py`
-serves redacted run review and SSE events, `routes/run_evidence.py` serves
+serves redacted run review and one-second-polled SSE events, `routes/run_evidence.py` serves
 filtered activity and observed relationship projections, including decoder lifecycle rows linked to
 `result.json#contentOverlap.decoding`; decoder source and streams remain in the redacted provenance
 projection, never activity payloads. The run review route carries rationale, attempt hashes, bounded

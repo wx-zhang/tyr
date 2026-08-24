@@ -4,16 +4,14 @@ import re
 from collections.abc import Iterable
 from typing import Any
 
+from gamr_core.sandbox import sandbox_stream_is_safe, sanitize_sandbox_text
+
 _SECRET_KEY = re.compile(
     r"(?:authorization|api[_-]?key|token|secret|password|cookie|idempotency)", re.I
 )
 _BEARER = re.compile(r"Bearer\s+[^\s,;]+", re.I)
 _HOST_PATH = re.compile(
     r"/(?:tmp|private/tmp|Users|home|var/run/docker|var/folders)(?:[/\\][^\s'\"]*)?",
-    re.I,
-)
-_UNSAFE_STREAM = re.compile(
-    r"Traceback|/tmp/|/private/|/Users/|/home/|/var/run/docker|sandbox[-_]|container[-_]",
     re.I,
 )
 _REDACTED = "[REDACTED]"
@@ -43,6 +41,21 @@ _EXECUTION_ALLOWED_KEYS = frozenset(
     {"exitCode", "elapsedSeconds", "timedOut", "outputLimited", "stdout", "stderr"}
 )
 _STREAM_ALLOWED_KEYS = frozenset({"state", "value"})
+_SANDBOX_EVENT_ALLOWED_KEYS = frozenset(
+    {
+        "operationId",
+        "owner",
+        "state",
+        "generation",
+        "attempt",
+        "programSha256",
+        "source",
+        "execution",
+        "outputCount",
+        "failureCode",
+        "failureDetail",
+    }
+)
 
 
 def _sanitize_text(value: str, secrets: tuple[str, ...], *, paths: bool = False) -> str:
@@ -63,8 +76,8 @@ def _sanitize_stream(value: Any, secrets: tuple[str, ...]) -> dict[str, str]:
     content = value.get("value")
     if not isinstance(content, str) or not content:
         return {"state": "empty"}
-    content = _sanitize_text(content[:_DECODING_STREAM_LIMIT], secrets, paths=True)
-    if _UNSAFE_STREAM.search(content) or "\x00" in content:
+    content = sanitize_sandbox_text(content[:_DECODING_STREAM_LIMIT], secrets)
+    if not sandbox_stream_is_safe(content):
         return {"state": "suppressed"}
     return {"state": "captured", "value": content}
 
@@ -75,7 +88,7 @@ def _sanitize_attempt(attempt: Any, secrets: tuple[str, ...]) -> dict[str, Any]:
     sanitized = {key: attempt[key] for key in _ATTEMPT_ALLOWED_KEYS if key in attempt}
     source = sanitized.get("source")
     if isinstance(source, str):
-        sanitized["source"] = _sanitize_text(source[:_DECODING_SOURCE_LIMIT], secrets, paths=True)
+        sanitized["source"] = sanitize_sandbox_text(source[:_DECODING_SOURCE_LIMIT], secrets)
     execution = sanitized.get("execution")
     if isinstance(execution, dict):
         execution = {key: execution[key] for key in _EXECUTION_ALLOWED_KEYS if key in execution}
@@ -116,6 +129,30 @@ def _bound_decoding_provenance(
     return sanitized
 
 
+def _bound_sandbox_event(value: Any, secrets: tuple[str, ...]) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    sanitized = {key: value[key] for key in _SANDBOX_EVENT_ALLOWED_KEYS if key in value}
+    source = sanitized.get("source")
+    if isinstance(source, dict):
+        source = dict(source)
+        if source.get("state") == "captured" and isinstance(source.get("value"), str):
+            source["value"] = sanitize_sandbox_text(
+                source["value"][:_DECODING_SOURCE_LIMIT], secrets
+            )
+        sanitized["source"] = source
+    execution = sanitized.get("execution")
+    if isinstance(execution, dict):
+        execution = {key: execution[key] for key in _EXECUTION_ALLOWED_KEYS if key in execution}
+        execution["stdout"] = _sanitize_stream(execution.get("stdout"), secrets)
+        execution["stderr"] = _sanitize_stream(execution.get("stderr"), secrets)
+        sanitized["execution"] = execution
+    detail = sanitized.get("failureDetail")
+    if isinstance(detail, str):
+        sanitized["failureDetail"] = _sanitize_text(detail[:300], secrets, paths=True)
+    return sanitized
+
+
 def _bound_content_overlap(value: dict[str, Any], secrets: tuple[str, ...]) -> dict[str, Any]:
     for key in ("contentOverlap", "content_overlap"):
         overlap = value.get(key)
@@ -128,6 +165,9 @@ def _bound_content_overlap(value: dict[str, Any], secrets: tuple[str, ...]) -> d
         decoding = overlap.get("decoding")
         if isinstance(decoding, dict):
             overlap["decoding"] = _bound_decoding_provenance(decoding, secrets)
+    sandbox_event = value.get("sandboxEvent")
+    if isinstance(sandbox_event, dict):
+        value["sandboxEvent"] = _bound_sandbox_event(sandbox_event, secrets)
     return value
 
 

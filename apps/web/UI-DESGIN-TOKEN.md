@@ -335,6 +335,14 @@ Finding severity uses label plus token: Critical/High use `--danger`, Medium use
 - Autoscroll only when the reader is already near the bottom. Never pull a reviewer away from earlier evidence.
 - Large transcripts and SSE backlogs must be bounded or virtualized as required by the scaffold. Truncation states link to the complete permitted artifact and state what was omitted.
 
+Sandbox operation previews use one bordered terminal-style session per case-owned
+operation. Show the exact textual lifecycle state, opaque operation ID, logical
+generation, and bounded attempt disclosures. Python source uses Prism tokens with
+the semantic accent, success, warning, danger, and muted roles already defined
+above; stdout and stderr use monospace blocks and explicit safe-state labels.
+Never render backend sandbox/container IDs. Active previews use a restrained
+polite status announcement and become static under `prefers-reduced-motion`.
+
 ### Approvals
 
 - Pending approvals are prominent in the run navigation and page heading, including a text count.

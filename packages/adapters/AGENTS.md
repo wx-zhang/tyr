@@ -22,7 +22,10 @@ via the shared engine preparation service without writing an artifact copy;
 `collector_html.py` parses the admin HTML without retaining credentials or headers.
 `artifacts/redaction.py` owns the case-aware decoding provenance sanitizer, preserving route rationale,
 redacted source, hashes, bounded execution states, failure stage, and lineage while suppressing unsafe
-streams and transient identities. `artifacts/query.py` owns bounded in-memory activity and relationship projections derived from bundles.
+streams and transient identities. It applies the same bounded preview rules to
+generic sandbox events. `artifacts/evidence.py` folds interleaved sandbox event
+deltas into one case-scoped operation turn. `artifacts/query.py` owns bounded
+in-memory activity and relationship projections derived from bundles.
 `config.py` loads and validates configuration settings including `GAMR_MAX_CONCURRENT_DECODERS`.
 `sandbox/` owns attachment snapshots, output collection (`collect_output.py`),
 the disabled and explicitly unsafe host backends, the fixed Docker CLI backend,

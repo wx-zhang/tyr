@@ -102,6 +102,9 @@ def browser_safe_activity(
         "evidenceIds": browser_safe_value(value.get("evidenceRefs", []), secrets),
         "detailAvailability": browser_safe_value(value.get("detailAvailability"), secrets),
     }
+    sandbox_event = value.get("sandboxEvent")
+    if sandbox_event is not None:
+        safe["sandboxEvent"] = browser_safe_value(sandbox_event, secrets)
     related_case_ids = value.get("relatedCaseIds")
     if isinstance(related_case_ids, list) and related_case_ids:
         safe["relatedCaseIds"] = browser_safe_value(related_case_ids, secrets)

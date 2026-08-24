@@ -15,6 +15,7 @@ from gamr_core import (
     EvaluationPlan,
     EvaluationReference,
     ObjectiveStatus,
+    SandboxOperationEvent,
     Scenario,
     SecurityVerdict,
 )
@@ -543,6 +544,33 @@ async def test_decoder_lifecycle_activities_are_ordered_and_bounded() -> None:
         for name, payload in activities
         if name.startswith("decoder.")
     )
+    decoder_operation_ids = {
+        payload.get("operationId")
+        for name, payload in activities
+        if name.startswith("decoder.")
+    }
+    assert len(decoder_operation_ids) == 1
+    assert next(iter(decoder_operation_ids))
+    sandbox_events = [
+        SandboxOperationEvent.model_validate(event)
+        for name, payload in activities
+        if name == "sandbox.operation"
+        for event in [payload.get("sandboxEvent")]
+        if isinstance(event, dict)
+    ]
+    assert [event.state.value for event in sandbox_events] == [
+        "requested",
+        "ready",
+        "execution_started",
+        "execution_completed",
+        "collection_started",
+        "collection_completed",
+        "closing",
+        "closed",
+        "completed",
+    ]
+    assert all(event.owner == "evidence-and-content" for event in sandbox_events)
+    assert all("sandbox-1" not in event.model_dump_json() for event in sandbox_events)
 
 
 @pytest.mark.asyncio

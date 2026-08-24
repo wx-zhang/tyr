@@ -37,6 +37,14 @@ from .experiments import (
     RunSource,
     TaskReference,
 )
+from .sandbox import (
+    SandboxExecutionPreview,
+    SandboxOperationAttempt,
+    SandboxOperationEvent,
+    SandboxOperationPreview,
+    SandboxOperationState,
+    SandboxPreviewText,
+)
 from .states import (
     AssessmentReasonCode,
     AssessmentStatus,
@@ -122,6 +130,12 @@ __all__ = [
     "ParticipantId",
     "EvidenceId",
     "ResultSummary",
+    "SandboxExecutionPreview",
+    "SandboxOperationAttempt",
+    "SandboxOperationEvent",
+    "SandboxOperationPreview",
+    "SandboxOperationState",
+    "SandboxPreviewText",
     "RunState",
     "PromptBundle",
     "Scenario",

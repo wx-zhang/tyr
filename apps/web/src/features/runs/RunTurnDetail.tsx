@@ -8,6 +8,7 @@ import {
 } from "./ScientistHistoryUsed";
 import { ScientistScenarioCard } from "./ScientistScenarioCard";
 import { DecodingProvenance } from "./DecodingProvenance";
+import { SandboxOperationSession } from "./SandboxOperationSession";
 import {
   contentOverlapLabel,
   discoveryFields,
@@ -53,6 +54,14 @@ export function RunTurnDetail({
     ? discoveryFields(turn.agentMessage ?? "")
     : [];
   const contentOverlap = turn.contentOverlap;
+
+  if (presentation.sandboxOperation && turn.sandboxOperation) {
+    return (
+      <div className="turn-messages turn-messages-single">
+        <SandboxOperationSession preview={turn.sandboxOperation} />
+      </div>
+    );
+  }
 
   if (presentation.evaluation) {
     return (
@@ -166,7 +175,10 @@ export function RunTurnDetail({
                       ))}
                     </ul>
                   ) : null}
-                  <DecodingProvenance decoding={contentOverlap.decoding} />
+                  <DecodingProvenance
+                    decoding={contentOverlap.decoding}
+                    hideAttempts={Boolean(turn.sandboxOperation)}
+                  />
                 </div>
               ) : null}
             </section>

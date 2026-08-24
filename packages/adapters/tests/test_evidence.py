@@ -9,7 +9,16 @@ from gamr_adapters.artifacts.evidence import (
     normalize_turns,
 )
 from gamr_adapters.artifacts.filesystem import FilesystemArtifactStore
-from gamr_core import ActivityType, Availability, EvidenceType, RunActivity
+from gamr_core import (
+    ActivityType,
+    Availability,
+    EvidenceType,
+    RunActivity,
+    SandboxExecutionPreview,
+    SandboxOperationEvent,
+    SandboxOperationState,
+    SandboxPreviewText,
+)
 
 
 def activity(sequence: int = 1) -> RunActivity:
@@ -141,6 +150,98 @@ def test_turn_normalization_groups_messages_and_preserves_partial_turns(tmp_path
     assert turns[1].status == "waiting_for_tyr"
     assert turns[1].occurred_at == datetime(2026, 8, 8, 10, 2, 0, tzinfo=UTC)
     assert turns[1].replied_at is None
+
+
+def test_turn_normalization_folds_sandbox_events_into_one_operation(tmp_path: Path) -> None:
+    bundle = tmp_path / "sandbox-turns"
+    bundle.mkdir()
+    execution = SandboxExecutionPreview(
+        exitCode=0,
+        elapsedSeconds=0.2,
+        stdout=SandboxPreviewText(state="captured", value="encrypted"),
+        stderr=SandboxPreviewText(state="empty"),
+    )
+    events = [
+        SandboxOperationEvent(
+            operationId="op-1",
+            owner="evidence-and-content",
+            state=SandboxOperationState.REQUESTED,
+            generation=1,
+        ),
+        SandboxOperationEvent(
+            operationId="op-1",
+            owner="evidence-and-content",
+            state=SandboxOperationState.EXECUTION_STARTED,
+            generation=1,
+            attempt=1,
+            programSha256="a" * 64,
+        ),
+        SandboxOperationEvent(
+            operationId="op-1",
+            owner="evidence-and-content",
+            state=SandboxOperationState.FAILED,
+            generation=1,
+            attempt=1,
+            failureCode="timeout",
+        ),
+        SandboxOperationEvent(
+            operationId="op-1",
+            owner="evidence-and-content",
+            state=SandboxOperationState.EXECUTION_STARTED,
+            generation=2,
+            attempt=2,
+            programSha256="b" * 64,
+        ),
+        SandboxOperationEvent(
+            operationId="op-1",
+            owner="evidence-and-content",
+            state=SandboxOperationState.EXECUTION_COMPLETED,
+            generation=2,
+            attempt=2,
+            programSha256="b" * 64,
+            execution=execution,
+        ),
+        SandboxOperationEvent(
+            operationId="op-1",
+            owner="evidence-and-content",
+            state=SandboxOperationState.COMPLETED,
+            generation=2,
+            attempt=2,
+        ),
+    ]
+    records = []
+    for sequence, event in enumerate(events, 1):
+        records.append(
+            RunActivity(
+                id=f"activity-{sequence}",
+                runId="run-1",
+                sequence=sequence,
+                occurredAt=datetime(2026, 8, 8, 10, 0, sequence, tzinfo=UTC),
+                activityType=ActivityType.EXECUTION,
+                status=event.state.value,
+                phase="case",
+                caseId="case-1",
+                evidenceType=EvidenceType.EVENT,
+                summary=f"Sandbox {event.state.value}",
+                operationId="op-1",
+                sandboxEvent=event,
+            ).model_dump(by_alias=True, mode="json")
+        )
+    (bundle / "activity.jsonl").write_text(
+        "".join(json.dumps(record) + "\n" for record in records), encoding="utf-8"
+    )
+
+    turns = normalize_turns(bundle, run_id="run-1")
+
+    sandbox_turns = [turn for turn in turns if turn.update_type == "sandbox_operation"]
+    assert len(sandbox_turns) == 1
+    operation = sandbox_turns[0].sandbox_operation
+    assert operation is not None
+    assert operation.operation_id == "op-1"
+    assert operation.owner == "evidence-and-content"
+    assert operation.state is SandboxOperationState.COMPLETED
+    assert [attempt.state for attempt in operation.attempts] == ["failed", "completed"]
+    assert sandbox_turns[0].case_id == "case-1"
 
 
 def test_turn_normalization_uses_activity_times_when_transcript_lacks_timestamps(

@@ -507,6 +507,7 @@ export interface components {
             /** Relatedcaseids */
             relatedCaseIds?: string[];
             detailAvailability: components["schemas"]["Availability"];
+            sandboxEvent?: components["schemas"]["SandboxOperationEvent"] | null;
         };
         /** ActivityPageResponse */
         ActivityPageResponse: {
@@ -1017,6 +1018,7 @@ export interface components {
             historyCaseIds?: string[];
             /** Historycaseorigins */
             historyCaseOrigins?: string[];
+            sandboxOperation?: components["schemas"]["SandboxOperationPreview"] | null;
         };
         /** RunVisualization */
         RunVisualization: {
@@ -1062,6 +1064,101 @@ export interface components {
             currentCaseIds?: string[];
             /** Executionmode */
             executionMode: string;
+        };
+        /** SandboxExecutionPreview */
+        SandboxExecutionPreview: {
+            /** Exitcode */
+            exitCode?: number | null;
+            /** Elapsedseconds */
+            elapsedSeconds: number;
+            /**
+             * Timedout
+             * @default false
+             */
+            timedOut: boolean;
+            /**
+             * Outputlimited
+             * @default false
+             */
+            outputLimited: boolean;
+            stdout: components["schemas"]["SandboxPreviewText"];
+            stderr: components["schemas"]["SandboxPreviewText"];
+        };
+        /** SandboxOperationAttempt */
+        SandboxOperationAttempt: {
+            /** Attempt */
+            attempt: number;
+            /** Generation */
+            generation: number;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "running" | "completed" | "failed" | "cancelled";
+            /** Programsha256 */
+            programSha256?: string | null;
+            source?: components["schemas"]["SandboxPreviewText"] | null;
+            execution?: components["schemas"]["SandboxExecutionPreview"] | null;
+            /** Outputcount */
+            outputCount?: number | null;
+            /** Failurecode */
+            failureCode?: string | null;
+        };
+        /** SandboxOperationEvent */
+        SandboxOperationEvent: {
+            /** Operationid */
+            operationId: string;
+            /**
+             * Owner
+             * @default judge
+             */
+            owner: string;
+            state: components["schemas"]["SandboxOperationState"];
+            /** Generation */
+            generation: number;
+            /** Attempt */
+            attempt?: number | null;
+            /** Programsha256 */
+            programSha256?: string | null;
+            source?: components["schemas"]["SandboxPreviewText"] | null;
+            execution?: components["schemas"]["SandboxExecutionPreview"] | null;
+            /** Outputcount */
+            outputCount?: number | null;
+            /** Failurecode */
+            failureCode?: string | null;
+            /** Failuredetail */
+            failureDetail?: string | null;
+        };
+        /** SandboxOperationPreview */
+        SandboxOperationPreview: {
+            /** Operationid */
+            operationId: string;
+            /** Owner */
+            owner: string;
+            state: components["schemas"]["SandboxOperationState"];
+            /** Generation */
+            generation: number;
+            /** Attempts */
+            attempts?: components["schemas"]["SandboxOperationAttempt"][];
+            /** Startedat */
+            startedAt?: string | null;
+            /** Updatedat */
+            updatedAt?: string | null;
+        };
+        /**
+         * SandboxOperationState
+         * @enum {string}
+         */
+        SandboxOperationState: "requested" | "ready" | "execution_started" | "execution_completed" | "collection_started" | "collection_completed" | "closing" | "closed" | "completed" | "failed" | "cancelled";
+        /** SandboxPreviewText */
+        SandboxPreviewText: {
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "captured" | "empty" | "redacted" | "suppressed" | "unavailable";
+            /** Value */
+            value?: string | null;
         };
         /** ValidationError */
         ValidationError: {

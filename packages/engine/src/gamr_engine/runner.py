@@ -32,6 +32,7 @@ from gamr_core import (
     RunRecord,
     RunResult,
     RunState,
+    SandboxOperationEvent,
     Scenario,
     SecurityVerdict,
     TaskManifest,
@@ -1097,6 +1098,18 @@ class ExperimentRunner:
                 fields=payload.get("fields"),
                 metadata_extra=payload.get("metadata"),
                 evidence_refs=payload.get("evidenceRefs", ()),
+                operation_id=(
+                    payload.get("operationId")
+                    if isinstance(payload.get("operationId"), str)
+                    else None
+                ),
+                sandbox_event=(
+                    SandboxOperationEvent.model_validate(payload["sandboxEvent"])
+                    if isinstance(payload.get("sandboxEvent"), dict)
+                    else payload.get("sandboxEvent")
+                    if isinstance(payload.get("sandboxEvent"), SandboxOperationEvent)
+                    else None
+                ),
             ),
             run_id=run_id,
             case_id=case_id,
@@ -1766,6 +1779,8 @@ class ExperimentRunner:
         related_case_ids: tuple[str, ...] = (),
         metadata_extra: dict[str, object] | None = None,
         evidence_refs: tuple[str, ...] | list[str] = (),
+        operation_id: str | None = None,
+        sandbox_event: SandboxOperationEvent | None = None,
     ) -> None:
         sink = self._activity_sink
         if sink is not None:
@@ -1807,6 +1822,8 @@ class ExperimentRunner:
                     relatedCaseIds=list(related_case_ids),
                     evidenceRefs=list(evidence_refs),
                     metadata=metadata,
+                    operationId=operation_id,
+                    sandboxEvent=sandbox_event,
                 )
                 try:
                     activity = RunActivity(
@@ -1861,6 +1878,8 @@ class ExperimentRunner:
             return (
                 ActivityType.ERROR if event_type.endswith(".failed") else ActivityType.TYR_OPERATION
             )
+        if event_type.startswith("sandbox."):
+            return ActivityType.EXECUTION
         if event_type.startswith("turn."):
             return ActivityType.EXECUTION
         if event_type.endswith(".failed") or event_type.endswith(".error"):

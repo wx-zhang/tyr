@@ -44,6 +44,10 @@ Evaluation updates supply the result badge until visualization catches up. Scien
 cases belong only to their iteration group and never contribute to base test-case progress.
 `features/runs/runHistoryPresentation.ts` derives redacted summaries, and
 `RunTurnCard.tsx` plus `RunTurnDetail.tsx` render the activity disclosure and bounded evidence.
+`SandboxOperationSession.tsx` renders one bounded Prism-highlighted terminal preview per
+case-owned sandbox operation, including active lifecycle status, attempts, generations, and
+safe stream states. It is the postmortem surface for new runs; legacy decoding provenance
+remains the fallback.
 Evaluation details show judge status, sensitive content comparison, checked files, and missing evidence when the API supplies them.
 `features/runs/DecodingProvenance.tsx` renders structured trajectory decoding provenance (status,
 route rationale, redacted source, attempt hashes, bounded execution result states, and derived files)
@@ -56,7 +60,7 @@ without receiving collector credentials.
 Run-evidence behavior tests are split across `RunPage.test.tsx`,
 `RunPageScientist.test.tsx`, `RunPageUpdates.test.tsx`, `RunPageCancel.test.tsx`,
 `RunPageNetwork.test.tsx`, `RunPageSettings.test.tsx`, `RunHistory.test.tsx`,
-`RunHistoryInteraction.test.tsx`, `RunHistoryActivity.test.tsx`, `DecodingProvenance.test.tsx`, and `useRunEvents.test.ts`. Run
+`RunHistoryInteraction.test.tsx`, `RunHistoryActivity.test.tsx`, `SandboxOperationSession.test.tsx`, `DecodingProvenance.test.tsx`, and `useRunEvents.test.ts`. Run
 `pnpm --dir apps/web test -- --run` for the complete deterministic web suite and
 regenerate `src/api/generated.ts` with
 `pnpm --dir apps/web generate:api`.

@@ -303,3 +303,40 @@ def test_activity_rejects_oversized_page_and_summary_reveal_is_explicit(
     download = historical_client.get(f"/api/v1/runs/{RUN_ID}/evidence/evidence-1/download")
     assert download.status_code == 200
     assert "/" not in download.headers["content-disposition"].split('filename="', 1)[-1].rstrip('"')
+
+
+def test_activity_and_sse_preserve_typed_sandbox_event(historical_client: TestClient) -> None:
+    settings = app.dependency_overrides[get_settings]()
+    root = Path(settings.artifact_root) / "runs" / RUN_ID
+    records = [
+        {
+            "id": "sandbox-activity",
+            "runId": RUN_ID,
+            "sequence": 1,
+            "occurredAt": "2026-08-08T10:01:00Z",
+            "activityType": "execution",
+            "status": "execution_started",
+            "phase": "case",
+            "caseId": "case-alpha",
+            "operationId": "operation-1",
+            "summary": "Sandbox execution started",
+            "evidenceType": "event",
+            "detailAvailability": "available",
+            "sandboxEvent": {
+                "operationId": "operation-1",
+                "owner": "evidence-and-content",
+                "state": "execution_started",
+                "generation": 1,
+                "attempt": 1,
+                "programSha256": "a" * 64,
+                "source": {"state": "captured", "value": "print('ok')"},
+            },
+        }
+    ]
+    root.joinpath("activity.jsonl").write_text(
+        "".join(json.dumps(record) + "\n" for record in records), encoding="utf-8"
+    )
+
+    activity = historical_client.get(f"/api/v1/runs/{RUN_ID}/activity").json()
+    assert activity["items"][0]["sandboxEvent"]["state"] == "execution_started"
+    assert activity["items"][0]["sandboxEvent"]["operationId"] == "operation-1"

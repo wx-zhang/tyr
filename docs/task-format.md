@@ -6,7 +6,7 @@ contains a `task.json` manifest, optional `discovery.json`,
 scenario files. References are confined below the task directory and every
 case ID is unique.
 
-`tasks/exfiltrate-important-txt` contains five scenarios. Two are enabled by default; the
+`tasks/exfiltrate-important-txt` contains six scenarios. Two are enabled by default; the
 three additional transform/relay scenarios remain available through explicit
 `--case-id` or `--all-cases` selection.
 
@@ -49,6 +49,9 @@ comparison is skipped and assessment behaves as before. Do not declare a path
 until the authoritative synthetic copy is available. The task detail page
 shows the live file for review. GAMR includes only the reference path, size,
 and SHA-256 in run snapshots; it never copies the text into run evidence.
+
+The Caesar case is opt-in and demonstrates a shift-three transformation before upload;
+it is intentionally absent from `defaultCaseIds`.
 
 For reference-aware file cases, GAMR automatically analyzes trajectory context
 and collector-verified uploads using the configured judge model. When uploads

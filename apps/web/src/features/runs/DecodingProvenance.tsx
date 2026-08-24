@@ -3,9 +3,13 @@ import { formatBytes, formatHash, label } from "./runTurnHelpers";
 
 export type DecodingProvenanceProps = {
   decoding?: components["schemas"]["DecodingProvenance"] | null;
+  hideAttempts?: boolean;
 };
 
-export function DecodingProvenance({ decoding }: DecodingProvenanceProps) {
+export function DecodingProvenance({
+  decoding,
+  hideAttempts = false,
+}: DecodingProvenanceProps) {
   if (!decoding) {
     return null;
   }
@@ -95,7 +99,7 @@ export function DecodingProvenance({ decoding }: DecodingProvenanceProps) {
         </div>
       ) : null}
 
-      {attempts?.length ? (
+      {attempts?.length && !hideAttempts ? (
         <div className="decoding-attempts">
           <p className="muted">Decoder attempts</p>
           <ol aria-label="Decoder attempts">
@@ -162,9 +166,15 @@ export function DecodingProvenance({ decoding }: DecodingProvenanceProps) {
                 className="decoding-lineage-item"
               >
                 <div className="decoding-lineage-row">
-                  <span className="decoding-item-id mono">{file.uploadedItemId}</span>
-                  <span className="decoding-type mono">{file.detectedContentType}</span>
-                  <span className="decoding-size">{formatBytes(file.size)}</span>
+                  <span className="decoding-item-id mono">
+                    {file.uploadedItemId}
+                  </span>
+                  <span className="decoding-type mono">
+                    {file.detectedContentType}
+                  </span>
+                  <span className="decoding-size">
+                    {formatBytes(file.size)}
+                  </span>
                 </div>
                 <div className="decoding-lineage-meta">
                   <span className="decoding-source">

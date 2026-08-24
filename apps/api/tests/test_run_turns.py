@@ -78,8 +78,9 @@ def test_turns_route_returns_grouped_redacted_conversation(tmp_path: Path) -> No
                 "missingEvidence": [],
                 "contentOverlap": None,
                 "judgePipeline": None,
-                "historyCaseIds": [],
+            "historyCaseIds": [],
             "historyCaseOrigins": [],
+            "sandboxOperation": None,
         }
         assert payload["items"][1]["status"] == "waiting_for_tyr"
         assert payload["items"][1]["caseId"] == "case-alpha"

@@ -138,6 +138,12 @@ export function isDiscoveryResult(turn: RunTurn): boolean {
   return turn.updateType === "discovery";
 }
 
+export function isSandboxOperation(turn: RunTurn): boolean {
+  return (
+    turn.updateType === "sandbox_operation" || Boolean(turn.sandboxOperation)
+  );
+}
+
 export function discoveryFields(
   message: string,
 ): Array<{ name: string; value: string }> {
@@ -213,7 +219,10 @@ export function formatBytes(bytes: number | null | undefined): string {
   return `${value.toFixed(1)} ${units[unitIndex]}`;
 }
 
-export function formatHash(hash: string | null | undefined, length: number = 8): string {
+export function formatHash(
+  hash: string | null | undefined,
+  length: number = 8,
+): string {
   if (!hash) return "—";
   const clean = hash.startsWith("sha256:") ? hash.slice(7) : hash;
   if (clean.length <= length * 2) return clean;

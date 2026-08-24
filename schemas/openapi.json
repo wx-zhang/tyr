@@ -1700,6 +1700,16 @@
           },
           "detailAvailability": {
             "$ref": "#/components/schemas/Availability"
+          },
+          "sandboxEvent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SandboxOperationEvent"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -3310,6 +3320,16 @@
             },
             "type": "array",
             "title": "Historycaseorigins"
+          },
+          "sandboxOperation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SandboxOperationPreview"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -3469,6 +3489,373 @@
           "executionMode"
         ],
         "title": "RunVisualizationSummary"
+      },
+      "SandboxExecutionPreview": {
+        "properties": {
+          "exitCode": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exitcode"
+          },
+          "elapsedSeconds": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Elapsedseconds"
+          },
+          "timedOut": {
+            "type": "boolean",
+            "title": "Timedout",
+            "default": false
+          },
+          "outputLimited": {
+            "type": "boolean",
+            "title": "Outputlimited",
+            "default": false
+          },
+          "stdout": {
+            "$ref": "#/components/schemas/SandboxPreviewText"
+          },
+          "stderr": {
+            "$ref": "#/components/schemas/SandboxPreviewText"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "elapsedSeconds",
+          "stdout",
+          "stderr"
+        ],
+        "title": "SandboxExecutionPreview"
+      },
+      "SandboxOperationAttempt": {
+        "properties": {
+          "attempt": {
+            "type": "integer",
+            "maximum": 3.0,
+            "minimum": 1.0,
+            "title": "Attempt"
+          },
+          "generation": {
+            "type": "integer",
+            "maximum": 16.0,
+            "minimum": 1.0,
+            "title": "Generation"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "running",
+              "completed",
+              "failed",
+              "cancelled"
+            ],
+            "title": "State"
+          },
+          "programSha256": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Programsha256"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SandboxPreviewText"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "execution": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SandboxExecutionPreview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "outputCount": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 256.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outputcount"
+          },
+          "failureCode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failurecode"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "attempt",
+          "generation",
+          "state"
+        ],
+        "title": "SandboxOperationAttempt"
+      },
+      "SandboxOperationEvent": {
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Operationid"
+          },
+          "owner": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Owner",
+            "default": "judge"
+          },
+          "state": {
+            "$ref": "#/components/schemas/SandboxOperationState"
+          },
+          "generation": {
+            "type": "integer",
+            "maximum": 16.0,
+            "minimum": 1.0,
+            "title": "Generation"
+          },
+          "attempt": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 3.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt"
+          },
+          "programSha256": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Programsha256"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SandboxPreviewText"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "execution": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SandboxExecutionPreview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "outputCount": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 256.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outputcount"
+          },
+          "failureCode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failurecode"
+          },
+          "failureDetail": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failuredetail"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "operationId",
+          "state",
+          "generation"
+        ],
+        "title": "SandboxOperationEvent"
+      },
+      "SandboxOperationPreview": {
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Operationid"
+          },
+          "owner": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Owner"
+          },
+          "state": {
+            "$ref": "#/components/schemas/SandboxOperationState"
+          },
+          "generation": {
+            "type": "integer",
+            "maximum": 16.0,
+            "minimum": 1.0,
+            "title": "Generation"
+          },
+          "attempts": {
+            "items": {
+              "$ref": "#/components/schemas/SandboxOperationAttempt"
+            },
+            "type": "array",
+            "maxItems": 3,
+            "title": "Attempts"
+          },
+          "startedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Startedat"
+          },
+          "updatedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updatedat"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "operationId",
+          "owner",
+          "state",
+          "generation"
+        ],
+        "title": "SandboxOperationPreview"
+      },
+      "SandboxOperationState": {
+        "type": "string",
+        "enum": [
+          "requested",
+          "ready",
+          "execution_started",
+          "execution_completed",
+          "collection_started",
+          "collection_completed",
+          "closing",
+          "closed",
+          "completed",
+          "failed",
+          "cancelled"
+        ],
+        "title": "SandboxOperationState"
+      },
+      "SandboxPreviewText": {
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "captured",
+              "empty",
+              "redacted",
+              "suppressed",
+              "unavailable"
+            ],
+            "title": "State"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 65536
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "state"
+        ],
+        "title": "SandboxPreviewText"
       },
       "ValidationError": {
         "properties": {

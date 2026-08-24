@@ -8,10 +8,12 @@ from gamr_core import (
     CheckedContentFile,
     ContentOverlapResult,
     ContentOverlapStatus,
+    SandboxOperationEvent,
 )
 from gamr_engine.content_source import VerifiedContentSnapshot
 from gamr_engine.decoder.agent import DecoderAgent
 from gamr_engine.ports.models import ChatModelGateway
+from gamr_engine.sandbox_preview import ObservedSandbox
 
 from ..contracts import JudgeRequest, JudgeRuntime
 
@@ -84,6 +86,7 @@ async def decode_trajectory_content(state: PipelineState) -> dict[str, Any]:
         }
 
     chat_model: ChatModelGateway = judge_model  # type: ignore[assignment]
+    sandbox_operation_id: str | None = None
 
     def emit_decoder_activity(name: str, payload: dict[str, object]) -> None:
         if runtime.activity_sink is None:
@@ -94,6 +97,27 @@ async def decode_trajectory_content(state: PipelineState) -> dict[str, Any]:
                 **payload,
                 "phase": "case",
                 "caseId": runtime.case_id,
+                "operationId": sandbox_operation_id,
+                "evidenceRefs": ["result.json#contentOverlap.decoding"],
+            },
+        )
+
+    def emit_sandbox_event(event: object) -> None:
+        if runtime.activity_sink is None:
+            return
+        sandbox_event = (
+            event.model_dump(by_alias=True, mode="json")
+            if isinstance(event, SandboxOperationEvent)
+            else event
+        )
+        runtime.activity_sink(
+            "sandbox.operation",
+            {
+                "phase": "case",
+                "caseId": runtime.case_id,
+                "detail": f"Sandbox {getattr(event, 'state', 'updated')}",
+                "operationId": getattr(event, "operation_id", None),
+                "sandboxEvent": sandbox_event,
                 "evidenceRefs": ["result.json#contentOverlap.decoding"],
             },
         )
@@ -110,9 +134,16 @@ async def decode_trajectory_content(state: PipelineState) -> dict[str, Any]:
     if request.evaluation_plan is not None:
         eval_criteria = request.evaluation_plan.prompt
 
+    observed_sandbox = ObservedSandbox(
+        sandbox,
+        owner="evidence-and-content",
+        event_sink=emit_sandbox_event,
+        sensitive_values=[snapshot.content for snapshot in snapshots],
+    )
+    sandbox_operation_id = observed_sandbox.operation_id
     agent = DecoderAgent(
         model=chat_model,
-        sandbox=sandbox,
+        sandbox=observed_sandbox,
         snapshots=snapshots,
         task_context=request.scenario.metadata.title,
         case_fields=case_fields,
@@ -124,11 +155,19 @@ async def decode_trajectory_content(state: PipelineState) -> dict[str, Any]:
     try:
         loop_result = await agent.run()
     except asyncio.CancelledError:
+        if observed_sandbox.has_events:
+            observed_sandbox.cancel()
         emit_decoder_activity(
             "decoder.failed",
             {"detail": "Decoder cancelled", "metadata": {"failureStage": "cleanup"}},
         )
         raise
+
+    if observed_sandbox.has_events:
+        if loop_result.action == "failed":
+            observed_sandbox.fail()
+        else:
+            observed_sandbox.complete()
 
     if loop_result.action == "failed":
         failure_code_str = (

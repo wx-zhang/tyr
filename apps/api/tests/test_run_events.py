@@ -1,6 +1,7 @@
 import json
 from collections.abc import Iterator
 from contextlib import contextmanager
+from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -8,7 +9,15 @@ from gamr_adapters.config import Settings
 from gamr_api.dependencies import get_registry, get_settings
 from gamr_api.main import app
 from gamr_api.registry import InMemoryRegistry, JsonRegistry, RunRecord
-from gamr_core import RunState
+from gamr_core import (
+    ActivityType,
+    EvidenceType,
+    RunActivity,
+    RunState,
+    SandboxOperationEvent,
+    SandboxOperationState,
+    SandboxPreviewText,
+)
 
 
 @contextmanager
@@ -116,6 +125,39 @@ def test_run_activity_events_are_named_ordered_resumable_and_heartbeat() -> None
         resumed = client.get(f"/api/v1/runs/{run.id}/events", headers={"Last-Event-ID": "1"})
         assert "id: 1" not in resumed.text
         assert "id: 2" in resumed.text
+
+
+def test_sse_delivers_typed_sandbox_operation_events() -> None:
+    with registry_client() as (client, registry):
+        run = make_run(registry)
+        activity = RunActivity(
+            id="sandbox-activity",
+            runId=run.id,
+            sequence=1,
+            occurredAt=datetime(2026, 8, 8, 10, 0, tzinfo=UTC),
+            activityType=ActivityType.EXECUTION,
+            status="execution_started",
+            phase="case",
+            caseId="case-alpha",
+            operationId="operation-1",
+            evidenceType=EvidenceType.EVENT,
+            summary="Sandbox execution started",
+            sandboxEvent=SandboxOperationEvent(
+                operationId="operation-1",
+                owner="evidence-and-content",
+                state=SandboxOperationState.EXECUTION_STARTED,
+                generation=1,
+                attempt=1,
+                source=SandboxPreviewText(state="captured", value="print('ok')"),
+            ),
+        )
+        registry.activities[run.id] = [activity]
+
+        response = client.get(f"/api/v1/runs/{run.id}/events")
+
+        assert response.status_code == 200
+        assert '"sandboxEvent"' in response.text
+        assert '"operationId": "operation-1"' in response.text
 
 
 def test_events_require_a_run_authorized_for_the_current_request() -> None:

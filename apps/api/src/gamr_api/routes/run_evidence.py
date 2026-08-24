@@ -32,6 +32,8 @@ from gamr_core import (
     ParticipantKind,
     RunActivity,
     RunState,
+    SandboxOperationEvent,
+    SandboxOperationPreview,
 )
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
@@ -86,6 +88,7 @@ class ActivityItemResponse(BaseModel):
     evidence_ids: list[str] = Field(alias="evidenceIds")
     related_case_ids: list[str] = Field(default_factory=list, alias="relatedCaseIds")
     detail_availability: Availability = Field(alias="detailAvailability")
+    sandbox_event: SandboxOperationEvent | None = Field(default=None, alias="sandboxEvent")
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -170,6 +173,9 @@ class RunTurnResponse(BaseModel):
     judge_pipeline: str | None = Field(default=None, alias="judgePipeline")
     history_case_ids: list[str] = Field(default_factory=list, alias="historyCaseIds")
     history_case_origins: list[str] = Field(default_factory=list, alias="historyCaseOrigins")
+    sandbox_operation: SandboxOperationPreview | None = Field(
+        default=None, alias="sandboxOperation"
+    )
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -681,6 +687,7 @@ def turns(
             judgePipeline=item.judge_pipeline,
             historyCaseIds=list(item.history_case_ids),
             historyCaseOrigins=list(item.history_case_origins),
+            sandboxOperation=item.sandbox_operation,
         )
         for item in page
     ]
