@@ -85,9 +85,15 @@ export function ExpandableMarkdownMessage({
   }
   return (
     <div className="expandable-message">
-      <RenderedMarkdown
-        content={`${content.slice(0, previewCharacters).trimEnd()}…`}
-      />
+      {expanded ? (
+        <div id={contentId} className="long-message-content">
+          <RenderedMarkdown content={content} />
+        </div>
+      ) : (
+        <RenderedMarkdown
+          content={`${content.slice(0, previewCharacters).trimEnd()}…`}
+        />
+      )}
       <button
         type="button"
         className="long-message-toggle"
@@ -97,11 +103,6 @@ export function ExpandableMarkdownMessage({
       >
         {expanded ? "Hide full justification" : expandLabel}
       </button>
-      {expanded ? (
-        <div id={contentId} className="long-message-content">
-          <RenderedMarkdown content={content} />
-        </div>
-      ) : null}
     </div>
   );
 }
