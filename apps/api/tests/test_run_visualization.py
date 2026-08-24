@@ -418,7 +418,7 @@ def test_visualization_includes_discovery_result_with_peer_paths(tmp_path: Path)
         app.dependency_overrides.clear()
 
 
-def test_visualization_redacts_secrets_in_discovery_result(tmp_path: Path) -> None:
+def test_visualization_preserves_secrets_in_discovery_result(tmp_path: Path) -> None:
     artifact_root = tmp_path / "artifacts"
     bundle = artifact_root / "runs" / "run-discovery-secret"
     bundle.mkdir(parents=True)
@@ -468,7 +468,7 @@ def test_visualization_redacts_secrets_in_discovery_result(tmp_path: Path) -> No
         fields = {
             item["name"]: item["value"] for item in response.json()["discoveryResult"]["fields"]
         }
-        assert fields["path"] == "/home/alice/[REDACTED].txt"
+        assert fields["path"] == "/home/alice/top-secret.txt"
         assert fields["workspace"] == "peer"
     finally:
         app.dependency_overrides.clear()

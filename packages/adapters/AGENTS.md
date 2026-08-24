@@ -12,7 +12,7 @@ External I/O is async where practical. Redact credentials before persistence. Ty
 
 `tyr/` owns MCP transport and settling, `models/` owns OpenAI-compatible
 providers, `tasks/` owns confined JSON loading, and `artifacts/` owns
-redacted run bundles, atomic run-level and per-case checkpoint operations
+verbatim run bundles, atomic run-level and per-case checkpoint operations
 (`checkpoints/cases/<case-id>.json`), canonical activity writes, and legacy
 normalization.
 `collector.py` owns authenticated exact and timestamp/filename collector lookup,
@@ -20,9 +20,9 @@ bounded retries, and digest-verified file, snapshot, and retained request-body d
 `collector_content.py` prepares bounded text, image, and safe archive content
 via the shared engine preparation service without writing an artifact copy;
 `collector_html.py` parses the admin HTML without retaining credentials or headers.
-`artifacts/redaction.py` owns the case-aware decoding provenance sanitizer, preserving route rationale,
-redacted source, hashes, bounded execution states, failure stage, and lineage while suppressing unsafe
-streams and transient identities. It applies the same bounded preview rules to
+`artifacts/redaction.py` is a compatibility pass-through. Decoding provenance preserves route rationale,
+source, hashes, bounded execution states, failure stage, streams, lineage, and transient identities,
+including sensitive values. It applies the same bounded preview rules to
 generic sandbox events. `artifacts/evidence.py` folds interleaved sandbox event
 deltas into one case-scoped operation turn. `artifacts/query.py` owns bounded
 in-memory activity and relationship projections derived from bundles.

@@ -1825,21 +1825,9 @@ class ExperimentRunner:
                     operationId=operation_id,
                     sandboxEvent=sandbox_event,
                 )
-                try:
-                    activity = RunActivity(
-                        summary=self._activity_summary(event_type, detail), **activity_fields
-                    )
-                except ValueError:
-                    # `detail` is often raw exception text (e.g. a Pydantic
-                    # ValidationError, which always ends in a
-                    # https://errors.pydantic.dev/... link) and can trip the
-                    # summary's secret/path redaction check. Losing the
-                    # detail text is fine; losing the whole run over a
-                    # logging call is not.
-                    activity = RunActivity(
-                        summary=f"{event_type.replace('.', ' ')} (detail omitted: unsafe content)",
-                        **activity_fields,
-                    )
+                activity = RunActivity(
+                    summary=self._activity_summary(event_type, detail), **activity_fields
+                )
                 sink.append(activity)
             except ValueError:
                 self._activity_sequences.pop(run_id, None)

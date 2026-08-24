@@ -19,7 +19,7 @@ Do not hand-edit the generated browser contract.
 
 ## Safety/accessibility
 
-Never ship secrets to the browser. Preserve redaction in visible, collapsed, copied, and accessible content. Maintain labels, keyboard navigation, visible focus, reduced-motion behavior, and restrained status announcements. Display run state, action mode, approval state, and finding severity with text rather than color alone. The web may start action-enabled runs when the operator opts in (Actions Allowed); it may display approval evidence but never decides Tyr approvals.
+The web is a trusted test-operator surface and displays evidence verbatim, including secrets. Maintain labels, keyboard navigation, visible focus, reduced-motion behavior, and restrained status announcements. Display run state, action mode, approval state, and finding severity with text rather than color alone. The web may start action-enabled runs when the operator opts in (Actions Allowed); it may display approval evidence but never decides Tyr approvals.
 
 Task review uses `GET /api/v1/tasks/{id}`, `…/cases` (full scenarios), and
 `…/plans` (discovery/methodology/evaluation plus the live evaluation reference).
@@ -42,16 +42,16 @@ Every case row starts collapsed when entering the page; operator expansion persi
 Verdict-bearing case headers show lifecycle and vulnerability outcome as separate text badges.
 Evaluation updates supply the result badge until visualization catches up. Scientist-generated
 cases belong only to their iteration group and never contribute to base test-case progress.
-`features/runs/runHistoryPresentation.ts` derives redacted summaries, and
+`features/runs/runHistoryPresentation.ts` derives run summaries, and
 `RunTurnCard.tsx` plus `RunTurnDetail.tsx` render the activity disclosure and bounded evidence.
 `SandboxOperationSession.tsx` renders one bounded Prism-highlighted terminal preview per
 case-owned sandbox operation, including active lifecycle status, attempts, generations, and
 safe stream states. It is the postmortem surface for new runs; legacy decoding provenance
 remains the fallback.
-Evaluation details show judge status, Prism-highlighted redacted Markdown comparison diffs, checked
+Evaluation details show judge status, Prism-highlighted exact Markdown comparison diffs, checked
 files, and missing evidence when the API supplies them.
 `features/runs/DecodingProvenance.tsx` renders structured trajectory decoding provenance (status,
-route rationale, redacted source, attempt hashes, bounded execution result states, and derived files)
+route rationale, source, attempt hashes, bounded execution result states, streams, and derived files)
 without exposing secrets, decoded bytes, sandbox identity, or unsafe streams. Decoder lifecycle activity
 rows remain compact and reference the canonical provenance instead of duplicating source or process output.
 `features/runs/CollectorArtifacts.tsx` renders verified collector files as

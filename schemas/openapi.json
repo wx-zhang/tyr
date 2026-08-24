@@ -1701,6 +1701,11 @@
           "detailAvailability": {
             "$ref": "#/components/schemas/Availability"
           },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metadata"
+          },
           "sandboxEvent": {
             "anyOf": [
               {
@@ -2643,7 +2648,7 @@
           "redacted": {
             "type": "boolean",
             "title": "Redacted",
-            "default": true
+            "default": false
           },
           "content": {
             "anyOf": [
@@ -2695,9 +2700,7 @@
             "title": "Downloadavailable"
           },
           "provenance": {
-            "additionalProperties": {
-              "type": "string"
-            },
+            "additionalProperties": true,
             "type": "object",
             "title": "Provenance"
           }

@@ -20,7 +20,7 @@ discovery candidates, turn decisions, and structured assessments; `states.py`
 owns transitions.
 
 Activity and evidence safety tests live in `packages/core/tests/test_events.py`;
-browser-facing redaction belongs to the API and adapter tests rather than core.
+evidence models preserve supplied values; access control belongs to the API.
 
 ## Commands
 

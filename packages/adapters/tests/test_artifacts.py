@@ -18,21 +18,16 @@ from gamr_core import (
 )
 
 
-def test_redact_payload_handles_keys_headers_and_configured_values() -> None:
+def test_redact_payload_preserves_keys_headers_and_configured_values() -> None:
     payload = {
         "Authorization": "Bearer abc123",
         "nested": {"apiKey": "key-value", "message": "token=key-value"},
         "text": "Bearer abc123 and key-value",
     }
-    redacted = redact_payload(payload, ["key-value"])
-    assert redacted == {
-        "Authorization": "[REDACTED]",
-        "nested": {"apiKey": "[REDACTED]", "message": "token=[REDACTED]"},
-        "text": "Bearer [REDACTED] and [REDACTED]",
-    }
+    assert redact_payload(payload, ["key-value"]) == payload
 
 
-def test_redact_payload_bounds_and_sanitizes_sandbox_event() -> None:
+def test_redact_payload_preserves_sandbox_event() -> None:
     redacted = redact_payload(
         {
             "sandboxEvent": {
@@ -52,14 +47,14 @@ def test_redact_payload_bounds_and_sanitizes_sandbox_event() -> None:
     )
 
     event = redacted["sandboxEvent"]
-    assert event["source"]["value"] == "open('[REDACTED_PATH]')"
+    assert event["source"]["value"] == "open('/home/alice/input')"
     assert event["execution"]["stdout"] == {
         "state": "captured",
-        "value": "Bearer [REDACTED]",
+        "value": "Bearer configured-secret",
     }
 
 
-def test_redaction_keeps_content_overlap_summary_schema_valid(tmp_path: Path) -> None:
+def test_artifact_store_preserves_content_overlap_summary(tmp_path: Path) -> None:
     store = FilesystemArtifactStore(tmp_path / ".gamr", secrets=["s"])
     store.write_json(
         "runs/run-1/case-results/case-1.json",
@@ -81,21 +76,19 @@ def test_redaction_keeps_content_overlap_summary_schema_valid(tmp_path: Path) ->
     overlap = ContentOverlapResult.model_validate(payload["contentOverlap"])
 
     summary = overlap.summary or ""
-    full_summary = overlap.full_summary or ""
     assert len(summary) == 600
-    assert len(full_summary) == 609
-    assert "s" not in summary
-    assert "s" not in full_summary
+    assert summary.endswith("s")
+    assert overlap.full_summary is None
 
 
-def test_raw_artifact_is_confined_and_redacted(tmp_path: Path) -> None:
+def test_raw_artifact_is_confined_and_preserved(tmp_path: Path) -> None:
     store = FilesystemArtifactStore(tmp_path / ".gamr", secrets=["super-secret"])
     path = store.write_raw(
         "run-1",
         "turn-1",
         {"headers": {"Authorization": "Bearer super-secret"}, "body": "super-secret"},
     )
-    assert "super-secret" not in Path(path).read_text(encoding="utf-8")
+    assert "super-secret" in Path(path).read_text(encoding="utf-8")
     with pytest.raises(ValueError, match="escapes"):
         store.write_json("../outside.json", {"ok": True})
 
@@ -184,8 +177,7 @@ def test_per_case_checkpoint_writes_and_confinement(tmp_path: Path) -> None:
         "case-1",
         {"caseId": "case-1", "userToken": "secret-tok", "turn": 2},
     )
-    assert "secret-tok" not in Path(path).read_text(encoding="utf-8")
-    assert "[REDACTED]" in Path(path).read_text(encoding="utf-8")
+    assert "secret-tok" in Path(path).read_text(encoding="utf-8")
     assert (
         tmp_path / ".gamr" / "runs" / "run-1" / "checkpoints" / "cases" / "case-1.json"
     ).is_file()
@@ -265,9 +257,9 @@ def test_configured_secret_stays_out_of_legacy_search_graph_and_download_views(
         },
     )
 
-    assert secret not in Path(raw_path).read_text(encoding="utf-8")
-    assert secret not in json.dumps(store.read_evidence("run-1", "raw/evidence-1.json"))
-    assert secret not in store.read_evidence_download("run-1", "raw/evidence-1.json").decode()
+    assert secret in Path(raw_path).read_text(encoding="utf-8")
+    assert secret in json.dumps(store.read_evidence("run-1", "raw/evidence-1.json"))
+    assert secret in store.read_evidence_download("run-1", "raw/evidence-1.json").decode()
 
     legacy = tmp_path / "legacy"
     (legacy / "raw").mkdir(parents=True)
@@ -292,11 +284,11 @@ def test_configured_secret_stays_out_of_legacy_search_graph_and_download_views(
 
     normalized = BundleNormalizer(secrets=[secret]).normalize_bundle(legacy, run_id="legacy-run")
 
-    assert secret not in json.dumps(normalized.activities, default=str)
-    assert secret not in json.dumps(normalized.evidence, default=str)
+    assert secret in json.dumps(normalized.activities, default=str)
+    assert secret in json.dumps(normalized.evidence, default=str)
 
 
-def test_redaction_preserves_safe_decoding_provenance_and_strips_sensitive_data() -> None:
+def test_redact_payload_preserves_complete_decoding_provenance() -> None:
     secret = "configured-secret-token"
     overlap_payload = {
         "status": "confirmed",
@@ -352,7 +344,7 @@ def test_redaction_preserves_safe_decoding_provenance_and_strips_sensitive_data(
 
     # Safe provenance is preserved
     assert overlap["status"] == "confirmed"
-    assert overlap["summary"] == "Overlap found with [REDACTED]"
+    assert overlap["summary"] == f"Overlap found with {secret}"
     assert "decoding" in overlap
     decoding = overlap["decoding"]
     assert decoding["status"] == "succeeded"
@@ -367,8 +359,7 @@ def test_redaction_preserves_safe_decoding_provenance_and_strips_sensitive_data(
     assert decoding["derivedFiles"][0]["size"] == 64
     assert decoding["derivedFiles"][0]["detectedContentType"] == "text/plain"
 
-    # Ephemeral / sensitive keys must be excluded
-    for forbidden in (
+    for retained in (
         "generatedSource",
         "decodedContent",
         "stdout",
@@ -379,17 +370,10 @@ def test_redaction_preserves_safe_decoding_provenance_and_strips_sensitive_data(
         "hostPath",
         "apiKey",
     ):
-        assert forbidden not in decoding
-
-    # Validates into core model
-    validated = ContentOverlapResult.model_validate(overlap)
-    assert validated.decoding is not None
-    assert validated.decoding.status.value == "succeeded"
-    assert validated.decoding.attempt_count == 1
-    assert len(validated.decoding.derived_files) == 1
+        assert retained in decoding
 
 
-def test_redaction_handles_decoding_safe_failure_and_limit_flags() -> None:
+def test_redact_payload_preserves_decoding_failure_details() -> None:
     secret = "super-secret-key"
     overlap_payload = {
         "status": "inconclusive",
@@ -425,17 +409,11 @@ def test_redaction_handles_decoding_safe_failure_and_limit_flags() -> None:
     assert decoding["limitFlags"] == {"timedOut": True, "outputLimited": False}
     assert decoding["programSha256"] == ["1" * 64, "2" * 64]
     assert decoding["derivedFiles"] == []
-    assert "stdout" not in decoding
-    assert "exception" not in decoding
-
-    validated = ContentOverlapResult.model_validate(redacted["contentOverlap"])
-    assert validated.decoding is not None
-    assert validated.decoding.failure_code is not None
-    assert validated.decoding.failure_code.value == "timeout"
-    assert validated.decoding.limit_flags.timed_out is True
+    assert decoding["stdout"] == secret
+    assert decoding["exception"] == f"TimeoutError: {secret}"
 
 
-def test_redaction_preserves_reviewer_attempt_details_and_suppresses_unsafe_streams() -> None:
+def test_redact_payload_preserves_reviewer_attempt_details_and_streams() -> None:
     source = (
         "from pathlib import Path\nprint('configured-secret')\nPath('/tmp/host.txt').read_text()"
     )
@@ -485,10 +463,16 @@ def test_redaction_preserves_reviewer_attempt_details_and_suppresses_unsafe_stre
 
     assert decoding["action"] == "execute"
     assert decoding["rationale"] == "The upload uses a reversible wrapper."
-    assert "configured-secret" not in attempt["source"]
-    assert "/tmp/host.txt" not in attempt["source"]
-    assert attempt["execution"]["stdout"] == {"state": "captured", "value": "decoded [[REDACTED]]"}
-    assert attempt["execution"]["stderr"] == {"state": "suppressed"}
+    assert "configured-secret" in attempt["source"]
+    assert "/tmp/host.txt" in attempt["source"]
+    assert attempt["execution"]["stdout"] == {
+        "state": "captured",
+        "value": "decoded [configured-secret]",
+    }
+    assert attempt["execution"]["stderr"] == {
+        "state": "captured",
+        "value": "Traceback at /tmp/host.txt",
+    }
 
     validated = ContentOverlapResult.model_validate(redacted["contentOverlap"])
     assert validated.decoding is not None

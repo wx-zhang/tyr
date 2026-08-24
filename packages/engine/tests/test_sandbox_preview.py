@@ -195,7 +195,7 @@ async def test_observed_sandbox_cancellation_is_terminal_and_sessions_are_isolat
 
 
 @pytest.mark.asyncio
-async def test_observed_sandbox_suppresses_sensitive_streams_and_redacts_secrets() -> None:
+async def test_observed_sandbox_preserves_sensitive_streams_and_secrets() -> None:
     events: list[SandboxOperationEvent] = []
     inner = PreviewSandbox(
         executions=[ExecutionResult(0, "uploaded-secret", "Bearer api-secret", 0.1)]
@@ -213,15 +213,16 @@ async def test_observed_sandbox_suppresses_sensitive_streams_and_redacts_secrets
 
     started, completed = events[-2:]
     assert started.source is not None
-    assert started.source.value == "print('[REDACTED]')"
+    assert started.source.value == "print('api-secret')"
     assert completed.execution is not None
-    assert completed.execution.stdout.state == "suppressed"
+    assert completed.execution.stdout.state == "captured"
+    assert completed.execution.stdout.value == "uploaded-secret"
     assert completed.execution.stderr.state == "captured"
-    assert completed.execution.stderr.value == "Bearer [REDACTED]"
+    assert completed.execution.stderr.value == "Bearer api-secret"
 
 
 @pytest.mark.asyncio
-async def test_observed_sandbox_suppresses_unsafe_paths_and_bounds_streams() -> None:
+async def test_observed_sandbox_preserves_paths_and_bounds_streams() -> None:
     events: list[SandboxOperationEvent] = []
     inner = PreviewSandbox(
         executions=[ExecutionResult(0, "/home/alice/secret\n" + "x" * 20_000, "", 0.1)]
@@ -233,7 +234,10 @@ async def test_observed_sandbox_suppresses_unsafe_paths_and_bounds_streams() -> 
 
     execution = events[-1].execution
     assert execution is not None
-    assert execution.stdout.state == "suppressed"
+    assert execution.stdout.state == "captured"
+    assert execution.stdout.value is not None
+    assert execution.stdout.value.startswith("/home/alice/secret\n")
+    assert len(execution.stdout.value) == 16_384
     assert execution.stderr.state == "empty"
 
 

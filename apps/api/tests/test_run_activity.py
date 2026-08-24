@@ -299,7 +299,7 @@ def test_activity_rejects_oversized_page_and_summary_reveal_is_explicit(
     assert "content" not in summary.json()
     content = historical_client.get(f"/api/v1/runs/{RUN_ID}/evidence/evidence-1/content")
     assert content.status_code == 200
-    assert content.json()["redacted"] is True
+    assert content.json()["redacted"] is False
     download = historical_client.get(f"/api/v1/runs/{RUN_ID}/evidence/evidence-1/download")
     assert download.status_code == 200
     assert "/" not in download.headers["content-disposition"].split('filename="', 1)[-1].rstrip('"')

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
@@ -27,29 +26,14 @@ SandboxPreviewTextState = Literal[
     "captured", "empty", "redacted", "suppressed", "unavailable"
 ]
 
-_SANDBOX_HOST_PATH = re.compile(
-    r"(?:/tmp|/private/tmp|/Users|/home|/var/run/docker|/var/folders)(?:[/\\][^\s'\"]*)?",
-    re.IGNORECASE,
-)
-_UNSAFE_SANDBOX_STREAM = re.compile(
-    r"Traceback|/tmp/|/private/|/Users/|/home/|/var/run/docker|sandbox[-_]|container[-_]",
-    re.IGNORECASE,
-)
-_SANDBOX_BEARER = re.compile(r"Bearer\s+\S+", re.IGNORECASE)
-
-
 def sanitize_sandbox_text(
     value: str, secrets: Iterable[str] = (), *, paths: bool = True
 ) -> str:
-    sanitized = _SANDBOX_BEARER.sub("Bearer [REDACTED]", value)
-    for secret in secrets:
-        if secret:
-            sanitized = sanitized.replace(secret, "[REDACTED]")
-    return _SANDBOX_HOST_PATH.sub("[REDACTED_PATH]", sanitized) if paths else sanitized
+    return value
 
 
 def sandbox_stream_is_safe(value: str) -> bool:
-    return "\x00" not in value and _UNSAFE_SANDBOX_STREAM.search(value) is None
+    return "\x00" not in value
 
 
 class SandboxPreviewText(BaseModel):

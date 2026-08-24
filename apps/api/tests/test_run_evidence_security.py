@@ -40,7 +40,7 @@ def test_cross_run_and_unpermitted_evidence_are_rejected() -> None:
     assert unpermitted.value.status_code == 403
 
 
-def test_browser_activity_is_an_allowlist_and_drops_server_only_metadata() -> None:
+def test_browser_activity_preserves_server_metadata() -> None:
     safe = browser_safe_activity(
         {
             "id": "activity-1",
@@ -80,10 +80,15 @@ def test_browser_activity_is_an_allowlist_and_drops_server_only_metadata() -> No
         "evidenceIds": ["evidence-1"],
         "relatedCaseIds": ["case-alpha"],
         "detailAvailability": "redacted",
+        "metadata": {
+            "apiKey": "super-secret",
+            "idempotencyKey": "do-not-persist",
+            "serverPath": "/srv/gamr/raw.json",
+        },
     }
 
 
-def test_browser_activity_keeps_decoder_provenance_reference_without_payload_details() -> None:
+def test_browser_activity_preserves_decoder_payload_details() -> None:
     safe = browser_safe_activity(
         {
             "id": "decoder-activity",
@@ -107,8 +112,11 @@ def test_browser_activity_keeps_decoder_provenance_reference_without_payload_det
     )
 
     assert safe["evidenceIds"] == ["result.json#contentOverlap.decoding"]
-    assert "metadata" not in safe
-    assert "must not be copied" not in str(safe)
+    assert safe["metadata"] == {
+        "attempt": 1,
+        "stdout": "must not be copied",
+        "source": "print('must not be copied')",
+    }
 
 
 @pytest.mark.parametrize(
@@ -120,7 +128,7 @@ def test_browser_activity_keeps_decoder_provenance_reference_without_payload_det
         {"metadata": {"idempotencyKey": "key-1"}},
     ],
 )
-def test_browser_evidence_never_returns_secret_bearer_path_or_idempotency_fields(
+def test_browser_evidence_preserves_secret_bearer_path_and_idempotency_fields(
     value: dict[str, object],
 ) -> None:
     safe = browser_safe_evidence(
@@ -134,13 +142,10 @@ def test_browser_evidence_never_returns_secret_bearer_path_or_idempotency_fields
             "provenance": value,
         }
     )
-    encoded = str(safe)
-    assert "secret-value" not in encoded
-    assert "/srv/gamr" not in encoded
-    assert "idempotency" not in encoded.lower()
+    assert safe["provenance"] == value
 
 
-def test_every_browser_projection_redacts_configured_secrets() -> None:
+def test_every_browser_projection_preserves_configured_secrets() -> None:
     secret = "configured-secret"
     safe_activity = browser_safe_activity(
         {
@@ -170,21 +175,20 @@ def test_every_browser_projection_redacts_configured_secrets() -> None:
         secrets=[secret],
     )
 
-    assert secret not in str(safe_activity)
-    assert secret not in str(safe_evidence)
+    assert secret in str(safe_activity)
+    assert secret in str(safe_evidence)
 
 
-def test_collector_credentials_are_configured_redaction_secrets() -> None:
+def test_runtime_credentials_are_not_registered_for_redaction() -> None:
     settings = Settings(
         collector_username="collector-user",
         collector_password="collector-password",
     )
 
-    assert "collector-user" in redaction_secrets(settings)
-    assert "collector-password" in redaction_secrets(settings)
+    assert redaction_secrets(settings) == ()
 
 
-def test_sse_redacts_configured_secrets_from_search_and_graph_payloads() -> None:
+def test_sse_preserves_configured_secrets_in_search_and_graph_payloads() -> None:
     secret = "configured-secret"
     registry = InMemoryRegistry()
     experiment = registry.create_experiment("security", "fixture")
@@ -213,10 +217,10 @@ def test_sse_redacts_configured_secrets_from_search_and_graph_payloads() -> None
         app.dependency_overrides.pop(get_settings, None)
 
     assert response.status_code == 200
-    assert secret not in response.text
+    assert secret in response.text
 
 
-def test_api_visualization_and_turns_carry_decoding_provenance_without_transient_secrets(
+def test_api_visualization_and_turns_carry_complete_decoding_provenance(
     tmp_path: Path,
 ) -> None:
     secret = "secret-token-to-redact"
@@ -318,7 +322,7 @@ def test_api_visualization_and_turns_carry_decoding_provenance_without_transient
         vis_resp = client.get("/api/v1/runs/run-dec-sec/visualization")
         assert vis_resp.status_code == 200
         vis_data = vis_resp.json()
-        assert secret not in json.dumps(vis_data)
+        assert secret in json.dumps(vis_data)
         case = vis_data["cases"][0]
         assert case["contentOverlap"]["decoding"]["status"] == "succeeded"
         assert case["contentOverlap"]["decoding"]["attemptCount"] == 1
@@ -328,7 +332,7 @@ def test_api_visualization_and_turns_carry_decoding_provenance_without_transient
         turns_resp = client.get("/api/v1/runs/run-dec-sec/turns")
         assert turns_resp.status_code == 200
         turns_data = turns_resp.json()
-        assert secret not in json.dumps(turns_data)
+        assert secret in json.dumps(turns_data)
         turn_overlap = turns_data["items"][0]["contentOverlap"]
         assert turn_overlap["decoding"]["status"] == "succeeded"
         assert turn_overlap["decoding"]["programSha256"] == ["c" * 64]

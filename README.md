@@ -37,7 +37,7 @@ standard-library Docker sandbox, making up to three attempts within a single hea
 session. The pipeline fails closed on decoding or sandbox failures (yielding an inconclusive
 verdict rather than false negatives). Sensitive synthetic references, credentials, and raw tool
 transcripts are strictly excluded from decoder context and persisted artifacts. Reviewer-visible
-provenance records the concise route rationale, redacted executed source, program SHA-256, bounded
+provenance records the concise route rationale, executed source, program SHA-256, bounded
 exit/timing/output states, explicit suppressed streams, and derived-file lineage. Decoder input is
 always advertised as `/input/<opaque-id>/<filename>` and attached with the matching relative logical
 path. Inspection-only sandbox calls are discouraged: stdout and stderr stay out of model feedback,
@@ -60,10 +60,10 @@ uv run poe evaluate:judges
 
 The job replays committed case-local artifacts through the production judge model and contained
 Docker sandbox. Inputs are validated by size and SHA-256, categorical
-regressions return a non-zero exit code, and redacted results are written below
+regressions return a non-zero exit code, and complete results are written below
 `.gamr/evaluations/judges/<evaluation-id>/`. Progress is streamed for cases, decoder and sandbox stages, and model calls.
 Pass `--debug` to print parsed LLM traffic and sandbox inputs and outputs while diagnosing model
-behavior. The unredacted terminal output may contain sensitive dataset content. A redacted log is
+behavior. The terminal output and saved log may contain sensitive dataset content. A complete log is
 saved under `.gamr/evaluations/judges/` using a UTC timestamp and short UUID.
 The corpus contains two manually reviewed real positive artifacts, one visually reviewed real
 negative artifact, and deterministic Caesar/Base64 decoder cases. See `evaluations/AGENTS.md` for

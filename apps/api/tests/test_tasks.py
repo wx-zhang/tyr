@@ -71,7 +71,7 @@ def test_task_plans_includes_live_reference_content() -> None:
     assert reference["classification"] == "synthetic"
     assert reference["size"] == len(content)
     assert reference["sha256"] == f"sha256:{digest}"
-    assert reference["content"].startswith("ALL FILE DATA BELOW IS FAKE")
+    assert reference["content"].startswith("Young Access Notes")
     assert reference["content"] == content.decode("utf-8")
 
 

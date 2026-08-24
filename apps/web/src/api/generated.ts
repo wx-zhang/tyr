@@ -507,6 +507,10 @@ export interface components {
             /** Relatedcaseids */
             relatedCaseIds?: string[];
             detailAvailability: components["schemas"]["Availability"];
+            /** Metadata */
+            metadata?: {
+                [key: string]: unknown;
+            };
             sandboxEvent?: components["schemas"]["SandboxOperationEvent"] | null;
         };
         /** ActivityPageResponse */
@@ -791,7 +795,7 @@ export interface components {
             availability: components["schemas"]["Availability"];
             /**
              * Redacted
-             * @default true
+             * @default false
              */
             redacted: boolean;
             /** Content */
@@ -812,7 +816,7 @@ export interface components {
             downloadAvailable: boolean;
             /** Provenance */
             provenance: {
-                [key: string]: string;
+                [key: string]: unknown;
             };
         };
         /** ExperimentCreate */

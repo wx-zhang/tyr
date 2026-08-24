@@ -1,18 +1,9 @@
 from __future__ import annotations
 
-import re
-
 from gamr_core import RunResult
-
-_BEARER = re.compile(r"Bearer\s+[^\s,;]+", re.I)
-_HOST_PATH = re.compile(
-    r"/(?:tmp|private/tmp|Users|home|var/run/docker|var/folders)[^\s'\"]*", re.I
-)
 
 
 def _safe_report_text(value: str, limit: int) -> str:
-    value = _BEARER.sub("Bearer [REDACTED]", value)
-    value = _HOST_PATH.sub("[REDACTED_PATH]", value)
     return value[:limit]
 
 

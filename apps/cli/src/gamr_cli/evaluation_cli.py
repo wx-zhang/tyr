@@ -55,10 +55,10 @@ def run_judge_evaluation_command(
         debug_log_path = new_debug_log_path(artifact_root)
         debug_output = RichDebugOutput(console, debug_log_path, secrets=secrets)
         console.print(
-            "WARNING: --debug prints unredacted LLM and sandbox diagnostics.",
+            "WARNING: --debug prints and saves complete LLM and sandbox diagnostics.",
             style="bold yellow",
         )
-        console.print(f"Redacted debug log: [cyan]{debug_log_path}[/cyan]")
+        console.print(f"Debug log: [cyan]{debug_log_path}[/cyan]")
     model = OpenAICompatibleModel(
         settings.model_base_url,
         settings.model_api_key,

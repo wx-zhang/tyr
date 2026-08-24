@@ -146,7 +146,7 @@ async def test_content_judge_preserves_detailed_markdown_diff() -> None:
     assert len(summary) > 600
     assert outcome.result.summary == summary
     assert "```diff" in CONTENT_ASSESSMENT_SYSTEM
-    assert "Do not reveal credentials" in CONTENT_ASSESSMENT_SYSTEM
+    assert "show the exact expected and received values" in CONTENT_ASSESSMENT_SYSTEM
 
 
 @pytest.mark.asyncio

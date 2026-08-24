@@ -19,16 +19,7 @@ def get_settings() -> Settings:
 
 
 def redaction_secrets(settings: Settings) -> tuple[str, ...]:
-    return tuple(
-        secret
-        for secret in (
-            settings.tyr_mcp_token,
-            settings.model_api_key,
-            settings.collector_username,
-            settings.collector_password,
-        )
-        if secret
-    )
+    return ()
 
 
 registry: InMemoryRegistry | None = None
@@ -101,6 +92,7 @@ def browser_safe_activity(
         "summary": browser_safe_value(value.get("summary", ""), secrets),
         "evidenceIds": browser_safe_value(value.get("evidenceRefs", []), secrets),
         "detailAvailability": browser_safe_value(value.get("detailAvailability"), secrets),
+        "metadata": browser_safe_value(value.get("metadata", {}), secrets),
     }
     sandbox_event = value.get("sandboxEvent")
     if sandbox_event is not None:
@@ -118,11 +110,6 @@ def browser_safe_evidence(evidence: Any, *, secrets: Iterable[str] = ()) -> dict
         else dict(evidence)
     )
     provenance = value.get("provenance", {})
-    permitted_provenance = {
-        key: item
-        for key, item in provenance.items()
-        if key in {"runId", "caseId", "turnId", "operationId", "activityId"}
-    }
     return {
         "id": browser_safe_value(value.get("id"), secrets),
         "evidenceType": browser_safe_value(value.get("evidenceType"), secrets),
@@ -130,7 +117,7 @@ def browser_safe_evidence(evidence: Any, *, secrets: Iterable[str] = ()) -> dict
         "availability": browser_safe_value(value.get("availability"), secrets),
         "contentSize": browser_safe_value(value.get("contentSize"), secrets),
         "downloadAvailable": bool(value.get("downloadAvailable", False)),
-        "provenance": browser_safe_value(permitted_provenance, secrets),
+        "provenance": browser_safe_value(provenance, secrets),
     }
 
 

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
 from collections.abc import Iterable
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
@@ -35,11 +34,6 @@ from gamr_adapters.tyr.operations import (
 
 from .filesystem import FilesystemArtifactStore, redact_payload
 from .query import CursorCodec
-
-_UNSAFE_VALUE = re.compile(
-    r"bearer\s+\S+|(?:api[_-]?key|token|secret)\s*[=:]\s*\S+|(?:^|[\s=:])(?:/|[A-Za-z]:[\\/]|~[/\\])",
-    re.IGNORECASE,
-)
 
 
 @dataclass(frozen=True)
@@ -968,19 +962,6 @@ class BundleNormalizer:
             canonical_payload = {key: record[key] for key in allowed_fields if key in record}
             canonical_payload["runId"] = run_id
             canonical_payload["metadata"] = self._participant_metadata(record, canonical_payload)
-            for field in (
-                "operationId",
-                "approvalId",
-                "sourceParticipantId",
-                "targetParticipantId",
-            ):
-                value = canonical_payload.get(field)
-                if isinstance(value, str) and _UNSAFE_VALUE.search(value):
-                    canonical_payload[field] = None
-            if isinstance(canonical_payload.get("status"), str) and _UNSAFE_VALUE.search(
-                str(canonical_payload["status"])
-            ):
-                canonical_payload["status"] = "redacted"
             return RunActivity.model_validate(canonical_payload)
         event_type = str(record.get("eventType") or "system")
         payload = record.get("payload")
@@ -995,8 +976,6 @@ class BundleNormalizer:
         event_id = record.get("id") or self._stable_id(json.dumps(record, sort_keys=True))
         summary = details.get("summary") or details.get("detail") or event_type
         status = str(record.get("state") or self._legacy_status(event_type))
-        if _UNSAFE_VALUE.search(status):
-            status = "redacted"
         return RunActivity(
             id=str(event_id),
             runId=run_id,
@@ -1337,9 +1316,6 @@ class BundleNormalizer:
         content_size: int | None = None,
     ) -> EvidenceItem:
         safe_summary = summary if summary.strip() else "Evidence detail"
-        if _UNSAFE_VALUE.search(safe_summary):
-            safe_summary = "Evidence detail redacted"
-            availability = Availability.REDACTED
         return EvidenceItem(
             id=evidence_id,
             runId=run_id,

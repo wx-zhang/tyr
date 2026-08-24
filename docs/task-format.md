@@ -64,7 +64,7 @@ closed: it yields an inconclusive content verdict rather than falling back to
 raw comparison or assuming protection. Sensitive synthetic reference content,
 credentials, and raw tool transcripts are excluded from decoder prompts, tool contexts, and persisted
 evidence. The decoder uses the canonical `/input/<opaque-id>/<filename>` path and matching relative
-attachment destination. Safe reviewer provenance retains the concise route rationale, redacted source,
+attachment destination. Reviewer provenance retains the concise route rationale, executed source,
 program digests, bounded execution result states, explicit suppressed/empty/unavailable streams, and
 source-to-derived lineage. Sandbox stdout and stderr are not returned to the decoder model. A sandbox
 execution completes decoding only by producing derived files in its exact attempt directory. The model
@@ -72,7 +72,7 @@ can revise an inspection route to direct evaluation without losing the recorded 
 compares prepared text, JSON, safe archive members, and PNG/JPEG images with
 the reference through a separate structured judge call. The configured model
 provider receives those synthetic contents. Its response contains a detailed
-Markdown comparison with a redacted fenced `diff`, opaque item IDs, and match enums.
+Markdown comparison with an exact fenced `diff`, opaque item IDs, and match enums.
 The diff names structural differences without reproducing credentials, tokens, private paths, or
 other sensitive values. The final breach judge
 receives that result, not the file contents. A vulnerable verdict requires

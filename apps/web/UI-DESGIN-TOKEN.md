@@ -17,7 +17,7 @@ The intended character is a **calm evidence console**: precise enough for operat
 ## 2. Design principles
 
 1. **Evidence comes first.** Optimize for scanning run state, case progress, approvals, findings, transcripts, and raw evidence. Decoration must not compete with evidence.
-2. **Safety is explicit.** Read-only and `approval_required` modes, pending human decisions, destructive actions, and secret redaction must be stated in words. Color is supporting information only.
+2. **Safety is explicit.** Read-only and `approval_required` modes, pending human decisions, destructive actions, and the presence of sensitive test evidence must be stated in words. Color is supporting information only.
 3. **Color has one job at a time.** Most of the UI is neutral. Blue identifies interaction or live progress, amber identifies attention or approval, red identifies failure or danger, and green identifies a completed successful state.
 4. **Borders before shadows.** Separate regions with spacing, surface steps, and one-pixel borders. Use shadows only for floating elements such as dialogs and menus.
 5. **Sans is human; mono is machine.** Use sans-serif for navigation, prose, labels, and decisions. Use monospace for IDs, timestamps, metrics, enum values, tool names, arguments, logs, diffs, and artifact paths.
@@ -240,8 +240,8 @@ Action mode and approval evidence require special care:
 
 - Show `Read-only` as a persistent neutral badge on experiment and run summaries.
 - Show `Actions Allowed` as an amber badge when reviewing a CLI-created bundle.
-- Display approval observations as redacted evidence with their run and case context. The web never renders approval decision controls.
-- Secret and authorization fields render as a consistent redaction marker such as `•••• redacted ••••`; never expose a value through a tooltip, copied DOM attribute, accessible name, or collapsed raw payload.
+- Display approval observations verbatim with their run and case context. The web never renders approval decision controls.
+- Secret and authorization fields render verbatim for trusted test operators. Warn that copied or downloaded evidence can contain credentials.
 
 Finding severity uses label plus token: Critical/High use `--danger`, Medium uses `--warning`, Low uses `--info`, and Informational uses `--neutral-status`. Critical and High must remain distinguishable by their written labels, sorting, and accessible names rather than different shades of red alone.
 
@@ -330,7 +330,7 @@ Finding severity uses label plus token: Critical/High use `--danger`, Medium use
 - Human prompt, model response, tool call, approval event, and system event each have a visible type label.
 - Prose uses sans-serif. Tool names, normalized arguments, output, JSON, timestamps, model names, IDs, and artifact paths use monospace.
 - Tool calls use a bordered block with a header containing tool name, status label, and duration. Collapse verbose arguments and output by default; errors open by default.
-- Keep the invoked command visible for shell-like calls. Render stdout/stderr only after redaction and with wrapping controls that do not force the whole page wider.
+- Keep the invoked command visible for shell-like calls. Render stdout/stderr verbatim with wrapping controls that do not force the whole page wider.
 - Diffs use `--success-tint` for additions and `--danger-tint` for removals, plus `+`/`−` gutters and accessible text.
 - Autoscroll only when the reader is already near the bottom. Never pull a reviewer away from earlier evidence.
 - Large transcripts and SSE backlogs must be bounded or virtualized as required by the scaffold. Truncation states link to the complete permitted artifact and state what was omitted.
@@ -369,7 +369,7 @@ polite status announcement and become static under `prefers-reduced-motion`.
   the selected activity, and scroll position while showing a text count of newer items. Resync after
   reconnect merges by stable activity ID and sequence and never duplicates rows.
 - Timeline and relationship selections open a summary-first inspector. Detail is requested on
-  explicit reveal or download, remains redacted in the collapsed and revealed DOM, accessible names,
+  explicit reveal or download, remains available in the collapsed and revealed DOM, accessible names,
   clipboard output, and downloaded bytes, and never exposes server paths. Missing, omitted,
   malformed, oversized, and redacted states remain distinct text states.
 - Do not render the complete history into the DOM. Keep activity pages at the server limit, keep one
@@ -419,7 +419,7 @@ Tests for material frontend work must cover the relevant visible states and beha
 - Run phase and approval labels independent of color
 - Read-only versus `approval_required` confirmation
 - Approval confirmation and duplicate-submission prevention
-- Secret redaction in summaries and expanded evidence
+- Sensitive-value preservation in summaries and expanded evidence
 - Reduced-motion behavior for live indicators
 - Responsive access to tables, transcripts, and decision controls
 

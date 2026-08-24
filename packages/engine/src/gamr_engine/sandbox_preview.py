@@ -11,7 +11,6 @@ from gamr_core import (
     SandboxPreviewText,
 )
 from gamr_core.identifiers import new_id
-from gamr_core.sandbox import sandbox_stream_is_safe, sanitize_sandbox_text
 
 from .ports.sandbox import (
     ExecutionResult,
@@ -202,8 +201,7 @@ def _execution_preview(
 
 
 def _source_preview(value: str, configured_secrets: Sequence[str]) -> SandboxPreviewText:
-    sanitized = _sanitize(value, configured_secrets)
-    return SandboxPreviewText(state="captured", value=sanitized)
+    return SandboxPreviewText(state="captured", value=value[:65_536])
 
 
 def _stream_preview(
@@ -213,14 +211,4 @@ def _stream_preview(
 ) -> SandboxPreviewText:
     if not value:
         return SandboxPreviewText(state="empty")
-    if any(sensitive in value for sensitive in sensitive_values if sensitive):
-        return SandboxPreviewText(state="suppressed")
-    if not sandbox_stream_is_safe(value):
-        return SandboxPreviewText(state="suppressed")
-    return SandboxPreviewText(
-        state="captured", value=_sanitize(value[:16_384], configured_secrets)
-    )
-
-
-def _sanitize(value: str, configured_secrets: Sequence[str]) -> str:
-    return sanitize_sandbox_text(value, configured_secrets)
+    return SandboxPreviewText(state="captured", value=value[:16_384])

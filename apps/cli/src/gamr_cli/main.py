@@ -227,7 +227,7 @@ def evaluate_judges(
     debug: bool = typer.Option(
         False,
         "--debug",
-        help="Print unredacted LLM and sandbox inputs and outputs.",
+        help="Print and save complete LLM and sandbox inputs and outputs.",
     ),
 ) -> None:
     """Replay committed evidence through a production judge pipeline."""

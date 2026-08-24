@@ -11,7 +11,7 @@ Keep all provider and persistence access behind protocols. CLI and API use the s
 ## Source map
 
 `runner.py` is the shared discovery/case engine and emits typed activities,
-`sandbox_preview.py` decorates sandbox ports with append-only, redacted
+`sandbox_preview.py` decorates sandbox ports with append-only, verbatim
 operation lifecycle events and logical generation/attempt tracking,
 `assessment.py` builds and validates the evidence judge contract,
 `assessment_contract.py` owns its strict schema, `content_assessment.py` owns

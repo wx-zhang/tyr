@@ -57,7 +57,7 @@ Each CLI or service run owns one bundle:
 ```
 
 `run.json` records source (`cli` or `service`), optional experiment and retry links, validated
-configuration, lifecycle state, timestamps, result reference, and redacted failure summary.
+configuration, lifecycle state, timestamps, result reference, and failure summary.
 Mutable JSON documents use atomic replacement. JSONL has one writer per run. Readers may tolerate
 an incomplete trailing record only while a run is live.
 
@@ -80,7 +80,7 @@ derived from the bundle. Relationship tokens and cursors stay run-scoped and bou
 ## Safety and validation
 
 - Real actions require CLI opt-in and a recorded human decision for every Tyr action.
-- Secrets are redacted before persistence or browser delivery.
+- Evidence is retained verbatim for trusted test operators, including secrets and authorization data.
 - Every Tyr request uses an idempotency key.
 - Outer Tyr completion never overrides delegated or unsettled work.
 - Task, experiment, live-run, result, and OpenAPI schemas are generated from owning models.

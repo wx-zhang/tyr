@@ -35,7 +35,7 @@ def test_json_registry_persists_and_rediscovers_cli_and_service_runs(tmp_path: P
     assert [item["status"] for item in activities] == ["queued", "preparing"]
 
 
-def test_json_registry_redacts_persisted_values_and_rejects_escaped_ids(tmp_path: Path) -> None:
+def test_json_registry_preserves_values_and_rejects_escaped_ids(tmp_path: Path) -> None:
     registry = JsonRegistry(tmp_path, secrets=("top-secret",))
     run = registry.create_run(
         None,
@@ -44,7 +44,7 @@ def test_json_registry_redacts_persisted_values_and_rejects_escaped_ids(tmp_path
         source=RunSource.CLI,
     )
 
-    assert "top-secret" not in (tmp_path / "runs" / run.id / "run.json").read_text()
+    assert "top-secret" in (tmp_path / "runs" / run.id / "run.json").read_text()
     with pytest.raises(ValueError, match="identifier"):
         registry.get_run("../outside")
 

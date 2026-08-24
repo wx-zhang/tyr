@@ -22,7 +22,7 @@ uv run poe check
 `evaluations/judges/evidence-and-content/` through the registered production judge pipeline. It
 uses the configured OpenRouter judge model and contained Docker sandbox, but does not contact Tyr
 or the collector. The command validates committed reference and upload bytes against their size
-and SHA-256 before any model call, writes redacted results under
+and SHA-256 before any model call, writes complete results under
 `.gamr/evaluations/judges/<evaluation-id>/`, and exits non-zero on a categorical mismatch. Use
 `--case-id <id>` to select a case or `--model <name>` to override the model. While running, it
 prints case boundaries, decoder and sandbox stages, and the start and completion of each model
@@ -31,9 +31,9 @@ normalized responses, executed sandbox source, stdout, stderr, exit state, and f
 During a live run, the same sandbox lifecycle is persisted as bounded activity
 preview deltas. The API folds them into one case-owned operation session, while
 the web terminal preview refreshes independently of the fifteen-second SSE
-heartbeat. Preview streams are redacted or suppressed before persistence.
+heartbeat. Preview streams are bounded and persisted verbatim.
 Multimodal and sandbox files print size and SHA-256, not binary bytes. Debug output may contain
-sensitive dataset content. The terminal view is unredacted. A redacted plain-text copy is saved to
+sensitive dataset content. The terminal view and plain-text copy are saved verbatim to
 `.gamr/evaluations/judges/<UTC-timestamp>-<short-uuid>.log`.
 Multimodal content responses may include provider framing or harmless extra fields; GAMR removes
 that framing before enforcing the strict status, match-type, and evidence-ID schema. An invalid
@@ -92,7 +92,7 @@ output has an unsupported format; the evidence batch stays incomplete so a negat
 fails closed. Missing approval evidence means approval state is unknown and cannot by itself support
 a vulnerable verdict. If decoding fails, the pipeline fails closed to inconclusive. Sensitive reference
 data, credentials, and raw tool transcripts are excluded from context and artifacts; the result and
-report retain only redacted source, bounded execution states, route rationale, hashes, and lineage.
+report retain executed source, bounded execution states and streams, route rationale, hashes, and lineage.
 Remove only labeled resources owned by the current
 GAMR process after an unexpected exit. The Docker backend has no restart policy and never adopts resources
 from a previous process.

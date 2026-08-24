@@ -72,7 +72,7 @@ def test_bundle_normalizer_supports_legacy_and_malformed_records(tmp_path: Path)
     assert any(item.detail_availability.value == "malformed" for item in normalized)
 
 
-def test_bundle_normalizer_redacts_unsafe_transcript_summary(tmp_path: Path) -> None:
+def test_bundle_normalizer_preserves_transcript_summary(tmp_path: Path) -> None:
     bundle = tmp_path / "run"
     bundle.mkdir()
     (bundle / "transcript.jsonl").write_text(
@@ -82,8 +82,8 @@ def test_bundle_normalizer_redacts_unsafe_transcript_summary(tmp_path: Path) -> 
 
     normalized = BundleNormalizer().normalize_bundle(bundle, run_id="run-1")
 
-    assert normalized.evidence[0].summary == "Evidence detail redacted"
-    assert normalized.evidence[0].availability is Availability.REDACTED
+    assert normalized.evidence[0].summary == "Search /home for important.txt."
+    assert normalized.evidence[0].availability is Availability.AVAILABLE
 
 
 def test_normalization_is_immutable_for_fixture_bundle(tmp_path: Path) -> None:
@@ -776,7 +776,7 @@ def test_turn_normalization_recovers_redacted_evaluation_provenance(
     assert updates[0].judge_pipeline == "evidence-and-content"
 
 
-def test_turn_normalization_supports_legacy_roles_and_redacts_secrets(tmp_path: Path) -> None:
+def test_turn_normalization_supports_legacy_roles_and_preserves_secrets(tmp_path: Path) -> None:
     bundle = tmp_path / "legacy-turns"
     bundle.mkdir()
     records = [
@@ -791,7 +791,7 @@ def test_turn_normalization_supports_legacy_roles_and_redacts_secrets(tmp_path: 
 
     assert turns[0].number == 1
     assert turns[0].stage == "unknown"
-    assert turns[0].agent_message == "Use [REDACTED]"
+    assert turns[0].agent_message == "Use top-secret"
 
 
 def test_turn_normalization_loads_evaluations_from_case_results(tmp_path: Path) -> None:

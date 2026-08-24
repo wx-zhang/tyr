@@ -113,7 +113,7 @@ async def test_debug_sandbox_prints_source_results_and_file_metadata() -> None:
     assert "Sandbox closed" in rendered
 
 
-def test_rich_debug_output_prints_and_persists_redacted_plain_text(tmp_path: Path) -> None:
+def test_rich_debug_output_prints_and_persists_plain_text_verbatim(tmp_path: Path) -> None:
     terminal = Console(record=True, width=100, color_system=None)
     log_path = tmp_path / "evaluation.log"
     output = RichDebugOutput(terminal, log_path, secrets=("sensitive-value",))
@@ -123,8 +123,8 @@ def test_rich_debug_output_prints_and_persists_redacted_plain_text(tmp_path: Pat
     assert "sensitive-value" in terminal.export_text()
     persisted = log_path.read_text()
     assert "Debug record" in persisted
-    assert "sensitive-value" not in persisted
-    assert "[REDACTED]" in persisted
+    assert "sensitive-value" in persisted
+    assert "[REDACTED]" not in persisted
 
 
 def test_debug_log_path_uses_timestamp_and_short_uuid(tmp_path: Path) -> None:

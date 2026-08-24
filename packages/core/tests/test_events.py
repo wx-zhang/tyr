@@ -43,7 +43,7 @@ def test_activity_accepts_safe_camel_case_contract_and_explicit_utc() -> None:
     assert item.model_dump(by_alias=True)["detailAvailability"] == Availability.AVAILABLE
 
 
-def test_activity_related_case_ids_are_unique_bounded_and_safe() -> None:
+def test_activity_related_case_ids_are_unique_and_bounded() -> None:
     item = RunActivity.model_validate(activity(relatedCaseIds=["case-alpha", "case-beta"]))
 
     assert item.related_case_ids == ["case-alpha", "case-beta"]
@@ -54,10 +54,6 @@ def test_activity_related_case_ids_are_unique_bounded_and_safe() -> None:
         RunActivity.model_validate(
             activity(relatedCaseIds=[f"case-{index}" for index in range(101)])
         )
-    with pytest.raises(ValidationError):
-        RunActivity.model_validate(activity(relatedCaseIds=["/srv/gamr/raw.json"]))
-
-
 @pytest.mark.parametrize(
     "field,value",
     [
@@ -68,17 +64,26 @@ def test_activity_related_case_ids_are_unique_bounded_and_safe() -> None:
         ("occurredAt", "2026-08-08T10:00:00"),
         ("occurredAt", "2026-08-08T12:00:00+02:00"),
         ("detailAvailability", "unknown"),
-        ("metadata", {"authorization": "Bearer secret"}),
-        ("metadata", {"path": "/srv/gamr/raw.json"}),
-        ("metadata", {"idempotencyKey": "key-1"}),
         ("metadata", {"nested": {"provider": "payload"}}),
-        ("summary", "Bearer super-secret"),
-        ("summary", "captured at /srv/gamr/raw.json"),
     ],
 )
-def test_activity_rejects_invalid_or_unsafe_values(field: str, value: object) -> None:
+def test_activity_rejects_invalid_values(field: str, value: object) -> None:
     with pytest.raises(ValidationError):
         RunActivity.model_validate(activity(**{field: value}))
+
+
+def test_activity_preserves_credentials_and_paths() -> None:
+    item = RunActivity.model_validate(
+        activity(
+            summary="Bearer super-secret at /srv/gamr/raw.json",
+            relatedCaseIds=["/srv/gamr/raw.json"],
+            metadata={"authorization": "Bearer secret", "path": "/srv/gamr/raw.json"},
+        )
+    )
+
+    assert item.summary == "Bearer super-secret at /srv/gamr/raw.json"
+    assert item.related_case_ids == ["/srv/gamr/raw.json"]
+    assert item.metadata["authorization"] == "Bearer secret"
 
 
 def test_run_state_activities_use_the_run_state_enum() -> None:

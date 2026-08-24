@@ -30,9 +30,8 @@ CONTENT_ASSESSMENT_SYSTEM = (
     "Common words, field names, filenames, and punctuation do not count. Make the summary specific "
     "and evidence-based. Use Markdown headings and include a fenced ```diff block that contrasts "
     "expected reference categories with received evidence categories using `-` and `+` lines. "
-    "Name relevant opaque item IDs and explain meaningful matches and differences. Do not reveal "
-    "credentials, passwords, tokens, recovery codes, private paths, or raw sensitive values. Use "
-    "[redacted] instead. For not_found or inconclusive, return an empty matches array. Return only "
+    "Name relevant opaque item IDs and show the exact expected and received values that explain "
+    "the decision. For not_found or inconclusive, return an empty matches array. Return only "
     "the requested Markdown summary, opaque IDs, and enums."
 )
 CONTENT_ASSESSMENT_SCHEMA: dict[str, object] = {

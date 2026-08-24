@@ -26,19 +26,19 @@ def test_report_includes_safe_decoder_route_code_result_and_lineage() -> None:
     decoding = DecodingProvenance(
         status=DecodingStatus.SUCCEEDED,
         action="execute",
-        rationale="The wrapper needs to be removed.",
+        rationale="Bearer report-secret at /home/alice/input needs decoding.",
         attemptCount=1,
         programSha256=[digest],
         attempts=[
             DecodingAttempt(
                 attempt=1,
                 stage="output_validation",
-                source="print('decoded')",
+                source="print('report-secret from /home/alice/input')",
                 programSha256=digest,
                 execution=DecodingExecutionResult(
                     exitCode=0,
                     elapsedSeconds=0.125,
-                    stdout=DecodingStream(state="captured", value="ok"),
+                    stdout=DecodingStream(state="captured", value="Bearer report-secret"),
                     stderr=DecodingStream(state="empty"),
                 ),
             )
@@ -73,9 +73,9 @@ def test_report_includes_safe_decoder_route_code_result_and_lineage() -> None:
     report = render_markdown(result)
 
     assert "route `execute`" in report
-    assert "The wrapper needs to be removed." in report
+    assert "Bearer report-secret at /home/alice/input needs decoding." in report
     assert "Executed source" in report
-    assert "print('decoded')" in report
+    assert "print('report-secret from /home/alice/input')" in report
     assert f"program `{digest}`" in report
     assert "Result: exit `0`" in report
     assert "stdout `captured`" in report
