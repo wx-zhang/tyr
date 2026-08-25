@@ -27,7 +27,14 @@ or rewrite the source bundle.
 bundle-immutability budget. Run `uv run pytest tests -k run_evidence_scale` for
 that focused check; the full cross-package suite is `uv run pytest tests`.
 Judge graph offline rendering tests live in `tests/test_render_judge_graph.py`.
+Decoding runner, loop, prompt, and capacity regressions live in
+`packages/engine/tests/test_runner_decoder.py`, `packages/engine/tests/test_decoder_*.py`,
+`packages/engine/tests/test_reporting.py`,
+`packages/adapters/tests/test_collector_content.py`, and `apps/web/src/features/runs/DecodingProvenance.test.tsx`.
 Sandbox contract, backend, and developer-runner regressions live in
 `packages/engine/tests/test_sandbox.py`, `packages/adapters/tests/test_sandbox_*.py`,
-and `tests/test_sandbox_runner.py`. Docker runtime tests use the deselected-by-default
+`packages/engine/tests/test_sandbox_preview.py`, and `tests/test_sandbox_runner.py`. Docker runtime tests use the deselected-by-default
 `sandbox_docker` marker and controlled snippets only.
+Judge evaluation loader, scoring, trace, and CLI regressions live in
+`apps/cli/tests/test_judge_evaluation.py`. The real model-and-Docker evaluation is an explicit
+developer job and is never part of default pytest.

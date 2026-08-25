@@ -7,15 +7,24 @@ import tarfile
 
 import pytest
 from gamr_adapters.sandbox import docker as docker_module
+from gamr_adapters.sandbox.collect_output import parse_collected_output
 from gamr_adapters.sandbox.docker import (
     IMAGE_TAG,
+    build_collect_output_args,
     build_container_create_args,
     build_execute_args,
     build_input_archive,
     build_populate_args,
     build_volume_create_args,
 )
-from gamr_engine.ports import SandboxBusyError, SandboxClosedError, SandboxEntry
+from gamr_engine.ports import (
+    SandboxBusyError,
+    SandboxClosedError,
+    SandboxEntry,
+    SandboxId,
+    SandboxUnknownError,
+    SandboxValidationError,
+)
 
 
 def test_input_archive_contains_only_validated_logical_files() -> None:
@@ -33,6 +42,11 @@ def test_input_archive_contains_only_validated_logical_files() -> None:
             "punctuation-;-$().txt",
         ]
         assert handle.extractfile(members[0]).read() == b"hello"  # type: ignore[union-attr]
+
+
+def test_decoder_absolute_input_destination_is_rejected_before_docker() -> None:
+    with pytest.raises(SandboxValidationError, match="relative"):
+        build_input_archive([SandboxEntry("/workspace/input/upload-001/data.txt", b"x")])
 
 
 def test_docker_vectors_use_fixed_containment_flags() -> None:
@@ -222,3 +236,108 @@ async def test_docker_same_id_busy_and_terminal_timeout(
     assert result.timed_out
     with pytest.raises(SandboxClosedError):
         await sandbox.execute(sandbox_id, "print('closed')")
+
+
+def test_docker_collect_output_args_no_shell_interpolation() -> None:
+    args = build_collect_output_args("container-123", "output/attempt-001; rm -rf /")
+    assert "exec" in args
+    assert "container-123" in args
+    assert "/opt/gamr/collect_output.py" in args
+    assert "output/attempt-001; rm -rf /" in args
+    assert not any("sh" in arg or "bash" in arg for arg in args)
+
+
+def test_parse_collected_output_validates_and_extracts_archive() -> None:
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w") as archive:
+        info1 = tarfile.TarInfo(name="upload-001/data.txt")
+        info1.size = 5
+        info1.mode = 0o444
+        archive.addfile(info1, io.BytesIO(b"hello"))
+        info2 = tarfile.TarInfo(name="upload-001/nested/file.bin")
+        info2.size = 3
+        info2.mode = 0o444
+        archive.addfile(info2, io.BytesIO(b"\x00\x01\x02"))
+    valid_tar = buf.getvalue()
+
+    entries = parse_collected_output(valid_tar)
+    assert len(entries) == 2
+    assert entries[0].path == "upload-001/data.txt"
+    assert entries[0].content == b"hello"
+    assert entries[1].path == "upload-001/nested/file.bin"
+    assert entries[1].content == b"\x00\x01\x02"
+
+
+def test_parse_collected_output_rejects_symlinks_special_files_and_traversal() -> None:
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w") as archive:
+        info = tarfile.TarInfo(name="link.txt")
+        info.type = tarfile.SYMTYPE
+        info.linkname = "/etc/passwd"
+        archive.addfile(info)
+    with pytest.raises(SandboxValidationError):
+        parse_collected_output(buf.getvalue())
+
+    buf2 = io.BytesIO()
+    with tarfile.open(fileobj=buf2, mode="w") as archive:
+        info = tarfile.TarInfo(name="../escape.txt")
+        info.size = 2
+        archive.addfile(info, io.BytesIO(b"no"))
+    with pytest.raises(SandboxValidationError):
+        parse_collected_output(buf2.getvalue())
+
+
+@pytest.mark.asyncio
+async def test_docker_collect_output_lifecycle(monkeypatch: pytest.MonkeyPatch) -> None:
+    from gamr_adapters.sandbox.docker import DockerSandbox, _DockerResult
+
+    sandbox = DockerSandbox()
+    assert sandbox.isolation == "contained"
+
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w") as archive:
+        info = tarfile.TarInfo(name="upload-001/out.txt")
+        info.size = 2
+        archive.addfile(info, io.BytesIO(b"ok"))
+    valid_tar = buf.getvalue()
+
+    async def command(args: tuple[str, ...], stdin: bytes | None = None) -> _DockerResult:
+        del stdin
+        if args[0] == "exec" and "/opt/gamr/collect_output.py" in args:
+            return _DockerResult(0, valid_tar, b"")
+        return _DockerResult(0, b"", b"")
+
+    monkeypatch.setattr(sandbox, "_command", command)
+    sandbox_id = await sandbox.start()
+
+    entries = await sandbox.collect_output(sandbox_id, "output/attempt-001")
+    assert len(entries) == 1
+    assert entries[0].path == "upload-001/out.txt"
+    assert entries[0].content == b"ok"
+
+    await sandbox.close(sandbox_id)
+    with pytest.raises(SandboxClosedError):
+        await sandbox.collect_output(sandbox_id, "output/attempt-001")
+    with pytest.raises(SandboxUnknownError):
+        await sandbox.collect_output(SandboxId("unknown"), "output/attempt-001")
+
+
+@pytest.mark.asyncio
+async def test_docker_collect_output_failure_cleans_up(monkeypatch: pytest.MonkeyPatch) -> None:
+    from gamr_adapters.sandbox.docker import DockerSandbox, _DockerResult
+
+    sandbox = DockerSandbox()
+    commands: list[tuple[str, ...]] = []
+
+    async def command(args: tuple[str, ...], stdin: bytes | None = None) -> _DockerResult:
+        del stdin
+        commands.append(args)
+        if args[0] == "exec" and "/opt/gamr/collect_output.py" in args:
+            return _DockerResult(1, b"", b"collector error: output byte limit exceeded\n")
+        return _DockerResult(0, b"", b"")
+
+    monkeypatch.setattr(sandbox, "_command", command)
+    sandbox_id = await sandbox.start()
+
+    with pytest.raises(SandboxValidationError):
+        await sandbox.collect_output(sandbox_id, "output/attempt-001")

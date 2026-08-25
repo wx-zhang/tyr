@@ -11,13 +11,16 @@ No FastAPI, Typer, filesystem, network, terminal, or vendor SDK imports. Model w
 ## Source map
 
 `tasks.py` owns task documents and template binding; `experiments.py`
-owns run/result contracts; `events.py` owns normalized run activities,
+owns run/result contracts; `decoding.py` owns bounded route, attempt, execution-stream, and lineage provenance
+models; `sandbox.py` owns pipeline-neutral sandbox operation states, bounded
+preview text, execution results, attempts, and folded session contracts;
+`events.py` owns normalized run activities,
 participants, evidence, and transient evidence queries; `workflow.py` owns
 discovery candidates, turn decisions, and structured assessments; `states.py`
 owns transitions.
 
 Activity and evidence safety tests live in `packages/core/tests/test_events.py`;
-browser-facing redaction belongs to the API and adapter tests rather than core.
+evidence models preserve supplied values; access control belongs to the API.
 
 ## Commands
 

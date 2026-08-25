@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from collections.abc import Mapping
 from datetime import datetime
 from enum import StrEnum
@@ -8,6 +7,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from .sandbox import SandboxOperationEvent
 from .states import RunState
 
 ActivityId = str
@@ -62,19 +62,9 @@ class ParticipantKind(StrEnum):
     UNKNOWN = "unknown"
 
 
-_UNSAFE_KEY = re.compile(
-    r"(?:authorization|api[_-]?key|bearer|cookie|credential|idempotency|password|secret|token|path)",
-    re.IGNORECASE,
-)
-_BEARER = re.compile(r"bearer\s+\S+|(?:api[_-]?key|token|secret)\s*[=:]\s*\S+", re.I)
-_ABSOLUTE_PATH = re.compile(r"(?:^|[\s=:])(?:/|[A-Za-z]:[\\/]|~[/\\])")
-
-
 def _safe_text(value: str, *, field_name: str) -> str:
     if not value.strip():
         raise ValueError(f"{field_name} must not be empty")
-    if _BEARER.search(value) or _ABSOLUTE_PATH.search(value):
-        raise ValueError(f"{field_name} contains forbidden secret or path data")
     return value
 
 
@@ -82,8 +72,6 @@ def _safe_metadata(value: Mapping[str, object]) -> dict[str, object]:
     if len(value) > 32:
         raise ValueError("metadata has too many fields")
     for key, item in value.items():
-        if _UNSAFE_KEY.search(str(key)):
-            raise ValueError(f"metadata field is not safe: {key}")
         if not isinstance(item, (str, int, float, bool, type(None))):
             raise ValueError("metadata values must be scalar")
         if isinstance(item, str):
@@ -119,6 +107,7 @@ class RunActivity(BaseModel):
         default=Availability.AVAILABLE, alias="detailAvailability"
     )
     metadata: dict[str, object] = Field(default_factory=dict)
+    sandbox_event: SandboxOperationEvent | None = Field(default=None, alias="sandboxEvent")
 
     @field_validator("occurred_at")
     @classmethod

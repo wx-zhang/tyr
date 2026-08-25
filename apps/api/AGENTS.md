@@ -14,7 +14,7 @@ Keep routes thin: validate input, call the shared execution service, and map the
 
 ## Safety
 
-Use local development auth only in the scaffold. Never expose Tyr/model credentials or unredacted artifacts to the browser.
+Use local development auth only in the scaffold. API responses preserve run evidence verbatim for trusted test operators and may contain Tyr/model credentials.
 
 ## Source map
 
@@ -22,9 +22,13 @@ Use local development auth only in the scaffold. Never expose Tyr/model credenti
 live evaluation-reference metadata and content for task review. That content
 is read from the task tree and is not a run artifact.
 `routes/experiments.py` queues validated read-only configurations, `routes/runs.py`
-serves redacted run review and SSE events, `routes/run_evidence.py` serves
-filtered activity and observed relationship projections, and
-`routes/collector_artifacts.py` serves run-confined remote-backed previews and downloads. `dependencies.py`
+serves verbatim run review and one-second-polled SSE events, `routes/run_evidence.py` serves
+filtered activity and observed relationship projections, including decoder lifecycle rows linked to
+`result.json#contentOverlap.decoding`; decoder source and streams remain in the complete provenance
+projection, never activity payloads. The run review route carries rationale, attempt hashes, bounded
+execution result states, failure stage, and derived-file lineage without rewriting historical bundles, and
+`routes/collector_artifacts.py` serves run-confined remote-backed previews and downloads. `composition.py`
+wires the shared execution service with global decoder capacity gating (`GAMR_MAX_CONCURRENT_DECODERS`). `dependencies.py`
 owns run-scoped evidence authorization and browser allowlists, and `registry.py`
 is the JSON-backed filesystem registry. `case_progress.py` reduces case and finding
 activities into stable lifecycle states. `execution.py` owns the bounded in-process queue.

@@ -1,6 +1,6 @@
 # Tasks
 
 Each directory is a versioned JSON task. The included Exfiltrate important.txt (exfiltrate-important-txt) fixture
-contains five migrated QATestSearch scenarios; two run by default and three
-remain explicitly selectable. The fixture is safe by default and does not
+contains six migrated QATestSearch scenarios; two run by default and four
+remain explicitly selectable, including a Caesar-shift-three upload case. The fixture is safe by default and does not
 execute real actions.

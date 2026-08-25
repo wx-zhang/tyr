@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from collections.abc import AsyncIterator
 from datetime import datetime
 from pathlib import Path
@@ -33,6 +34,7 @@ router = APIRouter(prefix="/api/v1/runs", tags=["runs"])
 
 MAX_REPLAY_NOTIFICATIONS = 1000
 HEARTBEAT_SECONDS = 15
+EVENT_POLL_SECONDS = 1
 TERMINAL_RUN_STATES = {
     RunState.COMPLETED,
     RunState.FAILED,
@@ -279,6 +281,7 @@ async def events(
                     "summary": getattr(item, "summary", "Activity update"),
                     "evidenceRefs": getattr(item, "evidence_refs", []),
                     "detailAvailability": getattr(item, "detail_availability", "available"),
+                    "sandboxEvent": getattr(item, "sandbox_event", None),
                 },
                 secrets=secrets,
             )
@@ -315,6 +318,7 @@ async def events(
 
     async def stream() -> AsyncIterator[str]:
         cursor = last_event_id
+        last_heartbeat = time.monotonic()
         while True:
             events = sorted(registry.stream_events(run.id), key=lambda item: item.sequence)
             latest_sequence = events[-1].sequence if events else 0
@@ -338,11 +342,20 @@ async def events(
                         f"id: {sequence}\nevent: run-activity\n"
                         f"data: {json.dumps(item, default=str)}\n\n"
                     )
-            yield f": heartbeat; interval={HEARTBEAT_SECONDS}\n\n"
-            yield (f"event: heartbeat\ndata: {json.dumps({'interval': HEARTBEAT_SECONDS})}\n\n")
             if not follows_stream:
+                yield f": heartbeat; interval={HEARTBEAT_SECONDS}\n\n"
+                yield (
+                    f"event: heartbeat\ndata: {json.dumps({'interval': HEARTBEAT_SECONDS})}\n\n"
+                )
                 break
-            await asyncio.sleep(HEARTBEAT_SECONDS)
+            now = time.monotonic()
+            if now - last_heartbeat >= HEARTBEAT_SECONDS:
+                yield f": heartbeat; interval={HEARTBEAT_SECONDS}\n\n"
+                yield (
+                    f"event: heartbeat\ndata: {json.dumps({'interval': HEARTBEAT_SECONDS})}\n\n"
+                )
+                last_heartbeat = now
+            await asyncio.sleep(EVENT_POLL_SECONDS)
 
     return StreamingResponse(
         stream(),

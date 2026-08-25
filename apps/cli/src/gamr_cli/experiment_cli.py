@@ -76,6 +76,7 @@ def run_experiment_command(
         artifact_store,
         target,
         collector,
+        sandbox,
         model_gateway,
         scientist_model_gateway,
         judge_model_gateway,
@@ -122,6 +123,7 @@ def run_experiment_command(
                 progress=render_progress_cb,
                 delivery_verifier=collector,
                 content_evidence_provider=collector,
+                sandbox=sandbox,
             )
         finally:
             await target.aclose()
@@ -187,6 +189,7 @@ def resume_scientist_command(
         artifact_store,
         target,
         collector,
+        sandbox,
         model_gateway,
         scientist_model_gateway,
         judge_model_gateway,
@@ -230,6 +233,7 @@ def resume_scientist_command(
                 progress=render_progress_cb,
                 delivery_verifier=collector,
                 content_evidence_provider=collector,
+                sandbox=sandbox,
             )
         finally:
             await target.aclose()

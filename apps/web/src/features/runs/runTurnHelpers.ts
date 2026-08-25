@@ -138,6 +138,12 @@ export function isDiscoveryResult(turn: RunTurn): boolean {
   return turn.updateType === "discovery";
 }
 
+export function isSandboxOperation(turn: RunTurn): boolean {
+  return (
+    turn.updateType === "sandbox_operation" || Boolean(turn.sandboxOperation)
+  );
+}
+
 export function discoveryFields(
   message: string,
 ): Array<{ name: string; value: string }> {
@@ -198,6 +204,29 @@ export function formatWaited(ms: number): string {
   return remainMinutes
     ? `Waited ${hours}h ${remainMinutes}m`
     : `Waited ${hours}h`;
+}
+
+export function formatBytes(bytes: number | null | undefined): string {
+  if (bytes === null || bytes === undefined || Number.isNaN(bytes)) return "—";
+  if (bytes < 1024) return `${bytes.toLocaleString()} B`;
+  const units = ["KB", "MB", "GB", "TB"];
+  let value = bytes / 1024;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  return `${value.toFixed(1)} ${units[unitIndex]}`;
+}
+
+export function formatHash(
+  hash: string | null | undefined,
+  length: number = 8,
+): string {
+  if (!hash) return "—";
+  const clean = hash.startsWith("sha256:") ? hash.slice(7) : hash;
+  if (clean.length <= length * 2) return clean;
+  return `${clean.slice(0, length)}...${clean.slice(-length / 2)}`;
 }
 
 export function turnWaitMs(turn: RunTurn, now: number): number | null {

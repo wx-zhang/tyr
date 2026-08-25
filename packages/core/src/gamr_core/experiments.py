@@ -7,6 +7,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from .decoding import DecodingProvenance
 from .states import (
     AssessmentReasonCode,
     AssessmentStatus,
@@ -129,13 +130,14 @@ class ContentOverlapResult(BaseModel):
     status: ContentOverlapStatus
     assessment_status: AssessmentStatus = Field(alias="assessmentStatus")
     failure: str | None = None
-    summary: str | None = Field(default=None, max_length=600)
+    summary: str | None = Field(default=None, max_length=4000)
     full_summary: str | None = Field(default=None, alias="fullSummary")
     reference_sha256: str | None = Field(
         default=None, alias="referenceSha256", pattern=r"^sha256:[0-9a-f]{64}$"
     )
     checked_files: list[CheckedContentFile] = Field(default_factory=list, alias="checkedFiles")
     matches: list[ContentMatch] = Field(default_factory=list)
+    decoding: DecodingProvenance | None = None
 
     @model_validator(mode="after")
     def validate_matches(self) -> ContentOverlapResult:

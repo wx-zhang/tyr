@@ -9,6 +9,8 @@ def test_evidence_and_content_topology_nodes_and_edges() -> None:
 
     nodes = set(drawable_graph.nodes.keys())
     expected_nodes = {
+        "prepare_verified_content",
+        "decode_trajectory_content",
         "compare_reference_content",
         "preserve_execution_failure",
         "assess_evidence",
@@ -17,7 +19,9 @@ def test_evidence_and_content_topology_nodes_and_edges() -> None:
     assert expected_nodes.issubset(nodes)
 
     edge_tuples = {(edge.source, edge.target) for edge in drawable_graph.edges}
-    assert (START, "compare_reference_content") in edge_tuples
+    assert (START, "prepare_verified_content") in edge_tuples
+    assert ("prepare_verified_content", "decode_trajectory_content") in edge_tuples
+    assert ("decode_trajectory_content", "compare_reference_content") in edge_tuples
     assert ("preserve_execution_failure", END) in edge_tuples
     assert ("assess_evidence", "finalize_judgment") in edge_tuples
     assert ("finalize_judgment", END) in edge_tuples

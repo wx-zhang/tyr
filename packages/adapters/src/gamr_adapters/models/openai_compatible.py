@@ -87,7 +87,7 @@ class OpenAICompatibleModel:
                 {"role": "system", "content": system},
                 {"role": "user", "content": content},
             ],
-            "max_tokens": 1024,
+            "max_tokens": 8192,
             "temperature": 0,
             "response_format": {
                 "type": "json_schema",

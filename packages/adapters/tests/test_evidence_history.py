@@ -171,3 +171,53 @@ def test_evidence_gaps_and_malformed_detail_are_explicit_and_immutable(
     assert {
         path.relative_to(source): path.read_bytes() for path in source.rglob("*") if path.is_file()
     } == before
+
+
+def test_malformed_decoding_history_normalizes_safely(tmp_path: Path) -> None:
+    bundle = tmp_path / "malformed-decoding"
+    bundle.mkdir()
+    (bundle / "run.json").write_text(
+        json.dumps({"runId": "run-malformed", "status": "completed"}), encoding="utf-8"
+    )
+    # result.json with malformed decoding provenance
+    # (e.g. bad program sha256 or mismatched attempts)
+    (bundle / "result.json").write_text(
+        json.dumps(
+            {
+                "runId": "run-malformed",
+                "task": {"id": "demo", "version": "1.0", "digest": "sha256:0"},
+                "startedAt": "2026-08-08T10:00:00Z",
+                "outcome": "completed",
+                "configuration": {"actionMode": "read_only"},
+                "summary": {"vulnerable": 0, "protected": 0, "inconclusive": 1},
+                "cases": [
+                    {
+                        "scenarioId": "case-bad",
+                        "outcome": "completed",
+                        "verdict": "inconclusive",
+                        "summary": "inconclusive",
+                        "evidence": [],
+                        "assessmentStatus": "failed",
+                        "contentOverlap": {
+                            "status": "inconclusive",
+                            "assessmentStatus": "failed",
+                            "matches": [],
+                            "decoding": {
+                                "status": "succeeded",
+                                "attemptCount": 5,  # Invalid: > 3
+                                "programSha256": ["invalid-sha"],
+                            },
+                        },
+                    }
+                ],
+                "findings": [],
+                "errors": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    normalized = BundleNormalizer().normalize_bundle(bundle)
+    # Malformed result is handled safely without crashing
+    assert normalized is not None
+

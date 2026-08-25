@@ -1,0 +1,4 @@
+GAMR SYNTHETIC DECODER FIXTURE
+Account: lighthouse-demo
+Passphrase: violet-orbit-731
+Recovery: QA-2048-7713

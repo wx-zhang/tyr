@@ -11,10 +11,22 @@ Keep all provider and persistence access behind protocols. CLI and API use the s
 ## Source map
 
 `runner.py` is the shared discovery/case engine and emits typed activities,
+`sandbox_preview.py` decorates sandbox ports with append-only, verbatim
+operation lifecycle events and logical generation/attempt tracking,
 `assessment.py` builds and validates the evidence judge contract,
 `assessment_contract.py` owns its strict schema, `content_assessment.py` owns
 the synthetic-reference overlap judge, `content_pipeline.py` coordinates
-verified collector content, and `content_evidence.py` owns the in-memory contracts,
+verified collector content, `content_source.py` owns the verified content-source contract and snapshots,
+`content_prepare.py` owns shared preparation of original and derived content evidence,
+`decoder_capacity.py` owns the process-wide decoder-sandbox capacity gate, and
+`content_response.py` normalizes provider framing before strict content-decision validation,
+`capacity_sandbox.py` owns decoder capacity sandbox wrapping,
+`judge_runtime.py` owns judge runtime construction helpers,
+`decoder/` owns trajectory decoding agent, prompt rendering, feedback mapping, execution loop, relative
+`/input/<opaque-id>/<filename>` attachment construction, and bounded attempt records; `decoder/executor.py`
+owns sandbox stages and lifecycle cleanup, `decoder/output.py` owns derived evidence preparation, and
+`decoder/direct.py` validates fallback direct routes, `decoder/records.py` owns safe execution-result records,
+and `content_evidence.py` owns the in-memory contracts,
 `judges/` contains predefined judge pipelines orchestrated with LangGraph StateGraph:
 - `judges/contracts.py`: `JudgeRequest`, `JudgeRuntime`, `JudgeResult`, and `JudgePipeline` protocol
 - `judges/registry.py`: immutable registry mapping `JudgePipelineId` to pipeline implementations
@@ -29,7 +41,9 @@ Cases waiting for bounded capacity emit `case.queued`; `case.started` is emitted
 
 ### Judge pipeline conventions
 
-Predefined judges use LangGraph StateGraph with stable node names (`compare_content`, `handle_execution_failure`, `assess_evidence`, `finalize_result`). They run without checkpointers or persistent stores.
+Predefined judges use LangGraph StateGraph with stable node names (`prepare_verified_content`, `decode_trajectory_content`, `compare_reference_content`, `preserve_execution_failure`, `assess_evidence`, `finalize_judgment`). They run without checkpointers or persistent stores. Trajectory decoding reuses the judge model with a standard-library Docker sandbox across up to three attempts per case, fails closed on errors, and is capacity-governed via `DecoderCapacityGate`. Sensitive references and credentials are strictly excluded from decoder execution.
+Decoder feedback never exposes stdout or stderr. Executions require derived files, while an inspection-only route may be revised to direct evaluation with its attempt provenance retained.
+Usable derived text or images survive unsupported auxiliary outputs, but incomplete evidence cannot support a definitive negative comparison. Missing approval evidence is an unknown approval state, not evidence of an unapproved action.
 
 To add a predefined judge pipeline:
 1. Add the pipeline identifier literal in `gamr_core.tasks` (`JudgePipelineId`).

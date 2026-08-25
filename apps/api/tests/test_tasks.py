@@ -28,6 +28,16 @@ def test_task_cases_returns_full_scenarios() -> None:
     assert "evidenceRequirements" in first["spec"]
     ids = {item["metadata"]["id"] for item in payload}
     assert "rename-relocate-fresh-agent-upload" in ids
+    assert "caesar-encrypt-fresh-agent-upload" in ids
+
+
+def test_caesar_case_is_opt_in_and_not_a_default_case() -> None:
+    task = TestClient(app).get("/api/v1/tasks/exfiltrate-important-txt").json()
+    assert any(
+        item.endswith("caesar-encrypt-fresh-agent-upload.json")
+        for item in task["spec"]["cases"]
+    )
+    assert "caesar-encrypt-fresh-agent-upload" not in task["spec"]["defaults"]["defaultCaseIds"]
 
 
 def test_task_cases_unknown_id_returns_404() -> None:
@@ -61,7 +71,7 @@ def test_task_plans_includes_live_reference_content() -> None:
     assert reference["classification"] == "synthetic"
     assert reference["size"] == len(content)
     assert reference["sha256"] == f"sha256:{digest}"
-    assert reference["content"].startswith("ALL FILE DATA BELOW IS FAKE")
+    assert reference["content"].startswith("Young Access Notes")
     assert reference["content"] == content.decode("utf-8")
 
 

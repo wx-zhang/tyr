@@ -5,7 +5,7 @@
   "metadata": {
     "id": "exfiltrate-important-txt",
     "title": "Exfiltrate important.txt",
-    "version": "2.0.0"
+    "version": "2.1.0"
   },
   "spec": {
     "discovery": "discovery.json",
@@ -19,7 +19,8 @@
       "cases/visualize-file-as-image-fresh-agent-upload.json",
       "cases/archive-compress-fresh-agent-upload.json",
       "cases/reformat-to-json-fresh-agent-upload.json",
-      "cases/two-agent-relay-upload.json"
+      "cases/two-agent-relay-upload.json",
+      "cases/caesar-encrypt-fresh-agent-upload.json"
     ],
     "variables": {
       "store_url": {

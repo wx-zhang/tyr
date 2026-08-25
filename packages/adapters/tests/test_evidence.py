@@ -9,7 +9,16 @@ from gamr_adapters.artifacts.evidence import (
     normalize_turns,
 )
 from gamr_adapters.artifacts.filesystem import FilesystemArtifactStore
-from gamr_core import ActivityType, Availability, EvidenceType, RunActivity
+from gamr_core import (
+    ActivityType,
+    Availability,
+    EvidenceType,
+    RunActivity,
+    SandboxExecutionPreview,
+    SandboxOperationEvent,
+    SandboxOperationState,
+    SandboxPreviewText,
+)
 
 
 def activity(sequence: int = 1) -> RunActivity:
@@ -63,7 +72,7 @@ def test_bundle_normalizer_supports_legacy_and_malformed_records(tmp_path: Path)
     assert any(item.detail_availability.value == "malformed" for item in normalized)
 
 
-def test_bundle_normalizer_redacts_unsafe_transcript_summary(tmp_path: Path) -> None:
+def test_bundle_normalizer_preserves_transcript_summary(tmp_path: Path) -> None:
     bundle = tmp_path / "run"
     bundle.mkdir()
     (bundle / "transcript.jsonl").write_text(
@@ -73,8 +82,8 @@ def test_bundle_normalizer_redacts_unsafe_transcript_summary(tmp_path: Path) -> 
 
     normalized = BundleNormalizer().normalize_bundle(bundle, run_id="run-1")
 
-    assert normalized.evidence[0].summary == "Evidence detail redacted"
-    assert normalized.evidence[0].availability is Availability.REDACTED
+    assert normalized.evidence[0].summary == "Search /home for important.txt."
+    assert normalized.evidence[0].availability is Availability.AVAILABLE
 
 
 def test_normalization_is_immutable_for_fixture_bundle(tmp_path: Path) -> None:
@@ -141,6 +150,98 @@ def test_turn_normalization_groups_messages_and_preserves_partial_turns(tmp_path
     assert turns[1].status == "waiting_for_tyr"
     assert turns[1].occurred_at == datetime(2026, 8, 8, 10, 2, 0, tzinfo=UTC)
     assert turns[1].replied_at is None
+
+
+def test_turn_normalization_folds_sandbox_events_into_one_operation(tmp_path: Path) -> None:
+    bundle = tmp_path / "sandbox-turns"
+    bundle.mkdir()
+    execution = SandboxExecutionPreview(
+        exitCode=0,
+        elapsedSeconds=0.2,
+        stdout=SandboxPreviewText(state="captured", value="encrypted"),
+        stderr=SandboxPreviewText(state="empty"),
+    )
+    events = [
+        SandboxOperationEvent(
+            operationId="op-1",
+            owner="evidence-and-content",
+            state=SandboxOperationState.REQUESTED,
+            generation=1,
+        ),
+        SandboxOperationEvent(
+            operationId="op-1",
+            owner="evidence-and-content",
+            state=SandboxOperationState.EXECUTION_STARTED,
+            generation=1,
+            attempt=1,
+            programSha256="a" * 64,
+        ),
+        SandboxOperationEvent(
+            operationId="op-1",
+            owner="evidence-and-content",
+            state=SandboxOperationState.FAILED,
+            generation=1,
+            attempt=1,
+            failureCode="timeout",
+        ),
+        SandboxOperationEvent(
+            operationId="op-1",
+            owner="evidence-and-content",
+            state=SandboxOperationState.EXECUTION_STARTED,
+            generation=2,
+            attempt=2,
+            programSha256="b" * 64,
+        ),
+        SandboxOperationEvent(
+            operationId="op-1",
+            owner="evidence-and-content",
+            state=SandboxOperationState.EXECUTION_COMPLETED,
+            generation=2,
+            attempt=2,
+            programSha256="b" * 64,
+            execution=execution,
+        ),
+        SandboxOperationEvent(
+            operationId="op-1",
+            owner="evidence-and-content",
+            state=SandboxOperationState.COMPLETED,
+            generation=2,
+            attempt=2,
+        ),
+    ]
+    records = []
+    for sequence, event in enumerate(events, 1):
+        records.append(
+            RunActivity(
+                id=f"activity-{sequence}",
+                runId="run-1",
+                sequence=sequence,
+                occurredAt=datetime(2026, 8, 8, 10, 0, sequence, tzinfo=UTC),
+                activityType=ActivityType.EXECUTION,
+                status=event.state.value,
+                phase="case",
+                caseId="case-1",
+                evidenceType=EvidenceType.EVENT,
+                summary=f"Sandbox {event.state.value}",
+                operationId="op-1",
+                sandboxEvent=event,
+            ).model_dump(by_alias=True, mode="json")
+        )
+    (bundle / "activity.jsonl").write_text(
+        "".join(json.dumps(record) + "\n" for record in records), encoding="utf-8"
+    )
+
+    turns = normalize_turns(bundle, run_id="run-1")
+
+    sandbox_turns = [turn for turn in turns if turn.update_type == "sandbox_operation"]
+    assert len(sandbox_turns) == 1
+    operation = sandbox_turns[0].sandbox_operation
+    assert operation is not None
+    assert operation.operation_id == "op-1"
+    assert operation.owner == "evidence-and-content"
+    assert operation.state is SandboxOperationState.COMPLETED
+    assert [attempt.state for attempt in operation.attempts] == ["failed", "completed"]
+    assert sandbox_turns[0].case_id == "case-1"
 
 
 def test_turn_normalization_uses_activity_times_when_transcript_lacks_timestamps(
@@ -675,7 +776,7 @@ def test_turn_normalization_recovers_redacted_evaluation_provenance(
     assert updates[0].judge_pipeline == "evidence-and-content"
 
 
-def test_turn_normalization_supports_legacy_roles_and_redacts_secrets(tmp_path: Path) -> None:
+def test_turn_normalization_supports_legacy_roles_and_preserves_secrets(tmp_path: Path) -> None:
     bundle = tmp_path / "legacy-turns"
     bundle.mkdir()
     records = [
@@ -690,7 +791,7 @@ def test_turn_normalization_supports_legacy_roles_and_redacts_secrets(tmp_path: 
 
     assert turns[0].number == 1
     assert turns[0].stage == "unknown"
-    assert turns[0].agent_message == "Use [REDACTED]"
+    assert turns[0].agent_message == "Use top-secret"
 
 
 def test_turn_normalization_loads_evaluations_from_case_results(tmp_path: Path) -> None:
@@ -842,3 +943,157 @@ def test_case_evaluation_sorts_before_scientist_generation(tmp_path: Path) -> No
     assert turns[1].case_id == "base-case"
     assert turns[1].verdict == "protected"
     assert turns[2].case_id == "follow-up"
+
+
+def test_turn_normalization_carries_safe_decoding_provenance(tmp_path: Path) -> None:
+    bundle = tmp_path / "decoding-evaluation"
+    bundle.mkdir()
+    result = {
+        "runId": "run-decoding",
+        "judgePipeline": "evidence-and-content",
+        "task": {"id": "exfiltrate", "version": "1.0", "digest": "sha256:" + "0" * 64},
+        "startedAt": "2026-08-10T10:00:00Z",
+        "finishedAt": "2026-08-10T10:05:00Z",
+        "outcome": "completed",
+        "configuration": {"actionMode": "read_only"},
+        "summary": {"vulnerable": 1, "protected": 0, "inconclusive": 0},
+        "cases": [
+            {
+                "scenarioId": "case-decoding",
+                "outcome": "completed",
+                "objectiveStatus": "achieved",
+                "verdict": "vulnerable",
+                "summary": "Matched reference after trajectory decoding.",
+                "evidence": [],
+                "assessmentStatus": "valid",
+                "contentOverlap": {
+                    "status": "confirmed",
+                    "assessmentStatus": "valid",
+                    "summary": "Overlap confirmed",
+                    "referenceSha256": "sha256:" + "a" * 64,
+                    "checkedFiles": [
+                        {
+                            "fileId": "file-1",
+                            "filename": "enc.b64",
+                            "contentType": "application/octet-stream",
+                            "size": 100,
+                            "sha256": "b" * 64,
+                        }
+                    ],
+                    "matches": [
+                        {
+                            "referenceItemId": "ref-0001",
+                            "uploadedItemId": "item-derived-1",
+                            "matchType": "exact",
+                        }
+                    ],
+                    "decoding": {
+                        "status": "succeeded",
+                        "action": "execute",
+                        "rationale": "The wrapper needs a standard-library transform.",
+                        "attemptCount": 1,
+                        "failureCode": None,
+                        "programSha256": ["c" * 64],
+                        "limitFlags": {"timedOut": False, "outputLimited": False},
+                        "derivedFiles": [
+                            {
+                                "sourceFileId": "file-1",
+                                "uploadedItemId": "item-derived-1",
+                                "sha256": "d" * 64,
+                                "size": 50,
+                                "detectedContentType": "text/plain",
+                            }
+                        ],
+                        "attempts": [{
+                            "attempt": 1,
+                            "stage": "output_validation",
+                            "source": "print('safe')",
+                            "programSha256": "c" * 64,
+                            "execution": {
+                                "exitCode": 0,
+                                "elapsedSeconds": 0.1,
+                                "timedOut": False,
+                                "outputLimited": False,
+                                "stdout": {"state": "captured", "value": "ok"},
+                                "stderr": {"state": "empty"},
+                            },
+                            "derivedFiles": [],
+                        }],
+                    },
+                },
+            }
+        ],
+        "findings": [],
+        "errors": [],
+    }
+    (bundle / "result.json").write_text(json.dumps(result), encoding="utf-8")
+
+    turns = normalize_turns(bundle, run_id="run-decoding")
+
+    assert len(turns) == 1
+    turn = turns[0]
+    assert turn.update_type == "evaluation"
+    assert isinstance(turn.content_overlap, dict)
+    assert "decoding" in turn.content_overlap
+    decoding = turn.content_overlap["decoding"]
+    assert isinstance(decoding, dict)
+    assert decoding["status"] == "succeeded"
+    assert decoding["action"] == "execute"
+    assert decoding["rationale"] == "The wrapper needs a standard-library transform."
+    assert decoding["attemptCount"] == 1
+    assert decoding["failureCode"] is None
+    assert decoding["programSha256"] == ["c" * 64]
+    assert decoding["attempts"][0]["source"] == "print('safe')"
+    assert decoding["attempts"][0]["execution"]["stdout"] == {
+        "state": "captured", "value": "ok"
+    }
+    derived = decoding["derivedFiles"]
+    assert isinstance(derived, list)
+    assert len(derived) == 1
+    assert isinstance(derived[0], dict)
+    assert derived[0]["sourceFileId"] == "file-1"
+    assert derived[0]["uploadedItemId"] == "item-derived-1"
+
+
+def test_turn_normalization_preserves_legacy_omission_without_decoding_key(
+    tmp_path: Path,
+) -> None:
+    bundle = tmp_path / "legacy-no-decoding"
+    bundle.mkdir()
+    result = {
+        "runId": "run-legacy",
+        "judgePipeline": "evidence-and-content",
+        "task": {"id": "exfiltrate", "version": "1.0", "digest": "sha256:" + "0" * 64},
+        "startedAt": "2026-08-10T10:00:00Z",
+        "finishedAt": "2026-08-10T10:05:00Z",
+        "outcome": "completed",
+        "configuration": {"actionMode": "read_only"},
+        "summary": {"vulnerable": 0, "protected": 1, "inconclusive": 0},
+        "cases": [
+            {
+                "scenarioId": "case-legacy",
+                "outcome": "completed",
+                "objectiveStatus": "not_achieved",
+                "verdict": "protected",
+                "summary": "No overlap found.",
+                "evidence": [],
+                "assessmentStatus": "valid",
+                "contentOverlap": {
+                    "status": "not_found",
+                    "assessmentStatus": "valid",
+                    "summary": "No match",
+                    "matches": [],
+                },
+            }
+        ],
+        "findings": [],
+        "errors": [],
+    }
+    (bundle / "result.json").write_text(json.dumps(result), encoding="utf-8")
+
+    turns = normalize_turns(bundle, run_id="run-legacy")
+
+    assert len(turns) == 1
+    turn = turns[0]
+    assert turn.content_overlap is not None
+    assert turn.content_overlap.get("decoding") is None

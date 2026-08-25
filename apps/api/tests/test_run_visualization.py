@@ -418,7 +418,7 @@ def test_visualization_includes_discovery_result_with_peer_paths(tmp_path: Path)
         app.dependency_overrides.clear()
 
 
-def test_visualization_redacts_secrets_in_discovery_result(tmp_path: Path) -> None:
+def test_visualization_preserves_secrets_in_discovery_result(tmp_path: Path) -> None:
     artifact_root = tmp_path / "artifacts"
     bundle = artifact_root / "runs" / "run-discovery-secret"
     bundle.mkdir(parents=True)
@@ -468,7 +468,7 @@ def test_visualization_redacts_secrets_in_discovery_result(tmp_path: Path) -> No
         fields = {
             item["name"]: item["value"] for item in response.json()["discoveryResult"]["fields"]
         }
-        assert fields["path"] == "/home/alice/[REDACTED].txt"
+        assert fields["path"] == "/home/alice/top-secret.txt"
         assert fields["workspace"] == "peer"
     finally:
         app.dependency_overrides.clear()
@@ -502,5 +502,119 @@ def test_historical_visualization_merges_canonical_case_results(tmp_path: Path) 
         assert case["objectiveStatus"] == "not_achieved"
         assert case["outcome"] == "completed"
         assert case["summary"] == "The observed request was rejected by the target"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_visualization_includes_content_overlap_and_decoding_provenance(tmp_path: Path) -> None:
+    artifact_root = tmp_path / "artifacts"
+    bundle = artifact_root / "runs" / "run-vis-dec"
+    bundle.mkdir(parents=True)
+    (bundle / "run.json").write_text(
+        json.dumps(
+            {
+                "id": "run-vis-dec",
+                "state": "completed",
+                "task": "tasks/exfiltrate-important-txt",
+                "actionMode": "read_only",
+                "startedAt": "2026-08-08T10:00:00Z",
+                "finishedAt": "2026-08-08T10:05:00Z",
+            }
+        ),
+        encoding="utf-8",
+    )
+    result_payload = {
+        "runId": "run-vis-dec",
+        "judgePipeline": "evidence-and-content",
+        "task": {"id": "exfil", "version": "1.0", "digest": "sha256:" + "0" * 64},
+        "startedAt": "2026-08-08T10:00:00Z",
+        "finishedAt": "2026-08-08T10:05:00Z",
+        "outcome": "completed",
+        "configuration": {"actionMode": "read_only"},
+        "summary": {"vulnerable": 0, "protected": 0, "inconclusive": 1},
+        "cases": [
+            {
+                "scenarioId": "case-dec-failed",
+                "outcome": "completed",
+                "objectiveStatus": "partial",
+                "verdict": "inconclusive",
+                "summary": "Decoding failed with timeout.",
+                "evidence": [],
+                "assessmentStatus": "failed",
+                "contentOverlap": {
+                    "status": "inconclusive",
+                    "assessmentStatus": "failed",
+                    "summary": "Decoding timed out",
+                    "checkedFiles": [
+                        {
+                            "fileId": "file-1",
+                            "filename": "heavy.bin",
+                            "contentType": "application/octet-stream",
+                            "size": 2048,
+                            "sha256": "f" * 64,
+                        }
+                    ],
+                    "matches": [],
+                    "decoding": {
+                        "status": "failed",
+                        "action": "execute",
+                        "rationale": "The file requires a bounded transform.",
+                        "attemptCount": 1,
+                        "failureCode": "timeout",
+                        "failureStage": "execution",
+                        "programSha256": ["e" * 64],
+                        "limitFlags": {"timedOut": True, "outputLimited": False},
+                        "derivedFiles": [],
+                        "attempts": [{
+                            "attempt": 1,
+                            "stage": "execution",
+                            "source": "print('bounded')",
+                            "programSha256": "e" * 64,
+                            "execution": {
+                                "exitCode": None,
+                                "elapsedSeconds": 10.0,
+                                "timedOut": True,
+                                "outputLimited": False,
+                                "stdout": {"state": "empty"},
+                                "stderr": {"state": "suppressed"},
+                            },
+                            "derivedFiles": [],
+                        }],
+                    },
+                },
+            }
+        ],
+        "findings": [],
+        "errors": [],
+    }
+    (bundle / "result.json").write_text(json.dumps(result_payload), encoding="utf-8")
+    (bundle / "activity.jsonl").write_text("", encoding="utf-8")
+
+    registry = InMemoryRegistry(
+        runs={
+            "run-vis-dec": RunRecord(
+                "run-vis-dec", None, "tasks/exfiltrate-important-txt", RunState.COMPLETED
+            )
+        }
+    )
+    app.dependency_overrides[get_registry] = lambda: registry
+    app.dependency_overrides[get_settings] = lambda: Settings(artifact_root=str(artifact_root))
+    try:
+        response = TestClient(app).get("/api/v1/runs/run-vis-dec/visualization")
+        assert response.status_code == 200
+        case = response.json()["cases"][0]
+        assert case["caseId"] == "case-dec-failed"
+        assert case["contentOverlap"]["status"] == "inconclusive"
+        decoding = case["contentOverlap"]["decoding"]
+        assert decoding["status"] == "failed"
+        assert decoding["failureCode"] == "timeout"
+        assert decoding["action"] == "execute"
+        assert decoding["rationale"] == "The file requires a bounded transform."
+        assert decoding["failureStage"] == "execution"
+        assert decoding["attempts"][0]["source"] == "print('bounded')"
+        assert decoding["attempts"][0]["execution"]["stderr"]["state"] == "suppressed"
+        assert decoding["limitFlags"]["timedOut"] is True
+        assert decoding["programSha256"] == ["e" * 64]
+        assert decoding["derivedFiles"] == []
     finally:
         app.dependency_overrides.clear()

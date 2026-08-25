@@ -1914,13 +1914,7 @@ async def test_scientist_emits_failed_progress_when_scenario_invalid() -> None:
 
 
 @pytest.mark.asyncio
-async def test_scientist_failure_activity_survives_unsafe_exception_text() -> None:
-    """A Pydantic ValidationError's message always ends with a
-    https://errors.pydantic.dev/... link, which trips RunActivity.summary's
-    secret/path redaction. Recording that failure must not itself crash the
-    run (regression for the run that failed with errorSummary
-    'ValidationError: 1 validation error for RunActivity ... forbidden
-    secret or path data')."""
+async def test_scientist_failure_activity_preserves_exception_text() -> None:
     manifest = TaskManifest.model_validate(
         {
             "metadata": {"id": "live", "title": "Live", "version": "2.0.0"},
@@ -1986,8 +1980,7 @@ async def test_scientist_failure_activity_survives_unsafe_exception_text() -> No
         for item in activities.items
         if item.status == "scientist_failed" and item.phase == "scientist"
     )
-    assert "errors.pydantic.dev" not in failed.summary
-    assert "unsafe content" in failed.summary
+    assert "errors.pydantic.dev" in failed.summary
 
 
 @pytest.mark.asyncio

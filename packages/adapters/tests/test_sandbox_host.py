@@ -9,6 +9,7 @@ from gamr_engine.ports import (
     SandboxBusyError,
     SandboxClosedError,
     SandboxEntry,
+    SandboxId,
     SandboxUnknownError,
     SandboxValidationError,
 )
@@ -204,3 +205,78 @@ async def test_host_backend_rejects_invalid_source_without_starting_python() -> 
     with pytest.raises(SandboxValidationError):
         await sandbox.execute(sandbox_id, "x" * (64 * 1024 + 1))
     await sandbox.close(sandbox_id)
+
+
+@pytest.mark.asyncio
+async def test_host_backend_reports_unsafe_isolation() -> None:
+    sandbox = HostUnsafeSandbox()
+    assert sandbox.isolation == "unsafe"
+
+
+@pytest.mark.asyncio
+async def test_host_backend_collect_output_success() -> None:
+    sandbox = HostUnsafeSandbox()
+    sandbox_id = await sandbox.start()
+    await sandbox.execute(
+        sandbox_id,
+        (
+            "import os\n"
+            "os.makedirs('output/attempt-001/upload-001', exist_ok=True)\n"
+            "with open('output/attempt-001/upload-001/data.txt', 'wb') as f:\n"
+            "    f.write(b'decoded text')\n"
+            "with open('output/attempt-001/upload-001/nested.bin', 'wb') as f:\n"
+            "    f.write(b'\\x00\\x01\\x02')\n"
+        ),
+    )
+    entries = await sandbox.collect_output(sandbox_id, "output/attempt-001")
+    assert len(entries) == 2
+    assert entries[0].path == "upload-001/data.txt"
+    assert entries[0].content == b"decoded text"
+    assert entries[1].path == "upload-001/nested.bin"
+    assert entries[1].content == b"\x00\x01\x02"
+
+    missing = await sandbox.collect_output(sandbox_id, "output/attempt-002")
+    assert missing == ()
+
+    await sandbox.close(sandbox_id)
+
+
+@pytest.mark.asyncio
+async def test_host_backend_collect_output_rejects_symlinks_and_traversal() -> None:
+    sandbox = HostUnsafeSandbox()
+    sandbox_id = await sandbox.start()
+    await sandbox.execute(
+        sandbox_id,
+        (
+            "import os\n"
+            "os.makedirs('output/attempt-001', exist_ok=True)\n"
+            "with open('secret.txt', 'w') as f:\n"
+            "    f.write('secret')\n"
+            "os.symlink('../../secret.txt', 'output/attempt-001/link.txt')\n"
+        ),
+    )
+    with pytest.raises(SandboxValidationError):
+        await sandbox.collect_output(sandbox_id, "output/attempt-001")
+
+    with pytest.raises(SandboxValidationError):
+        await sandbox.collect_output(sandbox_id, "../outside")
+
+    await sandbox.close(sandbox_id)
+
+
+@pytest.mark.asyncio
+async def test_host_backend_collect_output_rejects_busy_unknown_and_closed() -> None:
+    sandbox = HostUnsafeSandbox()
+    sandbox_id = await sandbox.start()
+    task = asyncio.create_task(sandbox.execute(sandbox_id, "import time; time.sleep(0.3)"))
+    await asyncio.sleep(0.05)
+    with pytest.raises(SandboxBusyError):
+        await sandbox.collect_output(sandbox_id, "output/attempt-001")
+    await task
+
+    with pytest.raises(SandboxUnknownError):
+        await sandbox.collect_output(SandboxId("unknown-id"), "output/attempt-001")
+
+    await sandbox.close(sandbox_id)
+    with pytest.raises(SandboxClosedError):
+        await sandbox.collect_output(sandbox_id, "output/attempt-001")

@@ -7,9 +7,12 @@ Own the installed `gamr` Typer command and Rich terminal presentation.
 The source entrypoint is `src/gamr_cli/main.py`; `src/gamr_cli/progress.py`
 renders live experiment progress, including Tyr request and reply message bodies
 as terminal Markdown. `src/gamr_cli/experiment_cli.py` handles experiment execution
-and scientist resume commands, while `src/gamr_cli/runner_cli.py` owns execution
-composition and `--max-concurrent-cases` configuration. Ctrl+C during `experiment run` cancels the run and
+and scientist resume commands, while `src/gamr_cli/runner_cli.py` and `src/gamr_cli/composition.py` own execution
+composition, global decoder capacity gating (`GAMR_MAX_CONCURRENT_DECODERS`), and `--max-concurrent-cases` configuration. Ctrl+C during `experiment run` cancels the run and
 persists `cancelled` on the run record (exit code 130).
+`src/gamr_cli/evaluation_cli.py` composes opt-in live judge evaluations;
+`src/gamr_cli/judge_evaluation*.py` loads verified local datasets, runs registered pipelines,
+records safe model traces, and applies categorical expectations without contacting Tyr.
 
 ## Standards
 
@@ -17,7 +20,8 @@ Commands compose shared engine services and must not implement experiment algori
 
 ## Commands
 
-`uv run gamr --help`, `uv run gamr doctor`, and `pytest apps/cli/tests`.
+`uv run gamr --help`, `uv run gamr doctor`, `uv run poe evaluate:judges`, and
+`pytest apps/cli/tests`.
 
 ## Safety
 

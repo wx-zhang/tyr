@@ -1,5 +1,13 @@
 """Pure domain contracts for GAMR."""
 
+from .decoding import (
+    DecodingAttempt,
+    DecodingExecutionResult,
+    DecodingLimitFlags,
+    DecodingProvenance,
+    DecodingStream,
+    DerivedContentFile,
+)
 from .events import (
     ActivityId,
     ActivityType,
@@ -29,11 +37,22 @@ from .experiments import (
     RunSource,
     TaskReference,
 )
+from .sandbox import (
+    SandboxExecutionPreview,
+    SandboxOperationAttempt,
+    SandboxOperationEvent,
+    SandboxOperationPreview,
+    SandboxOperationState,
+    SandboxOutputFile,
+    SandboxPreviewText,
+)
 from .states import (
     AssessmentReasonCode,
     AssessmentStatus,
     ContentMatchType,
     ContentOverlapStatus,
+    DecodingFailureCode,
+    DecodingStatus,
     ExecutionOutcome,
     ObjectiveStatus,
     RunState,
@@ -67,6 +86,14 @@ __all__ = [
     "ContentMatchType",
     "ContentOverlapResult",
     "ContentOverlapStatus",
+    "DecodingFailureCode",
+    "DecodingAttempt",
+    "DecodingExecutionResult",
+    "DecodingLimitFlags",
+    "DecodingProvenance",
+    "DecodingStatus",
+    "DecodingStream",
+    "DerivedContentFile",
     "CaseAssessment",
     "AssessmentReasonCode",
     "AssessmentStatus",
@@ -104,6 +131,13 @@ __all__ = [
     "ParticipantId",
     "EvidenceId",
     "ResultSummary",
+    "SandboxExecutionPreview",
+    "SandboxOperationAttempt",
+    "SandboxOperationEvent",
+    "SandboxOperationPreview",
+    "SandboxOperationState",
+    "SandboxOutputFile",
+    "SandboxPreviewText",
     "RunState",
     "PromptBundle",
     "Scenario",

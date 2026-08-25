@@ -12,17 +12,24 @@ External I/O is async where practical. Redact credentials before persistence. Ty
 
 `tyr/` owns MCP transport and settling, `models/` owns OpenAI-compatible
 providers, `tasks/` owns confined JSON loading, and `artifacts/` owns
-redacted run bundles, atomic run-level and per-case checkpoint operations
+verbatim run bundles, atomic run-level and per-case checkpoint operations
 (`checkpoints/cases/<case-id>.json`), canonical activity writes, and legacy
 normalization.
 `collector.py` owns authenticated exact and timestamp/filename collector lookup,
-bounded retries, and digest-verified file and retained request-body downloads;
+bounded retries, and digest-verified file, snapshot, and retained request-body downloads;
 `collector_content.py` prepares bounded text, image, and safe archive content
-for the in-memory reference judge without writing an artifact copy;
+via the shared engine preparation service without writing an artifact copy;
 `collector_html.py` parses the admin HTML without retaining credentials or headers.
-`artifacts/query.py` owns bounded in-memory activity and relationship projections derived from bundles.
-`sandbox/` owns attachment snapshots, the disabled and explicitly unsafe host backends,
-the fixed Docker CLI backend, its Python 3.14 image, and bounded process support.
+`artifacts/redaction.py` is a compatibility pass-through. Decoding provenance preserves route rationale,
+source, hashes, bounded execution states, failure stage, streams, lineage, and transient identities,
+including sensitive values. It applies the same bounded preview rules to
+generic sandbox events. `artifacts/evidence.py` folds interleaved sandbox event
+deltas into one case-scoped operation turn. `artifacts/query.py` owns bounded
+in-memory activity and relationship projections derived from bundles.
+`config.py` loads and validates configuration settings including `GAMR_MAX_CONCURRENT_DECODERS`.
+`sandbox/` owns attachment snapshots, output collection (`collect_output.py`),
+the disabled and explicitly unsafe host backends, the fixed Docker CLI backend,
+its Python 3.14 image, and bounded process support.
 
 Canonical artifact and configured-secret regressions live in
 `packages/adapters/tests/test_artifacts.py`; normalization, projection recovery,

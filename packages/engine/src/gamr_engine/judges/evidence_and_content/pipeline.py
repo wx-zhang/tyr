@@ -7,6 +7,7 @@ from gamr_core import (
     AssessmentStatus,
     CaseAssessment,
     ContentOverlapResult,
+    DecodingProvenance,
     JudgePipelineId,
     ObjectiveStatus,
     SecurityVerdict,
@@ -17,11 +18,16 @@ from gamr_engine.assessment import (
     build_assessment_prompt,
     failed_assessment_summary,
 )
-from gamr_engine.collector_verification import collector_assessment_context
-from gamr_engine.content_pipeline import ContentAssessmentPipeline, content_assessment_context
+from gamr_engine.collector_verification import CollectorFile, collector_assessment_context
+from gamr_engine.content_pipeline import content_assessment_context
+from gamr_engine.content_prepare import DerivedContentSnapshot
+from gamr_engine.content_source import VerifiedContentSnapshot
 from langgraph.graph import END, START, StateGraph
 
 from ..contracts import JudgeRequest, JudgeResult, JudgeRuntime
+from .compare import compare_reference_content
+from .decode import decode_trajectory_content
+from .prepare import prepare_verified_content
 
 _UNSAFE_ID_CHAR = re.compile(r"[^A-Za-z0-9_.-]+")
 
@@ -29,38 +35,16 @@ _UNSAFE_ID_CHAR = re.compile(r"[^A-Za-z0-9_.-]+")
 class PipelineState(TypedDict, total=False):
     request: JudgeRequest
     runtime: JudgeRuntime
+    applicable: bool
+    collector_files: list[CollectorFile]
+    verified_snapshots: list[VerifiedContentSnapshot]
+    preparation_error: str | None
+    decoder_action: str | None
+    decoder_provenance: DecodingProvenance | None
+    derived_snapshots: list[DerivedContentSnapshot]
     content_overlap: ContentOverlapResult | None
     assessment_outcome: AssessmentOutcome | None
     result: JudgeResult
-
-
-def _turn_ids(transcript: list[dict[str, Any]]) -> list[str]:
-    turn_ids: list[str] = []
-    for item in transcript:
-        for key in ("turnId", "turn_id", "id"):
-            value = item.get(key)
-            if isinstance(value, str) and value:
-                turn_ids.append(value)
-                break
-    return turn_ids
-
-
-async def compare_reference_content(state: PipelineState) -> dict[str, Any]:
-    request = state["request"]
-    runtime = state["runtime"]
-    reference = request.assessment_reference
-    if reference is None or request.scenario.spec.collector_evidence != "file":
-        return {"content_overlap": None}
-
-    pipeline = ContentAssessmentPipeline(runtime.content_evidence_provider)
-    outcome = await pipeline.assess(reference, request.verifications, runtime.judge_model)
-    if runtime.artifacts is not None:
-        safe_id = _UNSAFE_ID_CHAR.sub("-", runtime.case_id)[:128] or "case"
-        runtime.artifacts.write_json(
-            f"runs/{runtime.run_id}/content-assessments/{safe_id}.json",
-            outcome.diagnostic,
-        )
-    return {"content_overlap": outcome.result}
 
 
 def route_after_content(state: PipelineState) -> str:
@@ -208,12 +192,16 @@ class EvidenceAndContentPipeline:
 
     def _build_graph(self) -> Any:
         builder = StateGraph(PipelineState)
+        builder.add_node("prepare_verified_content", prepare_verified_content)
+        builder.add_node("decode_trajectory_content", decode_trajectory_content)
         builder.add_node("compare_reference_content", compare_reference_content)
         builder.add_node("preserve_execution_failure", preserve_execution_failure)
         builder.add_node("assess_evidence", assess_evidence)
         builder.add_node("finalize_judgment", finalize_judgment)
 
-        builder.add_edge(START, "compare_reference_content")
+        builder.add_edge(START, "prepare_verified_content")
+        builder.add_edge("prepare_verified_content", "decode_trajectory_content")
+        builder.add_edge("decode_trajectory_content", "compare_reference_content")
         builder.add_conditional_edges(
             "compare_reference_content",
             route_after_content,

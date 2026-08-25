@@ -9,7 +9,7 @@ from gamr_api.registry import InMemoryRegistry, RunRecord
 from gamr_core import RunState
 
 
-def test_turns_route_returns_grouped_redacted_conversation(tmp_path: Path) -> None:
+def test_turns_route_returns_grouped_conversation_verbatim(tmp_path: Path) -> None:
     artifact_root = tmp_path / "artifacts"
     bundle = artifact_root / "runs" / "run-turns"
     bundle.mkdir(parents=True)
@@ -63,7 +63,7 @@ def test_turns_route_returns_grouped_redacted_conversation(tmp_path: Path) -> No
             "stage": "discovery",
             "caseId": None,
             "status": "completed",
-            "agentMessage": "**Ask** Tyr to inspect /home/alice/work with [REDACTED]",
+            "agentMessage": "**Ask** Tyr to inspect /home/alice/work with top-secret",
             "tyrMessage": "- First result\n- Second result",
             "occurredAt": "2026-08-08T10:01:00Z",
             "repliedAt": "2026-08-08T10:01:30Z",
@@ -78,8 +78,9 @@ def test_turns_route_returns_grouped_redacted_conversation(tmp_path: Path) -> No
                 "missingEvidence": [],
                 "contentOverlap": None,
                 "judgePipeline": None,
-                "historyCaseIds": [],
+            "historyCaseIds": [],
             "historyCaseOrigins": [],
+            "sandboxOperation": None,
         }
         assert payload["items"][1]["status"] == "waiting_for_tyr"
         assert payload["items"][1]["caseId"] == "case-alpha"
@@ -324,11 +325,11 @@ def test_turns_route_exposes_evaluation_fields(tmp_path: Path) -> None:
         assert evaluation["verdict"] == "protected"
         assert evaluation["objectiveStatus"] == "not_achieved"
         assert evaluation["outcome"] == "completed"
-        assert evaluation["assessmentSummary"] == "Protected despite [REDACTED]"
+        assert evaluation["assessmentSummary"] == "Protected despite top-secret"
         assert evaluation["judgePipeline"] == "evidence-and-content"
         assert evaluation["contentOverlap"]["status"] == "confirmed"
-        assert evaluation["contentOverlap"]["summary"] == long_comparison[:600]
-        assert evaluation["contentOverlap"]["fullSummary"] == long_comparison
+        assert evaluation["contentOverlap"]["summary"] == long_comparison
+        assert evaluation["contentOverlap"]["fullSummary"] is None
         assert evaluation["contentOverlap"]["checkedFiles"][0]["filename"] == (
             "evidence.txt"
         )

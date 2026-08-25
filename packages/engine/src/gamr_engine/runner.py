@@ -32,6 +32,7 @@ from gamr_core import (
     RunRecord,
     RunResult,
     RunState,
+    SandboxOperationEvent,
     Scenario,
     SecurityVerdict,
     TaskManifest,
@@ -50,10 +51,12 @@ from .collector_verification import (
     attach_verification_evidence,
 )
 from .content_evidence import AssessmentReference, ContentEvidenceProvider
-from .judges.contracts import JudgeRequest, JudgeRuntime
+from .judge_runtime import build_judge_runtime
+from .judges.contracts import JudgeRequest
 from .judges.registry import get_judge_pipeline
 from .ports.artifacts import ActivitySink, ArtifactStore
 from .ports.models import ModelGateway
+from .ports.sandbox import Sandbox
 from .ports.targets import TargetGateway
 
 _MAX_HISTORY_TRANSCRIPT_CHARS = 4000
@@ -225,12 +228,14 @@ class ExperimentRunner:
         activity_sink: ActivitySink | None = None,
         delivery_verifier: DeliveryVerifier | None = None,
         content_evidence_provider: ContentEvidenceProvider | None = None,
+        sandbox: Sandbox | None = None,
     ) -> None:
         self._progress = progress
         self._activity_sink = activity_sink
         self._activity_sequences: dict[str, int] = {}
         self._collector_verification = CollectorVerificationService(delivery_verifier)
         self._content_evidence_provider = content_evidence_provider
+        self._sandbox = sandbox
 
     async def run(
         self,
@@ -1079,9 +1084,10 @@ class ExperimentRunner:
             assessment_reference=task.assessment_reference,
             phase=phase,
         )
-        judge_runtime = JudgeRuntime(
+        judge_runtime = build_judge_runtime(
             judge_model=judge_model,
             content_evidence_provider=self._content_evidence_provider,
+            sandbox=self._sandbox,
             artifacts=artifacts,
             activity_sink=lambda name, payload: self._emit(
                 name,
@@ -1090,6 +1096,20 @@ class ExperimentRunner:
                 case_id=payload.get("caseId"),
                 detail=payload.get("detail"),
                 fields=payload.get("fields"),
+                metadata_extra=payload.get("metadata"),
+                evidence_refs=payload.get("evidenceRefs", ()),
+                operation_id=(
+                    payload.get("operationId")
+                    if isinstance(payload.get("operationId"), str)
+                    else None
+                ),
+                sandbox_event=(
+                    SandboxOperationEvent.model_validate(payload["sandboxEvent"])
+                    if isinstance(payload.get("sandboxEvent"), dict)
+                    else payload.get("sandboxEvent")
+                    if isinstance(payload.get("sandboxEvent"), SandboxOperationEvent)
+                    else None
+                ),
             ),
             run_id=run_id,
             case_id=case_id,
@@ -1757,7 +1777,10 @@ class ExperimentRunner:
         detail: str | None = None,
         fields: tuple[tuple[str, str], ...] | None = None,
         related_case_ids: tuple[str, ...] = (),
-        metadata_extra: dict[str, str] | None = None,
+        metadata_extra: dict[str, object] | None = None,
+        evidence_refs: tuple[str, ...] | list[str] = (),
+        operation_id: str | None = None,
+        sandbox_event: SandboxOperationEvent | None = None,
     ) -> None:
         sink = self._activity_sink
         if sink is not None:
@@ -1797,23 +1820,14 @@ class ExperimentRunner:
                         else EvidenceType.EVENT
                     ),
                     relatedCaseIds=list(related_case_ids),
+                    evidenceRefs=list(evidence_refs),
                     metadata=metadata,
+                    operationId=operation_id,
+                    sandboxEvent=sandbox_event,
                 )
-                try:
-                    activity = RunActivity(
-                        summary=self._activity_summary(event_type, detail), **activity_fields
-                    )
-                except ValueError:
-                    # `detail` is often raw exception text (e.g. a Pydantic
-                    # ValidationError, which always ends in a
-                    # https://errors.pydantic.dev/... link) and can trip the
-                    # summary's secret/path redaction check. Losing the
-                    # detail text is fine; losing the whole run over a
-                    # logging call is not.
-                    activity = RunActivity(
-                        summary=f"{event_type.replace('.', ' ')} (detail omitted: unsafe content)",
-                        **activity_fields,
-                    )
+                activity = RunActivity(
+                    summary=self._activity_summary(event_type, detail), **activity_fields
+                )
                 sink.append(activity)
             except ValueError:
                 self._activity_sequences.pop(run_id, None)
@@ -1852,6 +1866,8 @@ class ExperimentRunner:
             return (
                 ActivityType.ERROR if event_type.endswith(".failed") else ActivityType.TYR_OPERATION
             )
+        if event_type.startswith("sandbox."):
+            return ActivityType.EXECUTION
         if event_type.startswith("turn."):
             return ActivityType.EXECUTION
         if event_type.endswith(".failed") or event_type.endswith(".error"):

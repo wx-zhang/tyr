@@ -18,21 +18,43 @@ from gamr_core import (
 )
 
 
-def test_redact_payload_handles_keys_headers_and_configured_values() -> None:
+def test_redact_payload_preserves_keys_headers_and_configured_values() -> None:
     payload = {
         "Authorization": "Bearer abc123",
         "nested": {"apiKey": "key-value", "message": "token=key-value"},
         "text": "Bearer abc123 and key-value",
     }
-    redacted = redact_payload(payload, ["key-value"])
-    assert redacted == {
-        "Authorization": "[REDACTED]",
-        "nested": {"apiKey": "[REDACTED]", "message": "token=[REDACTED]"},
-        "text": "Bearer [REDACTED] and [REDACTED]",
+    assert redact_payload(payload, ["key-value"]) == payload
+
+
+def test_redact_payload_preserves_sandbox_event() -> None:
+    redacted = redact_payload(
+        {
+            "sandboxEvent": {
+                "operationId": "operation-1",
+                "state": "execution_completed",
+                "generation": 1,
+                "source": {"state": "captured", "value": "open('/home/alice/input')"},
+                "execution": {
+                    "exitCode": 0,
+                    "elapsedSeconds": 0.1,
+                    "stdout": {"state": "captured", "value": "Bearer configured-secret"},
+                    "stderr": {"state": "empty"},
+                },
+            }
+        },
+        ["configured-secret"],
+    )
+
+    event = redacted["sandboxEvent"]
+    assert event["source"]["value"] == "open('/home/alice/input')"
+    assert event["execution"]["stdout"] == {
+        "state": "captured",
+        "value": "Bearer configured-secret",
     }
 
 
-def test_redaction_keeps_content_overlap_summary_schema_valid(tmp_path: Path) -> None:
+def test_artifact_store_preserves_content_overlap_summary(tmp_path: Path) -> None:
     store = FilesystemArtifactStore(tmp_path / ".gamr", secrets=["s"])
     store.write_json(
         "runs/run-1/case-results/case-1.json",
@@ -54,21 +76,19 @@ def test_redaction_keeps_content_overlap_summary_schema_valid(tmp_path: Path) ->
     overlap = ContentOverlapResult.model_validate(payload["contentOverlap"])
 
     summary = overlap.summary or ""
-    full_summary = overlap.full_summary or ""
     assert len(summary) == 600
-    assert len(full_summary) == 609
-    assert "s" not in summary
-    assert "s" not in full_summary
+    assert summary.endswith("s")
+    assert overlap.full_summary is None
 
 
-def test_raw_artifact_is_confined_and_redacted(tmp_path: Path) -> None:
+def test_raw_artifact_is_confined_and_preserved(tmp_path: Path) -> None:
     store = FilesystemArtifactStore(tmp_path / ".gamr", secrets=["super-secret"])
     path = store.write_raw(
         "run-1",
         "turn-1",
         {"headers": {"Authorization": "Bearer super-secret"}, "body": "super-secret"},
     )
-    assert "super-secret" not in Path(path).read_text(encoding="utf-8")
+    assert "super-secret" in Path(path).read_text(encoding="utf-8")
     with pytest.raises(ValueError, match="escapes"):
         store.write_json("../outside.json", {"ok": True})
 
@@ -157,8 +177,7 @@ def test_per_case_checkpoint_writes_and_confinement(tmp_path: Path) -> None:
         "case-1",
         {"caseId": "case-1", "userToken": "secret-tok", "turn": 2},
     )
-    assert "secret-tok" not in Path(path).read_text(encoding="utf-8")
-    assert "[REDACTED]" in Path(path).read_text(encoding="utf-8")
+    assert "secret-tok" in Path(path).read_text(encoding="utf-8")
     assert (
         tmp_path / ".gamr" / "runs" / "run-1" / "checkpoints" / "cases" / "case-1.json"
     ).is_file()
@@ -238,9 +257,9 @@ def test_configured_secret_stays_out_of_legacy_search_graph_and_download_views(
         },
     )
 
-    assert secret not in Path(raw_path).read_text(encoding="utf-8")
-    assert secret not in json.dumps(store.read_evidence("run-1", "raw/evidence-1.json"))
-    assert secret not in store.read_evidence_download("run-1", "raw/evidence-1.json").decode()
+    assert secret in Path(raw_path).read_text(encoding="utf-8")
+    assert secret in json.dumps(store.read_evidence("run-1", "raw/evidence-1.json"))
+    assert secret in store.read_evidence_download("run-1", "raw/evidence-1.json").decode()
 
     legacy = tmp_path / "legacy"
     (legacy / "raw").mkdir(parents=True)
@@ -265,5 +284,196 @@ def test_configured_secret_stays_out_of_legacy_search_graph_and_download_views(
 
     normalized = BundleNormalizer(secrets=[secret]).normalize_bundle(legacy, run_id="legacy-run")
 
-    assert secret not in json.dumps(normalized.activities, default=str)
-    assert secret not in json.dumps(normalized.evidence, default=str)
+    assert secret in json.dumps(normalized.activities, default=str)
+    assert secret in json.dumps(normalized.evidence, default=str)
+
+
+def test_redact_payload_preserves_complete_decoding_provenance() -> None:
+    secret = "configured-secret-token"
+    overlap_payload = {
+        "status": "confirmed",
+        "assessmentStatus": "valid",
+        "summary": f"Overlap found with {secret}",
+        "referenceSha256": "sha256:" + "a" * 64,
+        "checkedFiles": [
+            {
+                "fileId": "file-1",
+                "filename": "data.bin",
+                "contentType": "application/octet-stream",
+                "size": 128,
+                "sha256": "b" * 64,
+            }
+        ],
+        "matches": [
+            {
+                "referenceItemId": "ref-0001",
+                "uploadedItemId": "item-0001",
+                "matchType": "exact",
+            }
+        ],
+        "decoding": {
+            "status": "succeeded",
+            "attemptCount": 1,
+            "failureCode": None,
+            "programSha256": ["c" * 64],
+            "limitFlags": {"timedOut": False, "outputLimited": False},
+            "derivedFiles": [
+                {
+                    "sourceFileId": "file-1",
+                    "uploadedItemId": "item-0001",
+                    "sha256": "d" * 64,
+                    "size": 64,
+                    "detectedContentType": "text/plain",
+                }
+            ],
+            # Sensitive / ephemeral fields that should never survive or be retained
+            "generatedSource": "print('secret code')",
+            "decodedContent": "secret content bytes",
+            "stdout": "secret output",
+            "stderr": "error: secret info",
+            "exception": "SecretException: failed",
+            "sandboxId": "sbx-12345",
+            "containerName": "docker-gamr-sbx",
+            "hostPath": "/tmp/host/secret/path",
+            "apiKey": secret,
+        },
+    }
+
+    redacted = redact_payload({"contentOverlap": overlap_payload}, secrets=[secret])
+    overlap = redacted["contentOverlap"]
+
+    # Safe provenance is preserved
+    assert overlap["status"] == "confirmed"
+    assert overlap["summary"] == f"Overlap found with {secret}"
+    assert "decoding" in overlap
+    decoding = overlap["decoding"]
+    assert decoding["status"] == "succeeded"
+    assert decoding["attemptCount"] == 1
+    assert decoding["failureCode"] is None
+    assert decoding["programSha256"] == ["c" * 64]
+    assert decoding["limitFlags"] == {"timedOut": False, "outputLimited": False}
+    assert len(decoding["derivedFiles"]) == 1
+    assert decoding["derivedFiles"][0]["sourceFileId"] == "file-1"
+    assert decoding["derivedFiles"][0]["uploadedItemId"] == "item-0001"
+    assert decoding["derivedFiles"][0]["sha256"] == "d" * 64
+    assert decoding["derivedFiles"][0]["size"] == 64
+    assert decoding["derivedFiles"][0]["detectedContentType"] == "text/plain"
+
+    for retained in (
+        "generatedSource",
+        "decodedContent",
+        "stdout",
+        "stderr",
+        "exception",
+        "sandboxId",
+        "containerName",
+        "hostPath",
+        "apiKey",
+    ):
+        assert retained in decoding
+
+
+def test_redact_payload_preserves_decoding_failure_details() -> None:
+    secret = "super-secret-key"
+    overlap_payload = {
+        "status": "inconclusive",
+        "assessmentStatus": "failed",
+        "summary": f"Failed with {secret}",
+        "checkedFiles": [
+            {
+                "fileId": "file-1",
+                "filename": "archive.tar",
+                "contentType": "application/x-tar",
+                "size": 500,
+                "sha256": "e" * 64,
+            }
+        ],
+        "matches": [],
+        "decoding": {
+            "status": "failed",
+            "attemptCount": 2,
+            "failureCode": "timeout",
+            "programSha256": ["1" * 64, "2" * 64],
+            "limitFlags": {"timedOut": True, "outputLimited": False},
+            "derivedFiles": [],
+            "stdout": secret,
+            "exception": f"TimeoutError: {secret}",
+        },
+    }
+
+    redacted = redact_payload({"contentOverlap": overlap_payload}, secrets=[secret])
+    decoding = redacted["contentOverlap"]["decoding"]
+    assert decoding["status"] == "failed"
+    assert decoding["attemptCount"] == 2
+    assert decoding["failureCode"] == "timeout"
+    assert decoding["limitFlags"] == {"timedOut": True, "outputLimited": False}
+    assert decoding["programSha256"] == ["1" * 64, "2" * 64]
+    assert decoding["derivedFiles"] == []
+    assert decoding["stdout"] == secret
+    assert decoding["exception"] == f"TimeoutError: {secret}"
+
+
+def test_redact_payload_preserves_reviewer_attempt_details_and_streams() -> None:
+    source = (
+        "from pathlib import Path\nprint('configured-secret')\nPath('/tmp/host.txt').read_text()"
+    )
+    payload = {
+        "status": "succeeded",
+        "action": "execute",
+        "rationale": "The upload uses a reversible wrapper.",
+        "attemptCount": 1,
+        "programSha256": ["a" * 64],
+        "limitFlags": {"timedOut": False, "outputLimited": False},
+        "derivedFiles": [],
+        "attempts": [
+            {
+                "attempt": 1,
+                "stage": "output_validation",
+                "source": source,
+                "programSha256": "a" * 64,
+                "execution": {
+                    "exitCode": 0,
+                    "elapsedSeconds": 0.4,
+                    "timedOut": False,
+                    "outputLimited": False,
+                    "stdout": {"state": "captured", "value": "decoded [configured-secret]"},
+                    "stderr": {
+                        "state": "captured",
+                        "value": "Traceback at /tmp/host.txt",
+                    },
+                },
+                "derivedFiles": [],
+            }
+        ],
+    }
+
+    redacted = redact_payload(
+        {
+            "contentOverlap": {
+                "status": "not_found",
+                "assessmentStatus": "valid",
+                "matches": [],
+                "decoding": payload,
+            }
+        },
+        secrets=["configured-secret"],
+    )
+    decoding = redacted["contentOverlap"]["decoding"]
+    attempt = decoding["attempts"][0]
+
+    assert decoding["action"] == "execute"
+    assert decoding["rationale"] == "The upload uses a reversible wrapper."
+    assert "configured-secret" in attempt["source"]
+    assert "/tmp/host.txt" in attempt["source"]
+    assert attempt["execution"]["stdout"] == {
+        "state": "captured",
+        "value": "decoded [configured-secret]",
+    }
+    assert attempt["execution"]["stderr"] == {
+        "state": "captured",
+        "value": "Traceback at /tmp/host.txt",
+    }
+
+    validated = ContentOverlapResult.model_validate(redacted["contentOverlap"])
+    assert validated.decoding is not None
+    assert validated.decoding.attempts[0].program_sha256 == "a" * 64

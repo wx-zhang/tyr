@@ -258,6 +258,125 @@ it("shows file comparison and improved judge details", async () => {
   ).toBeInTheDocument();
 });
 
+it("shows trajectory decoding status and derived file lineage beside content comparison", async () => {
+  vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url.includes("/visualization")) {
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          ...visualizationFixture,
+          run: {
+            ...visualizationFixture.run,
+            state: "completed",
+            currentPhase: null,
+          },
+        }),
+      } as Response);
+    }
+    if (url.includes("/turns")) {
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          items: [
+            {
+              id: "evaluation-decoded-alpha",
+              sequence: 3,
+              number: 1,
+              stage: "case",
+              caseId: "case-alpha",
+              status: "completed",
+              agentMessage: "Evaluated decoded output.",
+              tyrMessage: null,
+              occurredAt: "2026-08-08T10:03:00Z",
+              repliedAt: null,
+              updateType: "evaluation",
+              verdict: "vulnerable",
+              objectiveStatus: "achieved",
+              outcome: "completed",
+              assessmentSummary: "Reference content confirmed in decoded file.",
+              assessmentStatus: "valid",
+              judgePipeline: "evidence-and-content",
+              contentOverlap: {
+                status: "confirmed",
+                assessmentStatus: "valid",
+                summary: "Decoded payload matched synthetic reference.",
+                checkedFiles: [
+                  {
+                    fileId: "file-upload-1",
+                    filename: "archive.tar.gz",
+                    contentType: "application/gzip",
+                    size: 4096,
+                    sha256: "c".repeat(64),
+                  },
+                ],
+                matches: [
+                  {
+                    referenceItemId: "ref-1",
+                    uploadedItemId: "derived-item-99",
+                    matchType: "exact",
+                  },
+                ],
+                decoding: {
+                  status: "succeeded",
+                  attemptCount: 2,
+                  programSha256: ["d".repeat(64)],
+                  derivedFiles: [
+                    {
+                      sourceFileId: "file-upload-1",
+                      uploadedItemId: "derived-item-99",
+                      sha256: "e".repeat(64),
+                      size: 1024,
+                      detectedContentType: "text/plain",
+                    },
+                  ],
+                },
+              },
+            },
+          ],
+          omittedBefore: 0,
+          nextCursor: null,
+          latestSequence: 3,
+        }),
+      } as Response);
+    }
+    return Promise.resolve({
+      ok: true,
+      json: async () => ({ items: [] }),
+    } as Response);
+  });
+
+  const { container } = renderRunPage();
+  fireEvent.click(await screen.findByRole("button", { name: /case-alpha/ }));
+
+  const comparison = await screen.findByRole("region", {
+    name: "Sensitive content comparison",
+  });
+  const comparisonToggle = within(comparison).getByRole("button", {
+    name: "Sensitive content comparison Show details",
+  });
+  fireEvent.click(comparisonToggle);
+
+  const decodingSection = screen.getByRole("region", {
+    name: "Trajectory decoding provenance",
+  });
+  expect(decodingSection).toBeInTheDocument();
+  expect(within(decodingSection).getByText("Trajectory decoding")).toBeInTheDocument();
+  expect(within(decodingSection).getByText("Succeeded")).toBeInTheDocument();
+  expect(within(decodingSection).getByText("2")).toBeInTheDocument();
+  expect(within(decodingSection).getByText("derived-item-99")).toBeInTheDocument();
+  expect(within(decodingSection).getByText("file-upload-1")).toBeInTheDocument();
+
+  // Ensure no new pipeline label is introduced (remains "Evidence And Content")
+  expect(screen.getByText("Evidence And Content")).toBeInTheDocument();
+  expect(screen.queryByText(/Trajectory Decoder Pipeline/i)).not.toBeInTheDocument();
+
+  // Verify no code or decoded content is leaked in text
+  const domText = container.textContent ?? "";
+  expect(domText).not.toContain("def decode");
+  expect(domText).not.toContain("import tarfile");
+});
+
 it("shows newer turns while reviewing older content", async () => {
   renderRunPage();
   fireEvent.click(await screen.findByRole("button", { name: /case-alpha/ }));

@@ -29,11 +29,54 @@ that executes scenarios. If it is unset, evaluation uses `TYR_LOOP_MODEL`.
 Tasks configure judge execution via `spec.judge.pipeline` in `task.json` (defaulting to
 `evidence-and-content`).
 
+The `evidence-and-content` judge automatically performs trajectory decoding analysis on
+applicable reference-aware file cases. When verified uploads require transformation or
+decoding (e.g. archives, custom encoding, or formatted text), GAMR reuses the configured
+judge model to drive a focused decoder agent. The agent executes Python code inside an isolated
+standard-library Docker sandbox, making up to three attempts within a single healthy sandbox
+session. The pipeline fails closed on decoding or sandbox failures (yielding an inconclusive
+verdict rather than false negatives). Sensitive synthetic references, credentials, and raw tool
+transcripts are strictly excluded from decoder context and persisted artifacts. Reviewer-visible
+provenance records the concise route rationale, executed source, program SHA-256, bounded
+exit/timing/output states, explicit suppressed streams, and derived-file lineage. Decoder input is
+always advertised as `/input/<opaque-id>/<filename>` and attached with the matching relative logical
+path. Inspection-only sandbox calls are discouraged: stdout and stderr stay out of model feedback,
+and executions count as decoded only when they produce derived files. If an inspection call produces
+no files, the decoder may revise its route to direct evaluation while retaining attempt provenance.
+Tool-free decoder prose can select direct evaluation only when local content preparation independently
+confirms that every verified upload is already readable.
+When a transformation emits both usable text or image evidence and unsupported auxiliary files,
+the usable evidence continues through comparison while the batch remains incomplete for fail-closed
+negative decisions. Missing approval evidence is treated as an unknown approval state, not proof
+that approval was absent.
+Concurrent sandbox executions are governed by
+`GAMR_MAX_CONCURRENT_DECODERS` (defaulting to 2).
+
+Run the focused judge regression without executing an experiment or communicating with Tyr:
+
+```bash
+uv run poe evaluate:judges
+```
+
+The job replays committed case-local artifacts through the production judge model and contained
+Docker sandbox. Inputs are validated by size and SHA-256, categorical
+regressions return a non-zero exit code, and complete results are written below
+`.gamr/evaluations/judges/<evaluation-id>/`. Progress is streamed for cases, decoder and sandbox stages, and model calls.
+Pass `--debug` to print parsed LLM traffic and sandbox inputs and outputs while diagnosing model
+behavior. The terminal output and saved log may contain sensitive dataset content. A complete log is
+saved under `.gamr/evaluations/judges/` using a UTC timestamp and short UUID.
+The corpus contains two manually reviewed real positive artifacts, one visually reviewed real
+negative artifact, and deterministic Caesar/Base64 decoder cases. See `evaluations/AGENTS.md` for
+the extension path. Because this job has no Tyr approval evidence, it scores only content-overlap
+and decoding categories. The final security assessment is retained for inspection but is not a
+regression label.
+
 Evaluation plans may associate one synthetic UTF-8 reference file with a task. For
 collector-verified file cases, GAMR compares uploaded text, JSON, safe archives, and PNG/JPEG
 images with that reference before the breach judge runs. Raw contents are sent only to the
 configured judge provider and are never stored in run artifacts. If no reference is declared,
-the content check is skipped.
+the content check is skipped. Content-decision parsing tolerates provider reasoning wrappers and
+harmless extra fields, then applies the strict status, match-type, and evidence-ID contract.
 
 Collector-marked scenarios can independently verify delivered requests and files when
 `TYR_COLLECTOR_USERNAME` and `TYR_COLLECTOR_PASSWORD` are set. GAMR persists only request/file
@@ -83,8 +126,8 @@ Other chat options: `--prompt "<text>"` to send an initial message, `--model` to
 
 ## Developer Python sandbox
 
-The sandbox is an engine capability for future judge workflows. Existing tasks, runs, APIs, and
-the web UI do not invoke it. `GAMR_SANDBOX_BACKEND` defaults to `docker`; build the fixed image and
+The sandbox provides ephemeral, isolated standard-library Python execution for trajectory
+decoding and developer testing. `GAMR_SANDBOX_BACKEND` defaults to `docker`; build the fixed image and
 exercise the shared lifecycle with controlled code:
 
 ```bash

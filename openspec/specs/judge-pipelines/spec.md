@@ -75,23 +75,23 @@ CLI and API experiments SHALL resolve the task's selected pipeline through the s
 - **THEN** the case remains inconclusive with the existing safe failed-assessment summary and missing-evidence behavior
 
 ### Requirement: Behavior-preserving evidence-and-content pipeline
-The `evidence-and-content` pipeline SHALL reproduce the judge sequence that exists before this change. It SHALL conditionally perform collector-backed reference-content comparison and SHALL then perform the final structured evidence assessment with the resulting content context. It MUST preserve the existing prompts, model request modes, attempt limits, validation rules, conservative verdict constraints, reason-code enrichment, diagnostic persistence, activity ordering, and case-result fields.
+The `evidence-and-content` pipeline SHALL preserve its existing collector-backed comparison and final structured evidence-assessment semantics while adding trajectory analysis and bounded generated-Python execution before content comparison for every reference-aware file case. The decoder stage SHALL use the configured judge model and the shared secure sandbox path. The comparison and final stages MUST preserve their existing prompts, model request modes, attempt limits, validation rules, conservative verdict constraints, reason-code enrichment, diagnostic exclusions, and canonical assessment fields. Decoder lifecycle activities and bounded decoding provenance SHALL be additive and SHALL occur between collector verification and content comparison.
 
 #### Scenario: Reference-aware file case
 - **WHEN** a case requests file collector evidence and its evaluation plan contains a valid synthetic reference
-- **THEN** the pipeline verifies and prepares the collected files, performs the existing structured content-overlap assessment, and supplies that result to the existing final evidence assessment
+- **THEN** the pipeline verifies the collected files, records decoder analysis and its validated route rationale, prepares direct or safely decoded evidence with bounded attempt provenance, performs the existing structured content-overlap assessment, and supplies that result to the existing final evidence assessment
 
 #### Scenario: Content overlap is confirmed
-- **WHEN** the current content judge confirms meaningful overlap for a reference-aware file case
+- **WHEN** the current content judge confirms meaningful overlap in directly prepared or safely decoded evidence
 - **THEN** the final assessment receives the confirmed overlap and applies the existing reference-aware verdict constraints
 
 #### Scenario: Content is absent, incomplete, unsupported, or invalid
-- **WHEN** the current content assessment cannot safely confirm or reject overlap
-- **THEN** the pipeline preserves the existing inconclusive content result, safe failure, checked-file metadata, and final-assessment constraints
+- **WHEN** preparation, trajectory analysis, decoding, or content assessment cannot safely confirm or reject overlap
+- **THEN** the pipeline preserves an inconclusive content result, safe stage-specific failure, checked-file metadata, and final-assessment constraints
 
 #### Scenario: No applicable reference-content comparison
 - **WHEN** the evaluation has no synthetic reference or the scenario does not request file collector evidence
-- **THEN** the pipeline skips content comparison and runs the existing final evidence assessment without content-overlap context
+- **THEN** the pipeline skips trajectory decoding and content comparison and runs the existing final evidence assessment without content-overlap context
 
 #### Scenario: Structured content response is invalid once
 - **WHEN** the content judge's first response fails existing validation and its second response is valid
@@ -103,7 +103,7 @@ The `evidence-and-content` pipeline SHALL reproduce the judge sequence that exis
 
 #### Scenario: Case execution fails without verified content
 - **WHEN** case execution reports an error and no verified content is available under the existing rules
-- **THEN** GAMR preserves the existing early failed case result and does not start final assessment
+- **THEN** GAMR preserves the existing early failed case result and does not start trajectory analysis, generated execution, or final assessment
 
 ### Requirement: Judge pipeline provenance
 Canonical run results and normalized evaluation evidence SHALL identify the selected judge pipeline. This provenance SHALL be additive: existing content-overlap fields, assessment fields, diagnostic locations, and reviewer-facing content SHALL retain their current meaning and shape. Readers SHALL continue to accept legacy run bundles that have no pipeline identifier.
@@ -136,12 +136,27 @@ Pipeline extraction MUST NOT broaden model, target, filesystem, credential, or e
 - **THEN** schema validation rejects it and GAMR does not import or execute task-selected code
 
 ### Requirement: Follow-up judge behavior remains separate
-This capability SHALL NOT add transformed-content decoding, generated program execution, sandbox backends, external API judge calls, or judge-initiated Tyr conversations. Such behavior MUST be introduced through a later specification and a new predefined pipeline or an explicitly revised pipeline contract.
+The `evidence-and-content` pipeline MAY add only the bounded trajectory analysis and sandboxed generated-Python behavior defined by `trajectory-content-decoding`. It SHALL NOT call arbitrary external APIs, initiate new Tyr conversations, approve actions, execute on the host, install runtime packages, or load task-selected code. Any API-checking, Tyr-interacting, action-approving, dynamically installed, or networked judge behavior MUST be introduced through a later specification and a new predefined pipeline or an explicitly revised pipeline contract.
 
 #### Scenario: Transformed upload is not directly readable
-- **WHEN** the current content preparation cannot read a transformed upload
-- **THEN** `evidence-and-content` preserves the current unavailable or inconclusive result and does not attempt to derive or execute reading instructions
+- **WHEN** the current content preparation cannot directly read a transformed upload but verified bytes and trajectory context are available
+- **THEN** `evidence-and-content` may derive and execute standard-library Python only through its bounded secure decoder stage before invoking the existing comparator
 
 #### Scenario: Future pipeline identifier is not implemented
 - **WHEN** a task requests a future API-checking or Tyr-interacting pipeline before that identifier is added to the schema and registry
 - **THEN** task validation rejects the request
+
+### Requirement: Decoder execution parity
+CLI and API composition SHALL provide the same judge model, verified content source, secure sandbox, and process-wide decoder-capacity behavior to the existing `evidence-and-content` pipeline. Base cases and scientist-generated cases SHALL use the same graph, trajectory inputs, model limits, sandbox lifecycle, output validation, comparison semantics, safe failures, activity lifecycle, and provenance rules. Delivery surfaces MUST NOT provide a flag, request field, environment override, or model-controlled value that disables the decoder stage for an individual applicable case.
+
+#### Scenario: CLI and API execute equivalent decoder cases
+- **WHEN** equivalent CLI and API runs use the same task, verified evidence, judge-model responses, and sandbox results
+- **THEN** they produce equivalent decoder calls, route rationale, redacted executed source, structured execution results, activities, accepted outputs, content results, assessments, and safe provenance under the same `evidence-and-content` identifier
+
+#### Scenario: Scientist-generated case is decoded
+- **WHEN** a scientist-generated reference-aware file case reaches `evidence-and-content`
+- **THEN** its safe task context, rendered test case, evaluation criteria, and own agent–Tyr transcript are analyzed through the same decoder path used for a base case
+
+#### Scenario: Existing exfiltration task executes
+- **WHEN** the repository's existing exfiltration task runs a reference-aware file case after this change
+- **THEN** its existing `evidence-and-content` selection executes the upgraded decoder path without a task-selected code payload or second judge identifier

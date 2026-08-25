@@ -4,6 +4,7 @@ import {
   isDiscoveryResult,
   isEvaluation,
   isScientistGeneration,
+  isSandboxOperation,
   label,
   resultDisplay,
   tone,
@@ -29,27 +30,32 @@ export function turnActivityPresentation(
   const scientistGeneration = isScientistGeneration(turn);
   const evaluation = isEvaluation(turn);
   const discovery = isDiscoveryResult(turn);
+  const sandboxOperation = isSandboxOperation(turn);
   const result = evaluation
     ? resultDisplay(turn.verdict, turn.objectiveStatus, turn.outcome)
     : null;
-  const title = evaluation
-    ? turn.stage === "scientist"
-      ? `Scientist evaluation - ${turn.caseId ?? `Case ${turn.number}`}`
-      : `Evaluation result - ${turn.caseId ?? `Case ${turn.number}`}`
-    : discovery
-      ? turn.status === "blocked"
-        ? "Discovery blocked"
-        : "Discovery complete"
-      : scientistGeneration
-        ? `Scientist - Iteration ${turn.number}`
-        : turn.stage === "scientist"
-          ? `Scientist Scenario ${scientistIteration ?? turn.number} - Turn ${turn.number}`
-          : `${label(turn.stage)} - Turn ${turn.number}`;
-  const source = evaluation
-    ? (turn.assessmentSummary ?? turn.agentMessage ?? result?.label)
-    : waiting
-      ? "Waiting for Tyr response"
-      : (turn.tyrMessage ?? turn.agentMessage ?? label(turn.status));
+  const title = sandboxOperation
+    ? `Sandbox operation - ${turn.caseId ?? `Case ${turn.number}`}`
+    : evaluation
+      ? turn.stage === "scientist"
+        ? `Scientist evaluation - ${turn.caseId ?? `Case ${turn.number}`}`
+        : `Evaluation result - ${turn.caseId ?? `Case ${turn.number}`}`
+      : discovery
+        ? turn.status === "blocked"
+          ? "Discovery blocked"
+          : "Discovery complete"
+        : scientistGeneration
+          ? `Scientist - Iteration ${turn.number}`
+          : turn.stage === "scientist"
+            ? `Scientist Scenario ${scientistIteration ?? turn.number} - Turn ${turn.number}`
+            : `${label(turn.stage)} - Turn ${turn.number}`;
+  const source = sandboxOperation
+    ? `Sandbox ${turn.status.replaceAll("_", " ")}`
+    : evaluation
+      ? (turn.assessmentSummary ?? turn.agentMessage ?? result?.label)
+      : waiting
+        ? "Waiting for Tyr response"
+        : (turn.tyrMessage ?? turn.agentMessage ?? label(turn.status));
 
   return {
     title,
@@ -65,6 +71,7 @@ export function turnActivityPresentation(
     scientistGeneration,
     evaluation,
     discovery,
+    sandboxOperation,
   };
 }
 

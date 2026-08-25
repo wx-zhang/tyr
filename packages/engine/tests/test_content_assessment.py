@@ -11,7 +11,10 @@ from gamr_core import (
     Scenario,
 )
 from gamr_engine.collector_verification import CollectorFile, CollectorVerification
-from gamr_engine.content_assessment import ContentAssessmentService
+from gamr_engine.content_assessment import (
+    CONTENT_ASSESSMENT_SYSTEM,
+    ContentAssessmentService,
+)
 from gamr_engine.content_evidence import (
     AssessmentReference,
     ContentEvidenceBatch,
@@ -128,6 +131,25 @@ async def test_content_judge_returns_safe_match_provenance() -> None:
 
 
 @pytest.mark.asyncio
+async def test_content_judge_preserves_detailed_markdown_diff() -> None:
+    summary = (
+        "### Comparison\n\nThe environments differ.\n\n```diff\n"
+        + ("- expected field: [redacted]\n+ received field: [redacted]\n" * 12)
+        + "```"
+    )
+    model = MultimodalModel([_response("not_found", [], summary)])
+
+    outcome = await ContentAssessmentService().assess(
+        reference=_reference(), evidence=_batch(), model=model
+    )
+
+    assert len(summary) > 600
+    assert outcome.result.summary == summary
+    assert "```diff" in CONTENT_ASSESSMENT_SYSTEM
+    assert "show the exact expected and received values" in CONTENT_ASSESSMENT_SYSTEM
+
+
+@pytest.mark.asyncio
 async def test_content_judge_retries_unknown_ids_and_fails_safely() -> None:
     invalid = _response(
         "confirmed",
@@ -175,6 +197,84 @@ async def test_content_judge_recovers_one_invalid_response() -> None:
 
     assert outcome.result.assessment_status is AssessmentStatus.RECOVERED
     assert len(model.requests) == 2
+    assert "Return one JSON object only" in model.requests[1][0]
+    assert '\\"matches\\":[]' in model.requests[1][0]
+
+
+@pytest.mark.asyncio
+async def test_content_judge_accepts_json_in_a_code_fence() -> None:
+    response = _response("not_found", [], "No meaningful values match.")
+    response["content"] = f"```json\n{response['content']}\n```"
+    model = MultimodalModel([response])
+
+    outcome = await ContentAssessmentService().assess(
+        reference=_reference(), evidence=_batch(), model=model
+    )
+
+    assert outcome.result.status is ContentOverlapStatus.NOT_FOUND
+    assert outcome.result.assessment_status is AssessmentStatus.VALID
+
+
+@pytest.mark.asyncio
+async def test_nonmatching_decision_discards_noncanonical_match_details() -> None:
+    response = _response("not_found", [], "No meaningful values match.")
+    payload = json.loads(str(response["content"]))
+    payload["matches"] = [{"description": "Different value"}]
+    payload["analysis"] = "The values differ."
+    response["content"] = json.dumps(payload)
+    model = MultimodalModel([response])
+
+    outcome = await ContentAssessmentService().assess(
+        reference=_reference(), evidence=_batch(), model=model
+    )
+
+    assert outcome.result.status is ContentOverlapStatus.NOT_FOUND
+    assert outcome.result.matches == []
+
+
+@pytest.mark.asyncio
+async def test_content_judge_extracts_wrapped_confirmed_json_and_discards_extras() -> None:
+    payload = {
+        "status": "confirmed",
+        "summary": "The image contains the reference value.",
+        "analysis": "Unrequested explanation.",
+        "matches": [
+            {
+                "referenceItemId": "ref-0001",
+                "uploadedItemId": "upload-001",
+                "matchType": "visual",
+                "confidence": 0.99,
+            }
+        ],
+    }
+    wrapped = f"<think>comparison complete</think>\n{json.dumps(payload)}\nDone."
+    model = MultimodalModel([{"content": wrapped}])
+
+    outcome = await ContentAssessmentService().assess(
+        reference=_reference(), evidence=_batch(), model=model
+    )
+
+    assert outcome.result.status is ContentOverlapStatus.CONFIRMED
+    assert len(outcome.result.matches) == 1
+
+
+@pytest.mark.asyncio
+async def test_content_judge_reports_completion_token_exhaustion() -> None:
+    exhausted: dict[str, object] = {
+        "content": "",
+        "finishReason": "length",
+        "model": "judge-a",
+    }
+    model = MultimodalModel([exhausted, exhausted])
+
+    outcome = await ContentAssessmentService().assess(
+        reference=_reference(), evidence=_batch(), model=model
+    )
+
+    assert outcome.result.failure == "completion_token_limit"
+    attempts = outcome.diagnostic["attempts"]
+    assert isinstance(attempts, list)
+    assert attempts[0]["error"] == "completion_token_limit"
 
 
 @pytest.mark.asyncio

@@ -9,6 +9,7 @@ RUN rm -rf /usr/local/bin/pip* \
     && chown -R 65532:65532 /opt/gamr /input /workspace
 
 COPY populate_input.py /opt/gamr/populate_input.py
+COPY collect_output.py /opt/gamr/collect_output.py
 
 ENV PYTHONNOUSERSITE=1
 ENV PYTHONDONTWRITEBYTECODE=1

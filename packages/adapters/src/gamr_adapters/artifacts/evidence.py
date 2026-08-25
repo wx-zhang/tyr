@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
 from collections.abc import Iterable
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import TypedDict
 from uuid import UUID
 
 from gamr_core import (
@@ -20,6 +20,10 @@ from gamr_core import (
     RunParticipant,
     RunResult,
     RunState,
+    SandboxOperationAttempt,
+    SandboxOperationEvent,
+    SandboxOperationPreview,
+    SandboxOperationState,
 )
 from pydantic import ValidationError
 
@@ -30,11 +34,6 @@ from gamr_adapters.tyr.operations import (
 
 from .filesystem import FilesystemArtifactStore, redact_payload
 from .query import CursorCodec
-
-_UNSAFE_VALUE = re.compile(
-    r"bearer\s+\S+|(?:api[_-]?key|token|secret)\s*[=:]\s*\S+|(?:^|[\s=:])(?:/|[A-Za-z]:[\\/]|~[/\\])",
-    re.IGNORECASE,
-)
 
 
 @dataclass(frozen=True)
@@ -86,6 +85,18 @@ class NormalizedTurn:
     judge_pipeline: str | None = None
     history_case_ids: tuple[str, ...] = ()
     history_case_origins: tuple[str, ...] = ()
+    sandbox_operation: SandboxOperationPreview | None = None
+
+
+class _SandboxSession(TypedDict):
+    owner: str
+    state: SandboxOperationState
+    generation: int
+    attempts: dict[int, SandboxOperationAttempt]
+    started_at: datetime
+    updated_at: datetime
+    case_id: str | None
+    sequence: int
 
 
 def _parse_occurred_at(value: object) -> datetime | None:
@@ -605,6 +616,116 @@ def _evaluation_turns(
     )
 
 
+def _sandbox_turns_from_activity(
+    root: Path,
+    *,
+    run_id: str,
+    secrets: Iterable[str] = (),
+) -> list[NormalizedTurn]:
+    path = root / "activity.jsonl"
+    if not path.is_file():
+        return []
+    sessions: dict[tuple[str | None, str], _SandboxSession] = {}
+    with path.open(encoding="utf-8") as handle:
+        for line in handle:
+            if not line.strip():
+                continue
+            try:
+                record = redact_payload(json.loads(line), secrets)
+                activity = RunActivity.model_validate(record)
+            except (json.JSONDecodeError, TypeError, ValueError, ValidationError):
+                continue
+            event = activity.sandbox_event
+            if event is None:
+                continue
+            key = (activity.case_id, event.operation_id)
+            session = sessions.setdefault(
+                key,
+                {
+                    "owner": event.owner,
+                    "state": event.state,
+                    "generation": event.generation,
+                    "attempts": {},
+                    "started_at": activity.occurred_at,
+                    "updated_at": activity.occurred_at,
+                    "case_id": activity.case_id,
+                    "sequence": activity.sequence,
+                },
+            )
+            session["state"] = event.state
+            session["generation"] = event.generation
+            session["updated_at"] = activity.occurred_at
+            session["sequence"] = min(session["sequence"], activity.sequence)
+            _fold_sandbox_event(session, event)
+    turns: list[NormalizedTurn] = []
+    per_case: dict[str | None, int] = {}
+    for (_case_id, operation_id), session in sessions.items():
+        case_id = session["case_id"]
+        case_key = case_id if isinstance(case_id, str) else None
+        per_case[case_key] = per_case.get(case_key, 0) + 1
+        attempts = session["attempts"]
+        preview = SandboxOperationPreview(
+            operationId=operation_id,
+            owner=str(session["owner"]),
+            state=session["state"],
+            generation=session["generation"],
+            attempts=[attempts[number] for number in sorted(attempts)],
+            startedAt=session["started_at"],
+            updatedAt=session["updated_at"],
+        )
+        state = preview.state.value
+        turns.append(
+            NormalizedTurn(
+                id=f"{run_id}-sandbox-{operation_id}",
+                sequence=session["sequence"],
+                number=per_case[case_key],
+                stage="case",
+                case_id=case_key,
+                status=state,
+                agent_message=f"Sandbox operation {state.replace('_', ' ')}",
+                tyr_message=None,
+                occurred_at=preview.started_at,
+                replied_at=preview.updated_at,
+                update_type="sandbox_operation",
+                sandbox_operation=preview,
+            )
+        )
+    return turns
+
+
+def _fold_sandbox_event(session: _SandboxSession, event: SandboxOperationEvent) -> None:
+    attempts = session["attempts"]
+    if event.attempt is None:
+        return
+    current = attempts.get(event.attempt)
+    if current is None:
+        current = SandboxOperationAttempt(
+            attempt=event.attempt,
+            generation=event.generation,
+            state="running",
+        )
+    fields: dict[str, object] = {"generation": event.generation}
+    if event.program_sha256 is not None:
+        fields["program_sha256"] = event.program_sha256
+    if event.source is not None:
+        fields["source"] = event.source
+    if event.execution is not None:
+        fields["execution"] = event.execution
+    if event.output_count is not None:
+        fields["output_count"] = event.output_count
+    if event.output_files is not None:
+        fields["output_files"] = event.output_files
+    if event.failure_code is not None:
+        fields["failure_code"] = event.failure_code
+    if event.state is SandboxOperationState.EXECUTION_COMPLETED:
+        fields["state"] = "completed"
+    elif event.state is SandboxOperationState.FAILED:
+        fields["state"] = "failed"
+    elif event.state is SandboxOperationState.CANCELLED:
+        fields["state"] = "cancelled"
+    attempts[event.attempt] = current.model_copy(update=fields)
+
+
 def normalize_turns(
     bundle: str | Path,
     *,
@@ -704,8 +825,9 @@ def normalize_turns(
     scientist = [replace(turn, update_type="scientist") for turn in scientist]
     evaluations = _evaluation_turns(root, run_id=run_id, secrets=secrets)
     discovery = _discovery_turn_from_artifact(root, run_id=run_id, secrets=secrets)
+    sandbox_operations = _sandbox_turns_from_activity(root, run_id=run_id, secrets=secrets)
     discovery = _stamp_discovery_after_chatter(discovery, conversation)
-    combined = [*conversation, *scientist, *evaluations, *discovery]
+    combined = [*conversation, *scientist, *evaluations, *discovery, *sandbox_operations]
     minimum = datetime.min.replace(tzinfo=UTC)
 
     def sort_key(turn: NormalizedTurn) -> tuple[int, datetime, int, str]:
@@ -742,6 +864,7 @@ def normalize_turns(
             judge_pipeline=turn.judge_pipeline,
             history_case_ids=turn.history_case_ids,
             history_case_origins=turn.history_case_origins,
+            sandbox_operation=turn.sandbox_operation,
         )
         for index, turn in enumerate(ordered, 1)
     ]
@@ -836,23 +959,11 @@ class BundleNormalizer:
                 "summary",
                 "evidenceRefs",
                 "detailAvailability",
+                "sandboxEvent",
             }
             canonical_payload = {key: record[key] for key in allowed_fields if key in record}
             canonical_payload["runId"] = run_id
             canonical_payload["metadata"] = self._participant_metadata(record, canonical_payload)
-            for field in (
-                "operationId",
-                "approvalId",
-                "sourceParticipantId",
-                "targetParticipantId",
-            ):
-                value = canonical_payload.get(field)
-                if isinstance(value, str) and _UNSAFE_VALUE.search(value):
-                    canonical_payload[field] = None
-            if isinstance(canonical_payload.get("status"), str) and _UNSAFE_VALUE.search(
-                str(canonical_payload["status"])
-            ):
-                canonical_payload["status"] = "redacted"
             return RunActivity.model_validate(canonical_payload)
         event_type = str(record.get("eventType") or "system")
         payload = record.get("payload")
@@ -867,8 +978,6 @@ class BundleNormalizer:
         event_id = record.get("id") or self._stable_id(json.dumps(record, sort_keys=True))
         summary = details.get("summary") or details.get("detail") or event_type
         status = str(record.get("state") or self._legacy_status(event_type))
-        if _UNSAFE_VALUE.search(status):
-            status = "redacted"
         return RunActivity(
             id=str(event_id),
             runId=run_id,
@@ -1209,9 +1318,6 @@ class BundleNormalizer:
         content_size: int | None = None,
     ) -> EvidenceItem:
         safe_summary = summary if summary.strip() else "Evidence detail"
-        if _UNSAFE_VALUE.search(safe_summary):
-            safe_summary = "Evidence detail redacted"
-            availability = Availability.REDACTED
         return EvidenceItem(
             id=evidence_id,
             runId=run_id,

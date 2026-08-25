@@ -12,10 +12,15 @@ Tyr is a security and governance layer for AI agents. It sits between an AI agen
 - Use Python 3.14 with one root uv workspace and `uv.lock`. Use Node.js 24 LTS with pnpm only for `apps/web` and one root `pnpm-lock.yaml`.
 - Apps depend on shared packages; packages never depend on apps. CLI and API execution share the same engine.
 - Tasks and canonical run results are schema-validated JSON files. Databases contain rebuildable operational state only.
-- Read-only is the default. Real actions always require explicit, recorded human approval, and secrets must never enter persisted evidence.
+- Read-only is the default. Real actions always require explicit, recorded human approval. Test evidence is retained verbatim, including credentials and other sensitive values.
 - Put module-specific architecture, commands, conventions, and tests in the nearest child `AGENTS.md`; do not duplicate them here.
 - Keep every `AGENTS.md` below 300 lines and follow the root file's general pattern: purpose, scoped standards, layout or ownership, working commands, safety/testing rules, and coding standards. Omit sections that do not apply.
 - Avoid using lazy-import. Imports should be placed on top, unless it's required by the circurral dependency.
+
+## Traceability
+
+- Any interaction with LLM or Tyr must be traceable from the execution log.
+- Any code executed in sandbox should be stored with inputs and outputs in the logs.
 
 ## Repository Layout
 
@@ -39,10 +44,11 @@ schemas/     Generated task, run-result, and OpenAPI schemas
 docs/        Architecture, data-format, development, and scaffold specifications
 scripts/     Schema export, local development data utilities, and sandbox developer commands
 tests/       Cross-package fixtures, integration tests, smoke tests, and sandbox runner tests
+evaluations/ Small, reviewed, run-derived datasets for opt-in live judge regression
 .gamr/       Gitignored local run bundles and standalone operational state
 ```
 
-Scoped instruction files belong in `apps/`, every `apps/*` module, `packages/`, every `packages/*` module, `tasks/`, `schemas/`, `docs/`, `scripts/`, and `tests/`. A scoped file adds only subtree-specific rules and may tighten, but never weaken, this file's safety requirements. See `docs/SCAFFOLD_SPEC.md` for the ownership of each instruction file.
+Scoped instruction files belong in `apps/`, every `apps/*` module, `packages/`, every `packages/*` module, `tasks/`, `schemas/`, `docs/`, `scripts/`, `tests/`, and `evaluations/`. A scoped file adds only subtree-specific rules and may tighten, but never weaken, this file's safety requirements. See `docs/SCAFFOLD_SPEC.md` for the ownership of each instruction file.
 
 ### Module dependency rules
 
@@ -67,6 +73,7 @@ uv run poe test
 uv run poe schemas
 uv run poe sandbox-build
 uv run poe sandbox-run --attach <path> --code "<source>"
+uv run poe evaluate:judges
 uv run poe check
 ```
 
@@ -81,6 +88,7 @@ gamr task validate <task-directory>
 gamr experiment run <task-directory>
 gamr experiment show <run-id>
 gamr result validate <result.json>
+gamr evaluate judges
 gamr chat
 ```
 
@@ -92,7 +100,7 @@ gamr chat
 - Live Tyr/OpenRouter tests are opt-in and marker-gated. Never run them in default tests or enable real actions merely to verify a change.
 - Sandbox Docker runtime tests are opt-in and marker-gated. Default tests use fake Docker processes or controlled host snippets.
 - Use an idempotency key for every Tyr request and approval resolution. Retry an interrupted external step only when its idempotency and checkpoint state make the retry safe.
-- Redact API keys, bearer tokens, authorization headers, and configured secret fields before writing logs, events, snapshots, raw payloads, or API responses.
+- Preserve model, Tyr, tool, sandbox, and artifact evidence verbatim. Treat run bundles and API access as trusted-operator data because they can contain credentials and authorization values.
 - Never trust an outer Tyr terminal state alone: delegated executions, bridge work, or a late user-visible response may still be pending. Preserve the settle-window behavior and raw diagnostic evidence.
 - Never overwrite canonical task files or completed run bundles as a side effect of viewing or evaluating them.
 
