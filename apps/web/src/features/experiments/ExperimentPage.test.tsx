@@ -19,7 +19,11 @@ vi.mock("react-router-dom", async () => {
 
 const tasks = [
   {
-    metadata: { id: "exfiltrate-important-txt", title: "Exfiltrate important.txt", version: "2.0.0" },
+    metadata: {
+      id: "exfiltrate-important-txt",
+      title: "Exfiltrate important.txt",
+      version: "2.0.0",
+    },
     spec: {
       cases: ["cases/a.json", "cases/b.json"],
       defaults: {
@@ -118,6 +122,9 @@ it("creates the experiment via the API then redirects to details", async () => {
   expect(await screen.findByLabelText(/Case Alpha/)).toBeChecked();
   expect(screen.getByLabelText(/Case Beta/)).not.toBeChecked();
   expect(screen.getByLabelText("Task")).toHaveValue("exfiltrate-important-txt");
+  expect(
+    screen.queryByRole("option", { name: "Research new task" }),
+  ).not.toBeInTheDocument();
   expect(screen.getByLabelText("Actions Allowed")).toBeChecked();
 
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
@@ -155,19 +162,19 @@ it("sends scientist iterations when the operator sets them", async () => {
   renderPage();
 
   expect(await screen.findByLabelText(/Case Alpha/)).toBeChecked();
-  expect(screen.getByLabelText("Number of new task research")).toHaveValue(0);
+  expect(screen.getByLabelText("Scientist iterations")).toHaveValue(0);
   expect(
-    screen.getByRole("button", { name: "What number of new task research means" }),
+    screen.getByRole("button", { name: "What scientist iterations means" }),
   ).toBeInTheDocument();
   expect(
     screen.getByRole("tooltip", {
-      name: /generate-and-run cycles for the scientist stage/i,
+      name: /task-specific scenarios/i,
     }),
   ).toBeInTheDocument();
-  fireEvent.change(screen.getByLabelText("Number of new task research"), {
+  fireEvent.change(screen.getByLabelText("Scientist iterations"), {
     target: { value: "2" },
   });
-  expect(screen.getByLabelText("Number of new task research")).toHaveValue(2);
+  expect(screen.getByLabelText("Scientist iterations")).toHaveValue(2);
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
   await waitFor(() => {
@@ -206,7 +213,7 @@ it("defaults max concurrent cases to 1 and bounds operator input 1 through 5", a
   });
 });
 
-it("sends configured scientist history windows when selecting Research new task", async () => {
+it("sends configured scientist history windows for scientist-only task runs", async () => {
   const createBodies: Record<string, unknown>[] = [];
   installFetch((body) => {
     createBodies.push(body);
@@ -214,16 +221,14 @@ it("sends configured scientist history windows when selecting Research new task"
 
   renderPage();
   expect(await screen.findByLabelText(/Case Alpha/)).toBeChecked();
-  fireEvent.change(screen.getByLabelText("Task"), {
-    target: { value: "__research_new_task__" },
-  });
+  fireEvent.click(screen.getByLabelText(/Case Alpha/));
   expect(
     screen.getByRole("heading", { name: "Scientist history" }),
   ).toBeInTheDocument();
   expect(
-    screen.queryByRole("heading", { name: "Test cases" }),
-  ).not.toBeInTheDocument();
-  fireEvent.change(screen.getByLabelText("Number of new task research"), {
+    screen.getByRole("heading", { name: "Test cases" }),
+  ).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("Scientist iterations"), {
     target: { value: "1" },
   });
   fireEvent.change(screen.getByLabelText("Test-case runs"), {
@@ -274,7 +279,7 @@ it("does not redirect when the API fails to create the experiment", async () => 
   expect(navigate).not.toHaveBeenCalled();
 });
 
-it("disables continue when no cases are selected", async () => {
+it("disables continue when no cases and no scientist iterations are selected", async () => {
   renderPage();
 
   expect(await screen.findByLabelText(/Case Alpha/)).toBeChecked();
@@ -284,7 +289,7 @@ it("disables continue when no cases are selected", async () => {
   expect(navigate).not.toHaveBeenCalled();
 });
 
-it("allows skipping seed cases to jump straight to the scientist stage with Research new task", async () => {
+it("allows a selected task to run scientist-only iterations without seed cases", async () => {
   const createBodies: Record<string, unknown>[] = [];
   installFetch((body) => {
     createBodies.push(body);
@@ -293,15 +298,13 @@ it("allows skipping seed cases to jump straight to the scientist stage with Rese
   renderPage();
 
   expect(await screen.findByLabelText(/Case Alpha/)).toBeChecked();
-  fireEvent.change(screen.getByLabelText("Task"), {
-    target: { value: "__research_new_task__" },
-  });
+  fireEvent.click(screen.getByLabelText(/Case Alpha/));
   expect(
     screen.getByRole("heading", { name: "Scientist history" }),
   ).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
 
-  fireEvent.change(screen.getByLabelText("Number of new task research"), {
+  fireEvent.change(screen.getByLabelText("Scientist iterations"), {
     target: { value: "3" },
   });
 

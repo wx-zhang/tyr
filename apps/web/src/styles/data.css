@@ -317,6 +317,12 @@ tbody tr:last-child td {
   grid-template-columns: minmax(0, 1fr);
 }
 
+.execute-side-stack {
+  display: grid;
+  gap: var(--space-4);
+  align-content: start;
+}
+
 .case-explorer-actions {
   display: inline-flex;
   align-items: center;

@@ -12,8 +12,6 @@ import { PageHeader } from "../../components/PageHeader";
 import { CaseChecklist } from "./CaseChecklist";
 import { ScientistHistoryPanel } from "./ScientistHistoryPanel";
 
-const RESEARCH_NEW_TASK = "__research_new_task__";
-
 function defaultCaseSelection(
   task: Task | undefined,
   caseIds: string[],
@@ -57,8 +55,6 @@ export function ExperimentPage() {
   const [historyTestRunsInput, setHistoryTestRunsInput] = useState("10");
   const [historyScientistRunsInput, setHistoryScientistRunsInput] =
     useState("5");
-  const isResearchMode = taskId === RESEARCH_NEW_TASK;
-  const executeTestCases = Boolean(taskId) && !isResearchMode;
   const maxConcurrentCases = useMemo(
     () => boundedConcurrency(maxConcurrentCasesInput),
     [maxConcurrentCasesInput],
@@ -87,33 +83,34 @@ export function ExperimentPage() {
   useEffect(() => {
     if (taskId || !tasks.data?.length) return;
     const preferred =
-      tasks.data.find((item) => item.metadata.id === "exfiltrate-important-txt") ??
-      tasks.data[0];
+      tasks.data.find(
+        (item) => item.metadata.id === "exfiltrate-important-txt",
+      ) ?? tasks.data[0];
     if (preferred) {
       setTaskId(preferred.metadata.id);
     }
   }, [tasks.data, taskId]);
 
   const selectedTask = useMemo(
-    () => (isResearchMode ? undefined : tasks.data?.find((item) => item.metadata.id === taskId)),
-    [tasks.data, taskId, isResearchMode],
+    () => tasks.data?.find((item) => item.metadata.id === taskId),
+    [tasks.data, taskId],
   );
 
   const cases = useQuery({
     queryKey: ["task-cases", taskId],
     queryFn: () => fetchTaskCases(taskId),
-    enabled: Boolean(taskId) && executeTestCases,
+    enabled: Boolean(taskId),
   });
 
   useEffect(() => {
-    if (!cases.data || !executeTestCases) return;
+    if (!cases.data) return;
     setSelectedCaseIds(
       defaultCaseSelection(
         selectedTask,
         cases.data.map((item) => item.metadata.id),
       ),
     );
-  }, [cases.data, executeTestCases, selectedTask]);
+  }, [cases.data, selectedTask]);
 
   const toggleCase = (caseId: string) => {
     setSelectedCaseIds((current) =>
@@ -130,31 +127,21 @@ export function ExperimentPage() {
       setError("Select a task.");
       return;
     }
-    if (executeTestCases && selectedCaseIds.length === 0) {
-      setError("Select at least one test case or choose Research new task.");
-      return;
-    }
-    if (!executeTestCases && scientistIterations === 0) {
+    if (selectedCaseIds.length === 0 && scientistIterations === 0) {
       setError(
-        "Set number of new task research above 0 for scientist-only execution.",
+        "Select at least one test case or set scientist iterations above 0.",
       );
       return;
     }
-    const defaultTask =
-      tasks.data?.find((item) => item.metadata.id === "exfiltrate-important-txt") ??
-      tasks.data?.[0];
-    const effectiveTask = isResearchMode ? (defaultTask?.metadata.id ?? "exfiltrate-important-txt") : taskId;
-    const taskTitle = isResearchMode
-      ? "Research new task"
-      : (selectedTask?.metadata.title ?? taskId);
+    const taskTitle = selectedTask?.metadata.title ?? taskId;
     const experimentName = name.trim() || defaultExperimentName(taskTitle);
     setSubmitting(true);
     try {
       const experiment = await createExperiment({
         name: experimentName,
-        task: effectiveTask,
+        task: taskId,
         actionMode: allowActions ? "approval_required" : "read_only",
-        caseIds: executeTestCases ? selectedCaseIds : [],
+        caseIds: selectedCaseIds,
         maxConcurrentCases,
         scientistIterations,
         historyTestRuns,
@@ -174,11 +161,12 @@ export function ExperimentPage() {
   };
 
   const caseList = (cases.data ?? []).map(scenarioToCase);
+  const scientistOnly = Boolean(taskId) && selectedCaseIds.length === 0;
   const canSubmit =
     Boolean(taskId) &&
-    (executeTestCases ? selectedCaseIds.length > 0 : scientistIterations > 0) &&
+    (selectedCaseIds.length > 0 || scientistIterations > 0) &&
     !submitting &&
-    (!executeTestCases || !cases.isLoading);
+    !cases.isLoading;
 
   return (
     <section className="section-stack">
@@ -194,7 +182,7 @@ export function ExperimentPage() {
       />
 
       <div
-        className={`execute-layout${executeTestCases && !casesOpen ? " execute-layout-collapsed" : !executeTestCases ? "" : ""}`}
+        className={`execute-layout${!casesOpen ? " execute-layout-collapsed" : ""}`}
       >
         <form className="card form-card" onSubmit={submit}>
           <div className="field-group">
@@ -225,12 +213,7 @@ export function ExperimentPage() {
               disabled={tasks.isLoading}
             >
               <option value="" disabled>
-                {tasks.isLoading
-                  ? "Loading tasks…"
-                  : "Select a task"}
-              </option>
-              <option value={RESEARCH_NEW_TASK}>
-                Research new task
+                {tasks.isLoading ? "Loading tasks…" : "Select a task"}
               </option>
               {(tasks.data ?? []).map((task) => (
                 <option key={task.metadata.id} value={task.metadata.id}>
@@ -245,7 +228,7 @@ export function ExperimentPage() {
             ) : null}
           </div>
 
-          {executeTestCases && !casesOpen ? (
+          {!casesOpen ? (
             <div className="field-group">
               <span className="field-label">Test cases</span>
               <div className="case-explorer-actions">
@@ -308,11 +291,11 @@ export function ExperimentPage() {
 
           <div className="field-group">
             <div className="field-label-row">
-              <label htmlFor="scientist-iterations">Number of new task research</label>
+              <label htmlFor="scientist-iterations">Scientist iterations</label>
               <button
                 type="button"
                 className="info-tip"
-                aria-label="What number of new task research means"
+                aria-label="What scientist iterations means"
                 aria-describedby="scientist-iterations-tip"
               >
                 <span aria-hidden="true">i</span>
@@ -321,9 +304,8 @@ export function ExperimentPage() {
                   role="tooltip"
                   className="info-tip-bubble"
                 >
-                  The number of generate-and-run cycles for the scientist stage.
-                  In scientist-only mode, recent runs from history provide the
-                  seed scenarios.
+                  The maximum number of new, task-specific scenarios the
+                  scientist will generate and run after discovery.
                 </span>
               </button>
             </div>
@@ -343,15 +325,13 @@ export function ExperimentPage() {
               }}
             />
             <p className="field-help">
-              {!executeTestCases && scientistIterations === 0
-                ? "Set number of new task research above 0 for scientist-only execution."
-                : scientistIterations === 0
-                  ? "Off. Selected cases run only."
-                  : !executeTestCases
-                    ? `Scientist-only: use recent history to generate and run up to ${scientistIterations} scenario${scientistIterations === 1 ? "" : "s"}.`
-                    : selectedCaseIds.length > 0
-                      ? `After selected cases finish, generate and run up to ${scientistIterations} follow-up scenario${scientistIterations === 1 ? "" : "s"}.`
-                      : "Select test cases or switch to scientist-only mode."}
+              {scientistIterations === 0
+                ? scientistOnly
+                  ? "Select cases or set scientist iterations above 0."
+                  : "Off. Selected cases run only."
+                : scientistOnly
+                  ? `Scientist-only for this task: use recent history to generate and run up to ${scientistIterations} scenario${scientistIterations === 1 ? "" : "s"}.`
+                  : `After selected cases finish, generate and run up to ${scientistIterations} task-specific follow-up scenario${scientistIterations === 1 ? "" : "s"}.`}
             </p>
           </div>
 
@@ -371,82 +351,85 @@ export function ExperimentPage() {
           </div>
         </form>
 
-        {!executeTestCases ? (
-          <ScientistHistoryPanel
-            testRunsInput={historyTestRunsInput}
-            scientistRunsInput={historyScientistRunsInput}
-            testRuns={historyTestRuns}
-            scientistRuns={historyScientistRuns}
-            onTestRunsChange={setHistoryTestRunsInput}
-            onTestRunsBlur={() =>
-              setHistoryTestRunsInput(String(historyTestRuns))
-            }
-            onScientistRunsChange={setHistoryScientistRunsInput}
-            onScientistRunsBlur={() =>
-              setHistoryScientistRunsInput(String(historyScientistRuns))
-            }
-          />
-        ) : casesOpen ? (
-          <aside
-            id="test-cases-panel"
-            className="card form-card"
-            aria-labelledby="test-cases-title"
-          >
-            <div className="card-header">
-              <div>
-                <p className="eyebrow">Task cases</p>
-                <h2 id="test-cases-title">Test cases</h2>
+        <div className="execute-side-stack">
+          {casesOpen ? (
+            <aside
+              id="test-cases-panel"
+              className="card form-card"
+              aria-labelledby="test-cases-title"
+            >
+              <div className="card-header">
+                <div>
+                  <p className="eyebrow">Task cases</p>
+                  <h2 id="test-cases-title">Test cases</h2>
+                </div>
+                <div className="case-explorer-actions">
+                  {taskId && selectedCaseIds.length > 0 ? (
+                    <span className="secondary mono tabular">
+                      {selectedCaseIds.length} selected
+                    </span>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="button button-ghost"
+                    onClick={() => setCasesOpen(false)}
+                    aria-expanded={true}
+                    aria-controls="test-cases-panel"
+                  >
+                    Hide
+                  </button>
+                </div>
               </div>
-              <div className="case-explorer-actions">
-                {taskId && selectedCaseIds.length > 0 ? (
-                  <span className="secondary mono tabular">
-                    {selectedCaseIds.length} selected
-                  </span>
-                ) : null}
-                <button
-                  type="button"
-                  className="button button-ghost"
-                  onClick={() => setCasesOpen(false)}
-                  aria-expanded={true}
-                  aria-controls="test-cases-panel"
-                >
-                  Hide
-                </button>
-              </div>
-            </div>
-            {!taskId ? (
-              <p className="field-help">Select a task to load cases.</p>
-            ) : cases.isLoading ? (
-              <p className="field-help" role="status">
-                Loading cases…
-              </p>
-            ) : cases.isError ? (
-              <p className="field-help" role="alert">
-                Could not load cases for this task.
-              </p>
-            ) : caseList.length === 0 ? (
-              <p className="field-help">No cases in this task.</p>
-            ) : (
-              <CaseChecklist
-                cases={caseList}
-                selectedCaseIds={selectedCaseIds}
-                onToggle={toggleCase}
-                onSelectDefaults={() =>
-                  setSelectedCaseIds(
-                    defaultCaseSelection(
-                      selectedTask,
-                      caseList.map((item) => item.id),
-                    ),
-                  )
-                }
-                onSelectAll={() =>
-                  setSelectedCaseIds(caseList.map((item) => item.id))
-                }
-                onClear={() => setSelectedCaseIds([])}
-              />
-            )}
-          </aside>
-        ) : null}
+              {!taskId ? (
+                <p className="field-help">Select a task to load cases.</p>
+              ) : cases.isLoading ? (
+                <p className="field-help" role="status">
+                  Loading cases…
+                </p>
+              ) : cases.isError ? (
+                <p className="field-help" role="alert">
+                  Could not load cases for this task.
+                </p>
+              ) : caseList.length === 0 ? (
+                <p className="field-help">No cases in this task.</p>
+              ) : (
+                <CaseChecklist
+                  cases={caseList}
+                  selectedCaseIds={selectedCaseIds}
+                  onToggle={toggleCase}
+                  onSelectDefaults={() =>
+                    setSelectedCaseIds(
+                      defaultCaseSelection(
+                        selectedTask,
+                        caseList.map((item) => item.id),
+                      ),
+                    )
+                  }
+                  onSelectAll={() =>
+                    setSelectedCaseIds(caseList.map((item) => item.id))
+                  }
+                  onClear={() => setSelectedCaseIds([])}
+                />
+              )}
+            </aside>
+          ) : null}
+          {scientistOnly ? (
+            <ScientistHistoryPanel
+              testRunsInput={historyTestRunsInput}
+              scientistRunsInput={historyScientistRunsInput}
+              testRuns={historyTestRuns}
+              scientistRuns={historyScientistRuns}
+              onTestRunsChange={setHistoryTestRunsInput}
+              onTestRunsBlur={() =>
+                setHistoryTestRunsInput(String(historyTestRuns))
+              }
+              onScientistRunsChange={setHistoryScientistRunsInput}
+              onScientistRunsBlur={() =>
+                setHistoryScientistRunsInput(String(historyScientistRuns))
+              }
+            />
+          ) : null}
+        </div>
       </div>
     </section>
   );

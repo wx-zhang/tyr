@@ -30,7 +30,8 @@ export function ExperimentDetailPage() {
   const scientistIterations = config?.scientistIterations ?? 0;
   const historyTestRuns = config?.historyTestRuns ?? 10;
   const historyScientistRuns = config?.historyScientistRuns ?? 5;
-  const scientistOnly = configuredCaseIds?.length === 0 && scientistIterations > 0;
+  const scientistOnly =
+    configuredCaseIds?.length === 0 && scientistIterations > 0;
 
   return (
     <section className="section-stack">
@@ -85,7 +86,11 @@ export function ExperimentDetailPage() {
               <div className="detail-row">
                 <dt>Cases</dt>
                 <dd className="mono">
-                  {caseIds.length > 0 ? caseIds.join(", ") : "Task defaults"}
+                  {caseIds.length > 0
+                    ? caseIds.join(", ")
+                    : scientistOnly
+                      ? "None (scientist only)"
+                      : "Task defaults"}
                 </dd>
               </div>
               <div className="detail-row">
@@ -93,7 +98,7 @@ export function ExperimentDetailPage() {
                 <dd className="mono tabular">{maxConcurrentCases}</dd>
               </div>
               <div className="detail-row">
-                <dt>Number of new task research</dt>
+                <dt>Scientist iterations</dt>
                 <dd className="mono tabular">
                   {scientistIterations > 0 ? scientistIterations : "0 (off)"}
                 </dd>

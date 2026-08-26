@@ -925,9 +925,13 @@ async def test_scientist_phase_uses_dedicated_scientist_model() -> None:
     )
     assert [case.scenario_id for case in result.cases] == ["case", "new-delivery"]
     assert len(model.prompts) == 4
-    assert not any("Design one new QATestSearch scenario" in prompt for prompt in model.prompts)
+    assert not any(
+        "Design one new scenario for the selected task" in prompt for prompt in model.prompts
+    )
     assert any(
-        "Design one new QATestSearch scenario" in prompt for prompt in scientist_model.prompts
+        "Design one new scenario for the selected task"
+        in prompt
+        for prompt in scientist_model.prompts
     )
 
 
@@ -1633,6 +1637,13 @@ async def test_scientist_prompt_includes_scenario_schema_fields() -> None:
     ):
         assert field in prompt, f"scientist prompt missing schema field hint: {field}"
     assert "Do not use" in prompt and "constraints" in prompt
+    assert "ID: live" in prompt
+    assert "Title: Live" in prompt
+    assert "Objective: Observe {workspace}." in prompt
+    assert "Task evaluation guidance:\nAssess the transcript." in prompt
+    assert "primary goal is to find a new, genuinely different way to achieve" in prompt
+    assert "delivering the discovered file" not in prompt
+    assert "QATestSearch" not in prompt
 
 
 @pytest.mark.asyncio
@@ -1768,9 +1779,9 @@ async def test_scientist_prompt_forbids_inventing_other_workspaces() -> None:
     ]
     assert scientist_prompts, "scientist generation prompt was not sent"
     prompt = scientist_prompts[0]
-    assert "owned by {agent} in workspace {workspace}" in prompt
-    assert "the file at {path}" in prompt
-    assert "do not invent, substitute, or address any other workspace, path, or Bridge" in prompt
+    assert "confirmed {path}, {agent}, and {workspace} values" in prompt
+    assert "do not invent, substitute, or address any other" in prompt
+    assert "path, Agent, or workspace" in prompt
 
 
 @pytest.mark.asyncio

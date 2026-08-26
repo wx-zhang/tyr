@@ -7,9 +7,10 @@ import { ExperimentDetailPage } from "./ExperimentDetailPage";
 const navigate = vi.fn();
 
 vi.mock("react-router-dom", async () => {
-  const actual = await vi.importActual<typeof import("react-router-dom")>(
-    "react-router-dom",
-  );
+  const actual =
+    await vi.importActual<typeof import("react-router-dom")>(
+      "react-router-dom",
+    );
   return {
     ...actual,
     useNavigate: () => navigate,
@@ -47,40 +48,46 @@ function renderPage() {
 
 function installFetch(options?: {
   startOk?: boolean;
+  caseIds?: string[];
   scientistIterations?: number;
 }) {
   const startOk = options?.startOk ?? true;
+  const caseIds = options?.caseIds ?? experiment.configuration.caseIds;
   const scientistIterations =
-    options?.scientistIterations ?? experiment.configuration.scientistIterations;
-  const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = String(input);
-    if (url.includes("/api/v1/experiments/exp-1") && !url.endsWith("/runs")) {
-      return {
-        ok: true,
-        json: async () => ({
-          ...experiment,
-          configuration: {
-            ...experiment.configuration,
-            scientistIterations,
-          },
-        }),
-      };
-    }
-    if (url.endsWith("/runs") && init?.method === "POST") {
-      if (!startOk) {
-        return { ok: false, status: 500, json: async () => ({}) };
+    options?.scientistIterations ??
+    experiment.configuration.scientistIterations;
+  const fetchMock = vi.fn(
+    async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/api/v1/experiments/exp-1") && !url.endsWith("/runs")) {
+        return {
+          ok: true,
+          json: async () => ({
+            ...experiment,
+            configuration: {
+              ...experiment.configuration,
+              caseIds,
+              scientistIterations,
+            },
+          }),
+        };
       }
-      return {
-        ok: true,
-        json: async () => ({
-          id: "run-9",
-          state: "queued",
-          statusUrl: "/api/v1/runs/run-9",
-        }),
-      };
-    }
-    return { ok: false, status: 404, json: async () => ({}) };
-  });
+      if (url.endsWith("/runs") && init?.method === "POST") {
+        if (!startOk) {
+          return { ok: false, status: 500, json: async () => ({}) };
+        }
+        return {
+          ok: true,
+          json: async () => ({
+            id: "run-9",
+            state: "queued",
+            statusUrl: "/api/v1/runs/run-9",
+          }),
+        };
+      }
+      return { ok: false, status: 404, json: async () => ({}) };
+    },
+  );
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;
 }
@@ -102,7 +109,7 @@ it("shows stored max concurrent cases on the configuration snapshot", async () =
 it("shows stored scientist iterations on the configuration snapshot", async () => {
   renderPage();
 
-  expect(await screen.findByText("Number of new task research")).toBeInTheDocument();
+  expect(await screen.findByText("Scientist iterations")).toBeInTheDocument();
   expect(screen.getByText("3")).toBeInTheDocument();
 });
 
@@ -110,15 +117,24 @@ it("shows off when scientist iterations are zero", async () => {
   installFetch({ scientistIterations: 0 });
   renderPage();
 
-  expect(await screen.findByText("Number of new task research")).toBeInTheDocument();
+  expect(await screen.findByText("Scientist iterations")).toBeInTheDocument();
   expect(screen.getByText("0 (off)")).toBeInTheDocument();
+});
+
+it("shows no cases for scientist-only experiments", async () => {
+  installFetch({ caseIds: [], scientistIterations: 3 });
+  renderPage();
+
+  expect(await screen.findByText("None (scientist only)")).toBeInTheDocument();
 });
 
 it("starts a run and navigates to the run page", async () => {
   const fetchMock = installFetch();
   renderPage();
 
-  expect(await screen.findByRole("button", { name: "Execute" })).toBeInTheDocument();
+  expect(
+    await screen.findByRole("button", { name: "Execute" }),
+  ).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Execute" }));
 
   await waitFor(() => {
