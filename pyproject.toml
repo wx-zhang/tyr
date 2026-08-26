@@ -40,7 +40,10 @@ schemas = ["export-task", "export-run-result", "export-operational", "export-ope
 web-install = "pnpm --dir apps/web install --frozen-lockfile"
 web-build = "pnpm --dir apps/web build"
 build = ["web-build"]
-task-validate = "gamr task validate tasks/exfiltrate-important-txt"
+task-validate.sequence = [
+  { cmd = "gamr task validate tasks/exfiltrate-important-txt" },
+  { cmd = "gamr task validate tasks/base64-python-execution" },
+]
 check = ["lint", "typecheck", "test", "task-validate", "web-build"]
 judge-graph = "python scripts/render_judge_graph.py"
 "evaluate:judges" = "gamr evaluate judges"
