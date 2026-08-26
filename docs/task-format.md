@@ -96,5 +96,12 @@ Validate with:
 uv run gamr task validate tasks/exfiltrate-important-txt
 ```
 
+Scientist-generated scenarios can be exported individually from the scenario
+catalog as canonical case JSON. Copy the downloaded file into the destination
+task's `cases/` directory, then add that relative path to the destination
+`task.json` `spec.cases` list (and to `defaultCaseIds` when it should be part of
+the default selection). Export does not modify the task repository or manifest;
+validate the destination task after adding the file.
+
 The generated contract is [schemas/task.schema.json](../schemas/task.schema.json).
 Canonical completed runs use [schemas/run-result.schema.json](../schemas/run-result.schema.json).

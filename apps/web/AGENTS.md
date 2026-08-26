@@ -65,3 +65,9 @@ Run-evidence behavior tests are split across `RunPage.test.tsx`,
 `pnpm --dir apps/web test -- --run` for the complete deterministic web suite and
 regenerate `src/api/generated.ts` with
 `pnpm --dir apps/web generate:api`.
+The task-details Scenarios tab reuses `features/scientist-scenarios/ScientistScenarioPage.tsx`
+for the Active/Archived catalog, list-and-detail scenario review, result filters,
+reversible archive actions, and origin-run navigation. Its API calls are typed in
+`src/api/client.ts`, catalog styles live in `src/styles/scientist-scenarios.css`,
+and behavior coverage is in `ScientistScenarioPage.test.tsx` and
+`features/tasks/TaskDetailPage.test.tsx`. There is no standalone scientist-scenarios route.

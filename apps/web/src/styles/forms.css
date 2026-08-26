@@ -348,6 +348,7 @@ textarea {
   display: flex;
   justify-content: space-between;
   gap: var(--space-4);
+  min-width: 0;
   border-bottom: var(--border-w) solid var(--border);
   padding-bottom: var(--space-3);
 }
@@ -363,9 +364,11 @@ textarea {
 }
 
 .detail-row dd {
+  min-width: 0;
   margin: 0;
   color: var(--text);
   font-size: var(--text-sm);
   font-weight: 500;
+  overflow-wrap: anywhere;
   text-align: right;
 }

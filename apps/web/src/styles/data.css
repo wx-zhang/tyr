@@ -1,6 +1,8 @@
 .card,
 .table-card,
 .run-panel {
+  min-width: 0;
+  max-width: 100%;
   border: var(--border-w) solid var(--border);
   border-radius: var(--radius-md);
   background: var(--surface);
@@ -38,6 +40,10 @@
 .mono {
   font-family: var(--font-mono);
   font-size: var(--text-code);
+}
+
+.cell-wrap {
+  overflow-wrap: anywhere;
 }
 
 .tabular {
@@ -147,7 +153,9 @@
 
 .section-stack {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-4);
+  min-width: 0;
 }
 
 .product-overview {
@@ -197,6 +205,7 @@
 }
 
 .table-scroll {
+  max-width: 100%;
   overflow-x: auto;
 }
 
@@ -461,6 +470,7 @@ tbody tr:last-child td {
   color: var(--text);
   font-size: var(--text-sm);
   line-height: var(--leading-md, 1.55);
+  overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
 

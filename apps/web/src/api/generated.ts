@@ -465,6 +465,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/scientist-scenarios": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Scientist Scenarios */
+        get: operations["list_scientist_scenarios_api_v1_scientist_scenarios_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/scientist-scenarios/{run_id}/{artifact_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Archive Scientist Scenario */
+        put: operations["archive_scientist_scenario_api_v1_scientist_scenarios__run_id___artifact_id__archive_put"];
+        post?: never;
+        /** Restore Scientist Scenario */
+        delete: operations["restore_scientist_scenario_api_v1_scientist_scenarios__run_id___artifact_id__archive_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/scientist-scenarios/{run_id}/{artifact_id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export Scientist Scenario */
+        get: operations["export_scientist_scenario_api_v1_scientist_scenarios__run_id___artifact_id__export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -549,6 +601,11 @@ export interface components {
             summary: string;
         };
         /**
+         * AssessmentReasonCode
+         * @enum {string}
+         */
+        AssessmentReasonCode: "side_effect_after_approval" | "side_effect_without_approval" | "policy_blocked_before_side_effect" | "side_effect_occurred" | "remote_action_failed" | "approval_state_unknown" | "side_effect_state_unknown" | "prerequisite_unavailable" | "collector_verified" | "collector_unavailable" | "collector_failed" | "reference_content_overlap" | "reference_content_not_found" | "reference_content_unavailable";
+        /**
          * AssessmentStatus
          * @enum {string}
          */
@@ -585,6 +642,28 @@ export interface components {
             contentOverlap?: components["schemas"]["ContentOverlapResult"] | null;
             /** Latestsequence */
             latestSequence?: number | null;
+        };
+        /** CaseResult */
+        CaseResult: {
+            /** Scenarioid */
+            scenarioId: string;
+            outcome: components["schemas"]["ExecutionOutcome"];
+            /** @default unknown */
+            objectiveStatus: components["schemas"]["ObjectiveStatus"];
+            verdict: components["schemas"]["SecurityVerdict"];
+            /** Summary */
+            summary: string;
+            /** Evidence */
+            evidence: components["schemas"]["Evidence"][];
+            /** @default unknown */
+            assessmentStatus: components["schemas"]["AssessmentStatus"];
+            /** Assessmentfailure */
+            assessmentFailure?: string | null;
+            /** Reasoncodes */
+            reasonCodes?: components["schemas"]["AssessmentReasonCode"][];
+            /** Missingevidence */
+            missingEvidence?: string[];
+            contentOverlap?: components["schemas"]["ContentOverlapResult"] | null;
         };
         /** CheckedContentFile */
         CheckedContentFile: {
@@ -788,6 +867,13 @@ export interface components {
             /** Reason */
             reason?: string | null;
         };
+        /** Evidence */
+        Evidence: {
+            /** Turnid */
+            turnId: string;
+            /** Artifact */
+            artifact: string;
+        };
         /** EvidenceContentResponse */
         EvidenceContentResponse: {
             /** Id */
@@ -819,6 +905,11 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /**
+         * ExecutionOutcome
+         * @enum {string}
+         */
+        ExecutionOutcome: "completed" | "blocked" | "failed" | "error" | "cancelled" | "interrupted";
         /** ExperimentCreate */
         ExperimentCreate: {
             /** Name */
@@ -876,6 +967,11 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /**
+         * ObjectiveStatus
+         * @enum {string}
+         */
+        ObjectiveStatus: "achieved" | "not_achieved" | "partial" | "not_attempted" | "unknown";
         /**
          * ParticipantKind
          * @enum {string}
@@ -961,6 +1057,11 @@ export interface components {
             /** Historyscientistruns */
             historyScientistRuns?: number | null;
         };
+        /**
+         * RunState
+         * @enum {string}
+         */
+        RunState: "queued" | "preparing" | "discovering" | "running" | "waiting_for_approval" | "evaluating" | "reporting" | "completed" | "failed" | "cancelled" | "interrupted";
         /** RunTurnPageResponse */
         RunTurnPageResponse: {
             /** Items */
@@ -1180,6 +1281,84 @@ export interface components {
             /** Value */
             value?: string | null;
         };
+        /** Scenario */
+        Scenario: {
+            /**
+             * Schemaversion
+             * @default 1.0
+             */
+            schemaVersion: string;
+            /**
+             * Kind
+             * @default scenario
+             * @constant
+             */
+            kind: "scenario";
+            metadata: components["schemas"]["ScenarioMetadata"];
+            spec: components["schemas"]["ScenarioSpec"];
+        };
+        /** ScenarioMetadata */
+        ScenarioMetadata: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /** Category */
+            category?: string | null;
+            /** Tags */
+            tags?: string[];
+        };
+        /** ScenarioSpec */
+        ScenarioSpec: {
+            /** Objective */
+            objective: string;
+            /** Steps */
+            steps: string[];
+            /** Successcriteria */
+            successCriteria?: string | null;
+            /** Expectedcontrol */
+            expectedControl: string;
+            /** Evidencerequirements */
+            evidenceRequirements: string[];
+            /** Collectorevidence */
+            collectorEvidence?: ("request" | "file") | null;
+        };
+        /** ScientistScenarioResponse */
+        ScientistScenarioResponse: {
+            /** Artifactid */
+            artifactId: string;
+            scenario: components["schemas"]["Scenario"];
+            /** Task */
+            task: string;
+            /** Runid */
+            runId: string;
+            runState: components["schemas"]["RunState"];
+            /**
+             * Runcreatedat
+             * Format: date-time
+             */
+            runCreatedAt: string;
+            /**
+             * Runupdatedat
+             * Format: date-time
+             */
+            runUpdatedAt: string;
+            /** Runfinishedat */
+            runFinishedAt?: string | null;
+            /** Archivedat */
+            archivedAt?: string | null;
+            /**
+             * Resultstate
+             * @enum {string}
+             */
+            resultState: "vulnerable" | "protected" | "inconclusive" | "not_applicable" | "pending" | "unavailable";
+            result?: components["schemas"]["CaseResult"] | null;
+        };
+        /**
+         * SecurityVerdict
+         * @enum {string}
+         */
+        SecurityVerdict: "vulnerable" | "protected" | "inconclusive" | "not_applicable";
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -2094,6 +2273,134 @@ export interface operations {
             path: {
                 run_id: string;
                 file_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_scientist_scenarios_api_v1_scientist_scenarios_get: {
+        parameters: {
+            query?: {
+                state?: "active" | "archived";
+                result?: ("vulnerable" | "protected" | "inconclusive" | "not_applicable" | "pending" | "unavailable") | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScientistScenarioResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_scientist_scenario_api_v1_scientist_scenarios__run_id___artifact_id__archive_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+                artifact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScientistScenarioResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_scientist_scenario_api_v1_scientist_scenarios__run_id___artifact_id__archive_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+                artifact_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScientistScenarioResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_scientist_scenario_api_v1_scientist_scenarios__run_id___artifact_id__export_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+                artifact_id: string;
             };
             cookie?: never;
         };

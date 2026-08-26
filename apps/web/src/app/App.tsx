@@ -62,7 +62,10 @@ export function App() {
       <a className="skip-link" href="#main-content">
         Skip to content
       </a>
-      <aside className="sidebar" aria-label="GAMR for Tyr application navigation">
+      <aside
+        className="sidebar"
+        aria-label="GAMR for Tyr application navigation"
+      >
         <div className="sidebar-inner">
           <div className="sidebar-top">
             <Link to="/" className="brand" aria-label="GAMR home">

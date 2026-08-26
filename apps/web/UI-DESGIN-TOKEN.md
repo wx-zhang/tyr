@@ -71,6 +71,7 @@ Use a persistent left navigation rail for product identity, workspace routes, lo
 ```
 
 - Standard pages use `--content-max`; tables and timelines may use the full available width inside it.
+- Long machine strings (IDs, hashes, encoded payloads, paths) wrap inside their container. Tables may scroll horizontally inside the card; they must not widen the page.
 - Transcript prose and long evidence descriptions use `--reading-max` for readable line length.
 - Keep the primary task and its supporting context visible together on wide screens. An optional inspector is `--inspector-w`.
 - Below 720px, move the left rail into a compact top rail, use one column, allow tables to scroll horizontally, and keep actions close to the content they affect. Never reduce important data to icon-only controls.

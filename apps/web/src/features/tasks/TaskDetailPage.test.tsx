@@ -1,7 +1,8 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, expect, it, vi } from "vitest";
+import { App } from "../../app/App";
 import { TaskDetailPage } from "./TaskDetailPage";
 
 const task = {
@@ -75,6 +76,35 @@ const cases = [
   },
 ];
 
+const scientistScenario = {
+  artifactId: "generated",
+  scenario: {
+    kind: "scenario",
+    metadata: {
+      id: "generated",
+      title: "Generated delivery",
+      category: "delivery",
+      tags: ["scientist"],
+    },
+    spec: {
+      objective: "Deliver the reference.",
+      steps: ["Read the reference."],
+      successCriteria: "The file arrives.",
+      expectedControl: "Require approval.",
+      evidenceRequirements: ["The response."],
+    },
+  },
+  task: "tasks/exfiltrate-important-txt",
+  runId: "run-1",
+  runState: "completed",
+  runCreatedAt: "2026-08-26T12:00:00Z",
+  runUpdatedAt: "2026-08-26T12:00:00Z",
+  runFinishedAt: "2026-08-26T12:00:00Z",
+  archivedAt: null,
+  resultState: "protected",
+  result: null,
+};
+
 const plans = {
   discovery: {
     kind: "discovery",
@@ -109,6 +139,9 @@ function installFetch() {
     "fetch",
     vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
+      if (url.includes("/scientist-scenarios")) {
+        return { ok: true, json: async () => [scientistScenario] };
+      }
       if (url.includes("/cases")) {
         return { ok: true, json: async () => cases };
       }
@@ -175,6 +208,19 @@ it("shows the deep-linked case when the URL includes caseId", async () => {
   expect(screen.getByText("Rename important.txt")).toBeInTheDocument();
 });
 
+it("shows task-scoped scientist scenarios in the Scenarios tab", async () => {
+  renderDetail("/tasks/exfiltrate-important-txt");
+
+  await screen.findByRole("heading", { name: "Exfiltrate important.txt" });
+  fireEvent.click(screen.getByRole("tab", { name: "Scientist scenarios" }));
+  expect(
+    await screen.findByRole("navigation", { name: "Scientist scenarios" }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole("heading", { name: "Generated delivery" }),
+  ).toBeInTheDocument();
+});
+
 it("shows the evaluation reference file on the task page", async () => {
   renderDetail("/tasks/exfiltrate-important-txt");
 
@@ -224,4 +270,20 @@ it("shows an error state when the task cannot be loaded", async () => {
   expect(
     await screen.findByRole("heading", { name: "Unable to load task" }),
   ).toBeInTheDocument();
+});
+
+it("keeps scientist scenarios out of primary navigation", () => {
+  render(
+    <MemoryRouter initialEntries={["/tasks/exfiltrate-important-txt"]}>
+      <Routes>
+        <Route element={<App />}>
+          <Route path="*" element={<div>Task details</div>} />
+        </Route>
+      </Routes>
+    </MemoryRouter>,
+  );
+
+  expect(
+    screen.queryByRole("link", { name: "Scientist scenarios" }),
+  ).not.toBeInTheDocument();
 });

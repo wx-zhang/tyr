@@ -32,11 +32,15 @@ wires the shared execution service with global decoder capacity gating (`GAMR_MA
 owns run-scoped evidence authorization and browser allowlists, and `registry.py`
 is the JSON-backed filesystem registry. `case_progress.py` reduces case and finding
 activities into stable lifecycle states. `execution.py` owns the bounded in-process queue.
+`routes/scientist_scenarios.py` serves the active/archived scientist scenario
+catalog, safe archive/restore actions, and exact canonical JSON exports over
+the shared artifact root.
 Verified request-only manifests may hydrate immutable collector request-body metadata in memory;
 failed manifests with exact request IDs may recover verified remote files the same way. The route
 never rewrites historical run bundles.
 
 Security and cross-representation regressions live in
 `apps/api/tests/test_run_evidence_security.py`; SSE recovery remains covered by
-`test_run_events.py`. Regenerate `schemas/openapi.json` from the API source with
+`test_run_events.py`; scientist catalog contracts live in
+`apps/api/tests/test_scientist_scenarios.py`. Regenerate `schemas/openapi.json` from the API source with
 `uv run poe schemas` and never edit the generated contract by hand.

@@ -15,6 +15,7 @@ from gamr_core import RunResult
 
 from .finalizer import finalize_result
 from .redaction import redact_payload
+from .scientist_scenarios import ScientistScenarioCatalog
 
 __all__ = [
     "FilesystemArtifactStore",
@@ -43,6 +44,7 @@ class FilesystemArtifactStore:
 
     def delete_run(self, run_id: str) -> None:
         run_root = self._run_root(run_id, create=False)
+        ScientistScenarioCatalog(self.root).delete_run_markers(run_id)
         if run_root.is_dir():
             shutil.rmtree(run_root)
 
@@ -54,6 +56,11 @@ class FilesystemArtifactStore:
             path.name
             for path in runs_root.iterdir()
             if path.is_dir() and (path / "run.json").is_file()
+        )
+
+    def is_scientist_scenario_archived(self, run_id: str, artifact_id: str) -> bool:
+        return ScientistScenarioCatalog(self.root).is_scientist_scenario_archived(
+            run_id, artifact_id
         )
 
     def _safe_path(self, relative_path: str) -> Path:

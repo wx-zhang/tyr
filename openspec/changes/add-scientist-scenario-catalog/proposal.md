@@ -4,7 +4,7 @@ Scientist-generated scenarios are retained inside individual run bundles, but op
 
 ## What Changes
 
-- Add a web catalog for browsing active and archived scientist-generated scenarios across runs.
+- Add a Scientist scenarios tab or equivalent selection inside the Scenarios section on task details for browsing generated scenarios belonging to that task.
 - Show each scenario's originating task, run, canonical definition, and security verdict or pending/unavailable result state.
 - Add security-verdict filtering and links back to the run case where each scenario was invented.
 - Export one scenario at a time as canonical schema-valid JSON suitable for adding to a task's `cases/` directory.
@@ -26,5 +26,5 @@ Scientist-generated scenarios are retained inside individual run bundles, but op
 - Adds API endpoints and generated web contract types for the scenario catalog, archive state, and JSON export.
 - Adds a confined operational archive index alongside `.gamr` run bundles while leaving completed bundles unchanged.
 - Extends artifact access used by the shared engine so CLI and API execution honor the same archive decisions.
-- Adds a web route, navigation entry, catalog UI, and focused adapter, engine, API, and browser tests.
+- Adds the task-details Scenarios tab, catalog UI, and focused adapter, engine, API, and browser tests; it does not add a separate primary-navigation entry.
 - Updates task-format and scoped architecture documentation; no new external dependencies are required.

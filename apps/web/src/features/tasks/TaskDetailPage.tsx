@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { fetchTask, fetchTaskCases, fetchTaskPlans } from "../../api/client";
@@ -6,6 +7,7 @@ import { StatusBadge } from "../../components/StatusBadge";
 import { TaskCaseDetail } from "./TaskCaseDetail";
 import { TaskPlansSection } from "./TaskPlansSection";
 import { TaskReferenceCard } from "./TaskReferenceCard";
+import { ScientistScenarioPage } from "../scientist-scenarios/ScientistScenarioPage";
 
 function modeLabel(mode: string | undefined): string {
   if (mode === "approval_required") return "Actions Allowed";
@@ -32,6 +34,7 @@ function variableSummary(variable: {
 
 export function TaskDetailPage() {
   const { taskId, caseId } = useParams();
+  const [scenarioTab, setScenarioTab] = useState<"cases" | "scientist">("cases");
 
   const task = useQuery({
     queryKey: ["task", taskId],
@@ -165,7 +168,7 @@ export function TaskDetailPage() {
                         <tr key={name}>
                           <td className="mono table-primary">{name}</td>
                           <td className="mono">{variable.source}</td>
-                          <td className="mono">{variableSummary(variable)}</td>
+                          <td className="mono cell-wrap">{variableSummary(variable)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -202,7 +205,34 @@ export function TaskDetailPage() {
               </span>
             </div>
 
-            {cases.isLoading ? (
+            <div
+              className="task-scenario-tabs"
+              role="tablist"
+              aria-label="Scenario source"
+            >
+              <button
+                className="catalog-tab"
+                type="button"
+                role="tab"
+                aria-selected={scenarioTab === "cases"}
+                onClick={() => setScenarioTab("cases")}
+              >
+                Task cases
+              </button>
+              <button
+                className="catalog-tab"
+                type="button"
+                role="tab"
+                aria-selected={scenarioTab === "scientist"}
+                onClick={() => setScenarioTab("scientist")}
+              >
+                Scientist scenarios
+              </button>
+            </div>
+
+            {scenarioTab === "scientist" ? (
+              <ScientistScenarioPage taskId={taskId!} />
+            ) : cases.isLoading ? (
               <p className="secondary" role="status">
                 Loading cases…
               </p>

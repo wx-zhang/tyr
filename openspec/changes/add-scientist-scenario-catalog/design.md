@@ -64,11 +64,11 @@ Add these endpoints under `/api/v1/scientist-scenarios`:
 
 The list response includes the full scenario because the documents are bounded by the existing task schema and browsing requires all fields. V1 intentionally returns the complete filtered collection; the local catalog is small and this avoids premature pagination.
 
-### Add an Active/Archived catalog page
+### Embed the catalog in task details
 
-Add a primary-navigation entry and `/scientist-scenarios` route. The page uses TanStack Query with archive state and result filter in the query key. Active is the initial tab. Each summary row shows scenario identity, task, run, result, and tags; an accessible disclosure renders the complete definition. The run link targets `/runs/<run-id>/cases/<scenario-id>`.
+Place the existing catalog component in the task-details Scenarios section as a Scientist scenarios tab or equivalent labeled selection alongside authored task cases. The selected task view shows only generated scenarios originating from that task. Reuse the normal task-case list-and-detail layout for scientist scenarios, with Active and Archived tabs and the result filter inside the Scientist scenarios view. Do not add a standalone primary-navigation entry or `/scientist-scenarios` route. The list shows scenario identity and result; the detail view shows the complete definition, origin run, tags, and actions. The run link targets `/runs/<run-id>/cases/<scenario-id>`.
 
-Archive and Restore mutations invalidate all scientist-catalog queries. Export uses the attachment endpoint directly and remains available in both tabs. An adjacent accessible information disclosure explains preservation, history exclusion, and restoration. Archive is reversible, so it does not require a destructive confirmation dialog.
+Archive and Restore mutations invalidate all scientist-catalog queries. Export uses the attachment endpoint directly and remains available in both views. Archive is reversible, so it does not require a destructive confirmation dialog.
 
 ## Risks / Trade-offs
 

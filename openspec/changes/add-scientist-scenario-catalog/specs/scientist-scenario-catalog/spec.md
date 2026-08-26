@@ -26,21 +26,25 @@ When a matching case result does not yet exist, the entry SHALL report `pending`
 - **THEN** its scientist scenarios no longer appear in either catalog view
 
 ### Requirement: Scenario browsing and origin navigation
-The web application SHALL provide a scientist scenario page reachable from primary navigation. Active scenarios SHALL be shown by default, archived scenarios SHALL be available in a separate view, and each entry SHALL expose its full scenario definition and a link to the originating run case.
+The web application SHALL expose scientist-generated scenarios from the task details Scenarios section through a dedicated Scientist scenarios tab or equivalent labeled selection alongside authored task cases. The selected task view SHALL show only generated scenarios originating from that task. The Scientist scenarios view SHALL use the same list-and-detail pattern as the authored task cases, with the full scenario definition in the detail panel. It SHALL NOT require a separate primary-navigation entry or standalone catalog page. Active scenarios SHALL be shown by default, archived scenarios SHALL be available in a separate view within the Scientist scenarios selection, and each entry SHALL expose a link to the originating run case.
 
 The full definition SHALL include the scenario identifier, title, tags, objective, steps, success criteria when present, expected control, evidence requirements, and collector-evidence mode when present.
 
 #### Scenario: Operator browses an active scenario
-- **WHEN** an operator opens the scientist scenario page and expands an active entry
-- **THEN** the complete retained scenario definition and result summary are available without opening the run
+- **WHEN** an operator opens a task's Scenarios section, selects Scientist scenarios, and selects an active entry
+- **THEN** the complete retained scenario definition and result summary for that task are available in the detail panel without opening the run
+
+#### Scenario: Scientist scenarios are not a standalone menu
+- **WHEN** an operator navigates the application primary menu
+- **THEN** the application does not present a separate Scientist scenarios destination; the scenarios are available from task details
 
 #### Scenario: Operator follows the origin link
 - **WHEN** an operator activates a scenario's run link
 - **THEN** the application opens the originating run with that scenario case selected
 
 #### Scenario: Operator views archived scenarios
-- **WHEN** an operator selects the Archived view
-- **THEN** only archived entries are listed with restore and export actions
+- **WHEN** an operator selects Scientist scenarios in a task's Scenarios section and then selects the Archived view
+- **THEN** only archived entries originating from that task are listed with restore and export actions
 
 ### Requirement: Security verdict filtering
 The catalog SHALL allow operators to filter the selected Active or Archived view by one result value. Supported values SHALL be `vulnerable`, `protected`, `inconclusive`, `not_applicable`, `pending`, and `unavailable`. Clearing the filter SHALL restore every entry in the selected archive view.
@@ -60,7 +64,7 @@ The catalog SHALL allow operators to filter the selected Active or Archived view
 ### Requirement: Reversible scenario archiving
 The system SHALL allow an operator to archive an active scientist scenario and restore an archived scenario. Archive state SHALL be scoped to the scenario artifact in its originating run so scenarios with the same scenario identifier in different runs remain independent.
 
-Archiving and restoring SHALL be idempotent and SHALL NOT modify or delete the originating scenario artifact, run result, transcript, activity, or other run evidence. The interface SHALL explain that archiving hides the entry from the active catalog, excludes it from later scientist history, preserves run evidence, and can be reversed.
+Archiving and restoring SHALL be idempotent and SHALL NOT modify or delete the originating scenario artifact, run result, transcript, activity, or other run evidence. The Active and Archived controls and the archive or restore action labels SHALL make the reversible catalog state clear.
 
 #### Scenario: Archive an active scenario
 - **WHEN** an operator archives an active scientist scenario

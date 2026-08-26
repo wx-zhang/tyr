@@ -79,6 +79,10 @@ _RETRYABLE_REPLY = re.compile(
 _RETRY_LIMIT = 2
 _RUNTIME_VAR = re.compile(r"\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b")
 _UNSAFE_ID_CHAR = re.compile(r"[^A-Za-z0-9_-]+")
+
+
+def _scientist_artifact_id(scenario_id: str) -> str:
+    return _UNSAFE_ID_CHAR.sub("-", scenario_id)[:128] or "scenario"
 _DECISION_SCHEMA_HINT = (
     'Use the field name "kind" (not "action"). '
     'Send to Tyr with {"kind":"send","message":"<direct instruction only>"}. '
@@ -197,6 +201,8 @@ class CaseRecord:
     case: CaseResult
     transcript: list[dict[str, str]]
     origin: str = "base"
+    origin_run_id: str | None = None
+    origin_artifact_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -653,6 +659,10 @@ class ExperimentRunner:
                     case=case,
                     transcript=transcript_by_case.get(case.scenario_id, []),
                     origin="base" if is_base else "scientist",
+                    origin_run_id=None if is_base else source_run_id,
+                    origin_artifact_id=(
+                        None if is_base else _scientist_artifact_id(case.scenario_id)
+                    ),
                 )
             )
         return records
@@ -697,7 +707,10 @@ class ExperimentRunner:
             else ""
         )
         for index in range(1, config.scientist_iterations + 1):
-            history_records = self._newest_history_records(prior_records + records)
+            effective_records = self._effective_scientist_history(
+                prior_records + records, artifacts
+            )
+            history_records = self._newest_history_records(effective_records)
             history = self._scientist_history(history_records)
             history_case_ids = tuple(record.case.scenario_id for record in history_records)[:100]
             history_origins = tuple(
@@ -975,6 +988,10 @@ class ExperimentRunner:
                 case=case,
                 transcript=[],
                 origin="scientist" if phase == "scientist" else "base",
+                origin_run_id=run_id if phase == "scientist" else None,
+                origin_artifact_id=(
+                    _scientist_artifact_id(case_id) if phase == "scientist" else None
+                ),
             )
             return record, str(case.summary)
 
@@ -1042,6 +1059,10 @@ class ExperimentRunner:
                 case=case,
                 transcript=result.transcript,
                 origin="scientist" if phase == "scientist" else "base",
+                origin_run_id=run_id if phase == "scientist" else None,
+                origin_artifact_id=(
+                    _scientist_artifact_id(case_id) if phase == "scientist" else None
+                ),
             )
             return record, result.error
 
@@ -1124,8 +1145,11 @@ class ExperimentRunner:
             case=case,
             transcript=result.transcript,
             origin="scientist" if phase == "scientist" else "base",
+            origin_run_id=run_id if phase == "scientist" else None,
+            origin_artifact_id=(
+                _scientist_artifact_id(case_id) if phase == "scientist" else None
+            ),
         )
-        return record, result.error
         return record, result.error
 
     async def _converse(
@@ -1661,6 +1685,25 @@ class ExperimentRunner:
         return [newest[scenario_id] for scenario_id in order]
 
     @staticmethod
+    def _effective_scientist_history(
+        records: list[CaseRecord], artifacts: ArtifactStore | None
+    ) -> list[CaseRecord]:
+        if artifacts is None:
+            return records
+        checker = getattr(artifacts, "is_scientist_scenario_archived", None)
+        if not callable(checker):
+            return records
+        return [
+            record
+            for record in records
+            if not record.origin_run_id
+            or not checker(
+                record.origin_run_id,
+                record.origin_artifact_id or _scientist_artifact_id(record.case.scenario_id),
+            )
+        ]
+
+    @staticmethod
     def _scientist_history(records: list[CaseRecord]) -> str:
         if not records:
             return "none"
@@ -1713,7 +1756,7 @@ class ExperimentRunner:
     def _write_scenario(artifacts: ArtifactStore | None, run_id: str, scenario: Scenario) -> None:
         if artifacts is None:
             return
-        safe_id = _UNSAFE_ID_CHAR.sub("-", scenario.metadata.id)[:128] or "scenario"
+        safe_id = _scientist_artifact_id(scenario.metadata.id)
         artifacts.write_json(
             f"runs/{run_id}/scientist-scenarios/{safe_id}.json",
             scenario.model_dump(by_alias=True, exclude_none=True, mode="json"),

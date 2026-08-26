@@ -34,7 +34,9 @@ and `content_evidence.py` owns the in-memory contracts,
 `execution.py` finalizes the shared JSON result and report,
 `chat.py` is the interactive tool loop, `reporting.py` derives Markdown, and
 `scientist_prompt.py` builds task-specific scientist generation prompts, and
-`ports/` contains provider, artifact, activity-sink, and ephemeral Python sandbox interfaces.
+`ports/` contains provider, artifact, activity-sink, and ephemeral Python sandbox interfaces;
+the artifact port exposes the archive-state query used immediately before each
+scientist prompt.
 
 Keep activity emission changes covered in `packages/engine/tests/test_runner.py`;
 the CLI and API must continue to consume this same execution path.
@@ -56,6 +58,8 @@ To add a predefined judge pipeline:
 ## Commands
 
 `uv run pytest packages/engine/tests` (focused: `uv run pytest packages/engine/tests/judges/`).
+Scientist history archive filtering is covered by
+`packages/engine/tests/test_scientist_history_archive.py`.
 
 ## Safety
 

@@ -82,7 +82,10 @@ export function scenarioToCase(scenario: TaskScenario): TaskCase {
   };
 }
 export type RunVisualization = components["schemas"]["RunVisualization"];
-export type RunTurn = Omit<components["schemas"]["RunTurnResponse"], "updateType"> & {
+export type RunTurn = Omit<
+  components["schemas"]["RunTurnResponse"],
+  "updateType"
+> & {
   updateType?: string;
   historyCaseOrigins?: string[];
 };
@@ -139,7 +142,12 @@ export type Experiment = {
 export type ActivityItem = components["schemas"]["ActivityItemResponse"];
 export type ActivityPage = components["schemas"]["ActivityPageResponse"];
 
-export type CollectorArtifact = components["schemas"]["CollectorVerificationResponse"];
+export type CollectorArtifact =
+  components["schemas"]["CollectorVerificationResponse"];
+export type ScientistScenario =
+  components["schemas"]["ScientistScenarioResponse"];
+export type ScientistScenarioState = "active" | "archived";
+export type ScientistScenarioResult = ScientistScenario["resultState"];
 
 export type EvidenceFilters = {
   q?: string;
@@ -175,9 +183,7 @@ export function fetchTaskCases(taskId: string): Promise<TaskScenario[]> {
 }
 
 export function fetchTaskPlans(taskId: string): Promise<TaskPlans> {
-  return get<TaskPlans>(
-    `/api/v1/tasks/${encodeURIComponent(taskId)}/plans`,
-  );
+  return get<TaskPlans>(`/api/v1/tasks/${encodeURIComponent(taskId)}/plans`);
 }
 
 async function get<T>(path: string, init?: RequestInit): Promise<T> {
@@ -190,7 +196,9 @@ export async function fetchRuns(): Promise<Run[]> {
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), 15_000);
   try {
-    const runs = await get<Run[]>("/api/v1/runs", { signal: controller.signal });
+    const runs = await get<Run[]>("/api/v1/runs", {
+      signal: controller.signal,
+    });
     if (!Array.isArray(runs)) {
       throw new Error("Run index response was not a list");
     }
@@ -246,7 +254,11 @@ export async function startExperiment(
     },
   );
   if (!response.ok) throw new Error(`Request failed: ${response.status}`);
-  return response.json() as Promise<{ id: string; state: RunState; statusUrl: string }>;
+  return response.json() as Promise<{
+    id: string;
+    state: RunState;
+    statusUrl: string;
+  }>;
 }
 
 export function fetchRun(runId: string): Promise<Run> {
@@ -270,13 +282,18 @@ export async function deleteRun(runId: string): Promise<void> {
   if (!response.ok) throw new Error(`Request failed: ${response.status}`);
 }
 
-export function fetchRunVisualization(runId: string): Promise<RunVisualization> {
+export function fetchRunVisualization(
+  runId: string,
+): Promise<RunVisualization> {
   return get<RunVisualization>(
     `/api/v1/runs/${encodeURIComponent(runId)}/visualization`,
   );
 }
 
-export function fetchRunTurns(runId: string, cursor?: string): Promise<RunTurnPage> {
+export function fetchRunTurns(
+  runId: string,
+  cursor?: string,
+): Promise<RunTurnPage> {
   const params = new URLSearchParams({ limit: "100" });
   if (cursor) params.set("cursor", cursor);
   return get<RunTurnPage>(
@@ -284,13 +301,18 @@ export function fetchRunTurns(runId: string, cursor?: string): Promise<RunTurnPa
   );
 }
 
-export function fetchCollectorArtifacts(runId: string): Promise<CollectorArtifact[]> {
+export function fetchCollectorArtifacts(
+  runId: string,
+): Promise<CollectorArtifact[]> {
   return get<CollectorArtifact[]>(
     `/api/v1/runs/${encodeURIComponent(runId)}/collector-verifications`,
   );
 }
 
-export function collectorFileDownloadUrl(runId: string, fileId: string): string {
+export function collectorFileDownloadUrl(
+  runId: string,
+  fileId: string,
+): string {
   return `${apiOrigin}/api/v1/runs/${encodeURIComponent(runId)}/collector-files/${encodeURIComponent(fileId)}/download`;
 }
 
@@ -303,18 +325,25 @@ export async function fetchCollectorFilePreview(
   fileId: string,
   signal?: AbortSignal,
 ): Promise<Response> {
-  const response = await fetch(collectorFilePreviewUrl(runId, fileId), { signal });
+  const response = await fetch(collectorFilePreviewUrl(runId, fileId), {
+    signal,
+  });
   if (!response.ok) throw new Error(`Preview failed: ${response.status}`);
   return response;
 }
 
-export type RelationshipParticipant = components["schemas"]["ParticipantResponse"];
+export type RelationshipParticipant =
+  components["schemas"]["ParticipantResponse"];
 export type RelationshipEdge = components["schemas"]["RelationshipResponse"];
-export type RelationshipProjection = components["schemas"]["RelationshipProjectionResponse"];
+export type RelationshipProjection =
+  components["schemas"]["RelationshipProjectionResponse"];
 
 export function fetchRunRelationships(
   runId: string,
-  filters: Pick<EvidenceFilters, "caseId" | "participantId" | "activityType"> = {},
+  filters: Pick<
+    EvidenceFilters,
+    "caseId" | "participantId" | "activityType"
+  > = {},
 ): Promise<RelationshipProjection> {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(filters)) {
@@ -328,15 +357,69 @@ export function fetchRunRelationships(
   );
 }
 
-export function fetchActivity(runId: string, filters: EvidenceFilters = {}): Promise<ActivityPage> {
+export function fetchActivity(
+  runId: string,
+  filters: EvidenceFilters = {},
+): Promise<ActivityPage> {
   const params = new URLSearchParams();
   params.set("limit", String(Math.min(filters.limit ?? 200, 200)));
   params.set("order", filters.order ?? "asc");
   for (const [key, value] of Object.entries(filters)) {
-    if (key !== "limit" && key !== "order" && value !== undefined && value !== "") {
+    if (
+      key !== "limit" &&
+      key !== "order" &&
+      value !== undefined &&
+      value !== ""
+    ) {
       params.set(key, String(value));
     }
   }
   const suffix = params.toString() ? `?${params.toString()}` : "";
-  return get<ActivityPage>(`/api/v1/runs/${encodeURIComponent(runId)}/activity${suffix}`);
+  return get<ActivityPage>(
+    `/api/v1/runs/${encodeURIComponent(runId)}/activity${suffix}`,
+  );
+}
+
+export function fetchScientistScenarios(
+  state: ScientistScenarioState = "active",
+  result?: ScientistScenarioResult,
+): Promise<ScientistScenario[]> {
+  const params = new URLSearchParams({ state });
+  if (result) params.set("result", result);
+  return get<ScientistScenario[]>(
+    `/api/v1/scientist-scenarios?${params.toString()}`,
+  );
+}
+
+export function archiveScientistScenario(
+  runId: string,
+  artifactId: string,
+): Promise<ScientistScenario> {
+  return mutate<ScientistScenario>(
+    `/api/v1/scientist-scenarios/${encodeURIComponent(runId)}/${encodeURIComponent(artifactId)}/archive`,
+    "PUT",
+  );
+}
+
+export function restoreScientistScenario(
+  runId: string,
+  artifactId: string,
+): Promise<ScientistScenario> {
+  return mutate<ScientistScenario>(
+    `/api/v1/scientist-scenarios/${encodeURIComponent(runId)}/${encodeURIComponent(artifactId)}/archive`,
+    "DELETE",
+  );
+}
+
+export function scientistScenarioExportUrl(
+  runId: string,
+  artifactId: string,
+): string {
+  return `${apiOrigin}/api/v1/scientist-scenarios/${encodeURIComponent(runId)}/${encodeURIComponent(artifactId)}/export`;
+}
+
+async function mutate<T>(path: string, method: "PUT" | "DELETE"): Promise<T> {
+  const response = await fetch(`${apiOrigin}${path}`, { method });
+  if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+  return response.json() as Promise<T>;
 }

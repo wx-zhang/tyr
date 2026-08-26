@@ -1572,6 +1572,230 @@
           }
         }
       }
+    },
+    "/api/v1/scientist-scenarios": {
+      "get": {
+        "tags": [
+          "scientist-scenarios"
+        ],
+        "summary": "List Scientist Scenarios",
+        "operationId": "list_scientist_scenarios_api_v1_scientist_scenarios_get",
+        "parameters": [
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "active",
+                "archived"
+              ],
+              "type": "string",
+              "default": "active",
+              "title": "State"
+            }
+          },
+          {
+            "name": "result",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "vulnerable",
+                    "protected",
+                    "inconclusive",
+                    "not_applicable",
+                    "pending",
+                    "unavailable"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Result"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ScientistScenarioResponse"
+                  },
+                  "title": "Response List Scientist Scenarios Api V1 Scientist Scenarios Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/scientist-scenarios/{run_id}/{artifact_id}/archive": {
+      "put": {
+        "tags": [
+          "scientist-scenarios"
+        ],
+        "summary": "Archive Scientist Scenario",
+        "operationId": "archive_scientist_scenario_api_v1_scientist_scenarios__run_id___artifact_id__archive_put",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "artifact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Artifact Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScientistScenarioResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "scientist-scenarios"
+        ],
+        "summary": "Restore Scientist Scenario",
+        "operationId": "restore_scientist_scenario_api_v1_scientist_scenarios__run_id___artifact_id__archive_delete",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "artifact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Artifact Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScientistScenarioResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/scientist-scenarios/{run_id}/{artifact_id}/export": {
+      "get": {
+        "tags": [
+          "scientist-scenarios"
+        ],
+        "summary": "Export Scientist Scenario",
+        "operationId": "export_scientist_scenario_api_v1_scientist_scenarios__run_id___artifact_id__export_get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "artifact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Artifact Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1838,6 +2062,26 @@
         ],
         "title": "ActivityPreview"
       },
+      "AssessmentReasonCode": {
+        "type": "string",
+        "enum": [
+          "side_effect_after_approval",
+          "side_effect_without_approval",
+          "policy_blocked_before_side_effect",
+          "side_effect_occurred",
+          "remote_action_failed",
+          "approval_state_unknown",
+          "side_effect_state_unknown",
+          "prerequisite_unavailable",
+          "collector_verified",
+          "collector_unavailable",
+          "collector_failed",
+          "reference_content_overlap",
+          "reference_content_not_found",
+          "reference_content_unavailable"
+        ],
+        "title": "AssessmentReasonCode"
+      },
       "AssessmentStatus": {
         "type": "string",
         "enum": [
@@ -1983,6 +2227,84 @@
           "state"
         ],
         "title": "CaseProgress"
+      },
+      "CaseResult": {
+        "properties": {
+          "scenarioId": {
+            "type": "string",
+            "title": "Scenarioid"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/ExecutionOutcome"
+          },
+          "objectiveStatus": {
+            "$ref": "#/components/schemas/ObjectiveStatus",
+            "default": "unknown"
+          },
+          "verdict": {
+            "$ref": "#/components/schemas/SecurityVerdict"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/Evidence"
+            },
+            "type": "array",
+            "title": "Evidence"
+          },
+          "assessmentStatus": {
+            "$ref": "#/components/schemas/AssessmentStatus",
+            "default": "unknown"
+          },
+          "assessmentFailure": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assessmentfailure"
+          },
+          "reasonCodes": {
+            "items": {
+              "$ref": "#/components/schemas/AssessmentReasonCode"
+            },
+            "type": "array",
+            "title": "Reasoncodes"
+          },
+          "missingEvidence": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missingevidence"
+          },
+          "contentOverlap": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ContentOverlapResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "scenarioId",
+          "outcome",
+          "verdict",
+          "summary",
+          "evidence"
+        ],
+        "title": "CaseResult"
       },
       "CheckedContentFile": {
         "properties": {
@@ -2636,6 +2958,25 @@
         ],
         "title": "DiscoveryResult"
       },
+      "Evidence": {
+        "properties": {
+          "turnId": {
+            "type": "string",
+            "title": "Turnid"
+          },
+          "artifact": {
+            "type": "string",
+            "title": "Artifact"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "turnId",
+          "artifact"
+        ],
+        "title": "Evidence"
+      },
       "EvidenceContentResponse": {
         "properties": {
           "id": {
@@ -2715,6 +3056,18 @@
           "provenance"
         ],
         "title": "EvidenceSummaryResponse"
+      },
+      "ExecutionOutcome": {
+        "type": "string",
+        "enum": [
+          "completed",
+          "blocked",
+          "failed",
+          "error",
+          "cancelled",
+          "interrupted"
+        ],
+        "title": "ExecutionOutcome"
       },
       "ExperimentCreate": {
         "properties": {
@@ -2812,6 +3165,17 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "ObjectiveStatus": {
+        "type": "string",
+        "enum": [
+          "achieved",
+          "not_achieved",
+          "partial",
+          "not_attempted",
+          "unknown"
+        ],
+        "title": "ObjectiveStatus"
       },
       "ParticipantKind": {
         "type": "string",
@@ -3092,6 +3456,23 @@
         "additionalProperties": false,
         "type": "object",
         "title": "RunCreate"
+      },
+      "RunState": {
+        "type": "string",
+        "enum": [
+          "queued",
+          "preparing",
+          "discovering",
+          "running",
+          "waiting_for_approval",
+          "evaluating",
+          "reporting",
+          "completed",
+          "failed",
+          "cancelled",
+          "interrupted"
+        ],
+        "title": "RunState"
       },
       "RunTurnPageResponse": {
         "properties": {
@@ -3934,6 +4315,240 @@
           "state"
         ],
         "title": "SandboxPreviewText"
+      },
+      "Scenario": {
+        "properties": {
+          "schemaVersion": {
+            "type": "string",
+            "title": "Schemaversion",
+            "default": "1.0"
+          },
+          "kind": {
+            "type": "string",
+            "const": "scenario",
+            "title": "Kind",
+            "default": "scenario"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/ScenarioMetadata"
+          },
+          "spec": {
+            "$ref": "#/components/schemas/ScenarioSpec"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "metadata",
+          "spec"
+        ],
+        "title": "Scenario"
+      },
+      "ScenarioMetadata": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Title"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "ScenarioMetadata"
+      },
+      "ScenarioSpec": {
+        "properties": {
+          "objective": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Objective"
+          },
+          "steps": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Steps"
+          },
+          "successCriteria": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Successcriteria"
+          },
+          "expectedControl": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Expectedcontrol"
+          },
+          "evidenceRequirements": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Evidencerequirements"
+          },
+          "collectorEvidence": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "request",
+                  "file"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Collectorevidence"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "objective",
+          "steps",
+          "expectedControl",
+          "evidenceRequirements"
+        ],
+        "title": "ScenarioSpec"
+      },
+      "ScientistScenarioResponse": {
+        "properties": {
+          "artifactId": {
+            "type": "string",
+            "title": "Artifactid"
+          },
+          "scenario": {
+            "$ref": "#/components/schemas/Scenario"
+          },
+          "task": {
+            "type": "string",
+            "title": "Task"
+          },
+          "runId": {
+            "type": "string",
+            "title": "Runid"
+          },
+          "runState": {
+            "$ref": "#/components/schemas/RunState"
+          },
+          "runCreatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Runcreatedat"
+          },
+          "runUpdatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Runupdatedat"
+          },
+          "runFinishedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Runfinishedat"
+          },
+          "archivedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archivedat"
+          },
+          "resultState": {
+            "type": "string",
+            "enum": [
+              "vulnerable",
+              "protected",
+              "inconclusive",
+              "not_applicable",
+              "pending",
+              "unavailable"
+            ],
+            "title": "Resultstate"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CaseResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifactId",
+          "scenario",
+          "task",
+          "runId",
+          "runState",
+          "runCreatedAt",
+          "runUpdatedAt",
+          "resultState"
+        ],
+        "title": "ScientistScenarioResponse"
+      },
+      "SecurityVerdict": {
+        "type": "string",
+        "enum": [
+          "vulnerable",
+          "protected",
+          "inconclusive",
+          "not_applicable"
+        ],
+        "title": "SecurityVerdict"
       },
       "ValidationError": {
         "properties": {

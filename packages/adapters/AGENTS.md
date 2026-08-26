@@ -26,14 +26,18 @@ including sensitive values. It applies the same bounded preview rules to
 generic sandbox events. `artifacts/evidence.py` folds interleaved sandbox event
 deltas into one case-scoped operation turn. `artifacts/query.py` owns bounded
 in-memory activity and relationship projections derived from bundles.
+`artifacts/scientist_scenarios.py` owns the confined cross-run scientist
+scenario catalog, exact JSON exports, and per-occurrence archive markers;
+marker state is operational and never rewrites run evidence.
 `config.py` loads and validates configuration settings including `GAMR_MAX_CONCURRENT_DECODERS`.
 `sandbox/` owns attachment snapshots, output collection (`collect_output.py`),
 the disabled and explicitly unsafe host backends, the fixed Docker CLI backend,
 its Python 3.14 image, and bounded process support.
 
-Canonical artifact and configured-secret regressions live in
-`packages/adapters/tests/test_artifacts.py`; normalization, projection recovery,
-relationship, and history behavior remain in the neighboring evidence tests.
+Canonical artifact, scientist-catalog, and configured-secret regressions live in
+`packages/adapters/tests/test_artifacts.py` and
+`packages/adapters/tests/test_scientist_scenarios.py`; normalization, projection
+recovery, relationship, and history behavior remain in the neighboring evidence tests.
 
 ## Commands
 
