@@ -34,6 +34,7 @@ from gamr_core import (
     RunState,
     SandboxOperationEvent,
     SandboxOperationPreview,
+    Scenario,
 )
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
@@ -177,6 +178,7 @@ class RunTurnResponse(BaseModel):
     sandbox_operation: SandboxOperationPreview | None = Field(
         default=None, alias="sandboxOperation"
     )
+    scenario: Scenario | None = None
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -689,6 +691,7 @@ def turns(
             historyCaseIds=list(item.history_case_ids),
             historyCaseOrigins=list(item.history_case_origins),
             sandboxOperation=item.sandbox_operation,
+            scenario=item.scenario,
         )
         for item in page
     ]

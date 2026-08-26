@@ -1,3 +1,4 @@
+import { useId, useState } from "react";
 import type { RunTurn } from "../../api/client";
 import { MarkdownMessage } from "./MarkdownMessage";
 
@@ -38,12 +39,67 @@ function isHistorySummary(message: string): boolean {
   );
 }
 
+function ScenarioSpecBlock({
+  spec,
+  id,
+}: {
+  spec: NonNullable<RunTurn["scenario"]>["spec"];
+  id: string;
+}) {
+  return (
+    <div className="scientist-scenario-spec" id={id}>
+      <section className="case-section">
+        <h4>Objective</h4>
+        <p className="plan-prose reading-width">{spec.objective}</p>
+      </section>
+      <section className="case-section">
+        <h4>Steps</h4>
+        <ol className="case-steps reading-width">
+          {spec.steps.map((step, index) => (
+            <li key={`${index}-${step.slice(0, 24)}`}>{step}</li>
+          ))}
+        </ol>
+      </section>
+      {spec.successCriteria ? (
+        <section className="case-section">
+          <h4>Success criteria</h4>
+          <p className="plan-prose reading-width">{spec.successCriteria}</p>
+        </section>
+      ) : null}
+      <section className="case-section">
+        <h4>Expected control</h4>
+        <p className="plan-prose reading-width">{spec.expectedControl}</p>
+      </section>
+      <section className="case-section">
+        <h4>Evidence requirements</h4>
+        <ul className="case-evidence reading-width">
+          {spec.evidenceRequirements.map((item, index) => (
+            <li key={`${index}-${item.slice(0, 24)}`}>{item}</li>
+          ))}
+        </ul>
+      </section>
+      {spec.collectorEvidence ? (
+        <section className="case-section">
+          <h4>Collector evidence</h4>
+          <p className="plan-prose reading-width">{spec.collectorEvidence}</p>
+        </section>
+      ) : null}
+    </div>
+  );
+}
+
 export function ScientistScenarioCard({ turn }: ScientistScenarioCardProps) {
+  const [expanded, setExpanded] = useState(false);
+  const definitionId = useId();
   const copy = statusCopy(turn.status);
   const message = turn.agentMessage?.trim() ?? "";
   const title =
     (turn.status === "ready" || turn.status === "completed") && message
       ? message
+      : null;
+  const spec =
+    (turn.status === "ready" || turn.status === "completed") && turn.scenario?.spec
+      ? turn.scenario.spec
       : null;
   const showError = turn.status === "failed" && Boolean(message);
   const showWorkingDetail =
@@ -71,9 +127,23 @@ export function ScientistScenarioCard({ turn }: ScientistScenarioCardProps) {
 
       {title ? (
         <div className="scientist-scenario-title">
-          <p className="scientist-scenario-title-label">Scenario title</p>
           <p className="scientist-scenario-title-text">{title}</p>
         </div>
+      ) : null}
+
+      {spec ? (
+        <>
+          <button
+            className="scientist-scenario-toggle"
+            type="button"
+            aria-expanded={expanded}
+            aria-controls={definitionId}
+            onClick={() => setExpanded((current) => !current)}
+          >
+            {expanded ? "Hide complete definition" : "Show complete definition"}
+          </button>
+          {expanded ? <ScenarioSpecBlock spec={spec} id={definitionId} /> : null}
+        </>
       ) : null}
 
       {showError ? (

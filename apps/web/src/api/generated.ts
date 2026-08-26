@@ -1124,6 +1124,7 @@ export interface components {
             /** Historycaseorigins */
             historyCaseOrigins?: string[];
             sandboxOperation?: components["schemas"]["SandboxOperationPreview"] | null;
+            scenario?: components["schemas"]["Scenario"] | null;
         };
         /** RunVisualization */
         RunVisualization: {

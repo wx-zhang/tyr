@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from collections.abc import Iterable
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
@@ -24,6 +25,7 @@ from gamr_core import (
     SandboxOperationEvent,
     SandboxOperationPreview,
     SandboxOperationState,
+    Scenario,
 )
 from pydantic import ValidationError
 
@@ -86,6 +88,7 @@ class NormalizedTurn:
     history_case_ids: tuple[str, ...] = ()
     history_case_origins: tuple[str, ...] = ()
     sandbox_operation: SandboxOperationPreview | None = None
+    scenario: Scenario | None = None
 
 
 class _SandboxSession(TypedDict):
@@ -169,6 +172,20 @@ def _activity_turn_times(bundle: Path) -> dict[str, dict[str, datetime]]:
 
 
 _TURN_STAGES = frozenset({"discovery", "case", "assessment", "scientist"})
+
+
+def _scientist_scenario_from_artifact(
+    root: Path, case_id: str | None, secrets: Iterable[str] = ()
+) -> Scenario | None:
+    if not case_id or not case_id.strip():
+        return None
+    safe_id = re.sub(r"[^A-Za-z0-9_-]+", "-", case_id)[:128] or "scenario"
+    path = root / "scientist-scenarios" / f"{safe_id}.json"
+    try:
+        payload = redact_payload(json.loads(path.read_text(encoding="utf-8")), secrets)
+        return Scenario.model_validate(payload)
+    except (OSError, json.JSONDecodeError, ValidationError, ValueError):
+        return None
 
 
 def _scientist_turns_from_activity(
@@ -273,6 +290,9 @@ def _scientist_turns_from_activity(
                     "occurred_at": occurred_at,
                     "history_case_ids": previous.get("history_case_ids", ()),
                     "history_case_origins": previous.get("history_case_origins", ()),
+                    "scenario": _scientist_scenario_from_artifact(
+                        root, activity_case_id, secrets
+                    ),
                 }
                 continue
     result_errors = _scientist_errors_from_result(root, secrets)
@@ -302,6 +322,7 @@ def _scientist_turns_from_activity(
         )
         if len(history_origins) != len(history_ids):
             history_origins = ()
+        scenario_raw = item.get("scenario")
         turns.append(
             NormalizedTurn(
                 id=str(item["id"]),
@@ -316,6 +337,7 @@ def _scientist_turns_from_activity(
                 replied_at=None,
                 history_case_ids=history_ids,
                 history_case_origins=history_origins,
+                scenario=scenario_raw if isinstance(scenario_raw, Scenario) else None,
             )
         )
     return turns
@@ -865,6 +887,7 @@ def normalize_turns(
             history_case_ids=turn.history_case_ids,
             history_case_origins=turn.history_case_origins,
             sandbox_operation=turn.sandbox_operation,
+            scenario=turn.scenario,
         )
         for index, turn in enumerate(ordered, 1)
     ]

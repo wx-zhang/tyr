@@ -3714,6 +3714,16 @@
                 "type": "null"
               }
             ]
+          },
+          "scenario": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Scenario"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
