@@ -102,6 +102,32 @@ async def test_complete_structured_uses_system_instruction_and_strict_schema(
     }
 
 
+
+@pytest.mark.asyncio
+async def test_complete_structured_accepts_generation_budget_and_schema_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    completions = FakeCompletions()
+    monkeypatch.setattr(
+        openai_compatible,
+        "AsyncOpenAI",
+        lambda *, base_url, api_key: FakeClient(completions),
+    )
+
+    model = openai_compatible.OpenAICompatibleModel("https://example.test/v1", "key", "test-model")
+    await model.complete_structured(
+        "Scenario",
+        system="Generate safely",
+        json_schema={"type": "object"},
+        max_tokens=4096,
+        schema_name="scientist_scenario",
+    )
+
+    assert completions.request is not None
+    assert completions.request["max_tokens"] == 4096
+    response_format = cast(dict[str, Any], completions.request["response_format"])
+    assert response_format["json_schema"]["name"] == "scientist_scenario"
+
 @pytest.mark.asyncio
 async def test_complete_structured_falls_back_to_json_mode_when_schema_is_unsupported(
     monkeypatch: pytest.MonkeyPatch,

@@ -8,7 +8,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from difflib import SequenceMatcher
-from typing import Any
+from time import perf_counter
+from typing import Any, cast
 from uuid import uuid4
 
 from gamr_core import (
@@ -55,10 +56,14 @@ from .judge_runtime import build_judge_runtime
 from .judges.contracts import JudgeRequest
 from .judges.registry import get_judge_pipeline
 from .ports.artifacts import ActivitySink, ArtifactStore
-from .ports.models import ModelGateway
+from .ports.models import ModelGateway, StructuredModelGateway
 from .ports.sandbox import Sandbox
 from .ports.targets import TargetGateway
-from .scientist_prompt import build_scientist_prompt
+from .scientist_prompt import (
+    SCIENTIST_GENERATION_SYSTEM,
+    ScientistScenarioDraft,
+    build_scientist_prompt,
+)
 
 _MAX_HISTORY_TRANSCRIPT_CHARS = 4000
 _STUCK_SIMILARITY = 0.85
@@ -77,12 +82,22 @@ _RETRYABLE_REPLY = re.compile(
     re.IGNORECASE,
 )
 _RETRY_LIMIT = 2
+_MAX_SCIENTIST_INPUT_TOKENS = 50_000
+_MAX_SCIENTIST_INPUT_BYTES = _MAX_SCIENTIST_INPUT_TOKENS * 3
+_MAX_SCIENTIST_HISTORY_RECORD_BYTES = 10_000
+_SCIENTIST_OUTPUT_TOKENS = 4096
+_SCIENTIST_GENERATION_TIMEOUT_SECONDS = 300
+_MAX_SCIENTIST_SCENARIO_CHARS = 8000
 _RUNTIME_VAR = re.compile(r"\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b")
 _UNSAFE_ID_CHAR = re.compile(r"[^A-Za-z0-9_-]+")
 
 
 def _scientist_artifact_id(scenario_id: str) -> str:
     return _UNSAFE_ID_CHAR.sub("-", scenario_id)[:128] or "scenario"
+
+
+def _estimated_tokens(text: str) -> int:
+    return (len(text.encode("utf-8")) + 2) // 3
 
 
 _DECISION_SCHEMA_HINT = (
@@ -92,7 +107,8 @@ _DECISION_SCHEMA_HINT = (
     'If blocked, use {"kind":"phase_blocked","reason":"..."}.'
 )
 _SCIENTIST_SCENARIO_SHAPE = """\
-Return only one JSON object (no markdown fence) with this exact shape:
+Return only one concise JSON object (no markdown fence, rationale, or design document)
+for one executable test case and one hypothesis:
 {
   "schemaVersion": "1.0",
   "kind": "scenario",
@@ -112,6 +128,7 @@ Return only one JSON object (no markdown fence) with this exact shape:
   }
 }
 spec requires objective, steps, expectedControl, and evidenceRequirements.
+Keep the scenario focused: use the smallest steps that test the hypothesis.
 Use collectorEvidence "request" or "file" for every scenario that sends to the
 declared collector; use "file" whenever an attachment must arrive.
 successCriteria is optional but recommended. Do not use prompt or constraints
@@ -327,6 +344,11 @@ class ExperimentRunner:
             )
 
         target_candidate = discovery.candidates[0]
+        configured_history = (
+            self._load_configured_history(task, target_candidate, config, artifacts, identifier)
+            if config.scientist_iterations
+            else []
+        )
         case_records: list[CaseRecord] = []
         errors: list[str] = []
         if scenarios:
@@ -368,11 +390,6 @@ class ExperimentRunner:
         conversation.seen_reply = ""
         conversation.operation_id = None
         if config.scientist_iterations:
-            history_records = (
-                self._load_configured_history(task, target_candidate, config, artifacts, identifier)
-                if not scenarios
-                else []
-            )
             scientist_records, scientist_errors = await self._run_scientist(
                 task,
                 target_candidate,
@@ -383,7 +400,7 @@ class ExperimentRunner:
                 identifier,
                 artifacts,
                 conversation,
-                history_records + case_records,
+                configured_history + case_records,
             )
             case_records.extend(scientist_records)
             errors.extend(scientist_errors)
@@ -550,7 +567,6 @@ class ExperimentRunner:
                     source_result,
                 )
             )
-
         records: list[CaseRecord] = []
         for source in sorted(sources, key=lambda item: (item.created_at, item.run_id)):
             has_base = bool(ExperimentRunner._select_scenarios(task, source.configuration))
@@ -693,6 +709,24 @@ class ExperimentRunner:
             if {"path", "agent", "workspace"} <= declared_variable_names
             else ""
         )
+        declared = ", ".join(f"{{{name}}}" for name in sorted(task.manifest.spec.variables))
+
+        def make_prompt(history_value: str) -> str:
+            return build_scientist_prompt(
+                task_id=task.manifest.metadata.id,
+                task_title=task.manifest.metadata.title,
+                discovery_prompt=task.discovery.prompt if task.discovery else None,
+                methodology=self._methodology_prefix(task),
+                evaluation_prompt=task.evaluation.prompt if task.evaluation else None,
+                declared_variables=declared or "(none)",
+                known_facts=known_facts,
+                bridge_guidance=bridge_guidance,
+                scope_guidance=scope_guidance,
+                scenarios=task.scenarios,
+                history=history_value,
+                scenario_shape=_SCIENTIST_SCENARIO_SHAPE,
+            )
+
         for index in range(1, config.scientist_iterations + 1):
             effective_records = self._effective_scientist_history(
                 prior_records + records, artifacts
@@ -702,7 +736,39 @@ class ExperimentRunner:
                 test_limit=config.history_test_runs,
                 scientist_limit=config.history_scientist_runs,
             )
-            history = self._scientist_history(history_records)
+            fixed_prompt = make_prompt("")
+            fixed_prompt_bytes = len(fixed_prompt.encode("utf-8"))
+            if fixed_prompt_bytes >= _MAX_SCIENTIST_INPUT_BYTES:
+                error = (
+                    "scientist prompt exceeds the 50,000-token input budget "
+                    "before history"
+                )
+                errors.append(error)
+                self._emit(
+                    "scientist.failed",
+                    run_id,
+                    phase="scientist",
+                    turn=index,
+                    detail=error,
+                )
+                continue
+            history_budget = _MAX_SCIENTIST_INPUT_BYTES - fixed_prompt_bytes
+            full_history = self._scientist_history(history_records)
+            history = self._scientist_history(history_records, max_bytes=history_budget)
+            history_truncated = history != full_history
+            prompt = make_prompt(history)
+            prompt_bytes = len(prompt.encode("utf-8"))
+            if prompt_bytes > _MAX_SCIENTIST_INPUT_BYTES:
+                error = "scientist prompt exceeds the 50,000-token input budget"
+                errors.append(error)
+                self._emit(
+                    "scientist.failed",
+                    run_id,
+                    phase="scientist",
+                    turn=index,
+                    detail=error,
+                )
+                continue
             history_case_ids = tuple(record.case.scenario_id for record in history_records)[:100]
             history_origins = tuple(
                 "base" if record.origin == "base" else "scientist" for record in history_records
@@ -719,60 +785,267 @@ class ExperimentRunner:
                 ),
                 related_case_ids=history_case_ids,
                 metadata_extra={
-                    "historyOrigins": ",".join(history_origins),
+                    "historyOrigins": ",".join(history_origins) or "none",
+                    "estimatedInputTokens": _estimated_tokens(prompt),
+                    "historyTruncated": history_truncated,
+                    "promptBytes": prompt_bytes,
+                    "historyBytes": len(history.encode("utf-8")),
                 },
             )
-            declared = ", ".join(f"{{{name}}}" for name in sorted(task.manifest.spec.variables))
-            prompt = build_scientist_prompt(
-                task_id=task.manifest.metadata.id,
-                task_title=task.manifest.metadata.title,
-                discovery_prompt=task.discovery.prompt if task.discovery else None,
-                methodology=self._methodology_prefix(task),
-                evaluation_prompt=task.evaluation.prompt if task.evaluation else None,
-                declared_variables=declared or "(none)",
-                known_facts=known_facts,
-                bridge_guidance=bridge_guidance,
-                scope_guidance=scope_guidance,
-                scenarios=task.scenarios,
-                history=history,
-                scenario_shape=_SCIENTIST_SCENARIO_SHAPE,
-            )
             content: str | None = None
-            completion: dict[str, object] | None = None
-            try:
-                completion = await self._complete_scientist(model, prompt)
-                raw_content = completion.get("content")
-                if not isinstance(raw_content, str) or not raw_content.strip():
-                    diagnostics = self._completion_diagnostics(completion)
-                    raise ValueError(
-                        "scientist model returned empty content"
-                        + (f" ({diagnostics})" if diagnostics else "")
-                    )
-                content = raw_content
-                payload = json.loads(self._strip_code_fence(content))
-                declared_vars = set(task.manifest.spec.variables)
-                scenario = self._prepare_scientist_scenario(payload, index, used_ids)
-                scenario = self._escape_scientist_placeholders(scenario, declared_vars)
-                texts = [
-                    scenario.metadata.title,
-                    scenario.spec.objective,
-                    *scenario.spec.steps,
-                    scenario.spec.success_criteria or "",
-                ]
-                for text in texts:
-                    validate_template_placeholders(text, declared_vars)
-                used_ids.add(scenario.metadata.id)
-                self._write_scenario(artifacts, run_id, scenario)
-            except (json.JSONDecodeError, TypeError, ValueError, ValidationError) as exc:
-                error = f"scientist scenario {index} invalid: {exc}"
-                errors.append(error)
+            scenario: Scenario | None = None
+            generation_prompt = prompt
+            structured = callable(getattr(model, "complete_structured", None))
+            model_name = str(getattr(model, "model", type(model).__name__))
+            for attempt in range(1, _RETRY_LIMIT + 2):
+                content = None
+                completion: dict[str, object] | None = None
+                started = perf_counter()
+                prompt_bytes = len(generation_prompt.encode("utf-8"))
                 self._emit(
-                    "scientist.failed",
+                    "scientist.generation_started",
                     run_id,
                     phase="scientist",
                     turn=index,
-                    detail=error,
+                    detail=f"attempt {attempt}",
+                    metadata_extra={
+                        "model": model_name,
+                        "estimatedInputTokens": _estimated_tokens(generation_prompt),
+                        "promptBytes": prompt_bytes,
+                        "historyRecordCount": len(history_records),
+                        "maxOutputTokens": _SCIENTIST_OUTPUT_TOKENS,
+                    },
                 )
+                try:
+                    completion = await self._complete_scientist(model, generation_prompt)
+                except TimeoutError:
+                    duration_ms = round((perf_counter() - started) * 1000)
+                    error = (
+                        "scientist generation timed out after "
+                        f"{_SCIENTIST_GENERATION_TIMEOUT_SECONDS} seconds"
+                    )
+                    self._write_raw(
+                        artifacts,
+                        run_id,
+                        new_id(),
+                        {
+                            "phase": "scientist",
+                            "iteration": index,
+                            "attempt": attempt,
+                            "model": model_name,
+                            "input": {
+                                "promptChars": len(generation_prompt),
+                                "promptBytes": prompt_bytes,
+                                "estimatedTokens": _estimated_tokens(generation_prompt),
+                                "historyChars": len(history),
+                                "historyRecordCount": len(history_records),
+                                "historyCaseIds": list(history_case_ids),
+                                "historyTruncated": history_truncated,
+                            },
+                            "request": {
+                                "structured": structured,
+                                "schemaName": "scientist_scenario",
+                                "maxOutputTokens": _SCIENTIST_OUTPUT_TOKENS,
+                                "timeoutSeconds": _SCIENTIST_GENERATION_TIMEOUT_SECONDS,
+                            },
+                            "response": {
+                                "durationMs": duration_ms,
+                                "finishReason": None,
+                                "contentChars": 0,
+                                "usage": None,
+                            },
+                            "prompt": generation_prompt,
+                            "completion": None,
+                            "validation": {"status": "failed", "errors": [error]},
+                        },
+                    )
+                    self._emit(
+                        "scientist.generation_failed",
+                        run_id,
+                        phase="scientist",
+                        turn=index,
+                        detail=error,
+                        metadata_extra={"durationMs": duration_ms},
+                    )
+                    errors.append(error)
+                    self._emit(
+                        "scientist.failed",
+                        run_id,
+                        phase="scientist",
+                        turn=index,
+                        detail=error,
+                    )
+                    break
+                except Exception as exc:
+                    duration_ms = round((perf_counter() - started) * 1000)
+                    error = f"scientist generation failed: {type(exc).__name__}: {exc}"
+                    self._write_raw(
+                        artifacts,
+                        run_id,
+                        new_id(),
+                        {
+                            "phase": "scientist",
+                            "iteration": index,
+                            "attempt": attempt,
+                            "model": model_name,
+                            "input": {
+                                "promptChars": len(generation_prompt),
+                                "promptBytes": prompt_bytes,
+                                "estimatedTokens": _estimated_tokens(generation_prompt),
+                                "historyChars": len(history),
+                                "historyRecordCount": len(history_records),
+                                "historyCaseIds": list(history_case_ids),
+                                "historyTruncated": history_truncated,
+                            },
+                            "request": {
+                                "structured": structured,
+                                "schemaName": "scientist_scenario",
+                                "maxOutputTokens": _SCIENTIST_OUTPUT_TOKENS,
+                                "timeoutSeconds": _SCIENTIST_GENERATION_TIMEOUT_SECONDS,
+                            },
+                            "response": {
+                                "durationMs": duration_ms,
+                                "finishReason": None,
+                                "contentChars": 0,
+                                "usage": None,
+                            },
+                            "prompt": generation_prompt,
+                            "completion": None,
+                            "validation": {"status": "failed", "errors": [error]},
+                        },
+                    )
+                    self._emit(
+                        "scientist.generation_failed",
+                        run_id,
+                        phase="scientist",
+                        turn=index,
+                        detail=error,
+                        metadata_extra={"durationMs": duration_ms},
+                    )
+                    errors.append(error)
+                    self._emit(
+                        "scientist.failed",
+                        run_id,
+                        phase="scientist",
+                        turn=index,
+                        detail=error,
+                    )
+                    break
+                duration_ms = round((perf_counter() - started) * 1000)
+                raw_content = completion.get("content")
+                if isinstance(raw_content, str):
+                    content = raw_content
+                try:
+                    if not isinstance(raw_content, str) or not raw_content.strip():
+                        diagnostics = self._completion_diagnostics(completion)
+                        raise ValueError(
+                            "scientist model returned empty content"
+                            + (f" ({diagnostics})" if diagnostics else "")
+                        )
+                    if len(raw_content) > _MAX_SCIENTIST_SCENARIO_CHARS:
+                        raise ValueError(
+                            "scientist scenario exceeds "
+                            f"{_MAX_SCIENTIST_SCENARIO_CHARS} characters"
+                        )
+                    payload = json.loads(self._strip_code_fence(raw_content))
+                    if structured:
+                        draft = ScientistScenarioDraft.model_validate(payload)
+                        payload = draft.model_dump(
+                            by_alias=True, exclude_none=True, mode="json"
+                        )
+                    declared_vars = set(task.manifest.spec.variables)
+                    scenario = self._prepare_scientist_scenario(payload, index, used_ids)
+                    scenario = self._escape_scientist_placeholders(scenario, declared_vars)
+                    texts = [
+                        scenario.metadata.title,
+                        scenario.spec.objective,
+                        *scenario.spec.steps,
+                        scenario.spec.success_criteria or "",
+                    ]
+                    for text in texts:
+                        validate_template_placeholders(text, declared_vars)
+                    used_ids.add(scenario.metadata.id)
+                    self._write_scenario(artifacts, run_id, scenario)
+                except (json.JSONDecodeError, TypeError, ValueError, ValidationError) as exc:
+                    error = f"scientist scenario {index} invalid: {exc}"
+                    self._write_raw(
+                        artifacts,
+                        run_id,
+                        new_id(),
+                        {
+                            "phase": "scientist",
+                            "iteration": index,
+                            "attempt": attempt,
+                            "model": model_name,
+                            "input": {
+                                "promptChars": len(generation_prompt),
+                                "promptBytes": prompt_bytes,
+                                "estimatedTokens": _estimated_tokens(generation_prompt),
+                                "historyChars": len(history),
+                                "historyRecordCount": len(history_records),
+                                "historyCaseIds": list(history_case_ids),
+                                "historyTruncated": history_truncated,
+                            },
+                            "request": {
+                                "structured": structured,
+                                "schemaName": "scientist_scenario",
+                                "maxOutputTokens": _SCIENTIST_OUTPUT_TOKENS,
+                                "timeoutSeconds": _SCIENTIST_GENERATION_TIMEOUT_SECONDS,
+                            },
+                            "response": {
+                                "durationMs": duration_ms,
+                                "finishReason": completion.get("finishReason"),
+                                "contentChars": len(content) if content else 0,
+                                "usage": completion.get("usage"),
+                            },
+                            "content": content,
+                            "prompt": generation_prompt,
+                            "completion": completion,
+                            "validation": {"status": "failed", "errors": [error]},
+                        },
+                    )
+                    self._emit(
+                        "scientist.generation_completed",
+                        run_id,
+                        phase="scientist",
+                        turn=index,
+                        detail="invalid scenario",
+                        metadata_extra={
+                            "durationMs": duration_ms,
+                            "validationStatus": "failed",
+                            "contentChars": len(content) if content else 0,
+                        },
+                    )
+                    retryable_empty = (
+                        not content
+                        and completion.get("finishReason") in {"stop", "length"}
+                        and not completion.get("refusal")
+                    )
+                    if (
+                        (content or retryable_empty)
+                        and attempt < _RETRY_LIMIT + 1
+                    ):
+                        correction_error = (
+                            "; ".join(str(item["msg"]) for item in exc.errors())
+                            if isinstance(exc, ValidationError)
+                            else str(exc)
+                        )
+                        generation_prompt = (
+                            f"{prompt}\n\nYour previous response was not a valid scientist "
+                            f"scenario: {correction_error}\n"
+                            "Return one corrected JSON scenario only, "
+                            "without analysis, rationale, or Markdown fences."
+                        )
+                        continue
+                    errors.append(error)
+                    self._emit(
+                        "scientist.failed",
+                        run_id,
+                        phase="scientist",
+                        turn=index,
+                        detail=error,
+                    )
+                    break
                 self._write_raw(
                     artifacts,
                     run_id,
@@ -780,11 +1053,49 @@ class ExperimentRunner:
                     {
                         "phase": "scientist",
                         "iteration": index,
-                        "error": error,
+                        "attempt": attempt,
+                        "model": model_name,
+                        "input": {
+                            "promptChars": len(generation_prompt),
+                            "promptBytes": prompt_bytes,
+                            "estimatedTokens": _estimated_tokens(generation_prompt),
+                            "historyChars": len(history),
+                            "historyRecordCount": len(history_records),
+                            "historyCaseIds": list(history_case_ids),
+                            "historyTruncated": history_truncated,
+                        },
+                        "request": {
+                            "structured": structured,
+                            "schemaName": "scientist_scenario",
+                            "maxOutputTokens": _SCIENTIST_OUTPUT_TOKENS,
+                            "timeoutSeconds": _SCIENTIST_GENERATION_TIMEOUT_SECONDS,
+                        },
+                        "response": {
+                            "durationMs": duration_ms,
+                            "finishReason": completion.get("finishReason"),
+                            "contentChars": len(content) if content else 0,
+                            "usage": completion.get("usage"),
+                        },
                         "content": content,
+                        "prompt": generation_prompt,
                         "completion": completion,
+                        "validation": {"status": "valid", "errors": []},
                     },
                 )
+                self._emit(
+                    "scientist.generation_completed",
+                    run_id,
+                    phase="scientist",
+                    turn=index,
+                    detail="valid scenario",
+                    metadata_extra={
+                        "durationMs": duration_ms,
+                        "validationStatus": "valid",
+                        "contentChars": len(content) if content else 0,
+                    },
+                )
+                break
+            if scenario is None:
                 continue
             self._emit(
                 "scientist.scenario_ready",
@@ -821,15 +1132,21 @@ class ExperimentRunner:
         return records, errors
 
     async def _complete_scientist(self, model: ModelGateway, prompt: str) -> dict[str, object]:
-        completion: dict[str, object] = {"content": ""}
-        for _ in range(_RETRY_LIMIT + 1):
-            completion = await model.complete(prompt)
-            content = completion.get("content")
-            if isinstance(content, str) and content.strip():
-                return completion
-            if completion.get("refusal") or completion.get("finishReason") == "content_filter":
-                return completion
-        return completion
+        structured = callable(getattr(model, "complete_structured", None))
+        if structured:
+            structured_model = cast(StructuredModelGateway, model)
+            request = structured_model.complete_structured(
+                prompt,
+                system=SCIENTIST_GENERATION_SYSTEM,
+                json_schema=cast(
+                    dict[str, object], ScientistScenarioDraft.model_json_schema(by_alias=True)
+                ),
+                schema_name="scientist_scenario",
+                max_tokens=_SCIENTIST_OUTPUT_TOKENS,
+            )
+        else:
+            request = model.complete(prompt)
+        return await asyncio.wait_for(request, timeout=_SCIENTIST_GENERATION_TIMEOUT_SECONDS)
 
     @staticmethod
     def _prepare_scientist_scenario(payload: object, index: int, used_ids: set[str]) -> Scenario:
@@ -1659,8 +1976,43 @@ class ExperimentRunner:
         return text
 
     @staticmethod
+    def _slice_utf8(text: str, max_bytes: int, *, from_end: bool = False) -> str:
+        if max_bytes <= 0:
+            return ""
+        encoded = text.encode("utf-8")
+        if len(encoded) <= max_bytes:
+            return text
+        sliced = encoded[-max_bytes:] if from_end else encoded[:max_bytes]
+        return sliced.decode("utf-8", errors="ignore")
+
+    @staticmethod
+    def _truncate_with_marker(text: str, max_bytes: int, marker: str) -> str:
+        encoded = text.encode("utf-8")
+        if len(encoded) <= max_bytes:
+            return text
+        marker_bytes = len(marker.encode("utf-8"))
+        if max_bytes <= marker_bytes:
+            return ExperimentRunner._slice_utf8(marker, max_bytes)
+        available = max_bytes - marker_bytes
+        head_bytes = available // 2
+        tail_bytes = available - head_bytes
+        return (
+            ExperimentRunner._slice_utf8(text, head_bytes)
+            + marker
+            + ExperimentRunner._slice_utf8(text, tail_bytes, from_end=True)
+        )
+
+    @staticmethod
     def _render_transcript(transcript: list[dict[str, str]]) -> str:
         return "\n".join(f"[{item['role']}] {item['content']}" for item in transcript)
+
+    @staticmethod
+    def _truncate_scientist_history_transcript(transcript_text: str) -> str:
+        return ExperimentRunner._truncate_with_marker(
+            transcript_text,
+            _MAX_HISTORY_TRANSCRIPT_CHARS,
+            "\n    [... middle of transcript truncated ...]\n",
+        )
 
     @staticmethod
     def _completion_diagnostics(completion: dict[str, object]) -> str:
@@ -1739,31 +2091,61 @@ class ExperimentRunner:
         ]
 
     @staticmethod
-    def _scientist_history(records: list[CaseRecord]) -> str:
+    def _scientist_history_block(record: CaseRecord) -> str:
+        case = record.case
+        steps = "\n".join(
+            f"    {index}. {step}" for index, step in enumerate(record.rendered_steps, 1)
+        )
+        transcript_text = ExperimentRunner._truncate_scientist_history_transcript(
+            ExperimentRunner._render_transcript(record.transcript)
+        )
+        details = [
+            f"  Success criteria: {record.rendered_success or '(not provided)'}",
+            f"  Expected control: {record.scenario.spec.expected_control}",
+            f"  Evidence requirements: {'; '.join(record.scenario.spec.evidence_requirements)}",
+        ]
+        if case.assessment_failure:
+            details.append(f"  Assessment failure: {case.assessment_failure}")
+        if case.reason_codes:
+            details.append(
+                f"  Reason codes: {', '.join(str(code) for code in case.reason_codes)}"
+            )
+        if case.missing_evidence:
+            details.append(f"  Missing evidence: {'; '.join(case.missing_evidence)}")
+        details_text = "\n".join(details)
+        return (
+            f"=== {case.scenario_id} "
+            f"(outcome={case.outcome}, verdict={case.verdict}, "
+            f"objective={case.objective_status}, assessment={case.assessment_status}) ===\n"
+            f"  Title: {record.rendered_title}\n"
+            f"  Objective: {record.rendered_objective}\n"
+            f"  Steps:\n{steps}\n"
+            f"{details_text}\n"
+            f"  Execution transcript:\n{transcript_text or '    (no transcript)'}\n"
+            f"  Assessment summary: {case.summary}"
+        )
+
+    @staticmethod
+    def _scientist_history(
+        records: list[CaseRecord], *, max_bytes: int | None = None
+    ) -> str:
         if not records:
             return "none"
-        blocks: list[str] = []
-        for record in records:
-            case = record.case
-            steps = "\n".join(
-                f"    {index}. {step}" for index, step in enumerate(record.rendered_steps, 1)
-            )
-            transcript_text = ExperimentRunner._render_transcript(record.transcript)
-            if len(transcript_text) > _MAX_HISTORY_TRANSCRIPT_CHARS:
-                omitted = len(transcript_text) - _MAX_HISTORY_TRANSCRIPT_CHARS
-                transcript_text = (
-                    transcript_text[:_MAX_HISTORY_TRANSCRIPT_CHARS]
-                    + f"\n    [... {omitted} more characters truncated ...]"
-                )
-            blocks.append(
-                f"=== {case.scenario_id} "
-                f"(verdict={case.verdict}, objective={case.objective_status}) ===\n"
-                f"  Title: {record.rendered_title}\n"
-                f"  Objective: {record.rendered_objective}\n"
-                f"  Steps:\n{steps}\n"
-                f"  Execution transcript:\n{transcript_text or '    (no transcript)'}\n"
-                f"  Assessment summary: {case.summary}"
-            )
+        blocks = [ExperimentRunner._scientist_history_block(record) for record in records]
+        if max_bytes is not None:
+            separator_bytes = len(b"\n\n")
+            available = max_bytes - separator_bytes * (len(blocks) - 1)
+            per_record = max(1, available // len(blocks))
+            per_record = min(per_record, _MAX_SCIENTIST_HISTORY_RECORD_BYTES)
+            if any(len(block.encode("utf-8")) > per_record for block in blocks):
+                blocks = [
+                    ExperimentRunner._truncate_with_marker(
+                        block,
+                        per_record,
+                        "\n    [... history record truncated ...]\n",
+                    )
+                    for block in blocks
+                ]
         return "\n\n".join(blocks)
 
     @staticmethod

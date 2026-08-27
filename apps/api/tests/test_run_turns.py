@@ -71,16 +71,17 @@ def test_turns_route_returns_grouped_conversation_verbatim(tmp_path: Path) -> No
             "verdict": None,
             "objectiveStatus": None,
             "outcome": None,
-                "assessmentSummary": None,
-                "assessmentStatus": None,
-                "assessmentFailure": None,
-                "reasonCodes": [],
-                "missingEvidence": [],
-                "contentOverlap": None,
-                "judgePipeline": None,
+            "assessmentSummary": None,
+            "assessmentStatus": None,
+            "assessmentFailure": None,
+            "reasonCodes": [],
+            "missingEvidence": [],
+            "contentOverlap": None,
+            "judgePipeline": None,
             "historyCaseIds": [],
             "historyCaseOrigins": [],
             "sandboxOperation": None,
+            "scenario": None,
         }
         assert payload["items"][1]["status"] == "waiting_for_tyr"
         assert payload["items"][1]["caseId"] == "case-alpha"
@@ -170,9 +171,7 @@ def test_turns_route_includes_scientist_generation_events(tmp_path: Path) -> Non
         encoding="utf-8",
     )
     registry = InMemoryRegistry(
-        runs={
-            "run-scientist": RunRecord("run-scientist", None, "task", state=RunState.COMPLETED)
-        }
+        runs={"run-scientist": RunRecord("run-scientist", None, "task", state=RunState.COMPLETED)}
     )
     app.dependency_overrides[get_registry] = lambda: registry
     app.dependency_overrides[get_settings] = lambda: Settings(artifact_root=str(artifact_root))
@@ -309,9 +308,7 @@ def test_turns_route_exposes_evaluation_fields(tmp_path: Path) -> None:
     }
     (bundle / "result.json").write_text(json.dumps(result), encoding="utf-8")
     registry = InMemoryRegistry(
-        runs={
-            "run-evaluation": RunRecord("run-evaluation", None, "task", state=RunState.COMPLETED)
-        }
+        runs={"run-evaluation": RunRecord("run-evaluation", None, "task", state=RunState.COMPLETED)}
     )
     app.dependency_overrides[get_registry] = lambda: registry
     app.dependency_overrides[get_settings] = lambda: Settings(
@@ -330,9 +327,7 @@ def test_turns_route_exposes_evaluation_fields(tmp_path: Path) -> None:
         assert evaluation["contentOverlap"]["status"] == "confirmed"
         assert evaluation["contentOverlap"]["summary"] == long_comparison
         assert evaluation["contentOverlap"]["fullSummary"] is None
-        assert evaluation["contentOverlap"]["checkedFiles"][0]["filename"] == (
-            "evidence.txt"
-        )
+        assert evaluation["contentOverlap"]["checkedFiles"][0]["filename"] == ("evidence.txt")
     finally:
         app.dependency_overrides.clear()
 

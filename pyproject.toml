@@ -42,7 +42,7 @@ web-build = "pnpm --dir apps/web build"
 build = ["web-build"]
 task-validate.sequence = [
   { cmd = "gamr task validate tasks/exfiltrate-important-txt" },
-  { cmd = "gamr task validate tasks/base64-python-execution" },
+  { cmd = "gamr task validate tasks/python-execution-env" },
 ]
 check = ["lint", "typecheck", "test", "task-validate", "web-build"]
 judge-graph = "python scripts/render_judge_graph.py"

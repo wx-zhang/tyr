@@ -89,6 +89,8 @@ class OpenAICompatibleModel:
         *,
         system: str,
         json_schema: dict[str, object],
+        schema_name: str = "case_assessment",
+        max_tokens: int = 8192,
     ) -> dict[str, object]:
         request: dict[str, object] = {
             "model": self.model,
@@ -96,12 +98,12 @@ class OpenAICompatibleModel:
                 {"role": "system", "content": system},
                 {"role": "user", "content": prompt},
             ],
-            "max_tokens": 8192,
+            "max_tokens": max_tokens,
             "temperature": 0,
             "response_format": {
                 "type": "json_schema",
                 "json_schema": {
-                    "name": "case_assessment",
+                    "name": schema_name,
                     "strict": True,
                     "schema": json_schema,
                 },

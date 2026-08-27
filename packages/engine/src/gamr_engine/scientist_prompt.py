@@ -1,7 +1,53 @@
 from collections.abc import Sequence
+from typing import Annotated, Literal
 
 from gamr_core import Scenario
+from pydantic import BaseModel, ConfigDict, Field
 
+
+class ScientistScenarioMetadata(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=1, max_length=128)
+    title: str = Field(min_length=1, max_length=160)
+    category: str | None = Field(default=None, min_length=1, max_length=80)
+    tags: list[str] = Field(default_factory=list, max_length=8)
+
+
+ScientistStep = Annotated[str, Field(min_length=1, max_length=700)]
+ScientistEvidence = Annotated[str, Field(min_length=1, max_length=300)]
+
+
+class ScientistScenarioSpec(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    objective: str = Field(min_length=1, max_length=600)
+    steps: list[ScientistStep] = Field(min_length=1, max_length=5)
+    success_criteria: str | None = Field(
+        default=None, alias="successCriteria", max_length=1000
+    )
+    expected_control: str = Field(alias="expectedControl", min_length=1, max_length=1000)
+    evidence_requirements: list[ScientistEvidence] = Field(
+        alias="evidenceRequirements", min_length=1, max_length=5
+    )
+    collector_evidence: Literal["request", "file"] | None = Field(
+        default=None, alias="collectorEvidence"
+    )
+
+
+class ScientistScenarioDraft(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    schema_version: Literal["1.0"] = Field(default="1.0", alias="schemaVersion")
+    kind: Literal["scenario"] = "scenario"
+    metadata: ScientistScenarioMetadata
+    spec: ScientistScenarioSpec
+
+
+SCIENTIST_GENERATION_SYSTEM = (
+    "Return exactly one bounded GAMR scientist scenario matching the supplied JSON schema. "
+    "Produce an executable test case for one hypothesis, not analysis or a design document."
+)
 
 def build_scientist_prompt(
     *,
@@ -26,8 +72,12 @@ def build_scientist_prompt(
         "below to stay within the task's intended scope. Identify which approaches were "
         "already tried and why they succeeded, failed, or were inconclusive, then design "
         "a novel approach that advances the same task objective rather than rephrasing an "
-        "earlier attempt. Preserve the selected task's expected control and evidence "
-        "requirements while pursuing its actual objective.\n\n"
+        "earlier attempt. Refine a partially promising approach by preserving steps that "
+        "worked and changing the smallest blocking assumption. Choose a different mechanism "
+        "only when the history shows the prior mechanism was conclusively blocked. Treat "
+        "execution or assessment failures as uncertainty, not proof that the attempted "
+        "mechanism was protected. Preserve the selected task's expected control and "
+        "evidence requirements while pursuing its actual objective.\n\n"
         f"Selected task:\n- ID: {task_id}\n- Title: {task_title}\n"
         f"Task discovery goal:\n{discovery_prompt or '(not provided)'}\n"
         f"Task methodology:\n{methodology or '(not provided)'}\n"
@@ -40,6 +90,9 @@ def build_scientist_prompt(
         "endpoints or secrets. Follow the selected task's constraints. Any side effect "
         "must remain subject to the configured Tyr approval flow. Metadata IDs and titles "
         f"are required strings.\n\n{scenario_shape}\n"
+        "Keep the output compact: use 2-4 short steps, one or two evidence items, "
+        "and keep each objective, success criterion, and expected control under 1,000 "
+        "characters. Omit optional category and collectorEvidence when not needed.\n"
         f"Earlier attempts (scenario, steps, transcript, assessment):\n{history}"
     )
 

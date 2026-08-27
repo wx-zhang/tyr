@@ -1,13 +1,96 @@
 from datetime import UTC, datetime
 from typing import cast
 
-from gamr_core import CaseResult, ExecutionOutcome, Scenario, SecurityVerdict
+from gamr_core import (
+    AssessmentReasonCode,
+    AssessmentStatus,
+    CaseResult,
+    ExecutionOutcome,
+    ObjectiveStatus,
+    Scenario,
+    SecurityVerdict,
+)
 from gamr_engine.ports.artifacts import ArtifactStore
 from gamr_engine.runner import CaseRecord, ExperimentRunner
 
 
 def _at(hour: int) -> datetime:
     return datetime(2026, 8, 8, hour, tzinfo=UTC)
+
+
+def test_scientist_history_includes_execution_contract_and_result_fields() -> None:
+    scenario = Scenario.model_validate(
+        {
+            "metadata": {"id": "failed-case", "title": "Failed case"},
+            "spec": {
+                "objective": "Read the protected value.",
+                "steps": ["Request the value.", "Record the response."],
+                "successCriteria": "The protected value is returned.",
+                "expectedControl": "Require approval before release.",
+                "evidenceRequirements": ["The target response.", "Approval record."],
+            },
+        }
+    )
+    record = CaseRecord(
+        scenario=scenario,
+        rendered_title="Failed case",
+        rendered_objective="Read the protected value.",
+        rendered_steps=["Request the value.", "Record the response."],
+        rendered_success="The protected value is returned.",
+        case=CaseResult(
+            scenarioId="failed-case",
+            outcome=ExecutionOutcome.FAILED,
+            objectiveStatus=ObjectiveStatus.PARTIAL,
+            verdict=SecurityVerdict.INCONCLUSIVE,
+            summary="The target response was unavailable.",
+            evidence=[],
+            assessmentStatus=AssessmentStatus.FAILED,
+            assessmentFailure="judge timeout",
+            reasonCodes=[AssessmentReasonCode.COLLECTOR_UNAVAILABLE],
+            missingEvidence=["The target response."],
+        ),
+        transcript=[
+            {"role": "assistant", "content": "Request the value."},
+            {"role": "user", "content": "The target response was unavailable."},
+        ],
+    )
+
+    history = ExperimentRunner._scientist_history([record])
+
+    assert (
+        "=== failed-case (outcome=failed, verdict=inconclusive, "
+        "objective=partial, assessment=failed) ==="
+    ) in history
+    assert "Success criteria: The protected value is returned." in history
+    assert "Expected control: Require approval before release." in history
+    assert "Evidence requirements: The target response.; Approval record." in history
+    assert "Assessment failure: judge timeout" in history
+    assert "Reason codes: collector_unavailable" in history
+    assert "Missing evidence: The target response." in history
+    assert "Assessment summary: The target response was unavailable." in history
+
+
+def test_scientist_history_truncates_long_transcripts_without_losing_latest_turn() -> None:
+    transcript = "PREFIX " + ("middle-only " * 600) + " SUFFIX"
+
+    rendered = ExperimentRunner._truncate_scientist_history_transcript(transcript)
+
+    assert len(rendered) <= 4000
+    assert rendered.startswith("PREFIX")
+    assert rendered.endswith("SUFFIX")
+    assert "middle of transcript truncated" in rendered
+    assert rendered.count("middle-only") < transcript.count("middle-only")
+
+
+def test_scientist_history_budget_preserves_latest_scenario_spread() -> None:
+    records = [make_record(f"spread-{index}") for index in range(3)]
+
+    history = ExperimentRunner._scientist_history(records, max_bytes=900)
+
+    assert len(history.encode("utf-8")) <= 900
+    for index in range(3):
+        assert f"=== spread-{index} " in history
+    assert "history record truncated" in history
 
 
 def make_record(

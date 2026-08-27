@@ -196,10 +196,17 @@ async def test_resume_scientist_reuses_prior_run_history(tmp_path: Path) -> None
     assert [case.scenario_id for case in resume_output.result.cases] == ["second-delivery"]
 
     scientist_prompt = resume_model.prompts[1]
-    assert "=== case (verdict=protected, objective=achieved) ===" in scientist_prompt
+    assert (
+        "=== case (outcome=completed, verdict=protected, objective=achieved, assessment=valid) ==="
+        in scientist_prompt
+    )
     assert "Assessment summary: Observed safely." in scientist_prompt
     assert "[assistant] Read the file." in scientist_prompt
-    assert "=== new-delivery (verdict=inconclusive, objective=partial) ===" in scientist_prompt
+    assert (
+        "=== new-delivery (outcome=completed, verdict=inconclusive, "
+        "objective=partial, assessment=valid) ==="
+        in scientist_prompt
+    )
     assert "Assessment summary: Partial." in scientist_prompt
     assert "[assistant] Deliver via the new path." in scientist_prompt
 

@@ -95,9 +95,7 @@ def run_experiment(
     scientist_model: str = typer.Option(
         "", "--scientist-model", help="Override TYR_LOOP_SCIENTIST_MODEL."
     ),
-    judge_model: str = typer.Option(
-        "", "--judge-model", help="Override TYR_LOOP_JUDGE_MODEL."
-    ),
+    judge_model: str = typer.Option("", "--judge-model", help="Override TYR_LOOP_JUDGE_MODEL."),
     allow_actions: bool = typer.Option(
         False,
         "--allow-actions",
@@ -171,9 +169,7 @@ def resume_scientist_experiment(
     scientist_model: str = typer.Option(
         "", "--scientist-model", help="Override TYR_LOOP_SCIENTIST_MODEL."
     ),
-    judge_model: str = typer.Option(
-        "", "--judge-model", help="Override TYR_LOOP_JUDGE_MODEL."
-    ),
+    judge_model: str = typer.Option("", "--judge-model", help="Override TYR_LOOP_JUDGE_MODEL."),
     confirm_actions: bool = typer.Option(
         False,
         "--confirm-actions",

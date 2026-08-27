@@ -22,6 +22,8 @@ class StructuredModelGateway(ModelGateway, Protocol):
         *,
         system: str,
         json_schema: dict[str, object],
+        schema_name: str = "case_assessment",
+        max_tokens: int = 8192,
     ) -> dict[str, object]: ...
 
 
