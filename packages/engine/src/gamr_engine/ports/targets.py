@@ -7,6 +7,7 @@ class TargetGateway(Protocol):
     async def initialize(self) -> dict[str, object]: ...
 
     async def list_tools(self) -> list[dict[str, object]]: ...
+    async def start_conversation(self, *, idempotency_key: str) -> dict[str, object]: ...
 
     async def call_tool(
         self, name: str, arguments: dict[str, object], *, timeout: float = 60
@@ -17,6 +18,7 @@ class TargetGateway(Protocol):
         prompt: str,
         *,
         operation_id: str | None = None,
+        conversation_id: str | None = None,
         idempotency_key: str,
     ) -> dict[str, object]: ...
 
@@ -25,6 +27,7 @@ class TargetGateway(Protocol):
         prompt: str,
         *,
         operation_id: str | None = None,
+        conversation_id: str | None = None,
         idempotency_key: str,
     ) -> dict[str, object]: ...
 

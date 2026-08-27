@@ -165,6 +165,61 @@ async def test_request_adds_idempotency_key_and_operation_id() -> None:
 
 
 @pytest.mark.asyncio
+async def test_start_conversation_and_query_pass_conversation_id() -> None:
+    calls: list[dict[str, object]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content)
+        calls.append(payload)
+        params = cast(dict[str, object], payload["params"])
+        name = params["name"]
+        body = (
+            {"conversationId": "conversation-1"}
+            if name == "tyr_assistant_start_conversation"
+            else {"state": "completed", "response": "ok"}
+        )
+        return httpx.Response(
+            200,
+            json={
+                "jsonrpc": "2.0",
+                "id": payload["id"],
+                "result": {"content": [{"type": "text", "text": json.dumps(body)}]},
+            },
+        )
+
+    client = TyrMcpClient(
+        "https://tyr.invalid/mcp",
+        "secret-token",
+        http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+    )
+    try:
+        start = await client.start_conversation(idempotency_key="start-key")
+        result = await client.query(
+            "continue",
+            conversation_id=start["conversationId"],
+            idempotency_key="key-1",
+        )
+    finally:
+        await client.aclose()
+
+    assert result["response"] == "ok"
+    first_params = cast(dict[str, object], calls[0]["params"])
+    second_params = cast(dict[str, object], calls[1]["params"])
+    assert first_params == {
+        "name": "tyr_assistant_start_conversation",
+        "arguments": {"idempotencyKey": "start-key"},
+    }
+    assert second_params == {
+        "name": "tyr_assistant_query",
+        "arguments": {
+            "message": "continue",
+            "conversationId": "conversation-1",
+            "idempotencyKey": "key-1",
+        },
+    }
+
+
+@pytest.mark.asyncio
 async def test_settle_falls_back_to_prior_operation_id_when_reply_omits_it() -> None:
     calls: list[dict[str, object]] = []
 

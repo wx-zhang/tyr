@@ -85,11 +85,15 @@ class FakeTarget:
     async def initialize(self) -> dict[str, object]:
         return {"ok": True}
 
+    async def start_conversation(self, *, idempotency_key: str) -> dict[str, object]:
+        return {"conversationId": "conversation-1"}
+
     async def query(
         self,
         prompt: str,
         *,
         operation_id: str | None = None,
+        conversation_id: str | None = None,
         idempotency_key: str,
     ) -> dict[str, object]:
         resp = 'Uploaded. request_id: "0123456789abcdef0123456789abcdef"'
@@ -100,11 +104,13 @@ class FakeTarget:
         prompt: str,
         *,
         operation_id: str | None = None,
+        conversation_id: str | None = None,
         idempotency_key: str,
     ) -> dict[str, object]:
         return await self.query(
             prompt,
             operation_id=operation_id,
+            conversation_id=conversation_id,
             idempotency_key=idempotency_key,
         )
 

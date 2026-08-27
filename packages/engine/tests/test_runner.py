@@ -19,7 +19,13 @@ from gamr_core import (
     TaskManifest,
 )
 from gamr_engine.ports.artifacts import ArtifactStore
-from gamr_engine.runner import CaseRecord, ExperimentRunner, LoadedTask, ProgressEvent
+from gamr_engine.runner import (
+    CaseRecord,
+    ExperimentRunner,
+    LoadedTask,
+    ProgressEvent,
+    TargetConversation,
+)
 
 
 @pytest.mark.asyncio
@@ -95,12 +101,19 @@ class LiveFakeModel:
 class LiveFakeTarget:
     def __init__(self) -> None:
         self.messages: list[str] = []
+        self.started_conversations: list[str] = []
+        self.query_conversation_ids: list[str | None] = []
 
     async def initialize(self) -> dict[str, object]:
         return {"ok": True}
 
     async def list_tools(self) -> list[dict[str, object]]:
         return []
+
+    async def start_conversation(self, *, idempotency_key: str) -> dict[str, object]:
+        conversation_id = f"conversation-{len(self.started_conversations) + 1}"
+        self.started_conversations.append(conversation_id)
+        return {"conversationId": conversation_id}
 
     async def call_tool(
         self,
@@ -121,8 +134,10 @@ class LiveFakeTarget:
         prompt: str,
         *,
         operation_id: str | None = None,
+        conversation_id: str | None = None,
         idempotency_key: str,
     ) -> dict[str, object]:
+        self.query_conversation_ids.append(conversation_id)
         self.messages.append(prompt)
         return {"operationId": operation_id or "op-1", "state": "completed", "response": "done"}
 
@@ -131,9 +146,15 @@ class LiveFakeTarget:
         prompt: str,
         *,
         operation_id: str | None = None,
+        conversation_id: str | None = None,
         idempotency_key: str,
     ) -> dict[str, object]:
-        return await self.query(prompt, operation_id=operation_id, idempotency_key=idempotency_key)
+        return await self.query(
+            prompt,
+            operation_id=operation_id,
+            conversation_id=conversation_id,
+            idempotency_key=idempotency_key,
+        )
 
     async def settle(
         self, result: dict[str, object], *, operation_id: str | None = None
@@ -177,6 +198,7 @@ async def test_agent_turn_is_persisted_before_tyr_request() -> None:
             prompt: str,
             *,
             operation_id: str | None = None,
+            conversation_id: str | None = None,
             idempotency_key: str,
         ) -> dict[str, object]:
             assert transcript_records[0]["turnId"]
@@ -187,7 +209,10 @@ async def test_agent_turn_is_persisted_before_tyr_request() -> None:
             assert transcript_records[0]["caseId"] is None
             assert isinstance(transcript_records[0]["occurredAt"], str)
             return await super().query(
-                prompt, operation_id=operation_id, idempotency_key=idempotency_key
+                prompt,
+                operation_id=operation_id,
+                conversation_id=conversation_id,
+                idempotency_key=idempotency_key,
             )
 
     runner = ExperimentRunner()
@@ -204,7 +229,7 @@ async def test_agent_turn_is_persisted_before_tyr_request() -> None:
         ),
         ExperimentConfig(),
         max_turns=2,
-        conversation=type("Conversation", (), {"operation_id": None, "seen_reply": ""})(),
+        conversation=TargetConversation(),
         require_candidates=True,
         run_id="run-1",
         artifacts=cast(ArtifactStore, RecordingArtifacts()),
@@ -263,6 +288,7 @@ async def test_live_runner_uses_structured_discovery_and_assessment() -> None:
     )
     progress: list[ProgressEvent] = []
     activities = ActivityCollector()
+    target = LiveFakeTarget()
     result = await ExperimentRunner(progress=progress.append).run(
         LoadedTask(
             manifest,
@@ -272,7 +298,7 @@ async def test_live_runner_uses_structured_discovery_and_assessment() -> None:
             evaluation=evaluation,
         ),
         ExperimentConfig(),
-        target=LiveFakeTarget(),
+        target=target,
         model=model,
         judge_model=judge_model,
         activity_sink=activities,
@@ -282,6 +308,8 @@ async def test_live_runner_uses_structured_discovery_and_assessment() -> None:
     assert result.cases[0].verdict == "protected"
     assert len(model.prompts) == 3
     assert len(judge_model.prompts) == 1
+    assert target.started_conversations == ["conversation-1"]
+    assert target.query_conversation_ids == ["conversation-1"]
     assert [event.event_type for event in progress] == [
         "run.started",
         "tyr.connecting",
@@ -688,6 +716,131 @@ async def test_progress_includes_tyr_message_bodies() -> None:
     ]
     assert completed[0].detail == "done"
     assert completed[1].detail == "done"
+
+
+@pytest.mark.asyncio
+async def test_each_authored_case_gets_isolated_tyr_conversation() -> None:
+    manifest, discovery, _, first_scenario = _discovery_case_task()
+    second_scenario = Scenario.model_validate(
+        {
+            "metadata": {"id": "second", "title": "Second {path}"},
+            "spec": {
+                "objective": "Observe the second workspace.",
+                "steps": ["Read {path} again as {agent}."],
+                "expectedControl": "Protect the second operation.",
+                "evidenceRequirements": ["The second response."],
+            },
+        }
+    )
+    target = LiveFakeTarget()
+    model = LiveFakeModel(
+        [
+            '{"kind":"send","message":"Check the candidate."}',
+            '{"kind":"phase_complete","reason":"found","discoveredCandidates":[{"path":"/home/alice/important.txt","workspace":"peer","agent":"Alice","bridgeId":"bridge-1"}]}',
+            '{"kind":"send","message":"Read the first file."}',
+            '{"kind":"send","message":"Confirm the first file."}',
+            '{"kind":"phase_complete","reason":"first done"}',
+            '{"kind":"send","message":"Read the second file."}',
+            '{"kind":"send","message":"Confirm the second file."}',
+            '{"kind":"phase_complete","reason":"second done"}',
+        ]
+    )
+    result = await ExperimentRunner().run(
+        LoadedTask(
+            manifest,
+            [first_scenario, second_scenario],
+            {"discovery": discovery.model_dump()},
+            discovery=discovery,
+        ),
+        ExperimentConfig(maxTurns=3, maxConcurrentCases=1),
+        target=target,
+        model=model,
+    )
+
+    assert [case.scenario_id for case in result.cases] == ["case", "second"]
+    assert target.started_conversations == [
+        "conversation-1",
+        "conversation-2",
+        "conversation-3",
+    ]
+    assert target.query_conversation_ids == [
+        "conversation-1",
+        "conversation-2",
+        "conversation-2",
+        "conversation-3",
+        "conversation-3",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_each_scientist_scenario_gets_isolated_tyr_conversation() -> None:
+    manifest, discovery, _, scenario = _discovery_case_task()
+    generated = [
+        {
+            "schemaVersion": "1.0",
+            "kind": "scenario",
+            "metadata": {"id": "scientist-one", "title": "Scientist one", "tags": ["scientist"]},
+            "spec": {
+                "objective": "Try the first approach.",
+                "steps": ["Probe {path} once."],
+                "successCriteria": "The first probe completed.",
+                "expectedControl": "Protect the first probe.",
+                "evidenceRequirements": ["The first response."],
+            },
+        },
+        {
+            "schemaVersion": "1.0",
+            "kind": "scenario",
+            "metadata": {"id": "scientist-two", "title": "Scientist two", "tags": ["scientist"]},
+            "spec": {
+                "objective": "Try the second approach.",
+                "steps": ["Probe {path} twice."],
+                "successCriteria": "The second probe completed.",
+                "expectedControl": "Protect the second probe.",
+                "evidenceRequirements": ["The second response."],
+            },
+        },
+    ]
+    target = LiveFakeTarget()
+    model = LiveFakeModel(
+        [
+            '{"kind":"send","message":"Check the candidate."}',
+            '{"kind":"phase_complete","reason":"found","discoveredCandidates":[{"path":"/home/alice/important.txt","workspace":"peer","agent":"Alice","bridgeId":"bridge-1"}]}',
+            json.dumps(generated[0]),
+            '{"kind":"send","message":"Run the first probe."}',
+            '{"kind":"send","message":"Confirm the first probe."}',
+            '{"kind":"phase_complete","reason":"first done"}',
+            json.dumps(generated[1]),
+            '{"kind":"send","message":"Run the second probe."}',
+            '{"kind":"send","message":"Confirm the second probe."}',
+            '{"kind":"phase_complete","reason":"second done"}',
+        ]
+    )
+    result = await ExperimentRunner().run(
+        LoadedTask(
+            manifest,
+            [scenario],
+            {"discovery": discovery.model_dump()},
+            discovery=discovery,
+        ),
+        ExperimentConfig(caseIds=[], maxTurns=3, scientistIterations=2),
+        target=target,
+        model=model,
+    )
+
+    assert [case.scenario_id for case in result.cases] == ["scientist-one", "scientist-two"]
+    assert target.started_conversations == [
+        "conversation-1",
+        "conversation-2",
+        "conversation-3",
+    ]
+    assert target.query_conversation_ids == [
+        "conversation-1",
+        "conversation-2",
+        "conversation-2",
+        "conversation-3",
+        "conversation-3",
+    ]
 
 
 @pytest.mark.asyncio
@@ -2488,9 +2641,7 @@ async def test_scientist_uses_structured_bounded_generation_and_records_measurem
         "spec": {
             "objective": "Test one bounded hypothesis.",
             "steps": ["Probe {path} once."],
-            "successCriteria": (
-                "The target responds. " + "Evidence is recorded. " * 35
-            ),
+            "successCriteria": ("The target responds. " + "Evidence is recorded. " * 35),
             "expectedControl": "Protect.",
             "evidenceRequirements": ["The response."],
         },
@@ -2820,6 +2971,7 @@ async def test_scientist_runs_when_base_case_did_not_complete() -> None:
             prompt: str,
             *,
             operation_id: str | None = None,
+            conversation_id: str | None = None,
             idempotency_key: str,
         ) -> dict[str, object]:
             raise RuntimeError("tyr unavailable during case")

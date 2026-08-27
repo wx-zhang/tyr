@@ -207,6 +207,7 @@ class PhaseResult:
 @dataclass
 class TargetConversation:
     operation_id: str | None = None
+    conversation_id: str | None = None
     seen_reply: str = ""
 
 
@@ -387,8 +388,6 @@ class ExperimentRunner:
 
             case_records = [record for record in records if record is not None]
             errors.extend(error for error in case_errors if error is not None)
-        conversation.seen_reply = ""
-        conversation.operation_id = None
         if config.scientist_iterations:
             scientist_records, scientist_errors = await self._run_scientist(
                 task,
@@ -399,7 +398,6 @@ class ExperimentRunner:
                 judge_model or scientist_model or model,
                 identifier,
                 artifacts,
-                conversation,
                 configured_history + case_records,
             )
             case_records.extend(scientist_records)
@@ -485,7 +483,6 @@ class ExperimentRunner:
             judge_model or scientist_model or model,
             identifier,
             artifacts,
-            conversation,
             prior_records,
         )
         case_results = [record.case for record in scientist_records]
@@ -680,7 +677,6 @@ class ExperimentRunner:
         judge_model: ModelGateway,
         run_id: str,
         artifacts: ArtifactStore | None,
-        conversation: TargetConversation,
         prior_records: list[CaseRecord],
     ) -> tuple[list[CaseRecord], list[str]]:
         records: list[CaseRecord] = []
@@ -739,10 +735,7 @@ class ExperimentRunner:
             fixed_prompt = make_prompt("")
             fixed_prompt_bytes = len(fixed_prompt.encode("utf-8"))
             if fixed_prompt_bytes >= _MAX_SCIENTIST_INPUT_BYTES:
-                error = (
-                    "scientist prompt exceeds the 50,000-token input budget "
-                    "before history"
-                )
+                error = "scientist prompt exceeds the 50,000-token input budget before history"
                 errors.append(error)
                 self._emit(
                     "scientist.failed",
@@ -944,15 +937,12 @@ class ExperimentRunner:
                         )
                     if len(raw_content) > _MAX_SCIENTIST_SCENARIO_CHARS:
                         raise ValueError(
-                            "scientist scenario exceeds "
-                            f"{_MAX_SCIENTIST_SCENARIO_CHARS} characters"
+                            f"scientist scenario exceeds {_MAX_SCIENTIST_SCENARIO_CHARS} characters"
                         )
                     payload = json.loads(self._strip_code_fence(raw_content))
                     if structured:
                         draft = ScientistScenarioDraft.model_validate(payload)
-                        payload = draft.model_dump(
-                            by_alias=True, exclude_none=True, mode="json"
-                        )
+                        payload = draft.model_dump(by_alias=True, exclude_none=True, mode="json")
                     declared_vars = set(task.manifest.spec.variables)
                     scenario = self._prepare_scientist_scenario(payload, index, used_ids)
                     scenario = self._escape_scientist_placeholders(scenario, declared_vars)
@@ -1021,10 +1011,7 @@ class ExperimentRunner:
                         and completion.get("finishReason") in {"stop", "length"}
                         and not completion.get("refusal")
                     )
-                    if (
-                        (content or retryable_empty)
-                        and attempt < _RETRY_LIMIT + 1
-                    ):
+                    if (content or retryable_empty) and attempt < _RETRY_LIMIT + 1:
                         correction_error = (
                             "; ".join(str(item["msg"]) for item in exc.errors())
                             if isinstance(exc, ValidationError)
@@ -1115,7 +1102,7 @@ class ExperimentRunner:
                 judge_model,
                 run_id,
                 artifacts,
-                conversation,
+                TargetConversation(),
                 phase="scientist",
             )
             records.append(record)
@@ -1671,38 +1658,53 @@ class ExperimentRunner:
                 ],
             )
             idempotency_key = str(uuid4())
-            self._write_checkpoint(
-                artifacts,
-                run_id,
-                {
-                    "runId": run_id,
-                    "phase": phase_prompt[:120],
-                    "turnId": turn_id,
-                    "operationId": conversation.operation_id,
-                    "pendingExternalCall": True,
-                    "idempotencyKey": idempotency_key,
-                },
-            )
-            self._emit(
-                "target.requesting",
-                run_id,
-                phase=phase,
-                case_id=case_id,
-                turn=turn,
-                turn_id=turn_id,
-                detail=message,
-            )
+            conversation_start: dict[str, object] | None = None
+            conversation_start_idempotency_key: str | None = None
             try:
+                if conversation.conversation_id is None:
+                    conversation_start_idempotency_key = str(uuid4())
+                    conversation_start = await target.start_conversation(
+                        idempotency_key=conversation_start_idempotency_key
+                    )
+                    conversation_id = conversation_start.get("conversationId")
+                    if not isinstance(conversation_id, str) or not conversation_id:
+                        raise ValueError("Tyr conversation start returned no conversationId")
+                    conversation.conversation_id = conversation_id
+                self._write_checkpoint(
+                    artifacts,
+                    run_id,
+                    {
+                        "runId": run_id,
+                        "phase": phase_prompt[:120],
+                        "turnId": turn_id,
+                        "operationId": conversation.operation_id,
+                        "conversationId": conversation.conversation_id,
+                        "pendingExternalCall": True,
+                        "idempotencyKey": idempotency_key,
+                    },
+                )
+                self._emit(
+                    "target.requesting",
+                    run_id,
+                    phase=phase,
+                    case_id=case_id,
+                    turn=turn,
+                    turn_id=turn_id,
+                    metadata_extra={"conversationId": conversation.conversation_id},
+                    detail=message,
+                )
                 if config.action_mode == "approval_required":
                     result = await target.request(
                         message,
                         operation_id=conversation.operation_id,
+                        conversation_id=conversation.conversation_id,
                         idempotency_key=idempotency_key,
                     )
                 else:
                     result = await target.query(
                         message,
                         operation_id=conversation.operation_id,
+                        conversation_id=conversation.conversation_id,
                         idempotency_key=idempotency_key,
                     )
                 new_operation_id = result.get("operationId")
@@ -1729,8 +1731,13 @@ class ExperimentRunner:
                         "targetRequest": {
                             "message": message,
                             "operationId": conversation.operation_id,
+                            "conversationId": conversation.conversation_id,
                             "idempotencyKey": idempotency_key,
                         },
+                        "conversationStartRequest": {
+                            "idempotencyKey": conversation_start_idempotency_key
+                        },
+                        "conversationStart": conversation_start,
                         "error": str(exc),
                     },
                 )
@@ -1801,8 +1808,13 @@ class ExperimentRunner:
                     "targetRequest": {
                         "message": message,
                         "operationId": conversation.operation_id,
+                        "conversationId": conversation.conversation_id,
                         "idempotencyKey": idempotency_key,
                     },
+                    "conversationStartRequest": {
+                        "idempotencyKey": conversation_start_idempotency_key
+                    },
+                    "conversationStart": conversation_start,
                     "targetResponse": result,
                     "stuckStreak": stuck_streak,
                     "retryStreak": retry_streak,
@@ -1833,6 +1845,7 @@ class ExperimentRunner:
                     "phase": phase_prompt[:120],
                     "turnId": turn_id,
                     "operationId": conversation.operation_id,
+                    "conversationId": conversation.conversation_id,
                     "pendingExternalCall": False,
                     "idempotencyKey": idempotency_key,
                 },
@@ -2107,9 +2120,7 @@ class ExperimentRunner:
         if case.assessment_failure:
             details.append(f"  Assessment failure: {case.assessment_failure}")
         if case.reason_codes:
-            details.append(
-                f"  Reason codes: {', '.join(str(code) for code in case.reason_codes)}"
-            )
+            details.append(f"  Reason codes: {', '.join(str(code) for code in case.reason_codes)}")
         if case.missing_evidence:
             details.append(f"  Missing evidence: {'; '.join(case.missing_evidence)}")
         details_text = "\n".join(details)
@@ -2126,9 +2137,7 @@ class ExperimentRunner:
         )
 
     @staticmethod
-    def _scientist_history(
-        records: list[CaseRecord], *, max_bytes: int | None = None
-    ) -> str:
+    def _scientist_history(records: list[CaseRecord], *, max_bytes: int | None = None) -> str:
         if not records:
             return "none"
         blocks = [ExperimentRunner._scientist_history_block(record) for record in records]

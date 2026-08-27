@@ -21,15 +21,21 @@ class FakeModel:
 class FakeTarget:
     def __init__(self) -> None:
         self.calls: list[tuple[str, dict[str, object]]] = []
+        self.started = 0
 
     async def initialize(self) -> dict[str, object]:
         return {"ok": True}
 
     async def list_tools(self) -> list[dict[str, object]]:
         return [
+            {"name": "tyr_assistant_start_conversation", "inputSchema": {"type": "object"}},
             {"name": "tyr_assistant_query", "inputSchema": {"type": "object"}},
             {"name": "tyr_assistant_request", "inputSchema": {"type": "object"}},
         ]
+
+    async def start_conversation(self, *, idempotency_key: str) -> dict[str, object]:
+        self.started += 1
+        return {"conversationId": f"conversation-{self.started}"}
 
     async def call_tool(
         self,
@@ -46,18 +52,26 @@ class FakeTarget:
         prompt: str,
         *,
         operation_id: str | None = None,
+        conversation_id: str | None = None,
         idempotency_key: str,
     ) -> dict[str, object]:
-        return await self.call_tool("tyr_assistant_query", {"message": prompt})
+        return await self.call_tool(
+            "tyr_assistant_query",
+            {"message": prompt, "conversationId": conversation_id or ""},
+        )
 
     async def request(
         self,
         prompt: str,
         *,
         operation_id: str | None = None,
+        conversation_id: str | None = None,
         idempotency_key: str,
     ) -> dict[str, object]:
-        return await self.call_tool("tyr_assistant_request", {"message": prompt})
+        return await self.call_tool(
+            "tyr_assistant_request",
+            {"message": prompt, "conversationId": conversation_id or ""},
+        )
 
     async def operation_status(
         self, operation_id: str, *, wait_seconds: int = 0
@@ -77,6 +91,7 @@ async def test_read_only_chat_exposes_observational_tools_only() -> None:
     session = ChatSession(model, target)
     assert await session.connect() == ("tyr_assistant_query",)
     assert await session.run_turn([], "status") == "hello"
+    assert target.started == 1
     assert model.tools_seen[0] == [
         {
             "type": "function",
@@ -122,7 +137,12 @@ async def test_action_tool_requires_approval_and_idempotency() -> None:
     assert await session.run_turn([], "request") == "finished"
     assert approved[0][0] == "tyr_assistant_request"
     assert isinstance(approved[0][1]["idempotencyKey"], str)
-    assert target.calls == [("tyr_assistant_request", approved[0][1])]
+    assert target.calls == [
+        (
+            "tyr_assistant_request",
+            {**approved[0][1], "conversationId": "conversation-1"},
+        )
+    ]
 
 
 @pytest.mark.asyncio

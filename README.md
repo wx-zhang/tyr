@@ -96,12 +96,23 @@ with Actions Allowed (`--action-mode approval_required --allow-actions`); each a
 explicit human approval on the Tyr side. GAMR never auto-approves an action. Use `--all-cases` to run
 every case in a task instead of one.
 
+Each discovery thread, base case, and scientist thread starts a separate Tyr Assistant conversation.
+GAMR passes its `conversationId` on every query or action request, so concurrent cases do not share
+Tyr context.
+
 ## Interactive chat
 
 `gamr chat` opens a live chat session with Tyr through the same engine:
 
 ```bash
 uv run gamr chat
+```
+
+Each chat session also starts its own Tyr Assistant conversation. Validate the live MCP
+conversation contract and isolation with:
+
+```bash
+uv run python scripts/explore_tyr_conversations.py
 ```
 
 This starts in **read-only** mode: Tyr's action-capable tools are hidden entirely, so nothing can be

@@ -19,9 +19,10 @@ LEGACY_READ_ONLY_TOOLS = frozenset(
         "tyr_workspace_bridge_history",
     }
 )
+ASSISTANT_CONVERSATION_TOOLS = frozenset({"tyr_assistant_query", "tyr_assistant_request"})
 
 
-@dataclass(frozen=True)
+@dataclass
 class ChatSession:
     model: ChatModelGateway
     target: TargetGateway
@@ -29,6 +30,7 @@ class ChatSession:
     approve: ApprovalCallback | None = None
     max_tool_rounds: int = 8
     max_tokens: int = 1024
+    conversation_id: str | None = None
 
     @staticmethod
     def _is_action_tool(name: str) -> bool:
@@ -53,6 +55,8 @@ class ChatSession:
             name = tool.get("name")
             if not isinstance(name, str) or not name:
                 continue
+            if name == "tyr_assistant_start_conversation":
+                continue
             read_only = cls._tool_is_read_only(tool)
             read_only_by_name[name] = read_only
             if action_mode != "approval_required" and not read_only:
@@ -75,15 +79,26 @@ class ChatSession:
 
     async def connect(self) -> tuple[str, ...]:
         await self.target.initialize()
+        await self._ensure_conversation()
         tools = await self.target.list_tools()
         _, names, _ = self._tool_specs(tools, self.action_mode)
         return tuple(sorted(names))
+
+    async def _ensure_conversation(self) -> str:
+        if self.conversation_id is None:
+            result = await self.target.start_conversation(idempotency_key=str(uuid4()))
+            conversation_id = result.get("conversationId")
+            if not isinstance(conversation_id, str) or not conversation_id:
+                raise RuntimeError("Tyr conversation start returned no conversationId")
+            self.conversation_id = conversation_id
+        return self.conversation_id
 
     async def run_turn(
         self,
         messages: list[dict[str, object]],
         prompt: str,
     ) -> str:
+        await self._ensure_conversation()
         messages.append({"role": "user", "content": prompt})
         advertised = await self.target.list_tools()
         tool_specs, tool_names, read_only_by_name = self._tool_specs(advertised, self.action_mode)
@@ -162,6 +177,8 @@ class ChatSession:
             if self.approve is None or not await self.approve(name, normalized):
                 return {"error": "operator declined this tool call"}, action_upgrade_decided
             normalized.setdefault("idempotencyKey", str(uuid4()))
+        if name in ASSISTANT_CONVERSATION_TOOLS:
+            normalized["conversationId"] = await self._ensure_conversation()
         try:
             result = await self.target.call_tool(name, normalized)
             required_tool = self._required_action_upgrade(result)
@@ -190,6 +207,7 @@ class ChatSession:
                     }, action_upgrade_decided
                 result = await self.target.request(
                     upgrade_message,
+                    conversation_id=await self._ensure_conversation(),
                     idempotency_key=str(uuid4()),
                 )
                 name = required_tool

@@ -28,6 +28,9 @@ class _FakeTarget:
     async def list_tools(self) -> list[dict[str, object]]:
         return []
 
+    async def start_conversation(self, *, idempotency_key: str) -> dict[str, object]:
+        return {"conversationId": "conversation-1"}
+
     async def call_tool(
         self,
         name: str,
@@ -47,6 +50,7 @@ class _FakeTarget:
         prompt: str,
         *,
         operation_id: str | None = None,
+        conversation_id: str | None = None,
         idempotency_key: str,
     ) -> dict[str, object]:
         return {"operationId": operation_id or "op-1", "state": "completed", "response": "done"}
@@ -56,9 +60,15 @@ class _FakeTarget:
         prompt: str,
         *,
         operation_id: str | None = None,
+        conversation_id: str | None = None,
         idempotency_key: str,
     ) -> dict[str, object]:
-        return await self.query(prompt, operation_id=operation_id, idempotency_key=idempotency_key)
+        return await self.query(
+            prompt,
+            operation_id=operation_id,
+            conversation_id=conversation_id,
+            idempotency_key=idempotency_key,
+        )
 
     async def settle(
         self, result: dict[str, object], *, operation_id: str | None = None

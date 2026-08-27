@@ -25,11 +25,19 @@ class LiveFakeModel:
 
 
 class LiveFakeTarget:
+    def __init__(self) -> None:
+        self.conversation_count = 0
+        self.query_conversation_ids: list[str | None] = []
+
     async def initialize(self) -> dict[str, object]:
         return {"ok": True}
 
     async def list_tools(self) -> list[dict[str, object]]:
         return []
+
+    async def start_conversation(self, *, idempotency_key: str) -> dict[str, object]:
+        self.conversation_count += 1
+        return {"conversationId": f"conversation-{self.conversation_count}"}
 
     async def call_tool(
         self,
@@ -50,8 +58,10 @@ class LiveFakeTarget:
         prompt: str,
         *,
         operation_id: str | None = None,
+        conversation_id: str | None = None,
         idempotency_key: str,
     ) -> dict[str, object]:
+        self.query_conversation_ids.append(conversation_id)
         return {"operationId": operation_id or "op-1", "state": "completed", "response": "done"}
 
     async def request(
@@ -59,9 +69,15 @@ class LiveFakeTarget:
         prompt: str,
         *,
         operation_id: str | None = None,
+        conversation_id: str | None = None,
         idempotency_key: str,
     ) -> dict[str, object]:
-        return await self.query(prompt, operation_id=operation_id, idempotency_key=idempotency_key)
+        return await self.query(
+            prompt,
+            operation_id=operation_id,
+            conversation_id=conversation_id,
+            idempotency_key=idempotency_key,
+        )
 
     async def settle(
         self, result: dict[str, object], *, operation_id: str | None = None
@@ -149,15 +165,17 @@ async def test_resume_scientist_reuses_prior_run_history(tmp_path: Path) -> None
             ),
         ]
     )
+    source_target = LiveFakeTarget()
     source_output = await ExperimentExecutionService().execute(
         task,
         ExperimentConfig(scientistIterations=1),
-        target=LiveFakeTarget(),
+        target=source_target,
         model=source_model,
         artifacts=store,
         run_id="source-run",
     )
     assert [case.scenario_id for case in source_output.result.cases] == ["case", "new-delivery"]
+    assert source_target.query_conversation_ids == ["conversation-1", "conversation-2"]
 
     second_generated = {
         "schemaVersion": "1.0",
@@ -183,17 +201,19 @@ async def test_resume_scientist_reuses_prior_run_history(tmp_path: Path) -> None
             ),
         ]
     )
+    resume_target = LiveFakeTarget()
     resume_output = await ExperimentExecutionService().resume_scientist(
         task,
         ExperimentConfig(scientistIterations=1),
         source_run_id="source-run",
-        target=LiveFakeTarget(),
+        target=resume_target,
         model=resume_model,
         artifacts=store,
         run_id="resume-run",
     )
 
     assert [case.scenario_id for case in resume_output.result.cases] == ["second-delivery"]
+    assert resume_target.query_conversation_ids == ["conversation-1"]
 
     scientist_prompt = resume_model.prompts[1]
     assert (
@@ -204,8 +224,7 @@ async def test_resume_scientist_reuses_prior_run_history(tmp_path: Path) -> None
     assert "[assistant] Read the file." in scientist_prompt
     assert (
         "=== new-delivery (outcome=completed, verdict=inconclusive, "
-        "objective=partial, assessment=valid) ==="
-        in scientist_prompt
+        "objective=partial, assessment=valid) ===" in scientist_prompt
     )
     assert "Assessment summary: Partial." in scientist_prompt
     assert "[assistant] Deliver via the new path." in scientist_prompt

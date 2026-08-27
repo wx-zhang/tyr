@@ -179,11 +179,23 @@ class TyrMcpClient:
             return {"text": raw}
         return cast(dict[str, Any], decoded) if isinstance(decoded, dict) else {"value": decoded}
 
+    async def start_conversation(
+        self,
+        *,
+        idempotency_key: str | None = None,
+        title: str | None = None,
+    ) -> dict[str, Any]:
+        arguments: dict[str, object] = {"idempotencyKey": idempotency_key or str(uuid4())}
+        if title is not None:
+            arguments["title"] = title
+        return await self.call_tool("tyr_assistant_start_conversation", arguments)
+
     async def query(
         self,
         message: str,
         *,
         operation_id: str | None = None,
+        conversation_id: str | None = None,
         idempotency_key: str | None = None,
     ) -> dict[str, Any]:
         arguments: dict[str, object] = {
@@ -192,6 +204,8 @@ class TyrMcpClient:
         }
         if operation_id:
             arguments["operationId"] = operation_id
+        if conversation_id:
+            arguments["conversationId"] = conversation_id
         return await self.call_tool("tyr_assistant_query", arguments)
 
     async def request(
@@ -199,6 +213,7 @@ class TyrMcpClient:
         message: str,
         *,
         operation_id: str | None = None,
+        conversation_id: str | None = None,
         idempotency_key: str | None = None,
     ) -> dict[str, Any]:
         arguments: dict[str, object] = {
@@ -207,6 +222,8 @@ class TyrMcpClient:
         }
         if operation_id:
             arguments["operationId"] = operation_id
+        if conversation_id:
+            arguments["conversationId"] = conversation_id
         return await self.call_tool("tyr_assistant_request", arguments)
 
     async def operation_status(self, operation_id: str, *, wait_seconds: int = 0) -> dict[str, Any]:

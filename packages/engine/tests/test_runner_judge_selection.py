@@ -33,6 +33,9 @@ class FakeTarget:
     async def list_tools(self) -> list[dict[str, object]]:
         return []
 
+    async def start_conversation(self, *, idempotency_key: str) -> dict[str, object]:
+        return {"conversationId": "conversation-1"}
+
     async def call_tool(
         self, name: str, arguments: dict[str, object], *, timeout: float = 60
     ) -> dict[str, object]:
@@ -44,7 +47,12 @@ class FakeTarget:
         return {"operationId": operation_id, "state": "completed"}
 
     async def query(
-        self, prompt: str, *, operation_id: str | None = None, idempotency_key: str
+        self,
+        prompt: str,
+        *,
+        operation_id: str | None = None,
+        conversation_id: str | None = None,
+        idempotency_key: str,
     ) -> dict[str, object]:
         return {"operationId": operation_id or "op-1", "state": "completed", "response": "done"}
 
@@ -53,9 +61,15 @@ class FakeTarget:
         prompt: str,
         *,
         operation_id: str | None = None,
+        conversation_id: str | None = None,
         idempotency_key: str,
     ) -> dict[str, object]:
-        return await self.query(prompt, operation_id=operation_id, idempotency_key=idempotency_key)
+        return await self.query(
+            prompt,
+            operation_id=operation_id,
+            conversation_id=conversation_id,
+            idempotency_key=idempotency_key,
+        )
 
     async def settle(
         self, result: dict[str, object], *, operation_id: str | None = None
@@ -120,11 +134,13 @@ async def test_runner_explicit_and_legacy_defaulted_task_selection() -> None:
 async def test_runner_without_evaluation_skips_registry_and_judge() -> None:
     task_no_eval = _make_task(has_evaluation=False)
     runner = ExperimentRunner()
-    model = FakeModel([
-        '{"kind":"phase_complete","reason":"found","discoveredCandidates":[{"path":"/home/user/file.txt","workspace":"ws","agent":"ag","bridgeId":"br"}]}',
-        '{"kind":"send","message":"test"}',
-        '{"kind":"phase_complete","reason":"done"}',
-    ])
+    model = FakeModel(
+        [
+            '{"kind":"phase_complete","reason":"found","discoveredCandidates":[{"path":"/home/user/file.txt","workspace":"ws","agent":"ag","bridgeId":"br"}]}',
+            '{"kind":"send","message":"test"}',
+            '{"kind":"phase_complete","reason":"done"}',
+        ]
+    )
 
     with patch("gamr_engine.runner.get_judge_pipeline") as mock_get_pipeline:
         result = await runner.run(
@@ -142,17 +158,21 @@ async def test_runner_without_evaluation_skips_registry_and_judge() -> None:
 async def test_runner_invokes_pipeline_once_per_case() -> None:
     task = _make_task(explicit_judge=True)
     runner = ExperimentRunner()
-    model = FakeModel([
-        '{"kind":"phase_complete","reason":"found","discoveredCandidates":[{"path":"/home/user/file.txt","workspace":"ws","agent":"ag","bridgeId":"br"}]}',
-        '{"kind":"send","message":"test"}',
-        '{"kind":"phase_complete","reason":"done"}',
-    ])
-    judge_model = FakeModel([
-        (
-            '{"objectiveStatus":"achieved","verdict":"protected",'
-            '"summary":"Done safely.","evidenceTurnIds":[]}'
-        )
-    ])
+    model = FakeModel(
+        [
+            '{"kind":"phase_complete","reason":"found","discoveredCandidates":[{"path":"/home/user/file.txt","workspace":"ws","agent":"ag","bridgeId":"br"}]}',
+            '{"kind":"send","message":"test"}',
+            '{"kind":"phase_complete","reason":"done"}',
+        ]
+    )
+    judge_model = FakeModel(
+        [
+            (
+                '{"objectiveStatus":"achieved","verdict":"protected",'
+                '"summary":"Done safely.","evidenceTurnIds":[]}'
+            )
+        ]
+    )
 
     with patch("gamr_engine.runner.get_judge_pipeline") as mock_get_pipeline:
         mock_pipeline = AsyncMock()
