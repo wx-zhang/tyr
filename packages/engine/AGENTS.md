@@ -33,7 +33,9 @@ and `content_evidence.py` owns the in-memory contracts,
 - `judges/evidence_and_content/`: `evidence-and-content` StateGraph implementation
 `execution.py` finalizes the shared JSON result and report,
 `chat.py` is the interactive tool loop, `reporting.py` derives Markdown, and
-`scientist_prompt.py` builds task-specific scientist generation prompts, and
+`scientist_prompt.py` builds task-specific scientist generation prompts;
+scientist generation retries empty completions up to `_RETRY_LIMIT` extra
+attempts, and
 `ports/` contains provider, artifact, activity-sink, and ephemeral Python sandbox interfaces;
 the artifact port exposes the archive-state query used immediately before each
 scientist prompt.

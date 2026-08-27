@@ -12,15 +12,16 @@ from openai import BadRequestError
 
 
 class FakeCompletions:
-    def __init__(self) -> None:
+    def __init__(self, message: SimpleNamespace | None = None) -> None:
         self.request: dict[str, object] | None = None
+        self.message = message or SimpleNamespace(content='{"ok":true}', refusal=None)
 
     async def create(self, **request: object) -> SimpleNamespace:
         self.request = request
         return SimpleNamespace(
             choices=[
                 SimpleNamespace(
-                    message=SimpleNamespace(content='{"ok":true}', refusal=None),
+                    message=self.message,
                     finish_reason="stop",
                 )
             ],
@@ -82,9 +83,7 @@ async def test_complete_structured_uses_system_instruction_and_strict_schema(
         "additionalProperties": False,
     }
 
-    model = openai_compatible.OpenAICompatibleModel(
-        "https://example.test/v1", "key", "test-model"
-    )
+    model = openai_compatible.OpenAICompatibleModel("https://example.test/v1", "key", "test-model")
     await model.complete_structured("Evidence", system="Judge safely", json_schema=schema)
 
     assert completions.request is not None
@@ -113,9 +112,7 @@ async def test_complete_structured_falls_back_to_json_mode_when_schema_is_unsupp
         "AsyncOpenAI",
         lambda *, base_url, api_key: FakeClient(completions),
     )
-    model = openai_compatible.OpenAICompatibleModel(
-        "https://example.test/v1", "key", "test-model"
-    )
+    model = openai_compatible.OpenAICompatibleModel("https://example.test/v1", "key", "test-model")
 
     result = await model.complete_structured(
         "Evidence",
@@ -138,9 +135,7 @@ async def test_multimodal_structured_completion_sends_labeled_images(
         "AsyncOpenAI",
         lambda *, base_url, api_key: FakeClient(completions),
     )
-    model = openai_compatible.OpenAICompatibleModel(
-        "https://example.test/v1", "key", "test-model"
-    )
+    model = openai_compatible.OpenAICompatibleModel("https://example.test/v1", "key", "test-model")
     image = ModelImage("upload-001", "image/png", b"png")
 
     await model.complete_multimodal_structured(
@@ -167,3 +162,54 @@ async def test_multimodal_structured_completion_sends_labeled_images(
     assert completions.request["max_tokens"] == 8192
     response_format = cast(dict[str, Any], completions.request["response_format"])
     assert response_format["json_schema"]["name"] == "content_overlap"
+
+
+def _bind_model(
+    monkeypatch: pytest.MonkeyPatch, completions: FakeCompletions
+) -> openai_compatible.OpenAICompatibleModel:
+    monkeypatch.setattr(
+        openai_compatible,
+        "AsyncOpenAI",
+        lambda *, base_url, api_key: FakeClient(completions),
+    )
+    return openai_compatible.OpenAICompatibleModel("https://example.test/v1", "key", "test-model")
+
+
+@pytest.mark.asyncio
+async def test_complete_recovers_json_object_from_reasoning_when_content_is_empty(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scenario = '{"schemaVersion":"1.0","kind":"scenario"}'
+    completions = FakeCompletions(
+        SimpleNamespace(
+            content="",
+            refusal=None,
+            reasoning=f"Plan the case, then emit JSON.\n{scenario}",
+        )
+    )
+    model = _bind_model(monkeypatch, completions)
+
+    result = await model.complete("Design one scenario.")
+
+    assert result["content"] == scenario
+    assert result["reasoning"] == f"Plan the case, then emit JSON.\n{scenario}"
+    assert result["finishReason"] == "stop"
+
+
+@pytest.mark.asyncio
+async def test_complete_keeps_empty_content_when_reasoning_is_not_json(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    completions = FakeCompletions(
+        SimpleNamespace(
+            content="",
+            refusal=None,
+            reasoning_content="Need a genuinely new approach using {path}.",
+        )
+    )
+    model = _bind_model(monkeypatch, completions)
+
+    result = await model.complete("Design one scenario.")
+
+    assert result["content"] == ""
+    assert result["reasoning"] == "Need a genuinely new approach using {path}."

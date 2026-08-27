@@ -83,6 +83,8 @@ _UNSAFE_ID_CHAR = re.compile(r"[^A-Za-z0-9_-]+")
 
 def _scientist_artifact_id(scenario_id: str) -> str:
     return _UNSAFE_ID_CHAR.sub("-", scenario_id)[:128] or "scenario"
+
+
 _DECISION_SCHEMA_HINT = (
     'Use the field name "kind" (not "action"). '
     'Send to Tyr with {"kind":"send","message":"<direct instruction only>"}. '
@@ -749,7 +751,7 @@ class ExperimentRunner:
             content: str | None = None
             completion: dict[str, object] | None = None
             try:
-                completion = await model.complete(prompt)
+                completion = await self._complete_scientist(model, prompt)
                 raw_content = completion.get("content")
                 if not isinstance(raw_content, str) or not raw_content.strip():
                     diagnostics = self._completion_diagnostics(completion)
@@ -828,6 +830,17 @@ class ExperimentRunner:
             detail=f"{len(records)} scenario(s)",
         )
         return records, errors
+
+    async def _complete_scientist(self, model: ModelGateway, prompt: str) -> dict[str, object]:
+        completion: dict[str, object] = {"content": ""}
+        for _ in range(_RETRY_LIMIT + 1):
+            completion = await model.complete(prompt)
+            content = completion.get("content")
+            if isinstance(content, str) and content.strip():
+                return completion
+            if completion.get("refusal") or completion.get("finishReason") == "content_filter":
+                return completion
+        return completion
 
     @staticmethod
     def _prepare_scientist_scenario(payload: object, index: int, used_ids: set[str]) -> Scenario:
@@ -1146,9 +1159,7 @@ class ExperimentRunner:
             transcript=result.transcript,
             origin="scientist" if phase == "scientist" else "base",
             origin_run_id=run_id if phase == "scientist" else None,
-            origin_artifact_id=(
-                _scientist_artifact_id(case_id) if phase == "scientist" else None
-            ),
+            origin_artifact_id=(_scientist_artifact_id(case_id) if phase == "scientist" else None),
         )
         return record, result.error
 
@@ -2110,9 +2121,7 @@ class ExperimentRunner:
             ),
             cases=results,
             judgePipeline=(
-                task.manifest.spec.judge.pipeline
-                if task.evaluation is not None
-                else None
+                task.manifest.spec.judge.pipeline if task.evaluation is not None else None
             ),
             findings=[],
             errors=errors or [],

@@ -11,7 +11,8 @@ External I/O is async where practical. Redact credentials before persistence. Ty
 ## Source map
 
 `tyr/` owns MCP transport and settling, `models/` owns OpenAI-compatible
-providers, `tasks/` owns confined JSON loading, and `artifacts/` owns
+providers and recovers a JSON object from `reasoning`/`reasoning_content` when
+`content` is empty, `tasks/` owns confined JSON loading, and `artifacts/` owns
 verbatim run bundles, atomic run-level and per-case checkpoint operations
 (`checkpoints/cases/<case-id>.json`), canonical activity writes, and legacy
 normalization.
