@@ -8,8 +8,10 @@ services:
     environment:
       GAMR_ARTIFACT_ROOT: /app/.gamr
       GAMR_TASK_ROOT: /app/tasks
+      GAMR_WEB_ORIGIN: ${GAMR_DOCKER_WEB_ORIGIN:-http://127.0.0.1:${GAMR_DOCKER_WEB_PORT:-${DOCKER_WEB_PORT:-6688}}}
+      GAMR_API_ORIGIN: ${GAMR_DOCKER_API_ORIGIN:-http://127.0.0.1:${GAMR_DOCKER_API_PORT:-${DOCKER_API_PORT:-6687}}}
     ports:
-      - "6687:6687"
+      - "${GAMR_DOCKER_API_PORT:-${DOCKER_API_PORT:-6687}}:6687"
     volumes:
       - ./.gamr:/app/.gamr
       - ./tasks:/app/tasks:ro
@@ -32,10 +34,10 @@ services:
       context: .
       dockerfile: apps/web/Dockerfile
       args:
-        VITE_API_ORIGIN: ${VITE_API_ORIGIN:-http://127.0.0.1:6687}
+        VITE_API_ORIGIN: ${VITE_API_ORIGIN:-http://127.0.0.1:${GAMR_DOCKER_API_PORT:-${DOCKER_API_PORT:-6687}}}
     depends_on:
       api:
         condition: service_healthy
     ports:
-      - "6688:6688"
+      - "${GAMR_DOCKER_WEB_PORT:-${DOCKER_WEB_PORT:-6688}}:6688"
     restart: unless-stopped
