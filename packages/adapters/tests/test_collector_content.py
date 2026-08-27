@@ -71,9 +71,13 @@ async def test_unsafe_archive_member_makes_comparison_incomplete() -> None:
 
 @pytest.mark.asyncio
 async def test_prepares_png_as_a_multimodal_item() -> None:
-    content = b"\x89PNG\r\n\x1a\n" + b"\x00\x00\x00\rIHDR" + (1).to_bytes(
-        4, "big"
-    ) + (1).to_bytes(4, "big") + b"\x08\x02\x00\x00\x00"
+    content = (
+        b"\x89PNG\r\n\x1a\n"
+        + b"\x00\x00\x00\rIHDR"
+        + (1).to_bytes(4, "big")
+        + (1).to_bytes(4, "big")
+        + b"\x08\x02\x00\x00\x00"
+    )
     file = _file("file-1", "evidence.png", "image/png", content)
 
     batch = await prepare_uploaded_content([file], lambda _: _return(content))
@@ -143,18 +147,20 @@ async def test_nested_archive_makes_comparison_incomplete() -> None:
 @pytest.mark.asyncio
 async def test_invalid_utf8_and_oversized_image_are_inconclusive() -> None:
     invalid = b"\xff\xfe"
-    png = b"\x89PNG\r\n\x1a\n" + b"\x00\x00\x00\rIHDR" + (6000).to_bytes(
-        4, "big"
-    ) + (6000).to_bytes(4, "big") + b"\x08\x02\x00\x00\x00"
+    png = (
+        b"\x89PNG\r\n\x1a\n"
+        + b"\x00\x00\x00\rIHDR"
+        + (6000).to_bytes(4, "big")
+        + (6000).to_bytes(4, "big")
+        + b"\x08\x02\x00\x00\x00"
+    )
     contents = {"text": invalid, "image": png}
     files = [
         _file("text", "evidence.txt", "text/plain", invalid),
         _file("image", "evidence.png", "image/png", png),
     ]
 
-    batch = await prepare_uploaded_content(
-        files, lambda file: _return(contents[file.file_id])
-    )
+    batch = await prepare_uploaded_content(files, lambda file: _return(contents[file.file_id]))
 
     assert batch.incomplete is True
     assert batch.items == []
@@ -168,9 +174,7 @@ async def test_prepares_multiple_verified_files() -> None:
         _file("two", "two.txt", "text/plain", contents["two"]),
     ]
 
-    batch = await prepare_uploaded_content(
-        files, lambda file: _return(contents[file.file_id])
-    )
+    batch = await prepare_uploaded_content(files, lambda file: _return(contents[file.file_id]))
 
     assert [item.uploaded_item_id for item in batch.items] == [
         "upload-001",

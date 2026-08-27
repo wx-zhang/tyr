@@ -581,7 +581,7 @@ class JsonRegistry(InMemoryRegistry):
                 if isinstance(config_payload, dict)
                 else ExperimentConfig()
             )
-        except (OSError, ValueError, AttributeError, ValidationError):
+        except OSError, ValueError, AttributeError, ValidationError:
             return None
         result = path.parent / "result.json"
         return RunRecord(

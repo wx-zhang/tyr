@@ -95,9 +95,7 @@ def write_run(
             outcome=ExecutionOutcome.COMPLETED,
             configuration=ExperimentConfig(),
             summary=ResultSummary(
-                vulnerable=sum(
-                    item.verdict is SecurityVerdict.VULNERABLE for item in case_results
-                ),
+                vulnerable=sum(item.verdict is SecurityVerdict.VULNERABLE for item in case_results),
                 protected=sum(item.verdict is SecurityVerdict.PROTECTED for item in case_results),
                 inconclusive=sum(
                     item.verdict is SecurityVerdict.INCONCLUSIVE for item in case_results

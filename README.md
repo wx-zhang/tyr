@@ -198,5 +198,29 @@ retry.
 All experiment definitions, live state, evidence, and results are JSON or JSONL files. There is no
 database, migration service, broker, or worker process.
 
+## Observability & Tracing (Langfuse)
+
+GAMR supports optional tracing to a local [Langfuse](https://langfuse.com/) instance for observing model generations, token usage, tool calls, and run hierarchies:
+
+```bash
+# Enable in .env:
+GAMR_LANGFUSE_ENABLED=true
+GAMR_LANGFUSE_PUBLIC_KEY=pk-lf-local
+GAMR_LANGFUSE_SECRET_KEY=sk-lf-local
+GAMR_LANGFUSE_HOST_URL=http://127.0.0.1:3000
+```
+
+To run a bundled local Langfuse instance alongside GAMR with Docker Compose:
+
+```bash
+docker compose -f compose.langfuse.yaml up -d
+```
+
+The Langfuse UI is published on `http://127.0.0.1:3000`. Storage is persisted in named Docker volume `langfuse-postgres-data`.
+
+
+> **Note**: Tracing data in local Langfuse includes verbatim prompts, completions, and evidence. Treat local Langfuse storage as trusted-operator data.
+
 See [the scaffold contract](docs/SCAFFOLD_SPEC.md), [architecture](docs/architecture.md), and
 [development guide](docs/development.md).
+

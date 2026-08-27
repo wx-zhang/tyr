@@ -30,8 +30,11 @@ in-memory activity and relationship projections derived from bundles.
 `artifacts/scientist_scenarios.py` owns the confined cross-run scientist
 scenario catalog, exact JSON exports, and per-occurrence archive markers;
 marker state is operational and never rewrites run evidence.
-`config.py` loads and validates configuration settings including `GAMR_MAX_CONCURRENT_DECODERS` and `GAMR_SCIENTIST_OUTPUT_TOKENS`.
+`tracing.py` owns the Langfuse trace port adapter (`LangfuseTracePort`) and `create_trace_port` factory; `tracing_diagnostics.py` owns `DiagnosticReporter`; `tracing_observation.py` owns `LangfuseObservation`; traces contain verbatim evidence and local Langfuse storage is trusted-operator data.
+
+`config.py` loads and validates configuration settings including `GAMR_MAX_CONCURRENT_DECODERS`, `GAMR_SCIENTIST_OUTPUT_TOKENS`, and Langfuse observability settings (`is_langfuse_valid`).
 `sandbox/` owns attachment snapshots, output collection (`collect_output.py`),
+
 the disabled and explicitly unsafe host backends, the fixed Docker CLI backend,
 its Python 3.14 image, and bounded process support.
 

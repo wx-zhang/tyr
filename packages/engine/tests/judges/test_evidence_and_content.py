@@ -545,9 +545,7 @@ async def test_decoder_lifecycle_activities_are_ordered_and_bounded() -> None:
         if name.startswith("decoder.")
     )
     decoder_operation_ids = {
-        payload.get("operationId")
-        for name, payload in activities
-        if name.startswith("decoder.")
+        payload.get("operationId") for name, payload in activities if name.startswith("decoder.")
     }
     assert len(decoder_operation_ids) == 1
     assert next(iter(decoder_operation_ids))

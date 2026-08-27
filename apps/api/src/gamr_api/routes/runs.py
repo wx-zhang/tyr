@@ -344,16 +344,12 @@ async def events(
                     )
             if not follows_stream:
                 yield f": heartbeat; interval={HEARTBEAT_SECONDS}\n\n"
-                yield (
-                    f"event: heartbeat\ndata: {json.dumps({'interval': HEARTBEAT_SECONDS})}\n\n"
-                )
+                yield (f"event: heartbeat\ndata: {json.dumps({'interval': HEARTBEAT_SECONDS})}\n\n")
                 break
             now = time.monotonic()
             if now - last_heartbeat >= HEARTBEAT_SECONDS:
                 yield f": heartbeat; interval={HEARTBEAT_SECONDS}\n\n"
-                yield (
-                    f"event: heartbeat\ndata: {json.dumps({'interval': HEARTBEAT_SECONDS})}\n\n"
-                )
+                yield (f"event: heartbeat\ndata: {json.dumps({'interval': HEARTBEAT_SECONDS})}\n\n")
                 last_heartbeat = now
             await asyncio.sleep(EVENT_POLL_SECONDS)
 

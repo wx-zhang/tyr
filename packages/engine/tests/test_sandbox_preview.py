@@ -107,6 +107,7 @@ async def test_observed_sandbox_records_one_logical_session_without_backend_id()
     assert events[5].output_files[0].content is not None
     assert events[5].output_files[0].content.value == "ok"
 
+
 @pytest.mark.asyncio
 async def test_observed_sandbox_tracks_replacement_generations_and_attempts() -> None:
     events: list[SandboxOperationEvent] = []
@@ -182,12 +183,8 @@ async def test_observed_sandbox_records_collection_and_cleanup_failures() -> Non
 async def test_observed_sandbox_cancellation_is_terminal_and_sessions_are_isolated() -> None:
     first_events: list[SandboxOperationEvent] = []
     second_events: list[SandboxOperationEvent] = []
-    first = ObservedSandbox(
-        PreviewSandbox(), owner="pipeline-a", event_sink=first_events.append
-    )
-    second = ObservedSandbox(
-        PreviewSandbox(), owner="pipeline-a", event_sink=second_events.append
-    )
+    first = ObservedSandbox(PreviewSandbox(), owner="pipeline-a", event_sink=first_events.append)
+    second = ObservedSandbox(PreviewSandbox(), owner="pipeline-a", event_sink=second_events.append)
 
     await asyncio.gather(first.start(), second.start())
     first.cancel()

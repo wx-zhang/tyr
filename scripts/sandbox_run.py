@@ -46,9 +46,7 @@ async def _run(args: argparse.Namespace) -> int:
             )
         )
         exit_code = (
-            0
-            if result.exit_code == 0 and not result.timed_out and not result.output_limited
-            else 1
+            0 if result.exit_code == 0 and not result.timed_out and not result.output_limited else 1
         )
     except (SandboxError, OSError, UnicodeError) as error:
         print(str(error), file=sys.stderr)

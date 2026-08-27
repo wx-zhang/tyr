@@ -5,6 +5,7 @@ import json
 from typing import Any, cast
 
 from gamr_engine.ports.models import ModelImage
+from gamr_engine.ports.tracing import TracePort, trace_generation
 from openai import AsyncOpenAI, BadRequestError
 
 
@@ -71,17 +72,42 @@ def _completion_payload(response: Any) -> dict[str, object]:
 
 
 class OpenAICompatibleModel:
-    def __init__(self, base_url: str, api_key: str, model: str) -> None:
+    def __init__(
+        self,
+        base_url: str,
+        api_key: str,
+        model: str,
+        *,
+        trace_port: TracePort | None = None,
+    ) -> None:
         self.client = AsyncOpenAI(base_url=base_url, api_key=api_key)
         self.model = model
+        self.trace_port = trace_port
 
     async def complete(self, prompt: str) -> dict[str, object]:
-        response = await self.client.chat.completions.create(
+        with trace_generation(
+            self.trace_port,
+            "complete",
             model=self.model,
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=8192,
-        )
-        return _completion_payload(response)
+            input={"prompt": prompt},
+        ) as gen_obs:
+            response = await self.client.chat.completions.create(
+                model=self.model,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=8192,
+            )
+            payload = _completion_payload(response)
+            if gen_obs is not None:
+                gen_obs.end(
+                    output=payload,
+                    usage=cast(dict[str, object], payload.get("usage")),
+                    metadata={
+                        "finishReason": payload.get("finishReason"),
+                        "refusal": payload.get("refusal"),
+                        "reasoning": payload.get("reasoning"),
+                    },
+                )
+            return payload
 
     async def complete_structured(
         self,
@@ -109,7 +135,25 @@ class OpenAICompatibleModel:
                 },
             },
         }
-        return await self._structured_response(request)
+        with trace_generation(
+            self.trace_port,
+            "complete_structured",
+            model=self.model,
+            input=request,
+            metadata={"schema_name": schema_name},
+        ) as gen_obs:
+            payload = await self._structured_response(request)
+            if gen_obs is not None:
+                gen_obs.end(
+                    output=payload,
+                    usage=cast(dict[str, object], payload.get("usage")),
+                    metadata={
+                        "finishReason": payload.get("finishReason"),
+                        "refusal": payload.get("refusal"),
+                        "reasoning": payload.get("reasoning"),
+                    },
+                )
+            return payload
 
     async def complete_multimodal_structured(
         self,
@@ -155,7 +199,25 @@ class OpenAICompatibleModel:
                 },
             },
         }
-        return await self._structured_response(request)
+        with trace_generation(
+            self.trace_port,
+            "complete_multimodal_structured",
+            model=self.model,
+            input=request,
+            metadata={"schema_name": schema_name},
+        ) as gen_obs:
+            payload = await self._structured_response(request)
+            if gen_obs is not None:
+                gen_obs.end(
+                    output=payload,
+                    usage=cast(dict[str, object], payload.get("usage")),
+                    metadata={
+                        "finishReason": payload.get("finishReason"),
+                        "refusal": payload.get("refusal"),
+                        "reasoning": payload.get("reasoning"),
+                    },
+                )
+            return payload
 
     async def _structured_response(self, request: dict[str, object]) -> dict[str, object]:
         try:
@@ -180,13 +242,30 @@ class OpenAICompatibleModel:
         if tools:
             request["tools"] = tools
             request["tool_choice"] = "auto"
-        response = await self.client.chat.completions.create(**request)
-        if not response.choices:
-            return {"message": {"role": "assistant", "content": ""}, "usage": {}}
-        message = response.choices[0].message
-        return {
-            "message": message.model_dump(exclude_none=True),
-            "usage": response.usage.model_dump() if response.usage else {},
-            "model": response.model,
-            "finishReason": response.choices[0].finish_reason,
-        }
+        with trace_generation(
+            self.trace_port,
+            "chat",
+            model=self.model,
+            input=request,
+        ) as gen_obs:
+            response = await self.client.chat.completions.create(**request)
+            if not response.choices:
+                payload: dict[str, Any] = {
+                    "message": {"role": "assistant", "content": ""},
+                    "usage": {},
+                }
+            else:
+                message = response.choices[0].message
+                payload = {
+                    "message": message.model_dump(exclude_none=True),
+                    "usage": response.usage.model_dump() if response.usage else {},
+                    "model": response.model,
+                    "finishReason": response.choices[0].finish_reason,
+                }
+            if gen_obs is not None:
+                gen_obs.end(
+                    output=payload,
+                    usage=cast(dict[str, object], payload.get("usage")),
+                    metadata={"finishReason": payload.get("finishReason")},
+                )
+            return payload

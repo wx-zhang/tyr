@@ -44,9 +44,7 @@ def test_runner_supports_repeated_attachments_and_json_output(
     monkeypatch.setattr(sandbox_run, "create_sandbox", lambda settings: sandbox)
 
     assert (
-        sandbox_run.main(
-            ["--attach", str(first), "--attach", str(second), "--code", "print(1)"]
-        )
+        sandbox_run.main(["--attach", str(first), "--attach", str(second), "--code", "print(1)"])
         == 0
     )
 

@@ -55,6 +55,8 @@ def test_activity_related_case_ids_are_unique_and_bounded() -> None:
         RunActivity.model_validate(
             activity(relatedCaseIds=[f"case-{index}" for index in range(101)])
         )
+
+
 @pytest.mark.parametrize(
     "field,value",
     [
@@ -172,6 +174,7 @@ def test_sandbox_operation_event_accepts_output_files() -> None:
     assert event.output_files[0].path == "upload-001/decoded.txt"
     assert event.output_files[0].content is not None
     assert event.output_files[0].content.value == "hello world"
+
 
 def test_sandbox_execution_preview_requires_structured_streams() -> None:
     execution = SandboxExecutionPreview(

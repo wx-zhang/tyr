@@ -52,9 +52,7 @@ def test_judge_evaluation_writes_artifacts_under_judges_directory(
 ) -> None:
     output_roots: list[Path] = []
 
-    async def run_dataset(
-        _dataset: Any, *, output_root: Path, **_kwargs: Any
-    ) -> dict[str, Any]:
+    async def run_dataset(_dataset: Any, *, output_root: Path, **_kwargs: Any) -> dict[str, Any]:
         output_roots.append(output_root)
         return {"passed": True, "cases": []}
 
@@ -75,8 +73,6 @@ def test_judge_evaluation_writes_artifacts_under_judges_directory(
     monkeypatch.setattr(evaluation_cli, "new_id", lambda: "eval-1")
     monkeypatch.setattr(evaluation_cli, "run_evaluation_dataset", run_dataset)
 
-    evaluation_cli.run_judge_evaluation_command(
-        Console(), Path("dataset.json"), "", [], False
-    )
+    evaluation_cli.run_judge_evaluation_command(Console(), Path("dataset.json"), "", [], False)
 
     assert output_roots == [tmp_path / "evaluations" / "judges" / "eval-1"]

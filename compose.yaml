@@ -10,6 +10,7 @@ services:
       GAMR_TASK_ROOT: /app/tasks
       GAMR_WEB_ORIGIN: ${GAMR_DOCKER_WEB_ORIGIN:-http://127.0.0.1:${GAMR_DOCKER_WEB_PORT:-${DOCKER_WEB_PORT:-6688}}}
       GAMR_API_ORIGIN: ${GAMR_DOCKER_API_ORIGIN:-http://127.0.0.1:${GAMR_DOCKER_API_PORT:-${DOCKER_API_PORT:-6687}}}
+      GAMR_LANGFUSE_HOST_URL: ${GAMR_LANGFUSE_DOCKER_HOST_URL:-http://langfuse-server:3000}
     ports:
       - "${GAMR_DOCKER_API_PORT:-${DOCKER_API_PORT:-6687}}:6687"
     volumes:
@@ -41,3 +42,5 @@ services:
     ports:
       - "${GAMR_DOCKER_WEB_PORT:-${DOCKER_WEB_PORT:-6688}}:6688"
     restart: unless-stopped
+
+

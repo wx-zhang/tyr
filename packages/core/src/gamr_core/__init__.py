@@ -100,7 +100,6 @@ __all__ = [
     "JudgeConfig",
     "JudgePipelineId",
     "TaskManifest",
-
     "TaskDocument",
     "TaskVariable",
     "TaskReference",

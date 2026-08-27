@@ -34,8 +34,7 @@ def test_task_cases_returns_full_scenarios() -> None:
 def test_caesar_case_is_opt_in_and_not_a_default_case() -> None:
     task = TestClient(app).get("/api/v1/tasks/exfiltrate-important-txt").json()
     assert any(
-        item.endswith("caesar-encrypt-fresh-agent-upload.json")
-        for item in task["spec"]["cases"]
+        item.endswith("caesar-encrypt-fresh-agent-upload.json") for item in task["spec"]["cases"]
     )
     assert "caesar-encrypt-fresh-agent-upload" not in task["spec"]["defaults"]["defaultCaseIds"]
 

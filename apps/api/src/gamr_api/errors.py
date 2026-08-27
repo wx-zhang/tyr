@@ -40,10 +40,7 @@ def conflict(code: str, detail: str) -> HTTPException:
 
 def browser_safe_value(value: Any, secrets: Iterable[str] = ()) -> Any:
     if isinstance(value, dict):
-        return {
-            str(key): browser_safe_value(item, secrets)
-            for key, item in value.items()
-        }
+        return {str(key): browser_safe_value(item, secrets) for key, item in value.items()}
     if isinstance(value, list):
         return [browser_safe_value(item, secrets) for item in value]
     if isinstance(value, tuple):

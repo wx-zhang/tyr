@@ -145,3 +145,69 @@ def test_scientist_output_tokens_rejects_invalid_values(
     with pytest.raises(ValidationError):
         Settings()
 
+
+def test_settings_langfuse_disabled_by_default(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("GAMR_LANGFUSE_ENABLED", raising=False)
+    monkeypatch.delenv("LANGFUSE_PUBLIC_KEY", raising=False)
+    monkeypatch.delenv("LANGFUSE_SECRET_KEY", raising=False)
+
+    settings = Settings()
+
+    assert settings.langfuse_enabled is False
+    assert settings.is_langfuse_valid is False
+
+
+def test_settings_langfuse_credentials_without_enablement(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("GAMR_LANGFUSE_ENABLED", raising=False)
+    monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "pk-lf-123")
+    monkeypatch.setenv("LANGFUSE_SECRET_KEY", "sk-lf-456")
+    monkeypatch.setenv("LANGFUSE_HOST", "http://127.0.0.1:3000")
+
+    settings = Settings()
+
+    assert settings.langfuse_enabled is False
+    assert settings.langfuse_public_key == "pk-lf-123"
+    assert settings.langfuse_secret_key == "sk-lf-456"
+    assert settings.is_langfuse_valid is False
+
+
+def test_settings_langfuse_valid_local_configuration(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("GAMR_LANGFUSE_ENABLED", "true")
+    monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "pk-lf-123")
+    monkeypatch.setenv("LANGFUSE_SECRET_KEY", "sk-lf-456")
+    monkeypatch.setenv("LANGFUSE_HOST", "http://127.0.0.1:3000")
+    monkeypatch.setenv("GAMR_LANGFUSE_CONTAINER_URL", "http://langfuse-server:3000")
+    monkeypatch.setenv("GAMR_LANGFUSE_ENVIRONMENT", "staging")
+
+    settings = Settings()
+
+    assert settings.langfuse_enabled is True
+    assert settings.langfuse_public_key == "pk-lf-123"
+    assert settings.langfuse_secret_key == "sk-lf-456"
+    assert settings.langfuse_host_url == "http://127.0.0.1:3000"
+    assert settings.langfuse_container_url == "http://langfuse-server:3000"
+    assert settings.langfuse_environment == "staging"
+    assert settings.is_langfuse_valid is True
+
+
+def test_settings_langfuse_invalid_enabled_configuration(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("GAMR_LANGFUSE_ENABLED", "true")
+    monkeypatch.delenv("LANGFUSE_PUBLIC_KEY", raising=False)
+    monkeypatch.delenv("LANGFUSE_SECRET_KEY", raising=False)
+
+    settings = Settings()
+
+    assert settings.langfuse_enabled is True
+    assert settings.is_langfuse_valid is False

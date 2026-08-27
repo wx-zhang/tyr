@@ -7,12 +7,14 @@ from gamr_adapters.config import Settings
 from gamr_adapters.models.openai_compatible import OpenAICompatibleModel
 from gamr_adapters.sandbox.factory import create_sandbox
 from gamr_adapters.tasks.filesystem import load_task, resolve_task_directory
+from gamr_adapters.tracing import create_trace_port
 from gamr_adapters.tyr.client import TyrMcpClient
 from gamr_core import RunState
 from gamr_engine import ExperimentExecutionService, ProgressEvent
 from gamr_engine.capacity_sandbox import CapacitySandbox
 from gamr_engine.decoder_capacity import DecoderCapacityGate
 from gamr_engine.ports.sandbox import Sandbox
+from gamr_engine.ports.tracing import TracePort
 
 from .execution import RunExecutor
 from .registry import JsonRegistry
@@ -41,7 +43,14 @@ def _advance_run_state(registry: JsonRegistry, run_id: str, event: ProgressEvent
         registry.set_state(current, RunState.RUNNING)
 
 
-def build_run_executor(settings: Settings, registry: JsonRegistry) -> RunExecutor:
+def build_run_executor(
+    settings: Settings,
+    registry: JsonRegistry,
+    trace_port: TracePort | None = None,
+) -> RunExecutor:
+    if trace_port is None:
+        trace_port = create_trace_port(settings)
+
     async def execute(run_id: str) -> str:
         run = registry.get_run(run_id)
         if run is None:
@@ -92,6 +101,7 @@ def build_run_executor(settings: Settings, registry: JsonRegistry) -> RunExecuto
             settings.model_base_url,
             settings.model_api_key,
             selected_model,
+            trace_port=trace_port,
         )
         scientist_model = (
             model
@@ -100,6 +110,7 @@ def build_run_executor(settings: Settings, registry: JsonRegistry) -> RunExecuto
                 settings.model_base_url,
                 settings.model_api_key,
                 selected_scientist_model,
+                trace_port=trace_port,
             )
         )
         judge_model = (
@@ -109,6 +120,7 @@ def build_run_executor(settings: Settings, registry: JsonRegistry) -> RunExecuto
                 settings.model_base_url,
                 settings.model_api_key,
                 selected_judge_model,
+                trace_port=trace_port,
             )
         )
         sandbox = build_sandbox(settings)
@@ -128,6 +140,7 @@ def build_run_executor(settings: Settings, registry: JsonRegistry) -> RunExecuto
                 content_evidence_provider=collector,
                 sandbox=sandbox,
                 scientist_output_tokens=settings.scientist_output_tokens,
+                trace_port=trace_port,
             )
         finally:
             await target.aclose()

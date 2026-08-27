@@ -36,9 +36,10 @@ and `content_evidence.py` owns the in-memory contracts,
 `scientist_prompt.py` builds task-specific scientist generation prompts;
 scientist generation retries empty completions up to `_RETRY_LIMIT` extra
 attempts, and
-`ports/` contains provider, artifact, activity-sink, and ephemeral Python sandbox interfaces;
+`ports/` contains provider, artifact, activity-sink, ephemeral Python sandbox, and tracing interfaces (`ports/tracing.py` defines vendor-neutral `TracePort`, `TraceObservation`, and fail-open context managers);
 the artifact port exposes the archive-state query used immediately before each
 scientist prompt.
+
 
 Keep activity emission changes covered in `packages/engine/tests/test_runner.py`;
 the CLI and API must continue to consume this same execution path.

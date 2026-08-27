@@ -105,7 +105,7 @@ class HostUnsafeSandbox(Sandbox):
                 record.closed = True
                 await self._cleanup(record)
             return result
-        except (asyncio.CancelledError, SandboxInfrastructureError):
+        except asyncio.CancelledError, SandboxInfrastructureError:
             record.closed = True
             await self._cleanup(record)
             raise
@@ -267,7 +267,7 @@ def _set_resource_limits() -> None:
     for resource, limit in limits:
         try:
             setrlimit(resource, limit)
-        except (OSError, ValueError):
+        except OSError, ValueError:
             pass
 
 
@@ -296,4 +296,3 @@ def _validate_relpath(path: str) -> None:
     components = path.split("/")
     if any(not c or c in {".", ".."} for c in components):
         raise SandboxValidationError("invalid traversal in path")
-

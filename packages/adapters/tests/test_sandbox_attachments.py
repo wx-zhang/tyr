@@ -32,9 +32,7 @@ def test_snapshot_repeats_roots_and_preserves_directory_names(tmp_path: Path) ->
         lambda root: [root / "a", root / "a"],
     ],
 )
-def test_snapshot_rejects_duplicate_and_ancestor_conflicts(
-    tmp_path: Path, paths: object
-) -> None:
+def test_snapshot_rejects_duplicate_and_ancestor_conflicts(tmp_path: Path, paths: object) -> None:
     (tmp_path / "same.txt").write_bytes(b"one")
     (tmp_path / "a").mkdir()
     (tmp_path / "a" / "b.txt").write_bytes(b"two")

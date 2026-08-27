@@ -73,7 +73,6 @@ class TaskSpec(BaseModel):
     variables: dict[str, TaskVariable] = Field(default_factory=dict)
 
 
-
 class TaskManifest(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 

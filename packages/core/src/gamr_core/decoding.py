@@ -76,12 +76,8 @@ class DecodingProvenance(BaseModel):
     failure_code: DecodingFailureCode | None = Field(default=None, alias="failureCode")
     failure_stage: str | None = Field(default=None, alias="failureStage", max_length=64)
     program_sha256: list[str] = Field(default_factory=list, alias="programSha256", max_length=3)
-    limit_flags: DecodingLimitFlags = Field(
-        default_factory=DecodingLimitFlags, alias="limitFlags"
-    )
-    derived_files: list[DerivedContentFile] = Field(
-        default_factory=list, alias="derivedFiles"
-    )
+    limit_flags: DecodingLimitFlags = Field(default_factory=DecodingLimitFlags, alias="limitFlags")
+    derived_files: list[DerivedContentFile] = Field(default_factory=list, alias="derivedFiles")
     attempts: list[DecodingAttempt] = Field(default_factory=list, max_length=3)
 
     @field_validator("program_sha256")

@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from gamr_adapters.tracing import create_trace_port
 
 from .composition import build_run_executor
 from .dependencies import get_registry, get_settings
@@ -35,12 +36,14 @@ def _web_origins(origin: str) -> list[str]:
 async def lifespan(application: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     registry = get_registry()
+    trace_port = create_trace_port(settings)
+    application.state.trace_port = trace_port
     if not isinstance(registry, JsonRegistry):
         yield
         return
     manager = RunTaskManager(
         registry,
-        build_run_executor(settings, registry),
+        build_run_executor(settings, registry, trace_port=trace_port),
         max_concurrent_runs=settings.max_concurrent_runs,
     )
     application.state.run_task_manager = manager
@@ -49,6 +52,8 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         yield
     finally:
         await manager.shutdown()
+        if trace_port is not None:
+            trace_port.flush(timeout=5.0)
 
 
 def create_app() -> FastAPI:

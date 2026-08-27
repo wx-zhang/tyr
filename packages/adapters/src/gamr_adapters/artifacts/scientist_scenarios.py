@@ -39,6 +39,7 @@ CatalogResult = Literal[
 class ScientistScenarioNotFound(LookupError):
     pass
 
+
 class ScientistScenarioArchiveMarker(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
@@ -62,6 +63,7 @@ class ScientistScenarioEntry:
     archived_at: datetime | None
     result_state: CatalogResult
     result: CaseResult | None
+
 
 @dataclass(frozen=True)
 class _ResolvedScenario:
@@ -188,7 +190,7 @@ class ScientistScenarioCatalog:
             return None
         try:
             scenario = Scenario.model_validate(self._read_json(path))
-        except (OSError, ValueError, ValidationError):
+        except OSError, ValueError, ValidationError:
             return None
         result = self._read_result(run_dir, scenario.metadata.id)
         marker = self._read_marker(self._marker_path(run_id, artifact_id))
@@ -226,7 +228,7 @@ class ScientistScenarioCatalog:
             return None
         try:
             result = RunResult.model_validate(self._read_json(result_path))
-        except (OSError, ValueError, ValidationError):
+        except OSError, ValueError, ValidationError:
             return None
         if result.run_id != run_dir.name:
             return None
@@ -235,7 +237,7 @@ class ScientistScenarioCatalog:
     def _read_run(self, run_dir: Path) -> RunRecord | None:
         try:
             return RunRecord.model_validate(self._read_json(run_dir / "run.json"))
-        except (OSError, ValueError, ValidationError):
+        except OSError, ValueError, ValidationError:
             return None
 
     def _read_marker(self, path: Path | None) -> ScientistScenarioArchiveMarker | None:
@@ -243,7 +245,7 @@ class ScientistScenarioCatalog:
             return None
         try:
             marker = ScientistScenarioArchiveMarker.model_validate(self._read_json(path))
-        except (OSError, ValueError, ValidationError):
+        except OSError, ValueError, ValidationError:
             return None
         if (
             marker.schema_version != "1.0"

@@ -73,3 +73,5 @@ async def run_chat_loop(
                 return
     finally:
         await target.aclose()
+        if session.trace_port is not None:
+            session.trace_port.flush(timeout=5.0)

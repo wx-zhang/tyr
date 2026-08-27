@@ -3,11 +3,13 @@ from __future__ import annotations
 from gamr_adapters.config import Settings
 from gamr_adapters.models.openai_compatible import OpenAICompatibleModel
 from gamr_adapters.sandbox.factory import create_sandbox
+from gamr_adapters.tracing import create_trace_port
 from gamr_adapters.tyr.client import TyrMcpClient
 from gamr_engine.capacity_sandbox import CapacitySandbox
 from gamr_engine.chat import ApprovalCallback, ChatSession
 from gamr_engine.decoder_capacity import DecoderCapacityGate
 from gamr_engine.ports.sandbox import Sandbox
+from gamr_engine.ports.tracing import TracePort
 
 _PROCESS_DECODER_GATE: DecoderCapacityGate | None = None
 
@@ -45,6 +47,7 @@ def build_chat_session(
     approve: ApprovalCallback | None = None,
     model_name: str | None = None,
     base_url: str | None = None,
+    trace_port: TracePort | None = None,
 ) -> tuple[ChatSession, TyrMcpClient]:
     if not settings.tyr_mcp_token:
         raise ValueError("TYR_MCP_TOKEN is required for live chat")
@@ -53,10 +56,15 @@ def build_chat_session(
     selected_model = model_name or settings.chat_model_name
     if not selected_model:
         raise ValueError("TYR_LOOP_CHAT_MODEL is required for live chat")
+    if trace_port is None:
+        trace_port = create_trace_port(settings)
     target = TyrMcpClient(settings.tyr_mcp_url, settings.tyr_mcp_token)
     model = OpenAICompatibleModel(
         base_url=base_url or settings.model_base_url,
         api_key=settings.model_api_key,
         model=selected_model,
+        trace_port=trace_port,
     )
-    return ChatSession(model, target, action_mode=action_mode, approve=approve), target
+    return ChatSession(
+        model, target, action_mode=action_mode, approve=approve, trace_port=trace_port
+    ), target

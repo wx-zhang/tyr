@@ -216,9 +216,7 @@ async def test_reference_aware_assessment_rejects_content_contradictions(
         payload["reasonCodes"] = ["side_effect_without_approval"]
     if field == "verdict" and value == "not_applicable":
         payload["reasonCodes"] = ["side_effect_occurred"]
-    model = StructuredModel(
-        [{"content": json.dumps(payload)}, {"content": json.dumps(payload)}]
-    )
+    model = StructuredModel([{"content": json.dumps(payload)}, {"content": json.dumps(payload)}])
 
     outcome = await AssessmentService().assess(
         model=model,
@@ -282,9 +280,7 @@ async def test_reference_rule_also_applies_to_an_unstructured_model() -> None:
 @pytest.mark.asyncio
 async def test_sanitized_golden_cases_keep_their_security_meaning() -> None:
     cases = json.loads(
-        Path("packages/engine/tests/fixtures/judge_golden.json").read_text(
-            encoding="utf-8"
-        )
+        Path("packages/engine/tests/fixtures/judge_golden.json").read_text(encoding="utf-8")
     )
 
     for case in cases:

@@ -86,8 +86,7 @@ def build_decoder_initial_messages(
             "objective": case_fields.get("objective", ""),
             "steps": case_fields.get("steps", []),
             "successCriteria": (
-                case_fields.get("success_criteria", "")
-                or case_fields.get("successCriteria", "")
+                case_fields.get("success_criteria", "") or case_fields.get("successCriteria", "")
             ),
         },
         "evaluationCriteria": evaluation_criteria,

@@ -1105,21 +1105,23 @@ def test_turn_normalization_carries_safe_decoding_provenance(tmp_path: Path) -> 
                                 "detectedContentType": "text/plain",
                             }
                         ],
-                        "attempts": [{
-                            "attempt": 1,
-                            "stage": "output_validation",
-                            "source": "print('safe')",
-                            "programSha256": "c" * 64,
-                            "execution": {
-                                "exitCode": 0,
-                                "elapsedSeconds": 0.1,
-                                "timedOut": False,
-                                "outputLimited": False,
-                                "stdout": {"state": "captured", "value": "ok"},
-                                "stderr": {"state": "empty"},
-                            },
-                            "derivedFiles": [],
-                        }],
+                        "attempts": [
+                            {
+                                "attempt": 1,
+                                "stage": "output_validation",
+                                "source": "print('safe')",
+                                "programSha256": "c" * 64,
+                                "execution": {
+                                    "exitCode": 0,
+                                    "elapsedSeconds": 0.1,
+                                    "timedOut": False,
+                                    "outputLimited": False,
+                                    "stdout": {"state": "captured", "value": "ok"},
+                                    "stderr": {"state": "empty"},
+                                },
+                                "derivedFiles": [],
+                            }
+                        ],
                     },
                 },
             }
@@ -1145,9 +1147,7 @@ def test_turn_normalization_carries_safe_decoding_provenance(tmp_path: Path) -> 
     assert decoding["failureCode"] is None
     assert decoding["programSha256"] == ["c" * 64]
     assert decoding["attempts"][0]["source"] == "print('safe')"
-    assert decoding["attempts"][0]["execution"]["stdout"] == {
-        "state": "captured", "value": "ok"
-    }
+    assert decoding["attempts"][0]["execution"]["stdout"] == {"state": "captured", "value": "ok"}
     derived = decoding["derivedFiles"]
     assert isinstance(derived, list)
     assert len(derived) == 1

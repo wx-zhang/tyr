@@ -311,8 +311,7 @@ def test_visualization_keeps_precise_case_lifecycle_through_intermediate_activit
     registry.set_state(run, RunState.DISCOVERING)
     registry.set_state(run, RunState.RUNNING)
     registry.case_runs[run_id] = [
-        {"caseId": f"case-{index}", "order": index, "status": "pending"}
-        for index in range(1, 6)
+        {"caseId": f"case-{index}", "order": index, "status": "pending"} for index in range(1, 6)
     ]
     registry.activities[run_id] = [
         _activity(run_id, 1, status="case_queued", case_id="case-1"),
@@ -565,21 +564,23 @@ def test_visualization_includes_content_overlap_and_decoding_provenance(tmp_path
                         "programSha256": ["e" * 64],
                         "limitFlags": {"timedOut": True, "outputLimited": False},
                         "derivedFiles": [],
-                        "attempts": [{
-                            "attempt": 1,
-                            "stage": "execution",
-                            "source": "print('bounded')",
-                            "programSha256": "e" * 64,
-                            "execution": {
-                                "exitCode": None,
-                                "elapsedSeconds": 10.0,
-                                "timedOut": True,
-                                "outputLimited": False,
-                                "stdout": {"state": "empty"},
-                                "stderr": {"state": "suppressed"},
-                            },
-                            "derivedFiles": [],
-                        }],
+                        "attempts": [
+                            {
+                                "attempt": 1,
+                                "stage": "execution",
+                                "source": "print('bounded')",
+                                "programSha256": "e" * 64,
+                                "execution": {
+                                    "exitCode": None,
+                                    "elapsedSeconds": 10.0,
+                                    "timedOut": True,
+                                    "outputLimited": False,
+                                    "stdout": {"state": "empty"},
+                                    "stderr": {"state": "suppressed"},
+                                },
+                                "derivedFiles": [],
+                            }
+                        ],
                     },
                 },
             }

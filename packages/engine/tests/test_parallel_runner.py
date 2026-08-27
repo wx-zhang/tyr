@@ -40,9 +40,11 @@ class CoordinatorRunner(ExperimentRunner):
             [],
             None,
             None,
-            [DiscoveryCandidate(
-                path="/home/space/file", workspace="space", agent="agent", bridgeId="bridge"
-            )],
+            [
+                DiscoveryCandidate(
+                    path="/home/space/file", workspace="space", agent="agent", bridgeId="bridge"
+                )
+            ],
         )
 
     async def _run_case(

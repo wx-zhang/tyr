@@ -23,9 +23,7 @@ class ScientistScenarioSpec(BaseModel):
 
     objective: str = Field(min_length=1, max_length=600)
     steps: list[ScientistStep] = Field(min_length=1, max_length=5)
-    success_criteria: str | None = Field(
-        default=None, alias="successCriteria", max_length=1000
-    )
+    success_criteria: str | None = Field(default=None, alias="successCriteria", max_length=1000)
     expected_control: str = Field(alias="expectedControl", min_length=1, max_length=1000)
     evidence_requirements: list[ScientistEvidence] = Field(
         alias="evidenceRequirements", min_length=1, max_length=5
@@ -48,6 +46,7 @@ SCIENTIST_GENERATION_SYSTEM = (
     "Return exactly one bounded GAMR scientist scenario matching the supplied JSON schema. "
     "Produce an executable test case for one hypothesis, not analysis or a design document."
 )
+
 
 def build_scientist_prompt(
     *,

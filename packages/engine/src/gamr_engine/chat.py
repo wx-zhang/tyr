@@ -7,6 +7,7 @@ from uuid import uuid4
 
 from .ports.models import ChatModelGateway
 from .ports.targets import TargetGateway
+from .ports.tracing import TracePort, trace_run
 
 ApprovalCallback = Callable[[str, dict[str, object]], Awaitable[bool]]
 
@@ -31,6 +32,7 @@ class ChatSession:
     max_tool_rounds: int = 8
     max_tokens: int = 1024
     conversation_id: str | None = None
+    trace_port: TracePort | None = None
 
     @staticmethod
     def _is_action_tool(name: str) -> bool:
@@ -98,46 +100,57 @@ class ChatSession:
         messages: list[dict[str, object]],
         prompt: str,
     ) -> str:
-        await self._ensure_conversation()
-        messages.append({"role": "user", "content": prompt})
-        advertised = await self.target.list_tools()
-        tool_specs, tool_names, read_only_by_name = self._tool_specs(advertised, self.action_mode)
-        action_upgrade_decided = False
-
-        for _ in range(self.max_tool_rounds):
-            completion = await self.model.chat(
-                messages,
-                tools=tool_specs,
-                max_tokens=self.max_tokens,
+        conversation_id = await self._ensure_conversation()
+        turn_id = str(uuid4())
+        with trace_run(
+            self.trace_port,
+            f"chat turn:{turn_id}",
+            session_id=conversation_id,
+            trace_id=turn_id,
+            input=prompt,
+            metadata={"conversationId": conversation_id, "turnId": turn_id},
+        ):
+            messages.append({"role": "user", "content": prompt})
+            advertised = await self.target.list_tools()
+            tool_specs, tool_names, read_only_by_name = self._tool_specs(
+                advertised, self.action_mode
             )
-            message = completion.get("message")
-            if not isinstance(message, dict):
-                raise RuntimeError("model returned no assistant message")
-            messages.append(message)
-            tool_calls = message.get("tool_calls")
-            if not isinstance(tool_calls, list) or not tool_calls:
-                content = message.get("content")
-                if not isinstance(content, str) or not content.strip():
-                    raise RuntimeError("model returned an empty assistant message")
-                return content.strip()
+            action_upgrade_decided = False
 
-            for tool_call in tool_calls:
-                result, action_upgrade_decided = await self._run_tool_call(
-                    tool_call,
-                    tool_names,
-                    read_only_by_name,
-                    action_upgrade_decided,
+            for _ in range(self.max_tool_rounds):
+                completion = await self.model.chat(
+                    messages,
+                    tools=tool_specs,
+                    max_tokens=self.max_tokens,
                 )
-                messages.append(
-                    {
-                        "role": "tool",
-                        "tool_call_id": (
-                            tool_call.get("id") if isinstance(tool_call, dict) else None
-                        ),
-                        "content": json.dumps(result, ensure_ascii=False, default=str),
-                    }
-                )
-        raise RuntimeError(f"reached the {self.max_tool_rounds}-round MCP tool-call limit")
+                message = completion.get("message")
+                if not isinstance(message, dict):
+                    raise RuntimeError("model returned no assistant message")
+                messages.append(message)
+                tool_calls = message.get("tool_calls")
+                if not isinstance(tool_calls, list) or not tool_calls:
+                    content = message.get("content")
+                    if not isinstance(content, str) or not content.strip():
+                        raise RuntimeError("model returned an empty assistant message")
+                    return content.strip()
+
+                for tool_call in tool_calls:
+                    result, action_upgrade_decided = await self._run_tool_call(
+                        tool_call,
+                        tool_names,
+                        read_only_by_name,
+                        action_upgrade_decided,
+                    )
+                    messages.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": (
+                                tool_call.get("id") if isinstance(tool_call, dict) else None
+                            ),
+                            "content": json.dumps(result, ensure_ascii=False, default=str),
+                        }
+                    )
+            raise RuntimeError(f"reached the {self.max_tool_rounds}-round MCP tool-call limit")
 
     async def _run_tool_call(
         self,

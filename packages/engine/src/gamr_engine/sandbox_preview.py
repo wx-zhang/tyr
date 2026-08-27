@@ -77,9 +77,7 @@ class ObservedSandbox:
         digest: str | None = None
         try:
             source_bytes = validate_source(source)
-            source_value = _source_preview(
-                source_bytes.decode("utf-8"), self._configured_secrets
-            )
+            source_value = _source_preview(source_bytes.decode("utf-8"), self._configured_secrets)
             digest = hashlib.sha256(source_bytes).hexdigest()
         except Exception as error:
             self._fail(error, attempt=self._attempt)
@@ -105,9 +103,7 @@ class ObservedSandbox:
             attempt=self._attempt,
             program_sha256=digest,
             source=source_value,
-            execution=_execution_preview(
-                result, self._sensitive_values, self._configured_secrets
-            ),
+            execution=_execution_preview(result, self._sensitive_values, self._configured_secrets),
         )
         return result
 
@@ -218,6 +214,8 @@ def _stream_preview(
     if not value:
         return SandboxPreviewText(state="empty")
     return SandboxPreviewText(state="captured", value=value[:16_384])
+
+
 def _detect_content_type(path: str, content: bytes) -> str:
     if content.startswith(b"\x89PNG\r\n\x1a\n"):
         return "image/png"

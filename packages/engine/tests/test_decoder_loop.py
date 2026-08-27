@@ -460,9 +460,7 @@ async def test_third_inspection_attempt_gets_non_executing_final_turn() -> None:
                     "type": "function",
                     "function": {
                         "name": "execute_python",
-                        "arguments": json.dumps(
-                            {"source": source, "rationale": "inspect upload"}
-                        ),
+                        "arguments": json.dumps({"source": source, "rationale": "inspect upload"}),
                     },
                 }
             ],

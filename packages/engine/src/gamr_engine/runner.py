@@ -59,6 +59,7 @@ from .ports.artifacts import ActivitySink, ArtifactStore
 from .ports.models import ModelGateway, StructuredModelGateway
 from .ports.sandbox import Sandbox
 from .ports.targets import TargetGateway
+from .ports.tracing import TracePort, trace_run, trace_score, trace_span
 from .scientist_prompt import (
     SCIENTIST_GENERATION_SYSTEM,
     ScientistScenarioDraft,
@@ -258,6 +259,7 @@ class ExperimentRunner:
         content_evidence_provider: ContentEvidenceProvider | None = None,
         sandbox: Sandbox | None = None,
         scientist_output_tokens: int = _SCIENTIST_OUTPUT_TOKENS,
+        trace_port: TracePort | None = None,
     ) -> None:
         self._progress = progress
         self._activity_sink = activity_sink
@@ -266,6 +268,7 @@ class ExperimentRunner:
         self._content_evidence_provider = content_evidence_provider
         self._sandbox = sandbox
         self._scientist_output_tokens = scientist_output_tokens
+        self._trace_port = trace_port
 
     async def run(
         self,
@@ -284,128 +287,156 @@ class ExperimentRunner:
         self._activity_sink = activity_sink or self._activity_sink
         self._activity_sequences.pop(identifier, None)
         started_at = datetime.now(UTC)
-        scenarios = self._select_scenarios(task, config)
-        if target is None or model is None:
-            raise ValueError("target and model providers are required")
-        execution_detail = "scientist-only" if not scenarios else f"{len(scenarios)} case(s)"
-        self._emit(
-            "run.started",
-            identifier,
-            detail=f"{task.manifest.metadata.id} · {execution_detail}",
-        )
-
-        self._emit("tyr.connecting", identifier)
-        try:
-            await target.initialize()
-        except Exception as exc:
-            self._emit("tyr.failed", identifier, detail=type(exc).__name__)
-            failed_results = [
-                self._case_result(
-                    scenario,
-                    outcome=ExecutionOutcome.ERROR,
-                    objective_status=ObjectiveStatus.NOT_ATTEMPTED,
-                    verdict=SecurityVerdict.INCONCLUSIVE,
-                    summary=f"Tyr initialization failed: {type(exc).__name__}: {exc}",
-                    turn_ids=[],
-                )
-                for scenario in scenarios
-            ]
-            return self._result(
+        with trace_run(
+            self._trace_port,
+            f"run:{identifier}",
+            session_id=identifier,
+            trace_id=identifier,
+            metadata={"taskId": task.manifest.metadata.id, "runId": identifier},
+        ) as run_obs:
+            scenarios = self._select_scenarios(task, config)
+            if target is None or model is None:
+                raise ValueError("target and model providers are required")
+            execution_detail = "scientist-only" if not scenarios else f"{len(scenarios)} case(s)"
+            self._emit(
+                "run.started",
                 identifier,
-                started_at,
-                task,
-                config,
-                failed_results,
-                outcome=ExecutionOutcome.ERROR,
-                errors=[f"Tyr initialization failed: {type(exc).__name__}: {exc}"],
-            )
-        self._emit("tyr.connected", identifier)
-        conversation = TargetConversation()
-        discovery = await self._run_discovery(
-            identifier, task, config, target, model, artifacts, conversation
-        )
-        if not discovery.candidates:
-            blocked_results = [
-                self._case_result(
-                    scenario,
-                    outcome=ExecutionOutcome.BLOCKED,
-                    objective_status=ObjectiveStatus.NOT_ATTEMPTED,
-                    verdict=SecurityVerdict.NOT_APPLICABLE,
-                    summary=discovery.error or "Discovery did not produce a usable target.",
-                    turn_ids=self._turn_ids(discovery.transcript),
-                )
-                for scenario in scenarios
-            ]
-            return self._result(
-                identifier,
-                started_at,
-                task,
-                config,
-                blocked_results,
-                outcome=ExecutionOutcome.BLOCKED,
-                errors=[discovery.error or "discovery failed"],
+                detail=f"{task.manifest.metadata.id} · {execution_detail}",
             )
 
-        target_candidate = discovery.candidates[0]
-        configured_history = (
-            self._load_configured_history(task, target_candidate, config, artifacts, identifier)
-            if config.scientist_iterations
-            else []
-        )
-        case_records: list[CaseRecord] = []
-        errors: list[str] = []
-        if scenarios:
-            semaphore = asyncio.Semaphore(config.max_concurrent_cases)
-            records: list[CaseRecord | None] = [None] * len(scenarios)
-            case_errors: list[str | None] = [None] * len(scenarios)
-
-            async def execute_case(index: int, scenario: Scenario) -> None:
-                async with semaphore:
-                    record, case_error = await self._run_case(
-                        task,
+            self._emit("tyr.connecting", identifier)
+            try:
+                await target.initialize()
+            except Exception as exc:
+                self._emit("tyr.failed", identifier, detail=type(exc).__name__)
+                failed_results = [
+                    self._case_result(
                         scenario,
-                        target_candidate,
-                        config,
-                        target,
-                        model,
-                        judge_model or model,
-                        identifier,
-                        artifacts,
-                        TargetConversation(),
+                        outcome=ExecutionOutcome.ERROR,
+                        objective_status=ObjectiveStatus.NOT_ATTEMPTED,
+                        verdict=SecurityVerdict.INCONCLUSIVE,
+                        summary=f"Tyr initialization failed: {type(exc).__name__}: {exc}",
+                        turn_ids=[],
                     )
-                    records[index] = record
-                    case_errors[index] = case_error
-
-            async with asyncio.TaskGroup() as task_group:
-                for index, scenario in enumerate(scenarios):
-                    if index >= config.max_concurrent_cases:
-                        self._emit(
-                            "case.queued",
-                            identifier,
-                            phase="case",
-                            case_id=scenario.metadata.id,
-                            detail="Waiting for an execution slot",
-                        )
-                    task_group.create_task(execute_case(index, scenario))
-
-            case_records = [record for record in records if record is not None]
-            errors.extend(error for error in case_errors if error is not None)
-        if config.scientist_iterations:
-            scientist_records, scientist_errors = await self._run_scientist(
-                task,
-                target_candidate,
-                config,
-                target,
-                scientist_model or model,
-                judge_model or scientist_model or model,
-                identifier,
-                artifacts,
-                configured_history + case_records,
+                    for scenario in scenarios
+                ]
+                res = self._result(
+                    identifier,
+                    started_at,
+                    task,
+                    config,
+                    failed_results,
+                    outcome=ExecutionOutcome.ERROR,
+                    errors=[f"Tyr initialization failed: {type(exc).__name__}: {exc}"],
+                )
+                if run_obs is not None:
+                    trace_score(
+                        self._trace_port,
+                        "final_run_outcome",
+                        res.outcome.value,
+                        observation=run_obs,
+                    )
+                return res
+            self._emit("tyr.connected", identifier)
+            conversation = TargetConversation()
+            discovery = await self._run_discovery(
+                identifier, task, config, target, model, artifacts, conversation
             )
-            case_records.extend(scientist_records)
-            errors.extend(scientist_errors)
-        case_results = [record.case for record in case_records]
-        return self._result(identifier, started_at, task, config, case_results, errors=errors)
+            if not discovery.candidates:
+                blocked_results = [
+                    self._case_result(
+                        scenario,
+                        outcome=ExecutionOutcome.BLOCKED,
+                        objective_status=ObjectiveStatus.NOT_ATTEMPTED,
+                        verdict=SecurityVerdict.NOT_APPLICABLE,
+                        summary=discovery.error or "Discovery did not produce a usable target.",
+                        turn_ids=self._turn_ids(discovery.transcript),
+                    )
+                    for scenario in scenarios
+                ]
+                res = self._result(
+                    identifier,
+                    started_at,
+                    task,
+                    config,
+                    blocked_results,
+                    outcome=ExecutionOutcome.BLOCKED,
+                    errors=[discovery.error or "discovery failed"],
+                )
+                if run_obs is not None:
+                    trace_score(
+                        self._trace_port,
+                        "final_run_outcome",
+                        res.outcome.value,
+                        observation=run_obs,
+                    )
+                return res
+
+            target_candidate = discovery.candidates[0]
+            configured_history = (
+                self._load_configured_history(task, target_candidate, config, artifacts, identifier)
+                if config.scientist_iterations
+                else []
+            )
+            case_records: list[CaseRecord] = []
+            errors: list[str] = []
+            if scenarios:
+                semaphore = asyncio.Semaphore(config.max_concurrent_cases)
+                records: list[CaseRecord | None] = [None] * len(scenarios)
+                case_errors: list[str | None] = [None] * len(scenarios)
+
+                async def execute_case(index: int, scenario: Scenario) -> None:
+                    async with semaphore:
+                        record, case_error = await self._run_case(
+                            task,
+                            scenario,
+                            target_candidate,
+                            config,
+                            target,
+                            model,
+                            judge_model or model,
+                            identifier,
+                            artifacts,
+                            TargetConversation(),
+                        )
+                        records[index] = record
+                        case_errors[index] = case_error
+
+                async with asyncio.TaskGroup() as task_group:
+                    for index, scenario in enumerate(scenarios):
+                        if index >= config.max_concurrent_cases:
+                            self._emit(
+                                "case.queued",
+                                identifier,
+                                phase="case",
+                                case_id=scenario.metadata.id,
+                                detail="Waiting for an execution slot",
+                            )
+                        task_group.create_task(execute_case(index, scenario))
+
+                case_records = [record for record in records if record is not None]
+                errors.extend(error for error in case_errors if error is not None)
+            if config.scientist_iterations:
+                scientist_records, scientist_errors = await self._run_scientist(
+                    task,
+                    target_candidate,
+                    config,
+                    target,
+                    scientist_model or model,
+                    judge_model or scientist_model or model,
+                    identifier,
+                    artifacts,
+                    configured_history + case_records,
+                )
+                case_records.extend(scientist_records)
+                errors.extend(scientist_errors)
+            case_results = [record.case for record in case_records]
+            res = self._result(identifier, started_at, task, config, case_results, errors=errors)
+            if run_obs is not None:
+                trace_score(
+                    self._trace_port, "final_run_outcome", res.outcome.value, observation=run_obs
+                )
+            return res
 
     async def resume_scientist(
         self,
@@ -438,57 +469,91 @@ class ExperimentRunner:
             raise ValueError("resuming the scientist phase requires an artifact store")
         if not config.scientist_iterations:
             raise ValueError("scientist_iterations must be greater than zero to resume")
-        self._emit(
-            "run.started",
-            identifier,
-            detail=f"{task.manifest.metadata.id} · resuming scientist from {source_run_id}",
-        )
-
-        self._emit("tyr.connecting", identifier)
-        try:
-            await target.initialize()
-        except Exception as exc:
-            self._emit("tyr.failed", identifier, detail=type(exc).__name__)
-            return self._result(
+        with trace_run(
+            self._trace_port,
+            f"run:{identifier}",
+            session_id=source_run_id,
+            trace_id=identifier,
+            metadata={
+                "taskId": task.manifest.metadata.id,
+                "runId": identifier,
+                "sourceRunId": source_run_id,
+            },
+        ) as run_obs:
+            self._emit(
+                "run.started",
                 identifier,
-                started_at,
-                task,
-                config,
-                [],
-                outcome=ExecutionOutcome.ERROR,
-                errors=[f"Tyr initialization failed: {type(exc).__name__}: {exc}"],
+                detail=f"{task.manifest.metadata.id} · resuming scientist from {source_run_id}",
             )
-        self._emit("tyr.connected", identifier)
-        conversation = TargetConversation()
-        discovery = await self._run_discovery(
-            identifier, task, config, target, model, artifacts, conversation
-        )
-        if not discovery.candidates:
-            return self._result(
-                identifier,
-                started_at,
-                task,
-                config,
-                [],
-                outcome=ExecutionOutcome.BLOCKED,
-                errors=[discovery.error or "discovery failed"],
-            )
-        target_candidate = discovery.candidates[0]
 
-        prior_records = self._load_prior_records(task, target_candidate, artifacts, source_run_id)
-        scientist_records, errors = await self._run_scientist(
-            task,
-            target_candidate,
-            config,
-            target,
-            scientist_model or model,
-            judge_model or scientist_model or model,
-            identifier,
-            artifacts,
-            prior_records,
-        )
-        case_results = [record.case for record in scientist_records]
-        return self._result(identifier, started_at, task, config, case_results, errors=errors)
+            self._emit("tyr.connecting", identifier)
+            try:
+                await target.initialize()
+            except Exception as exc:
+                self._emit("tyr.failed", identifier, detail=type(exc).__name__)
+                res = self._result(
+                    identifier,
+                    started_at,
+                    task,
+                    config,
+                    [],
+                    outcome=ExecutionOutcome.ERROR,
+                    errors=[f"Tyr initialization failed: {type(exc).__name__}: {exc}"],
+                )
+                if run_obs is not None:
+                    trace_score(
+                        self._trace_port,
+                        "final_run_outcome",
+                        res.outcome.value,
+                        observation=run_obs,
+                    )
+                return res
+            self._emit("tyr.connected", identifier)
+            conversation = TargetConversation()
+            discovery = await self._run_discovery(
+                identifier, task, config, target, model, artifacts, conversation
+            )
+            if not discovery.candidates:
+                res = self._result(
+                    identifier,
+                    started_at,
+                    task,
+                    config,
+                    [],
+                    outcome=ExecutionOutcome.BLOCKED,
+                    errors=[discovery.error or "discovery failed"],
+                )
+                if run_obs is not None:
+                    trace_score(
+                        self._trace_port,
+                        "final_run_outcome",
+                        res.outcome.value,
+                        observation=run_obs,
+                    )
+                return res
+            target_candidate = discovery.candidates[0]
+
+            prior_records = self._load_prior_records(
+                task, target_candidate, artifacts, source_run_id
+            )
+            scientist_records, errors = await self._run_scientist(
+                task,
+                target_candidate,
+                config,
+                target,
+                scientist_model or model,
+                judge_model or scientist_model or model,
+                identifier,
+                artifacts,
+                prior_records,
+            )
+            case_results = [record.case for record in scientist_records]
+            res = self._result(identifier, started_at, task, config, case_results, errors=errors)
+            if run_obs is not None:
+                trace_score(
+                    self._trace_port, "final_run_outcome", res.outcome.value, observation=run_obs
+                )
+            return res
 
     @staticmethod
     def _load_prior_records(
@@ -726,240 +791,332 @@ class ExperimentRunner:
             )
 
         for index in range(1, config.scientist_iterations + 1):
-            effective_records = self._effective_scientist_history(
-                prior_records + records, artifacts
-            )
-            history_records = self._cap_history_records(
-                effective_records,
-                test_limit=config.history_test_runs,
-                scientist_limit=config.history_scientist_runs,
-            )
-            fixed_prompt = make_prompt("")
-            fixed_prompt_bytes = len(fixed_prompt.encode("utf-8"))
-            if fixed_prompt_bytes >= _MAX_SCIENTIST_INPUT_BYTES:
-                error = "scientist prompt exceeds the 50,000-token input budget before history"
-                errors.append(error)
-                self._emit(
-                    "scientist.failed",
-                    run_id,
-                    phase="scientist",
-                    turn=index,
-                    detail=error,
+            with trace_span(
+                self._trace_port,
+                f"scientist iteration:{index}",
+                metadata={"iteration": index, "runId": run_id},
+            ):
+                effective_records = self._effective_scientist_history(
+                    prior_records + records, artifacts
                 )
-                continue
-            history_budget = _MAX_SCIENTIST_INPUT_BYTES - fixed_prompt_bytes
-            full_history = self._scientist_history(history_records)
-            history = self._scientist_history(history_records, max_bytes=history_budget)
-            history_truncated = history != full_history
-            prompt = make_prompt(history)
-            prompt_bytes = len(prompt.encode("utf-8"))
-            if prompt_bytes > _MAX_SCIENTIST_INPUT_BYTES:
-                error = "scientist prompt exceeds the 50,000-token input budget"
-                errors.append(error)
-                self._emit(
-                    "scientist.failed",
-                    run_id,
-                    phase="scientist",
-                    turn=index,
-                    detail=error,
+                history_records = self._cap_history_records(
+                    effective_records,
+                    test_limit=config.history_test_runs,
+                    scientist_limit=config.history_scientist_runs,
                 )
-                continue
-            history_case_ids = tuple(record.case.scenario_id for record in history_records)[:100]
-            history_origins = tuple(
-                "base" if record.origin == "base" else "scientist" for record in history_records
-            )[:100]
-            self._emit(
-                "scientist.history_used",
-                run_id,
-                phase="scientist",
-                turn=index,
-                detail=(
-                    f"Iteration {index} uses {len(history_records)} prior test(s)"
-                    if history_records
-                    else f"Iteration {index} has no prior tests"
-                ),
-                related_case_ids=history_case_ids,
-                metadata_extra={
-                    "historyOrigins": ",".join(history_origins) or "none",
-                    "estimatedInputTokens": _estimated_tokens(prompt),
-                    "historyTruncated": history_truncated,
-                    "promptBytes": prompt_bytes,
-                    "historyBytes": len(history.encode("utf-8")),
-                },
-            )
-            content: str | None = None
-            scenario: Scenario | None = None
-            generation_prompt = prompt
-            structured = callable(getattr(model, "complete_structured", None))
-            model_name = str(getattr(model, "model", type(model).__name__))
-            for attempt in range(1, _RETRY_LIMIT + 2):
-                content = None
-                completion: dict[str, object] | None = None
-                started = perf_counter()
-                prompt_bytes = len(generation_prompt.encode("utf-8"))
+                fixed_prompt = make_prompt("")
+                fixed_prompt_bytes = len(fixed_prompt.encode("utf-8"))
+                if fixed_prompt_bytes >= _MAX_SCIENTIST_INPUT_BYTES:
+                    error = "scientist prompt exceeds the 50,000-token input budget before history"
+                    errors.append(error)
+                    self._emit(
+                        "scientist.failed",
+                        run_id,
+                        phase="scientist",
+                        turn=index,
+                        detail=error,
+                    )
+                    continue
+                history_budget = _MAX_SCIENTIST_INPUT_BYTES - fixed_prompt_bytes
+                full_history = self._scientist_history(history_records)
+                history = self._scientist_history(history_records, max_bytes=history_budget)
+                history_truncated = history != full_history
+                prompt = make_prompt(history)
+                prompt_bytes = len(prompt.encode("utf-8"))
+                if prompt_bytes > _MAX_SCIENTIST_INPUT_BYTES:
+                    error = "scientist prompt exceeds the 50,000-token input budget"
+                    errors.append(error)
+                    self._emit(
+                        "scientist.failed",
+                        run_id,
+                        phase="scientist",
+                        turn=index,
+                        detail=error,
+                    )
+                    continue
+                history_case_ids = tuple(record.case.scenario_id for record in history_records)[
+                    :100
+                ]
+                history_origins = tuple(
+                    "base" if record.origin == "base" else "scientist" for record in history_records
+                )[:100]
                 self._emit(
-                    "scientist.generation_started",
+                    "scientist.history_used",
                     run_id,
                     phase="scientist",
                     turn=index,
-                    detail=f"attempt {attempt}",
+                    detail=(
+                        f"Iteration {index} uses {len(history_records)} prior test(s)"
+                        if history_records
+                        else f"Iteration {index} has no prior tests"
+                    ),
+                    related_case_ids=history_case_ids,
                     metadata_extra={
-                        "model": model_name,
-                        "estimatedInputTokens": _estimated_tokens(generation_prompt),
+                        "historyOrigins": ",".join(history_origins) or "none",
+                        "estimatedInputTokens": _estimated_tokens(prompt),
+                        "historyTruncated": history_truncated,
                         "promptBytes": prompt_bytes,
-                        "historyRecordCount": len(history_records),
-                        "maxOutputTokens": self._scientist_output_tokens,
+                        "historyBytes": len(history.encode("utf-8")),
                     },
                 )
-                try:
-                    completion = await self._complete_scientist(model, generation_prompt)
-                except TimeoutError:
-                    duration_ms = round((perf_counter() - started) * 1000)
-                    error = (
-                        "scientist generation timed out after "
-                        f"{_SCIENTIST_GENERATION_TIMEOUT_SECONDS} seconds"
-                    )
-                    self._write_raw(
-                        artifacts,
+                content = None
+                scenario = None
+                generation_prompt = prompt
+                structured = callable(getattr(model, "complete_structured", None))
+                model_name = str(getattr(model, "model", type(model).__name__))
+                for attempt in range(1, _RETRY_LIMIT + 2):
+                    content = None
+                    completion = None
+                    started = perf_counter()
+                    prompt_bytes = len(generation_prompt.encode("utf-8"))
+                    self._emit(
+                        "scientist.generation_started",
                         run_id,
-                        new_id(),
-                        {
-                            "phase": "scientist",
-                            "iteration": index,
-                            "attempt": attempt,
+                        phase="scientist",
+                        turn=index,
+                        detail=f"attempt {attempt}",
+                        metadata_extra={
                             "model": model_name,
-                            "input": {
-                                "promptChars": len(generation_prompt),
-                                "promptBytes": prompt_bytes,
-                                "estimatedTokens": _estimated_tokens(generation_prompt),
-                                "historyChars": len(history),
-                                "historyRecordCount": len(history_records),
-                                "historyCaseIds": list(history_case_ids),
-                                "historyTruncated": history_truncated,
-                            },
-                            "request": {
-                                "structured": structured,
-                                "schemaName": "scientist_scenario",
-                                "maxOutputTokens": self._scientist_output_tokens,
-                                "timeoutSeconds": _SCIENTIST_GENERATION_TIMEOUT_SECONDS,
-                            },
-                            "response": {
-                                "durationMs": duration_ms,
-                                "finishReason": None,
-                                "contentChars": 0,
-                                "usage": None,
-                            },
-                            "prompt": generation_prompt,
-                            "completion": None,
-                            "validation": {"status": "failed", "errors": [error]},
+                            "estimatedInputTokens": _estimated_tokens(generation_prompt),
+                            "promptBytes": prompt_bytes,
+                            "historyRecordCount": len(history_records),
+                            "maxOutputTokens": self._scientist_output_tokens,
                         },
                     )
-                    self._emit(
-                        "scientist.generation_failed",
-                        run_id,
-                        phase="scientist",
-                        turn=index,
-                        detail=error,
-                        metadata_extra={"durationMs": duration_ms},
-                    )
-                    errors.append(error)
-                    self._emit(
-                        "scientist.failed",
-                        run_id,
-                        phase="scientist",
-                        turn=index,
-                        detail=error,
-                    )
-                    break
-                except Exception as exc:
+                    try:
+                        with trace_span(
+                            self._trace_port,
+                            f"generation attempt:{attempt}",
+                            metadata={"attempt": attempt, "iteration": index, "runId": run_id},
+                        ):
+                            completion = await self._complete_scientist(model, generation_prompt)
+                    except TimeoutError:
+                        duration_ms = round((perf_counter() - started) * 1000)
+                        error = (
+                            "scientist generation timed out after "
+                            f"{_SCIENTIST_GENERATION_TIMEOUT_SECONDS} seconds"
+                        )
+                        self._write_raw(
+                            artifacts,
+                            run_id,
+                            new_id(),
+                            {
+                                "phase": "scientist",
+                                "iteration": index,
+                                "attempt": attempt,
+                                "model": model_name,
+                                "input": {
+                                    "promptChars": len(generation_prompt),
+                                    "promptBytes": prompt_bytes,
+                                    "estimatedTokens": _estimated_tokens(generation_prompt),
+                                    "historyChars": len(history),
+                                    "historyRecordCount": len(history_records),
+                                    "historyCaseIds": list(history_case_ids),
+                                    "historyTruncated": history_truncated,
+                                },
+                                "request": {
+                                    "structured": structured,
+                                    "schemaName": "scientist_scenario",
+                                    "maxOutputTokens": self._scientist_output_tokens,
+                                    "timeoutSeconds": _SCIENTIST_GENERATION_TIMEOUT_SECONDS,
+                                },
+                                "response": {
+                                    "durationMs": duration_ms,
+                                    "finishReason": None,
+                                    "contentChars": 0,
+                                    "usage": None,
+                                },
+                                "prompt": generation_prompt,
+                                "completion": None,
+                                "validation": {"status": "failed", "errors": [error]},
+                            },
+                        )
+                        self._emit(
+                            "scientist.generation_failed",
+                            run_id,
+                            phase="scientist",
+                            turn=index,
+                            detail=error,
+                            metadata_extra={"durationMs": duration_ms},
+                        )
+                        errors.append(error)
+                        self._emit(
+                            "scientist.failed",
+                            run_id,
+                            phase="scientist",
+                            turn=index,
+                            detail=error,
+                        )
+                        break
+                    except Exception as exc:
+                        duration_ms = round((perf_counter() - started) * 1000)
+                        error = f"scientist generation failed: {type(exc).__name__}: {exc}"
+                        self._write_raw(
+                            artifacts,
+                            run_id,
+                            new_id(),
+                            {
+                                "phase": "scientist",
+                                "iteration": index,
+                                "attempt": attempt,
+                                "model": model_name,
+                                "input": {
+                                    "promptChars": len(generation_prompt),
+                                    "promptBytes": prompt_bytes,
+                                    "estimatedTokens": _estimated_tokens(generation_prompt),
+                                    "historyChars": len(history),
+                                    "historyRecordCount": len(history_records),
+                                    "historyCaseIds": list(history_case_ids),
+                                    "historyTruncated": history_truncated,
+                                },
+                                "request": {
+                                    "structured": structured,
+                                    "schemaName": "scientist_scenario",
+                                    "maxOutputTokens": self._scientist_output_tokens,
+                                    "timeoutSeconds": _SCIENTIST_GENERATION_TIMEOUT_SECONDS,
+                                },
+                                "response": {
+                                    "durationMs": duration_ms,
+                                    "finishReason": None,
+                                    "contentChars": 0,
+                                    "usage": None,
+                                },
+                                "prompt": generation_prompt,
+                                "completion": None,
+                                "validation": {"status": "failed", "errors": [error]},
+                            },
+                        )
+                        self._emit(
+                            "scientist.generation_failed",
+                            run_id,
+                            phase="scientist",
+                            turn=index,
+                            detail=error,
+                            metadata_extra={"durationMs": duration_ms},
+                        )
+                        errors.append(error)
+                        self._emit(
+                            "scientist.failed",
+                            run_id,
+                            phase="scientist",
+                            turn=index,
+                            detail=error,
+                        )
+                        break
                     duration_ms = round((perf_counter() - started) * 1000)
-                    error = f"scientist generation failed: {type(exc).__name__}: {exc}"
-                    self._write_raw(
-                        artifacts,
-                        run_id,
-                        new_id(),
-                        {
-                            "phase": "scientist",
-                            "iteration": index,
-                            "attempt": attempt,
-                            "model": model_name,
-                            "input": {
-                                "promptChars": len(generation_prompt),
-                                "promptBytes": prompt_bytes,
-                                "estimatedTokens": _estimated_tokens(generation_prompt),
-                                "historyChars": len(history),
-                                "historyRecordCount": len(history_records),
-                                "historyCaseIds": list(history_case_ids),
-                                "historyTruncated": history_truncated,
+                    raw_content = completion.get("content")
+                    if isinstance(raw_content, str):
+                        content = raw_content
+                    try:
+                        if not isinstance(raw_content, str) or not raw_content.strip():
+                            diagnostics = self._completion_diagnostics(completion)
+                            raise ValueError(
+                                "scientist model returned empty content"
+                                + (f" ({diagnostics})" if diagnostics else "")
+                            )
+                        if len(raw_content) > _MAX_SCIENTIST_SCENARIO_CHARS:
+                            msg = (
+                                f"scientist scenario exceeds "
+                                f"{_MAX_SCIENTIST_SCENARIO_CHARS} characters"
+                            )
+                            raise ValueError(msg)
+
+                        payload = json.loads(self._strip_code_fence(raw_content))
+                        if structured:
+                            draft = ScientistScenarioDraft.model_validate(payload)
+                            payload = draft.model_dump(
+                                by_alias=True, exclude_none=True, mode="json"
+                            )
+                        declared_vars = set(task.manifest.spec.variables)
+                        scenario = self._prepare_scientist_scenario(payload, index, used_ids)
+                        scenario = self._escape_scientist_placeholders(scenario, declared_vars)
+                        texts = [
+                            scenario.metadata.title,
+                            scenario.spec.objective,
+                            *scenario.spec.steps,
+                            scenario.spec.success_criteria or "",
+                        ]
+                        for text in texts:
+                            validate_template_placeholders(text, declared_vars)
+                        used_ids.add(scenario.metadata.id)
+                        self._write_scenario(artifacts, run_id, scenario)
+                    except (json.JSONDecodeError, TypeError, ValueError, ValidationError) as exc:
+                        error = f"scientist scenario {index} invalid: {exc}"
+                        self._write_raw(
+                            artifacts,
+                            run_id,
+                            new_id(),
+                            {
+                                "phase": "scientist",
+                                "iteration": index,
+                                "attempt": attempt,
+                                "model": model_name,
+                                "input": {
+                                    "promptChars": len(generation_prompt),
+                                    "promptBytes": prompt_bytes,
+                                    "estimatedTokens": _estimated_tokens(generation_prompt),
+                                    "historyChars": len(history),
+                                    "historyRecordCount": len(history_records),
+                                    "historyCaseIds": list(history_case_ids),
+                                    "historyTruncated": history_truncated,
+                                },
+                                "request": {
+                                    "structured": structured,
+                                    "schemaName": "scientist_scenario",
+                                    "maxOutputTokens": self._scientist_output_tokens,
+                                    "timeoutSeconds": _SCIENTIST_GENERATION_TIMEOUT_SECONDS,
+                                },
+                                "response": {
+                                    "durationMs": duration_ms,
+                                    "finishReason": completion.get("finishReason"),
+                                    "contentChars": len(content) if content else 0,
+                                    "usage": completion.get("usage"),
+                                },
+                                "content": content,
+                                "prompt": generation_prompt,
+                                "completion": completion,
+                                "validation": {"status": "failed", "errors": [error]},
                             },
-                            "request": {
-                                "structured": structured,
-                                "schemaName": "scientist_scenario",
-                                "maxOutputTokens": self._scientist_output_tokens,
-                                "timeoutSeconds": _SCIENTIST_GENERATION_TIMEOUT_SECONDS,
-                            },
-                            "response": {
+                        )
+                        self._emit(
+                            "scientist.generation_completed",
+                            run_id,
+                            phase="scientist",
+                            turn=index,
+                            detail="invalid scenario",
+                            metadata_extra={
                                 "durationMs": duration_ms,
-                                "finishReason": None,
-                                "contentChars": 0,
-                                "usage": None,
+                                "validationStatus": "failed",
+                                "contentChars": len(content) if content else 0,
                             },
-                            "prompt": generation_prompt,
-                            "completion": None,
-                            "validation": {"status": "failed", "errors": [error]},
-                        },
-                    )
-                    self._emit(
-                        "scientist.generation_failed",
-                        run_id,
-                        phase="scientist",
-                        turn=index,
-                        detail=error,
-                        metadata_extra={"durationMs": duration_ms},
-                    )
-                    errors.append(error)
-                    self._emit(
-                        "scientist.failed",
-                        run_id,
-                        phase="scientist",
-                        turn=index,
-                        detail=error,
-                    )
-                    break
-                duration_ms = round((perf_counter() - started) * 1000)
-                raw_content = completion.get("content")
-                if isinstance(raw_content, str):
-                    content = raw_content
-                try:
-                    if not isinstance(raw_content, str) or not raw_content.strip():
-                        diagnostics = self._completion_diagnostics(completion)
-                        raise ValueError(
-                            "scientist model returned empty content"
-                            + (f" ({diagnostics})" if diagnostics else "")
                         )
-                    if len(raw_content) > _MAX_SCIENTIST_SCENARIO_CHARS:
-                        raise ValueError(
-                            f"scientist scenario exceeds {_MAX_SCIENTIST_SCENARIO_CHARS} characters"
+                        retryable_empty = (
+                            not content
+                            and completion.get("finishReason") in {"stop", "length"}
+                            and not completion.get("refusal")
                         )
-                    payload = json.loads(self._strip_code_fence(raw_content))
-                    if structured:
-                        draft = ScientistScenarioDraft.model_validate(payload)
-                        payload = draft.model_dump(by_alias=True, exclude_none=True, mode="json")
-                    declared_vars = set(task.manifest.spec.variables)
-                    scenario = self._prepare_scientist_scenario(payload, index, used_ids)
-                    scenario = self._escape_scientist_placeholders(scenario, declared_vars)
-                    texts = [
-                        scenario.metadata.title,
-                        scenario.spec.objective,
-                        *scenario.spec.steps,
-                        scenario.spec.success_criteria or "",
-                    ]
-                    for text in texts:
-                        validate_template_placeholders(text, declared_vars)
-                    used_ids.add(scenario.metadata.id)
-                    self._write_scenario(artifacts, run_id, scenario)
-                except (json.JSONDecodeError, TypeError, ValueError, ValidationError) as exc:
-                    error = f"scientist scenario {index} invalid: {exc}"
+                        if (content or retryable_empty) and attempt < _RETRY_LIMIT + 1:
+                            correction_error = (
+                                "; ".join(str(item["msg"]) for item in exc.errors())
+                                if isinstance(exc, ValidationError)
+                                else str(exc)
+                            )
+                            generation_prompt = (
+                                f"{prompt}\n\nYour previous response was not a valid scientist "
+                                f"scenario: {correction_error}\n"
+                                "Return one corrected JSON scenario only, "
+                                "without analysis, rationale, or Markdown fences."
+                            )
+                            continue
+                        errors.append(error)
+                        self._emit(
+                            "scientist.failed",
+                            run_id,
+                            phase="scientist",
+                            turn=index,
+                            detail=error,
+                        )
+                        break
                     self._write_raw(
                         artifacts,
                         run_id,
@@ -993,7 +1150,7 @@ class ExperimentRunner:
                             "content": content,
                             "prompt": generation_prompt,
                             "completion": completion,
-                            "validation": {"status": "failed", "errors": [error]},
+                            "validation": {"status": "valid", "errors": []},
                         },
                     )
                     self._emit(
@@ -1001,117 +1158,43 @@ class ExperimentRunner:
                         run_id,
                         phase="scientist",
                         turn=index,
-                        detail="invalid scenario",
+                        detail="valid scenario",
                         metadata_extra={
                             "durationMs": duration_ms,
-                            "validationStatus": "failed",
+                            "validationStatus": "valid",
                             "contentChars": len(content) if content else 0,
                         },
-                    )
-                    retryable_empty = (
-                        not content
-                        and completion.get("finishReason") in {"stop", "length"}
-                        and not completion.get("refusal")
-                    )
-                    if (content or retryable_empty) and attempt < _RETRY_LIMIT + 1:
-                        correction_error = (
-                            "; ".join(str(item["msg"]) for item in exc.errors())
-                            if isinstance(exc, ValidationError)
-                            else str(exc)
-                        )
-                        generation_prompt = (
-                            f"{prompt}\n\nYour previous response was not a valid scientist "
-                            f"scenario: {correction_error}\n"
-                            "Return one corrected JSON scenario only, "
-                            "without analysis, rationale, or Markdown fences."
-                        )
-                        continue
-                    errors.append(error)
-                    self._emit(
-                        "scientist.failed",
-                        run_id,
-                        phase="scientist",
-                        turn=index,
-                        detail=error,
                     )
                     break
-                self._write_raw(
-                    artifacts,
-                    run_id,
-                    new_id(),
-                    {
-                        "phase": "scientist",
-                        "iteration": index,
-                        "attempt": attempt,
-                        "model": model_name,
-                        "input": {
-                            "promptChars": len(generation_prompt),
-                            "promptBytes": prompt_bytes,
-                            "estimatedTokens": _estimated_tokens(generation_prompt),
-                            "historyChars": len(history),
-                            "historyRecordCount": len(history_records),
-                            "historyCaseIds": list(history_case_ids),
-                            "historyTruncated": history_truncated,
-                        },
-                        "request": {
-                            "structured": structured,
-                            "schemaName": "scientist_scenario",
-                            "maxOutputTokens": self._scientist_output_tokens,
-                            "timeoutSeconds": _SCIENTIST_GENERATION_TIMEOUT_SECONDS,
-                        },
-                        "response": {
-                            "durationMs": duration_ms,
-                            "finishReason": completion.get("finishReason"),
-                            "contentChars": len(content) if content else 0,
-                            "usage": completion.get("usage"),
-                        },
-                        "content": content,
-                        "prompt": generation_prompt,
-                        "completion": completion,
-                        "validation": {"status": "valid", "errors": []},
-                    },
-                )
+                if scenario is None:
+                    continue
                 self._emit(
-                    "scientist.generation_completed",
+                    "scientist.scenario_ready",
                     run_id,
                     phase="scientist",
+                    case_id=scenario.metadata.id,
                     turn=index,
-                    detail="valid scenario",
-                    metadata_extra={
-                        "durationMs": duration_ms,
-                        "validationStatus": "valid",
-                        "contentChars": len(content) if content else 0,
-                    },
+                    detail=scenario.metadata.title,
                 )
-                break
-            if scenario is None:
-                continue
-            self._emit(
-                "scientist.scenario_ready",
-                run_id,
-                phase="scientist",
-                case_id=scenario.metadata.id,
-                turn=index,
-                detail=scenario.metadata.title,
-            )
-            record, case_error = await self._run_case(
-                task,
-                scenario,
-                candidate,
-                config,
-                target,
-                model,
-                judge_model,
-                run_id,
-                artifacts,
-                TargetConversation(),
-                phase="scientist",
-            )
-            records.append(record)
-            if case_error:
-                errors.append(case_error)
-            elif self._scenario_succeeded(record.case):
-                break
+                record, case_error = await self._run_case(
+                    task,
+                    scenario,
+                    candidate,
+                    config,
+                    target,
+                    model,
+                    judge_model,
+                    run_id,
+                    artifacts,
+                    TargetConversation(),
+                    phase="scientist",
+                )
+                records.append(record)
+                if case_error:
+                    errors.append(case_error)
+                elif self._scenario_succeeded(record.case):
+                    break
+
         self._emit(
             "scientist.completed",
             run_id,
@@ -1211,34 +1294,35 @@ class ExperimentRunner:
         artifacts: ArtifactStore | None,
         conversation: TargetConversation,
     ) -> PhaseResult:
-        if task.discovery is None:
-            return PhaseResult([], None, None, [], "task has no discovery plan")
-        self._emit("discovery.started", run_id, phase="discovery")
-        prompt = self._methodology_prefix(task)
-        prompt += f"\nDiscovery plan:\n{task.discovery.prompt}\n"
-        prompt += _DISCOVERY_DECISION_PROMPT
-        result = await self._converse(
-            prompt,
-            target,
-            model,
-            config,
-            max_turns=config.discovery_turns,
-            conversation=conversation,
-            require_candidates=True,
-            run_id=run_id,
-            artifacts=artifacts,
-            phase="discovery",
-        )
-        fields = self._discovery_fields(result.candidates[0]) if result.candidates else None
-        self._write_discovery_result(artifacts, run_id, result)
-        self._emit(
-            "discovery.completed",
-            run_id,
-            phase="discovery",
-            detail=f"{len(result.candidates)} candidate(s)" if result.candidates else "blocked",
-            fields=fields,
-        )
-        return result
+        with trace_span(self._trace_port, "discovery", metadata={"runId": run_id}):
+            if task.discovery is None:
+                return PhaseResult([], None, None, [], "task has no discovery plan")
+            self._emit("discovery.started", run_id, phase="discovery")
+            prompt = self._methodology_prefix(task)
+            prompt += f"\nDiscovery plan:\n{task.discovery.prompt}\n"
+            prompt += _DISCOVERY_DECISION_PROMPT
+            result = await self._converse(
+                prompt,
+                target,
+                model,
+                config,
+                max_turns=config.discovery_turns,
+                conversation=conversation,
+                require_candidates=True,
+                run_id=run_id,
+                artifacts=artifacts,
+                phase="discovery",
+            )
+            fields = self._discovery_fields(result.candidates[0]) if result.candidates else None
+            self._write_discovery_result(artifacts, run_id, result)
+            self._emit(
+                "discovery.completed",
+                run_id,
+                phase="discovery",
+                detail=f"{len(result.candidates)} candidate(s)" if result.candidates else "blocked",
+                fields=fields,
+            )
+            return result
 
     async def _run_case(
         self,
@@ -1256,108 +1340,285 @@ class ExperimentRunner:
         phase: str = "case",
     ) -> tuple[CaseRecord, str | None]:
         case_id = scenario.metadata.id
-        self._emit(
-            "case.started",
-            run_id,
-            phase=phase,
-            case_id=case_id,
-            detail=scenario.metadata.title,
-        )
-        values = self._variables(task, candidate)
-        try:
-            title = render_template(scenario.metadata.title, values)
-            objective = render_template(scenario.spec.objective, values)
-            steps = [render_template(step, values) for step in scenario.spec.steps]
-            success = render_template(scenario.spec.success_criteria or "", values)
-            expected_control = render_template(scenario.spec.expected_control, values)
-        except KeyError as exc:
-            case = self._case_result(
-                scenario,
-                outcome=ExecutionOutcome.FAILED,
-                objective_status=ObjectiveStatus.NOT_ATTEMPTED,
-                verdict=SecurityVerdict.INCONCLUSIVE,
-                summary=f"Missing runtime task variable: {exc.args[0]}",
-                turn_ids=[],
-            )
-            self._write_case_result(artifacts, run_id, case, stage=phase)
+        with trace_span(
+            self._trace_port,
+            f"case:{case_id}",
+            input={"objective": scenario.spec.objective, "steps": list(scenario.spec.steps)},
+            metadata={"caseId": case_id, "runId": run_id, "phase": phase},
+        ) as case_obs:
             self._emit(
-                "case.completed",
+                "case.started",
                 run_id,
                 phase=phase,
                 case_id=case_id,
-                detail="failed",
+                detail=scenario.metadata.title,
             )
-            record = CaseRecord(
+            values = self._variables(task, candidate)
+            try:
+                title = render_template(scenario.metadata.title, values)
+                objective = render_template(scenario.spec.objective, values)
+                steps = [render_template(step, values) for step in scenario.spec.steps]
+                success = render_template(scenario.spec.success_criteria or "", values)
+                expected_control = render_template(scenario.spec.expected_control, values)
+            except KeyError as exc:
+                case = self._case_result(
+                    scenario,
+                    outcome=ExecutionOutcome.FAILED,
+                    objective_status=ObjectiveStatus.NOT_ATTEMPTED,
+                    verdict=SecurityVerdict.INCONCLUSIVE,
+                    summary=f"Missing runtime task variable: {exc.args[0]}",
+                    turn_ids=[],
+                )
+                self._write_case_result(artifacts, run_id, case, stage=phase)
+                self._emit(
+                    "case.completed",
+                    run_id,
+                    phase=phase,
+                    case_id=case_id,
+                    detail="failed",
+                )
+                if case_obs is not None:
+                    trace_score(
+                        self._trace_port,
+                        "security_verdict",
+                        case.verdict.value,
+                        observation=case_obs,
+                    )
+                    trace_score(
+                        self._trace_port,
+                        "objective_status",
+                        case.objective_status.value,
+                        observation=case_obs,
+                    )
+                    trace_score(
+                        self._trace_port,
+                        "assessment_status",
+                        case.assessment_status.value,
+                        observation=case_obs,
+                    )
+                    if case.outcome is not None:
+                        trace_score(
+                            self._trace_port,
+                            "execution_outcome",
+                            case.outcome.value,
+                            observation=case_obs,
+                        )
+                record = CaseRecord(
+                    scenario=scenario,
+                    rendered_title=scenario.metadata.title,
+                    rendered_objective=scenario.spec.objective,
+                    rendered_steps=list(scenario.spec.steps),
+                    rendered_success=scenario.spec.success_criteria or "",
+                    case=case,
+                    transcript=[],
+                    origin="scientist" if phase == "scientist" else "base",
+                    origin_run_id=run_id if phase == "scientist" else None,
+                    origin_artifact_id=(
+                        _scientist_artifact_id(case_id) if phase == "scientist" else None
+                    ),
+                )
+                return record, str(case.summary)
+
+            prompt = self._methodology_prefix(task)
+            prompt += self._known_facts_block(task, values)
+            prompt += (
+                f"\nExecute this scenario to a concrete outcome.\nTitle: {title}\n"
+                f"Objective: {objective}\nSteps:\n"
+                + "\n".join(f"{index}. {step}" for index, step in enumerate(steps, 1))
+                + f"\nSuccess criteria: {success}\n"
+                + _CASE_DECISION_PROMPT
+            )
+            result = await self._converse(
+                prompt,
+                target,
+                model,
+                config,
+                max_turns=config.max_turns,
+                conversation=conversation,
+                require_candidates=False,
+                run_id=run_id,
+                artifacts=artifacts,
+                phase=phase,
+                case_id=case_id,
+                runtime_vars={match.group(0) for match in _RUNTIME_VAR.finditer(" ".join(steps))},
+            )
+            turn_ids = self._turn_ids(result.transcript)
+            verification = await self._verify_collector(
+                scenario, result.transcript, run_id, artifacts, phase
+            )
+            verifications = verification.items
+
+            if task.evaluation is None:
+                case = self._case_result(
+                    scenario,
+                    outcome=ExecutionOutcome.FAILED if result.error else ExecutionOutcome.COMPLETED,
+                    objective_status=(
+                        ObjectiveStatus.UNKNOWN
+                        if not result.error
+                        else (
+                            ObjectiveStatus.PARTIAL if turn_ids else ObjectiveStatus.NOT_ATTEMPTED
+                        )
+                    ),
+                    verdict=(
+                        SecurityVerdict.INCONCLUSIVE
+                        if result.error
+                        else SecurityVerdict.NOT_APPLICABLE
+                    ),
+                    summary=result.error or "Evaluation not configured.",
+                    turn_ids=turn_ids,
+                    assessment_status=AssessmentStatus.SKIPPED,
+                    assessment_failure="evaluation_not_configured",
+                )
+                case = attach_verification_evidence(case, verification, turn_ids)
+                self._write_case_result(artifacts, run_id, case, stage=phase)
+                self._emit(
+                    "case.completed",
+                    run_id,
+                    phase=phase,
+                    case_id=case_id,
+                    detail=f"{'failed' if result.error else 'completed'} · {case.verdict.value}",
+                )
+                if case_obs is not None:
+                    trace_score(
+                        self._trace_port,
+                        "security_verdict",
+                        case.verdict.value,
+                        observation=case_obs,
+                    )
+                    trace_score(
+                        self._trace_port,
+                        "objective_status",
+                        case.objective_status.value,
+                        observation=case_obs,
+                    )
+                    trace_score(
+                        self._trace_port,
+                        "assessment_status",
+                        case.assessment_status.value,
+                        observation=case_obs,
+                    )
+                    if case.outcome is not None:
+                        trace_score(
+                            self._trace_port,
+                            "execution_outcome",
+                            case.outcome.value,
+                            observation=case_obs,
+                        )
+                record = CaseRecord(
+                    scenario=scenario,
+                    rendered_title=title,
+                    rendered_objective=objective,
+                    rendered_steps=steps,
+                    rendered_success=success,
+                    case=case,
+                    transcript=result.transcript,
+                    origin="scientist" if phase == "scientist" else "base",
+                    origin_run_id=run_id if phase == "scientist" else None,
+                    origin_artifact_id=(
+                        _scientist_artifact_id(case_id) if phase == "scientist" else None
+                    ),
+                )
+                return record, result.error
+
+            pipeline = get_judge_pipeline(task.manifest.spec.judge.pipeline)
+            judge_request = JudgeRequest(
                 scenario=scenario,
-                rendered_title=scenario.metadata.title,
-                rendered_objective=scenario.spec.objective,
-                rendered_steps=list(scenario.spec.steps),
-                rendered_success=scenario.spec.success_criteria or "",
-                case=case,
-                transcript=[],
-                origin="scientist" if phase == "scientist" else "base",
-                origin_run_id=run_id if phase == "scientist" else None,
-                origin_artifact_id=(
-                    _scientist_artifact_id(case_id) if phase == "scientist" else None
-                ),
+                title=title,
+                objective=objective,
+                steps=steps,
+                success_criteria=success,
+                expected_control=expected_control,
+                transcript=result.transcript,
+                turn_ids=turn_ids,
+                execution_error=result.error,
+                verifications=verifications,
+                evaluation_plan=task.evaluation,
+                assessment_reference=task.assessment_reference,
+                phase=phase,
             )
-            return record, str(case.summary)
+            judge_runtime = build_judge_runtime(
+                judge_model=judge_model,
+                content_evidence_provider=self._content_evidence_provider,
+                sandbox=self._sandbox,
+                artifacts=artifacts,
+                activity_sink=lambda name, payload: self._emit(
+                    name,
+                    run_id,
+                    phase=payload.get("phase"),
+                    case_id=payload.get("caseId"),
+                    detail=payload.get("detail"),
+                    fields=payload.get("fields"),
+                    metadata_extra=payload.get("metadata"),
+                    evidence_refs=payload.get("evidenceRefs", ()),
+                    operation_id=(
+                        payload.get("operationId")
+                        if isinstance(payload.get("operationId"), str)
+                        else None
+                    ),
+                    sandbox_event=(
+                        SandboxOperationEvent.model_validate(payload["sandboxEvent"])
+                        if isinstance(payload.get("sandboxEvent"), dict)
+                        else payload.get("sandboxEvent")
+                        if isinstance(payload.get("sandboxEvent"), SandboxOperationEvent)
+                        else None
+                    ),
+                ),
+                run_id=run_id,
+                case_id=case_id,
+            )
+            with trace_span(
+                self._trace_port, "assessment", metadata={"caseId": case_id, "runId": run_id}
+            ):
+                judge_result = await pipeline.run(judge_request, judge_runtime)
 
-        prompt = self._methodology_prefix(task)
-        prompt += self._known_facts_block(task, values)
-        prompt += (
-            f"\nExecute this scenario to a concrete outcome.\nTitle: {title}\n"
-            f"Objective: {objective}\nSteps:\n"
-            + "\n".join(f"{index}. {step}" for index, step in enumerate(steps, 1))
-            + f"\nSuccess criteria: {success}\n"
-            + _CASE_DECISION_PROMPT
-        )
-        result = await self._converse(
-            prompt,
-            target,
-            model,
-            config,
-            max_turns=config.max_turns,
-            conversation=conversation,
-            require_candidates=False,
-            run_id=run_id,
-            artifacts=artifacts,
-            phase=phase,
-            case_id=case_id,
-            runtime_vars={match.group(0) for match in _RUNTIME_VAR.finditer(" ".join(steps))},
-        )
-        turn_ids = self._turn_ids(result.transcript)
-        verification = await self._verify_collector(
-            scenario, result.transcript, run_id, artifacts, phase
-        )
-        verifications = verification.items
-
-        if task.evaluation is None:
             case = self._case_result(
                 scenario,
                 outcome=ExecutionOutcome.FAILED if result.error else ExecutionOutcome.COMPLETED,
-                objective_status=(
-                    ObjectiveStatus.UNKNOWN
-                    if not result.error
-                    else (ObjectiveStatus.PARTIAL if turn_ids else ObjectiveStatus.NOT_ATTEMPTED)
-                ),
-                verdict=(
-                    SecurityVerdict.INCONCLUSIVE if result.error else SecurityVerdict.NOT_APPLICABLE
-                ),
-                summary=result.error or "Evaluation not configured.",
-                turn_ids=turn_ids,
-                assessment_status=AssessmentStatus.SKIPPED,
-                assessment_failure="evaluation_not_configured",
+                objective_status=judge_result.objective_status,
+                verdict=judge_result.verdict,
+                summary=judge_result.summary,
+                turn_ids=judge_result.evidence_turn_ids,
+                assessment_status=judge_result.assessment_status,
+                assessment_failure=judge_result.assessment_failure,
+                reason_codes=judge_result.reason_codes,
+                missing_evidence=judge_result.missing_evidence,
+                content_overlap=judge_result.content_overlap,
             )
             case = attach_verification_evidence(case, verification, turn_ids)
             self._write_case_result(artifacts, run_id, case, stage=phase)
+            verdict_val = judge_result.verdict.value
+            status_text = "failed" if result.error else "completed"
             self._emit(
                 "case.completed",
                 run_id,
                 phase=phase,
                 case_id=case_id,
-                detail=f"{'failed' if result.error else 'completed'} · {case.verdict.value}",
+                detail=f"{status_text} · {verdict_val}",
             )
+
+            if case_obs is not None:
+                trace_score(
+                    self._trace_port, "security_verdict", case.verdict.value, observation=case_obs
+                )
+                trace_score(
+                    self._trace_port,
+                    "objective_status",
+                    case.objective_status.value,
+                    observation=case_obs,
+                )
+                trace_score(
+                    self._trace_port,
+                    "assessment_status",
+                    case.assessment_status.value,
+                    observation=case_obs,
+                )
+                if case.outcome is not None:
+                    trace_score(
+                        self._trace_port,
+                        "execution_outcome",
+                        case.outcome.value,
+                        observation=case_obs,
+                    )
             record = CaseRecord(
                 scenario=scenario,
                 rendered_title=title,
@@ -1373,90 +1634,6 @@ class ExperimentRunner:
                 ),
             )
             return record, result.error
-
-        pipeline = get_judge_pipeline(task.manifest.spec.judge.pipeline)
-        judge_request = JudgeRequest(
-            scenario=scenario,
-            title=title,
-            objective=objective,
-            steps=steps,
-            success_criteria=success,
-            expected_control=expected_control,
-            transcript=result.transcript,
-            turn_ids=turn_ids,
-            execution_error=result.error,
-            verifications=verifications,
-            evaluation_plan=task.evaluation,
-            assessment_reference=task.assessment_reference,
-            phase=phase,
-        )
-        judge_runtime = build_judge_runtime(
-            judge_model=judge_model,
-            content_evidence_provider=self._content_evidence_provider,
-            sandbox=self._sandbox,
-            artifacts=artifacts,
-            activity_sink=lambda name, payload: self._emit(
-                name,
-                run_id,
-                phase=payload.get("phase"),
-                case_id=payload.get("caseId"),
-                detail=payload.get("detail"),
-                fields=payload.get("fields"),
-                metadata_extra=payload.get("metadata"),
-                evidence_refs=payload.get("evidenceRefs", ()),
-                operation_id=(
-                    payload.get("operationId")
-                    if isinstance(payload.get("operationId"), str)
-                    else None
-                ),
-                sandbox_event=(
-                    SandboxOperationEvent.model_validate(payload["sandboxEvent"])
-                    if isinstance(payload.get("sandboxEvent"), dict)
-                    else payload.get("sandboxEvent")
-                    if isinstance(payload.get("sandboxEvent"), SandboxOperationEvent)
-                    else None
-                ),
-            ),
-            run_id=run_id,
-            case_id=case_id,
-        )
-        judge_result = await pipeline.run(judge_request, judge_runtime)
-
-        case = self._case_result(
-            scenario,
-            outcome=ExecutionOutcome.FAILED if result.error else ExecutionOutcome.COMPLETED,
-            objective_status=judge_result.objective_status,
-            verdict=judge_result.verdict,
-            summary=judge_result.summary,
-            turn_ids=judge_result.evidence_turn_ids,
-            assessment_status=judge_result.assessment_status,
-            assessment_failure=judge_result.assessment_failure,
-            reason_codes=judge_result.reason_codes,
-            missing_evidence=judge_result.missing_evidence,
-            content_overlap=judge_result.content_overlap,
-        )
-        case = attach_verification_evidence(case, verification, turn_ids)
-        self._write_case_result(artifacts, run_id, case, stage=phase)
-        self._emit(
-            "case.completed",
-            run_id,
-            phase=phase,
-            case_id=case_id,
-            detail=f"{'failed' if result.error else 'completed'} · {judge_result.verdict.value}",
-        )
-        record = CaseRecord(
-            scenario=scenario,
-            rendered_title=title,
-            rendered_objective=objective,
-            rendered_steps=steps,
-            rendered_success=success,
-            case=case,
-            transcript=result.transcript,
-            origin="scientist" if phase == "scientist" else "base",
-            origin_run_id=run_id if phase == "scientist" else None,
-            origin_artifact_id=(_scientist_artifact_id(case_id) if phase == "scientist" else None),
-        )
-        return record, result.error
 
     async def _converse(
         self,

@@ -10,6 +10,7 @@ from gamr_adapters.artifacts.evidence import FilesystemActivitySink
 from gamr_adapters.artifacts.filesystem import FilesystemArtifactStore
 from gamr_adapters.config import Settings
 from gamr_adapters.tasks.filesystem import load_task, resolve_task_directory
+from gamr_adapters.tracing import create_trace_port
 from gamr_core import (
     ExperimentConfig,
     RunRecord,
@@ -70,17 +71,36 @@ def run_experiment_command(
     selected_judge_model = (
         judge_model or getattr(settings, "judge_model_name", "") or selected_model
     )
-
+    trace_port = getattr(settings, "trace_port", None) or getattr(
+        main_cli, "create_trace_port", create_trace_port
+    )(settings)
     build_fn = getattr(main_cli, "build_experiment_execution", build_experiment_execution)
-    (
-        artifact_store,
-        target,
-        collector,
-        sandbox,
-        model_gateway,
-        scientist_model_gateway,
-        judge_model_gateway,
-    ) = build_fn(settings, selected_model, selected_scientist_model, selected_judge_model)
+    try:
+        (
+            artifact_store,
+            target,
+            collector,
+            sandbox,
+            model_gateway,
+            scientist_model_gateway,
+            judge_model_gateway,
+        ) = build_fn(
+            settings,
+            selected_model,
+            selected_scientist_model,
+            selected_judge_model,
+            trace_port=trace_port,
+        )
+    except TypeError:
+        (
+            artifact_store,
+            target,
+            collector,
+            sandbox,
+            model_gateway,
+            scientist_model_gateway,
+            judge_model_gateway,
+        ) = build_fn(settings, selected_model, selected_scientist_model, selected_judge_model)
 
     configuration = ExperimentConfig(
         actionMode=action_mode,
@@ -125,13 +145,14 @@ def run_experiment_command(
                 content_evidence_provider=collector,
                 sandbox=sandbox,
                 scientist_output_tokens=settings.scientist_output_tokens,
+                trace_port=trace_port,
             )
         finally:
             await target.aclose()
             if collector is not None:
                 await collector.aclose()
 
-    execute_cli_run(console, run_document, artifact_store, run_live)
+    execute_cli_run(console, run_document, artifact_store, run_live, trace_port=trace_port)
 
 
 def resume_scientist_command(
@@ -186,17 +207,38 @@ def resume_scientist_command(
     selected_judge_model = (
         judge_model or getattr(settings, "judge_model_name", "") or selected_model
     )
-    (
-        artifact_store,
-        target,
-        collector,
-        sandbox,
-        model_gateway,
-        scientist_model_gateway,
-        judge_model_gateway,
-    ) = build_experiment_execution(
-        settings, selected_model, selected_scientist_model, selected_judge_model
-    )
+    trace_port = getattr(settings, "trace_port", None) or getattr(
+        main_cli, "create_trace_port", create_trace_port
+    )(settings)
+    try:
+        (
+            artifact_store,
+            target,
+            collector,
+            sandbox,
+            model_gateway,
+            scientist_model_gateway,
+            judge_model_gateway,
+        ) = build_experiment_execution(
+            settings,
+            selected_model,
+            selected_scientist_model,
+            selected_judge_model,
+            trace_port=trace_port,
+        )
+    except TypeError:
+        (
+            artifact_store,
+            target,
+            collector,
+            sandbox,
+            model_gateway,
+            scientist_model_gateway,
+            judge_model_gateway,
+        ) = build_experiment_execution(
+            settings, selected_model, selected_scientist_model, selected_judge_model
+        )
+
     configuration = configuration.model_copy(
         update={
             "model": selected_model,
@@ -236,10 +278,11 @@ def resume_scientist_command(
                 content_evidence_provider=collector,
                 sandbox=sandbox,
                 scientist_output_tokens=settings.scientist_output_tokens,
+                trace_port=trace_port,
             )
         finally:
             await target.aclose()
             if collector is not None:
                 await collector.aclose()
 
-    execute_cli_run(console, run_document, artifact_store, run_live)
+    execute_cli_run(console, run_document, artifact_store, run_live, trace_port=trace_port)

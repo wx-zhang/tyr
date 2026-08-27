@@ -39,7 +39,7 @@ def test_formats_chat_request_as_readable_sections_and_parses_message_json() -> 
     text = _render_text(rendered)
     assert "case-a · LLM request 2 · chat" in text
     assert "1 · system" in text and "Choose a route." in text
-    assert '2 · user' in text and '"task": "inspect"' in text
+    assert "2 · user" in text and '"task": "inspect"' in text
     assert "Tools" in text and "execute_python" in text
     assert "Max tokens" in text and "2048" in text
     assert '\\"task\\"' not in text
@@ -80,9 +80,7 @@ class _Sandbox:
         assert source == 'print("hello")'
         return ExecutionResult(0, "hello\n", "", 0.125)
 
-    async def collect_output(
-        self, sandbox_id: SandboxId, output_dir: str
-    ) -> list[SandboxEntry]:
+    async def collect_output(self, sandbox_id: SandboxId, output_dir: str) -> list[SandboxEntry]:
         assert sandbox_id == "sandbox-1"
         assert output_dir == "output/attempt-001"
         return [SandboxEntry("result.txt", b"decoded")]

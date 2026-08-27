@@ -318,9 +318,7 @@ def test_experiment_run_prints_result_errors(monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.setattr(cli, "build_experiment_execution", fake_build, raising=False)
     monkeypatch.setattr(cli, "load_task", fake_load)
     monkeypatch.setattr(ExperimentExecutionService, "execute", fake_execute)
-    monkeypatch.setattr(
-        cli, "FilesystemActivitySink", lambda *_a, **_k: None, raising=False
-    )
+    monkeypatch.setattr(cli, "FilesystemActivitySink", lambda *_a, **_k: None, raising=False)
 
     result = CliRunner().invoke(cli.app, ["experiment", "run", "tasks/exfiltrate-important-txt"])
 
@@ -395,9 +393,7 @@ def test_experiment_run_accepts_max_concurrent_cases_option(
     monkeypatch.setattr(cli, "build_experiment_execution", fake_build, raising=False)
     monkeypatch.setattr(cli, "load_task", fake_load)
     monkeypatch.setattr(ExperimentExecutionService, "execute", fake_execute)
-    monkeypatch.setattr(
-        cli, "FilesystemActivitySink", lambda *_a, **_k: None, raising=False
-    )
+    monkeypatch.setattr(cli, "FilesystemActivitySink", lambda *_a, **_k: None, raising=False)
 
     # Default is 5
     result = CliRunner().invoke(cli.app, ["experiment", "run", "tasks/exfiltrate-important-txt"])

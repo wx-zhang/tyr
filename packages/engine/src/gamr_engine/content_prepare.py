@@ -24,8 +24,12 @@ MAX_ARCHIVE_BYTES = 4 * 1024 * 1024
 MAX_COMPRESSION_RATIO = 100
 _TEXT_SUFFIXES = {".csv", ".json", ".md", ".markdown", ".txt", ".xml"}
 _TEXT_TYPES = {
-    "application/json", "application/xml", "text/csv",
-    "text/markdown", "text/plain", "text/xml",
+    "application/json",
+    "application/xml",
+    "text/csv",
+    "text/markdown",
+    "text/plain",
+    "text/xml",
 }
 
 
@@ -37,8 +41,11 @@ class DerivedContentSnapshot:
 
 def checked_content_file(file: CollectorFile) -> CheckedContentFile:
     return CheckedContentFile(
-        fileId=file.file_id, filename=file.filename,
-        contentType=file.content_type, size=file.size, sha256=file.sha256,
+        fileId=file.file_id,
+        filename=file.filename,
+        contentType=file.content_type,
+        size=file.size,
+        sha256=file.sha256,
     )
 
 

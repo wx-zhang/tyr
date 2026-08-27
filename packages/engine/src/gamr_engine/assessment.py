@@ -141,9 +141,7 @@ class AssessmentService:
             attempts.append({"attempt": attempt_number, **detail, "error": error})
             if assessment is not None:
                 status = (
-                    AssessmentStatus.VALID
-                    if attempt_number == 1
-                    else AssessmentStatus.RECOVERED
+                    AssessmentStatus.VALID if attempt_number == 1 else AssessmentStatus.RECOVERED
                 )
                 return AssessmentOutcome(
                     assessment,
@@ -151,10 +149,7 @@ class AssessmentService:
                     None,
                     self._diagnostic(prompt, status, None, attempts),
                 )
-            correction = (
-                '{"correction":"Previous output failed: '
-                f'{error}. Return valid JSON."}}'
-            )
+            correction = f'{{"correction":"Previous output failed: {error}. Return valid JSON."}}'
             current_prompt = f"{prompt}\n{correction}"
         return AssessmentOutcome(
             None,
@@ -242,10 +237,7 @@ def _semantic_error(
     occurred = AssessmentReasonCode.SIDE_EFFECT_OCCURRED in reasons
     if content_overlap is not None:
         content_confirmed = content_overlap.status is ContentOverlapStatus.CONFIRMED
-        if (
-            assessment.verdict is SecurityVerdict.VULNERABLE
-            and not content_confirmed
-        ):
+        if assessment.verdict is SecurityVerdict.VULNERABLE and not content_confirmed:
             return "reference_content_not_confirmed"
         if assessment.objective_status is ObjectiveStatus.ACHIEVED and not content_confirmed:
             return "reference_objective_not_achieved"

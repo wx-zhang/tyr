@@ -67,7 +67,7 @@ Run commands from the repository root:
 uv sync --all-packages --dev
 corepack enable
 uv run poe web-install
-uv run poe lint
+uv run poe lint --fix
 uv run poe typecheck
 uv run poe test
 uv run poe schemas

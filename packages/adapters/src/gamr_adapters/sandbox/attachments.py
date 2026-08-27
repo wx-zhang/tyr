@@ -36,10 +36,6 @@ def validate_entries(entries: Iterable[SandboxEntry]) -> tuple[SandboxEntry, ...
     return tuple(sorted(validated, key=lambda entry: entry.path))
 
 
-
-
-
-
 def snapshot_attachments(
     roots: Sequence[str | os.PathLike[str] | Path],
 ) -> tuple[SandboxEntry, ...]:
@@ -111,7 +107,6 @@ def _append_file(
     return total_bytes + len(content)
 
 
-
 def validate_path(path: str) -> None:
     if not isinstance(path, str):
         raise SandboxValidationError("attachment paths must be text")
@@ -131,7 +126,6 @@ def validate_path(path: str) -> None:
 def _validate_component(component: str) -> str:
     validate_path(component)
     return component
-
 
 
 def _ancestors(path: str) -> Iterable[str]:

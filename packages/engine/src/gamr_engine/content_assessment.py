@@ -293,6 +293,8 @@ def _diagnostic(
     attempts: list[dict[str, object]],
 ) -> dict[str, object]:
     return {
-        "status": status.value, "failure": failure, "attempts": attempts,
+        "status": status.value,
+        "failure": failure,
+        "attempts": attempts,
         "promptSha256": hashlib.sha256(prompt.encode()).hexdigest(),
     }

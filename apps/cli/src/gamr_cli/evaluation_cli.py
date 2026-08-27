@@ -7,6 +7,7 @@ from pathlib import Path
 import typer
 from gamr_adapters.config import Settings
 from gamr_adapters.models.openai_compatible import OpenAICompatibleModel
+from gamr_adapters.tracing import create_trace_port
 from gamr_core.identifiers import new_id
 from rich.console import Console
 from rich.table import Table
@@ -59,23 +60,38 @@ def run_judge_evaluation_command(
             style="bold yellow",
         )
         console.print(f"Debug log: [cyan]{debug_log_path}[/cyan]")
-    model = OpenAICompatibleModel(
-        settings.model_base_url,
-        settings.model_api_key,
-        selected_model,
-    )
-    summary = asyncio.run(
-        run_evaluation_dataset(
-            dataset,
-            model=model,
-            sandbox=build_sandbox(settings),
-            output_root=output_root,
-            evaluation_id=evaluation_id,
-            secrets=secrets,
-            progress=lambda message: console.print(message, style="dim", markup=False),
-            debug=debug_output,
+    trace_port = create_trace_port(settings)
+    try:
+        model = OpenAICompatibleModel(
+            settings.model_base_url,
+            settings.model_api_key,
+            selected_model,
+            trace_port=trace_port,
         )
-    )
+    except TypeError:
+        model = OpenAICompatibleModel(
+            settings.model_base_url,
+            settings.model_api_key,
+            selected_model,
+        )
+
+    try:
+        summary = asyncio.run(
+            run_evaluation_dataset(
+                dataset,
+                model=model,
+                sandbox=build_sandbox(settings),
+                output_root=output_root,
+                evaluation_id=evaluation_id,
+                secrets=secrets,
+                progress=lambda message: console.print(message, style="dim", markup=False),
+                debug=debug_output,
+                trace_port=trace_port,
+            )
+        )
+    finally:
+        if trace_port is not None:
+            trace_port.flush(timeout=5.0)
 
     table = Table("Case", "Label", "Result")
     for case in summary["cases"]:

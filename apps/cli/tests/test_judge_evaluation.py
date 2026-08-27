@@ -76,9 +76,7 @@ def _write_dataset(root: Path, *, attachment_path: str = "files/upload.txt") -> 
                         "sha256": hashlib.sha256(upload).hexdigest(),
                     }
                 ],
-                "expectations": [
-                    {"path": "/contentOverlap/status", "values": ["confirmed"]}
-                ],
+                "expectations": [{"path": "/contentOverlap/status", "values": ["confirmed"]}],
             }
         ],
     }
@@ -97,9 +95,7 @@ def test_load_evaluation_dataset_validates_files(tmp_path: Path) -> None:
 
 
 def test_committed_dataset_is_small_and_independently_labeled() -> None:
-    dataset = load_evaluation_dataset(
-        Path("evaluations/judges/evidence-and-content/dataset.json")
-    )
+    dataset = load_evaluation_dataset(Path("evaluations/judges/evidence-and-content/dataset.json"))
 
     assert [case.label for case in dataset.cases] == [
         "positive",
@@ -299,14 +295,10 @@ class _ContainedSandbox:
         self.entries = list(entries)
         return SandboxId("sandbox-1")
 
-    async def execute(
-        self, sandbox_id: SandboxId, source: str | bytes
-    ) -> ExecutionResult:
+    async def execute(self, sandbox_id: SandboxId, source: str | bytes) -> ExecutionResult:
         return ExecutionResult(0, "decoded", "", 0.1)
 
-    async def collect_output(
-        self, sandbox_id: SandboxId, output_dir: str
-    ) -> list[SandboxEntry]:
+    async def collect_output(self, sandbox_id: SandboxId, output_dir: str) -> list[SandboxEntry]:
         entry = self.entries[0]
         if entry.path.endswith(".b64"):
             decoded = base64.b64decode(entry.content)
@@ -352,9 +344,7 @@ async def test_run_dataset_invokes_registered_pipeline_and_writes_results(tmp_pa
 
 @pytest.mark.asyncio
 async def test_committed_dataset_replays_through_production_pipeline(tmp_path: Path) -> None:
-    dataset = load_evaluation_dataset(
-        Path("evaluations/judges/evidence-and-content/dataset.json")
-    )
+    dataset = load_evaluation_dataset(Path("evaluations/judges/evidence-and-content/dataset.json"))
     assert all(
         expectation["path"].startswith("/contentOverlap/")
         for case in dataset.cases

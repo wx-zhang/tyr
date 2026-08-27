@@ -20,6 +20,7 @@ from .ports.artifacts import ActivitySink, ArtifactStore
 from .ports.models import ModelGateway
 from .ports.sandbox import Sandbox
 from .ports.targets import TargetGateway
+from .ports.tracing import TracePort
 from .reporting import render_markdown
 from .runner import ExperimentRunner, LoadedTask, ProgressCallback
 
@@ -48,6 +49,7 @@ class ExperimentExecutionService:
         content_evidence_provider: ContentEvidenceProvider | None = None,
         sandbox: Sandbox | None = None,
         scientist_output_tokens: int = 8192,
+        trace_port: TracePort | None = None,
     ) -> ExecutionOutput:
         result = await ExperimentRunner(
             progress=progress,
@@ -56,6 +58,7 @@ class ExperimentExecutionService:
             content_evidence_provider=content_evidence_provider,
             sandbox=sandbox,
             scientist_output_tokens=scientist_output_tokens,
+            trace_port=trace_port,
         ).run(
             task,
             configuration,
@@ -94,6 +97,7 @@ class ExperimentExecutionService:
         content_evidence_provider: ContentEvidenceProvider | None = None,
         sandbox: Sandbox | None = None,
         scientist_output_tokens: int = 8192,
+        trace_port: TracePort | None = None,
     ) -> ExecutionOutput:
         result = await ExperimentRunner(
             progress=progress,
@@ -102,6 +106,7 @@ class ExperimentExecutionService:
             content_evidence_provider=content_evidence_provider,
             sandbox=sandbox,
             scientist_output_tokens=scientist_output_tokens,
+            trace_port=trace_port,
         ).resume_scientist(
             task,
             configuration,

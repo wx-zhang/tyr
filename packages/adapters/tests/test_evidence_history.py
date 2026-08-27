@@ -220,4 +220,3 @@ def test_malformed_decoding_history_normalizes_safely(tmp_path: Path) -> None:
     normalized = BundleNormalizer().normalize_bundle(bundle)
     # Malformed result is handled safely without crashing
     assert normalized is not None
-

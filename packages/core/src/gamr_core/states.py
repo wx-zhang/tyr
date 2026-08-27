@@ -103,7 +103,6 @@ class DecodingFailureCode(StrEnum):
     PREPARATION_FAILURE = "preparation_failure"
 
 
-
 _ALLOWED: dict[RunState, set[RunState]] = {
     RunState.QUEUED: {RunState.PREPARING, RunState.CANCELLED, RunState.INTERRUPTED},
     RunState.PREPARING: {

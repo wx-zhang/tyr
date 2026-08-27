@@ -97,9 +97,13 @@ def test_prepare_unsafe_tar_snapshot_fails() -> None:
 
 
 def test_prepare_png_snapshot() -> None:
-    content = b"\x89PNG\r\n\x1a\n" + b"\x00\x00\x00\rIHDR" + (1).to_bytes(
-        4, "big"
-    ) + (1).to_bytes(4, "big") + b"\x08\x02\x00\x00\x00"
+    content = (
+        b"\x89PNG\r\n\x1a\n"
+        + b"\x00\x00\x00\rIHDR"
+        + (1).to_bytes(4, "big")
+        + (1).to_bytes(4, "big")
+        + b"\x08\x02\x00\x00\x00"
+    )
     file = _file("file-1", "evidence.png", "image/png", content)
     snapshot = _snapshot("upload-001", file.file_id, file.filename, file.content_type, content)
 
@@ -271,4 +275,3 @@ def test_prepare_derived_decompression_ratio_limit_fails_closed() -> None:
     assert batch.incomplete is True
     assert batch.failure == "archive_compression_ratio"
     assert batch.items == []
-

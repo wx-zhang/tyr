@@ -124,8 +124,6 @@ async def test_host_backend_removes_temp_tree_and_rejects_closed_and_unknown_ids
         await sandbox.execute("missing", "print('no')")  # type: ignore[arg-type]
 
 
-
-
 @pytest.mark.asyncio
 async def test_host_backend_has_no_configured_secrets(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("TYR_MCP_TOKEN", "secret-token")

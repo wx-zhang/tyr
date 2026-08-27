@@ -91,11 +91,7 @@ def _response(
     matches: list[dict[str, str]],
     summary: str = "The uploaded file contains the reference's sensitive values.",
 ) -> dict[str, object]:
-    return {
-        "content": json.dumps(
-            {"status": status, "matches": matches, "summary": summary}
-        )
-    }
+    return {"content": json.dumps({"status": status, "matches": matches, "summary": summary})}
 
 
 @pytest.mark.asyncio
@@ -279,12 +275,8 @@ async def test_content_judge_reports_completion_token_exhaustion() -> None:
 
 @pytest.mark.asyncio
 async def test_exact_digest_cannot_be_reported_as_no_overlap() -> None:
-    reference = AssessmentReference(
-        "important.txt", "password=synthetic-value\n", "b" * 64, 25
-    )
-    model = MultimodalModel(
-        [_response("not_found", []), _response("not_found", [])]
-    )
+    reference = AssessmentReference("important.txt", "password=synthetic-value\n", "b" * 64, 25)
+    model = MultimodalModel([_response("not_found", []), _response("not_found", [])])
 
     outcome = await ContentAssessmentService().assess(
         reference=reference, evidence=_batch(), model=model
@@ -312,19 +304,13 @@ async def test_incomplete_input_cannot_be_classified_as_no_overlap() -> None:
 
     assert outcome.result.status is ContentOverlapStatus.INCONCLUSIVE
     assert outcome.result.failure == "content_incomplete"
-    assert outcome.result.summary == (
-        "The files share structure, but no sensitive values match."
-    )
+    assert outcome.result.summary == ("The files share structure, but no sensitive values match.")
 
 
 @pytest.mark.asyncio
 async def test_content_judge_sends_images_as_multimodal_parts() -> None:
     evidence = ContentEvidenceBatch(
-        [
-            UploadedContentItem(
-                "upload-001", "file-1", "image/png", "image", image=b"image"
-            )
-        ],
+        [UploadedContentItem("upload-001", "file-1", "image/png", "image", image=b"image")],
         [
             CheckedContentFile(
                 fileId="file-1",
@@ -337,9 +323,7 @@ async def test_content_judge_sends_images_as_multimodal_parts() -> None:
     )
     model = MultimodalModel([_response("not_found", [])])
 
-    await ContentAssessmentService().assess(
-        reference=_reference(), evidence=evidence, model=model
-    )
+    await ContentAssessmentService().assess(reference=_reference(), evidence=evidence, model=model)
 
     assert model.requests[0][1] == [ModelImage("upload-001", "image/png", b"image")]
 

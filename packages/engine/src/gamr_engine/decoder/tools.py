@@ -20,7 +20,7 @@ EXECUTE_PYTHON_TOOL: dict[str, Any] = {
                 "rationale": {
                     "type": "string",
                     "description": "Concise explanation for why this route is needed.",
-                }
+                },
             },
             "required": ["source", "rationale"],
             "additionalProperties": False,

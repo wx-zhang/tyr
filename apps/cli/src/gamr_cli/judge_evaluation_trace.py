@@ -61,8 +61,7 @@ class TracedModel:
         except Exception as error:
             self._debug("response", call_number, method, {"error": type(error).__name__})
             self.progress(
-                f"[{self.case_id}] LLM call {call_number} failed: "
-                f"{method} ({type(error).__name__})"
+                f"[{self.case_id}] LLM call {call_number} failed: {method} ({type(error).__name__})"
             )
             self.store.append_event(
                 self.evaluation_id,

@@ -50,47 +50,109 @@ def build_volume_create_args(volume: str, public_id: str) -> tuple[str, ...]:
 
 def build_populate_args(volume: str, public_id: str) -> tuple[str, ...]:
     return (
-        "run", "--interactive", "--rm", "--network", "none",
-        "--label", f"{LABEL_KEY}=true", "--label", f"{LABEL_ID_KEY}={public_id}",
-        "--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
-        "--user", "65532:65532", "--volume", f"{volume}:/input:rw",
-        IMAGE_TAG, "/usr/local/bin/python", "/opt/gamr/populate_input.py",
+        "run",
+        "--interactive",
+        "--rm",
+        "--network",
+        "none",
+        "--label",
+        f"{LABEL_KEY}=true",
+        "--label",
+        f"{LABEL_ID_KEY}={public_id}",
+        "--read-only",
+        "--cap-drop",
+        "ALL",
+        "--security-opt",
+        "no-new-privileges",
+        "--user",
+        "65532:65532",
+        "--volume",
+        f"{volume}:/input:rw",
+        IMAGE_TAG,
+        "/usr/local/bin/python",
+        "/opt/gamr/populate_input.py",
     )
 
 
 def build_container_create_args(container: str, volume: str, public_id: str) -> tuple[str, ...]:
     mem = f"{MAX_MEMORY_BYTES // (1024 * 1024)}m"
     mount = (
-        f"/workspace:rw,noexec,nosuid,nodev,size={MAX_WORKSPACE_BYTES},"
-        "uid=65532,gid=65532,mode=700"
+        f"/workspace:rw,noexec,nosuid,nodev,size={MAX_WORKSPACE_BYTES},uid=65532,gid=65532,mode=700"
     )
     return (
-        "create", "--name", container,
-        "--label", f"{LABEL_KEY}=true", "--label", f"{LABEL_ID_KEY}={public_id}",
-        "--network", "none", "--restart", "no", "--read-only",
-        "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
-        "--cpus", "1", "--memory", mem, "--memory-swap", mem,
-        "--pids-limit", str(MAX_PROCESSES), "--volume", f"{volume}:/input:ro",
-        "--tmpfs", mount,
-        "--env", "PYTHONNOUSERSITE=1", "--env", "PYTHONDONTWRITEBYTECODE=1",
-        "--user", "65532:65532", "--workdir", "/workspace",
-        IMAGE_TAG, "/usr/local/bin/python", "-c", "import time; time.sleep(315360000)",
+        "create",
+        "--name",
+        container,
+        "--label",
+        f"{LABEL_KEY}=true",
+        "--label",
+        f"{LABEL_ID_KEY}={public_id}",
+        "--network",
+        "none",
+        "--restart",
+        "no",
+        "--read-only",
+        "--cap-drop",
+        "ALL",
+        "--security-opt",
+        "no-new-privileges",
+        "--cpus",
+        "1",
+        "--memory",
+        mem,
+        "--memory-swap",
+        mem,
+        "--pids-limit",
+        str(MAX_PROCESSES),
+        "--volume",
+        f"{volume}:/input:ro",
+        "--tmpfs",
+        mount,
+        "--env",
+        "PYTHONNOUSERSITE=1",
+        "--env",
+        "PYTHONDONTWRITEBYTECODE=1",
+        "--user",
+        "65532:65532",
+        "--workdir",
+        "/workspace",
+        IMAGE_TAG,
+        "/usr/local/bin/python",
+        "-c",
+        "import time; time.sleep(315360000)",
     )
 
 
 def build_execute_args(container: str) -> tuple[str, ...]:
     return (
-        "exec", "--interactive", "--user", "65532:65532",
-        "--workdir", "/workspace", container,
-        "/usr/local/bin/python", "-I", "-B", "-u", "-",
+        "exec",
+        "--interactive",
+        "--user",
+        "65532:65532",
+        "--workdir",
+        "/workspace",
+        container,
+        "/usr/local/bin/python",
+        "-I",
+        "-B",
+        "-u",
+        "-",
     )
 
 
 def build_collect_output_args(container: str, output_dir: str) -> tuple[str, ...]:
     return (
-        "exec", "--user", "65532:65532",
-        "--workdir", "/workspace", container,
-        "/usr/local/bin/python", "-I", "-B", "-u", "/opt/gamr/collect_output.py",
+        "exec",
+        "--user",
+        "65532:65532",
+        "--workdir",
+        "/workspace",
+        container,
+        "/usr/local/bin/python",
+        "-I",
+        "-B",
+        "-u",
+        "/opt/gamr/collect_output.py",
         output_dir,
     )
 
@@ -150,7 +212,7 @@ class DockerSandbox(Sandbox):
             await self._success(build_container_create_args(container, volume, public_id))
             container_created = True
             await self._success(("start", container))
-        except (SandboxUnavailableError, Exception):
+        except SandboxUnavailableError, Exception:
             await self._remove_resources(container, volume, container_created, volume_created)
             raise
         record = _Record(public_id, volume, container)
@@ -181,7 +243,7 @@ class DockerSandbox(Sandbox):
                 await self._cleanup(record)
                 raise SandboxInfrastructureError("Docker execution failed")
             return result
-        except (asyncio.CancelledError, SandboxInfrastructureError, SandboxUnavailableError):
+        except asyncio.CancelledError, SandboxInfrastructureError, SandboxUnavailableError:
             record.closed = True
             await self._cleanup(record)
             raise
@@ -206,7 +268,7 @@ class DockerSandbox(Sandbox):
                     raise SandboxValidationError(err)
                 raise SandboxInfrastructureError(f"Docker collection failed: {err}")
             return parse_collected_output(result.stdout)
-        except (SandboxValidationError, SandboxBusyError, SandboxClosedError, SandboxUnknownError):
+        except SandboxValidationError, SandboxBusyError, SandboxClosedError, SandboxUnknownError:
             raise
         except Exception as error:
             record.closed = True

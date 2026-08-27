@@ -31,6 +31,15 @@ from .sandbox import (
     validate_source,
 )
 from .targets import ApprovalGateway, TargetGateway
+from .tracing import (
+    TraceObservation,
+    TracePort,
+    current_observation,
+    trace_generation,
+    trace_run,
+    trace_score,
+    trace_span,
+)
 
 __all__ = [
     "ApprovalGateway",
@@ -42,6 +51,13 @@ __all__ = [
     "ModelGateway",
     "RunRepository",
     "TargetGateway",
+    "TraceObservation",
+    "TracePort",
+    "current_observation",
+    "trace_generation",
+    "trace_run",
+    "trace_score",
+    "trace_span",
     "ExecutionResult",
     "Sandbox",
     "SandboxBusyError",

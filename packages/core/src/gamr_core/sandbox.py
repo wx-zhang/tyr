@@ -22,13 +22,10 @@ class SandboxOperationState(StrEnum):
     CANCELLED = "cancelled"
 
 
-SandboxPreviewTextState = Literal[
-    "captured", "empty", "redacted", "suppressed", "unavailable"
-]
+SandboxPreviewTextState = Literal["captured", "empty", "redacted", "suppressed", "unavailable"]
 
-def sanitize_sandbox_text(
-    value: str, secrets: Iterable[str] = (), *, paths: bool = True
-) -> str:
+
+def sanitize_sandbox_text(value: str, secrets: Iterable[str] = (), *, paths: bool = True) -> str:
     return value
 
 
@@ -67,6 +64,7 @@ class SandboxExecutionPreview(BaseModel):
             if stream.value is not None and len(stream.value) > 16_384:
                 raise ValueError("execution preview streams are limited to 16384 characters")
         return self
+
 
 class SandboxOutputFile(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)

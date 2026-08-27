@@ -43,7 +43,7 @@ async def run_bounded_process(
             try:
                 process.stdin.write(source)
                 await process.stdin.drain()
-            except (BrokenPipeError, ConnectionError):
+            except BrokenPipeError, ConnectionError:
                 pass
             finally:
                 process.stdin.close()
@@ -91,9 +91,7 @@ async def run_bounded_process(
         raise SandboxInfrastructureError("sandbox process failed") from error
 
 
-async def _read_stream(
-    stream: asyncio.StreamReader, target: bytearray, capture: _Capture
-) -> None:
+async def _read_stream(stream: asyncio.StreamReader, target: bytearray, capture: _Capture) -> None:
     while True:
         chunk = await stream.read(_CHUNK_SIZE)
         if not chunk:

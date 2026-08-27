@@ -41,6 +41,3 @@ def _safe_name(name: str) -> bool:
 
 if __name__ == "__main__":
     main()
-
-
-

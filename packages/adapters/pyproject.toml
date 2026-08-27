@@ -11,6 +11,7 @@ dependencies = [
   "gamr-core",
   "gamr-engine",
   "httpx>=0.28,<1",
+  "langfuse>=4.0.0",
   "openai>=1.99,<2",
   "pydantic-settings>=2.10,<3",
 ]

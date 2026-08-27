@@ -175,7 +175,6 @@ async def test_docker_lifecycle_uses_fake_cli_and_fresh_processes(
         await sandbox.execute(sandbox_id, "print('closed')")
 
 
-
 @pytest.mark.asyncio
 async def test_docker_partial_start_failure_removes_created_volume(
     monkeypatch: pytest.MonkeyPatch,

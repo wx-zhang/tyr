@@ -184,7 +184,7 @@ def _scientist_scenario_from_artifact(
     try:
         payload = redact_payload(json.loads(path.read_text(encoding="utf-8")), secrets)
         return Scenario.model_validate(payload)
-    except (OSError, json.JSONDecodeError, ValidationError, ValueError):
+    except OSError, json.JSONDecodeError, ValidationError, ValueError:
         return None
 
 
@@ -290,9 +290,7 @@ def _scientist_turns_from_activity(
                     "occurred_at": occurred_at,
                     "history_case_ids": previous.get("history_case_ids", ()),
                     "history_case_origins": previous.get("history_case_origins", ()),
-                    "scenario": _scientist_scenario_from_artifact(
-                        root, activity_case_id, secrets
-                    ),
+                    "scenario": _scientist_scenario_from_artifact(root, activity_case_id, secrets),
                 }
                 continue
     result_errors = _scientist_errors_from_result(root, secrets)
@@ -655,7 +653,7 @@ def _sandbox_turns_from_activity(
             try:
                 record = redact_payload(json.loads(line), secrets)
                 activity = RunActivity.model_validate(record)
-            except (json.JSONDecodeError, TypeError, ValueError, ValidationError):
+            except json.JSONDecodeError, TypeError, ValueError, ValidationError:
                 continue
             event = activity.sandbox_event
             if event is None:

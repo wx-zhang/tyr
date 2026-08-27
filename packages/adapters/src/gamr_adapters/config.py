@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -37,9 +37,7 @@ class Settings(BaseSettings):
     model_name: str = Field(default="", validation_alias="TYR_LOOP_MODEL")
     scientist_model_name: str = Field(default="", validation_alias="TYR_LOOP_SCIENTIST_MODEL")
     judge_model_name: str = Field(default="", validation_alias="TYR_LOOP_JUDGE_MODEL")
-    chat_model_name: str = Field(
-        default="x-ai/grok-4.5", validation_alias="TYR_LOOP_CHAT_MODEL"
-    )
+    chat_model_name: str = Field(default="x-ai/grok-4.5", validation_alias="TYR_LOOP_CHAT_MODEL")
     max_concurrent_runs: int = Field(
         default=3,
         ge=1,
@@ -59,3 +57,38 @@ class Settings(BaseSettings):
         default="docker",
         validation_alias="GAMR_SANDBOX_BACKEND",
     )
+    langfuse_enabled: bool = Field(
+        default=False,
+        validation_alias="GAMR_LANGFUSE_ENABLED",
+    )
+    langfuse_public_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("GAMR_LANGFUSE_PUBLIC_KEY", "LANGFUSE_PUBLIC_KEY"),
+    )
+    langfuse_secret_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("GAMR_LANGFUSE_SECRET_KEY", "LANGFUSE_SECRET_KEY"),
+    )
+    langfuse_host_url: str = Field(
+        default="http://127.0.0.1:3000",
+        validation_alias=AliasChoices(
+            "GAMR_LANGFUSE_HOST_URL", "LANGFUSE_HOST", "LANGFUSE_HOST_URL"
+        ),
+    )
+    langfuse_container_url: str = Field(
+        default="http://langfuse-server:3000",
+        validation_alias="GAMR_LANGFUSE_CONTAINER_URL",
+    )
+    langfuse_environment: str = Field(
+        default="",
+        validation_alias=AliasChoices("GAMR_LANGFUSE_ENVIRONMENT", "LANGFUSE_ENVIRONMENT"),
+    )
+
+    @property
+    def is_langfuse_valid(self) -> bool:
+        return bool(
+            self.langfuse_enabled
+            and self.langfuse_public_key.strip()
+            and self.langfuse_secret_key.strip()
+            and self.langfuse_host_url.strip()
+        )

@@ -183,4 +183,3 @@ async def test_engine_sandbox_contract_enforces_output_limits() -> None:
         await sandbox.collect_output(sandbox_id, "output/oversized-bytes")
 
     await sandbox.close(sandbox_id)
-

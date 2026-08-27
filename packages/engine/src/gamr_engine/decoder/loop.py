@@ -17,6 +17,7 @@ from ..content_prepare import DerivedContentSnapshot
 from ..content_source import VerifiedContentSnapshot
 from ..ports.models import ChatModelGateway
 from ..ports.sandbox import Sandbox, SandboxId
+from ..ports.tracing import trace_span
 from .direct import originals_are_directly_readable
 from .executor import (
     attempt_record,
@@ -86,7 +87,12 @@ class DecoderExecutionLoop:
 
         try:
             for attempt_idx in range(1, self.max_attempts + 1):
-                res = await self._step(attempt_idx)
+                with trace_span(
+                    getattr(self.model, "trace_port", None),
+                    f"decoder attempt:{attempt_idx}",
+                    metadata={"attempt": attempt_idx},
+                ):
+                    res = await self._step(attempt_idx)
                 if res is not None:
                     return res
             return await finalize_after_attempts(self)
@@ -289,11 +295,6 @@ class DecoderExecutionLoop:
             derived_files=derived_files,
         )
 
-    def _activity(
-        self,
-        name: str,
-        detail: str,
-        metadata: dict[str, object] | None = None,
-    ) -> None:
+    def _activity(self, name: str, detail: str, metadata: dict[str, object] | None = None) -> None:
         if self.activity_sink is not None:
             self.activity_sink(name, {"detail": detail[:600], "metadata": metadata or {}})

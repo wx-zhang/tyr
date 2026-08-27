@@ -11,6 +11,7 @@ from gamr_adapters.artifacts.filesystem import FilesystemArtifactStore
 from gamr_adapters.collector import CollectorClient
 from gamr_adapters.config import Settings
 from gamr_adapters.models.openai_compatible import OpenAICompatibleModel
+from gamr_adapters.tracing import create_trace_port
 from gamr_adapters.tyr.client import TyrMcpClient
 from gamr_core import (
     ExecutionOutcome,
@@ -19,6 +20,7 @@ from gamr_core import (
 )
 from gamr_engine import ExecutionOutput
 from gamr_engine.ports.sandbox import Sandbox
+from gamr_engine.ports.tracing import TracePort
 from rich.console import Console
 
 from .composition import build_sandbox, configured_secrets
@@ -69,6 +71,7 @@ def build_experiment_execution(
     selected_model: str,
     selected_scientist_model: str,
     selected_judge_model: str,
+    trace_port: TracePort | None = None,
 ) -> tuple[
     FilesystemArtifactStore,
     TyrMcpClient,
@@ -90,6 +93,8 @@ def build_experiment_execution(
     tyr_cls = getattr(main_cli, "TyrMcpClient", TyrMcpClient)
     model_cls = getattr(main_cli, "OpenAICompatibleModel", OpenAICompatibleModel)
     build_sandbox_fn = getattr(main_cli, "build_sandbox", build_sandbox)
+    if trace_port is None:
+        trace_port = create_trace_port(settings)
 
     artifact_store = store_cls(
         settings.artifact_root,
@@ -102,6 +107,7 @@ def build_experiment_execution(
         settings.model_base_url,
         settings.model_api_key,
         selected_model,
+        trace_port=trace_port,
     )
     scientist_model_gateway = (
         model_gateway
@@ -110,6 +116,7 @@ def build_experiment_execution(
             settings.model_base_url,
             settings.model_api_key,
             selected_scientist_model,
+            trace_port=trace_port,
         )
     )
     judge_model_gateway = (
@@ -119,6 +126,7 @@ def build_experiment_execution(
             settings.model_base_url,
             settings.model_api_key,
             selected_judge_model,
+            trace_port=trace_port,
         )
     )
     return (
@@ -137,6 +145,7 @@ def execute_cli_run(
     run_document: RunRecord,
     artifact_store: FilesystemArtifactStore,
     execute_coro_fn: Callable[[], Coroutine[Any, Any, ExecutionOutput]],
+    trace_port: TracePort | None = None,
 ) -> None:
     run_id = run_document.id
     artifact_store.write_json(
@@ -174,6 +183,9 @@ def execute_cli_run(
             ).model_dump(by_alias=True, mode="json"),
         )
         raise
+    finally:
+        if trace_port is not None:
+            trace_port.flush(timeout=5.0)
     finished_at = datetime.now(UTC)
     terminal_state = (
         RunState.FAILED
