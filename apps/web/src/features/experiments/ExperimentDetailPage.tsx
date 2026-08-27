@@ -104,11 +104,11 @@ export function ExperimentDetailPage() {
                 </dd>
               </div>
               <div className="detail-row">
-                <dt>Test-case history runs</dt>
+                <dt>Test-case history scenarios</dt>
                 <dd className="mono tabular">{historyTestRuns}</dd>
               </div>
               <div className="detail-row">
-                <dt>Scientist history runs</dt>
+                <dt>Scientist history scenarios</dt>
                 <dd className="mono tabular">{historyScientistRuns}</dd>
               </div>
             </dl>

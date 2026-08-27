@@ -205,6 +205,7 @@ class CaseRecord:
     origin: str = "base"
     origin_run_id: str | None = None
     origin_artifact_id: str | None = None
+    source_created_at: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -489,6 +490,7 @@ class ExperimentRunner:
             source_run_id,
             source_result,
             source_result.configuration,
+            source_result.started_at,
             include_base=True,
             include_scientist=True,
         )
@@ -549,34 +551,14 @@ class ExperimentRunner:
                 )
             )
 
-        def latest_sources(candidates: list[_HistorySource], count: int) -> set[str]:
-            return {
-                source.run_id
-                for source in sorted(
-                    candidates,
-                    key=lambda item: (item.created_at, item.run_id),
-                    reverse=True,
-                )[:count]
-            }
-
-        test_run_ids = latest_sources(
-            [
-                source
-                for source in sources
-                if ExperimentRunner._select_scenarios(task, source.configuration)
-            ],
-            config.history_test_runs,
-        )
-        scientist_run_ids = latest_sources(
-            [source for source in sources if source.configuration.scientist_iterations],
-            config.history_scientist_runs,
-        )
-        selected_sources = sorted(
-            [source for source in sources if source.run_id in test_run_ids | scientist_run_ids],
-            key=lambda item: (item.created_at, item.run_id),
-        )
         records: list[CaseRecord] = []
-        for source in selected_sources:
+        for source in sorted(sources, key=lambda item: (item.created_at, item.run_id)):
+            has_base = bool(ExperimentRunner._select_scenarios(task, source.configuration))
+            has_scientist = bool(source.configuration.scientist_iterations)
+            include_base = has_base and config.history_test_runs > 0
+            include_scientist = has_scientist and config.history_scientist_runs > 0
+            if not include_base and not include_scientist:
+                continue
             records.extend(
                 ExperimentRunner._records_from_result(
                     task,
@@ -585,8 +567,9 @@ class ExperimentRunner:
                     source.run_id,
                     source.result,
                     source.configuration,
-                    include_base=source.run_id in test_run_ids,
-                    include_scientist=source.run_id in scientist_run_ids,
+                    source.created_at,
+                    include_base=include_base,
+                    include_scientist=include_scientist,
                 )
             )
         return records
@@ -599,6 +582,7 @@ class ExperimentRunner:
         source_run_id: str,
         source_result: RunResult,
         source_configuration: ExperimentConfig,
+        source_created_at: datetime,
         *,
         include_base: bool,
         include_scientist: bool,
@@ -665,6 +649,7 @@ class ExperimentRunner:
                     origin_artifact_id=(
                         None if is_base else _scientist_artifact_id(case.scenario_id)
                     ),
+                    source_created_at=source_created_at,
                 )
             )
         return records
@@ -712,7 +697,11 @@ class ExperimentRunner:
             effective_records = self._effective_scientist_history(
                 prior_records + records, artifacts
             )
-            history_records = self._newest_history_records(effective_records)
+            history_records = self._cap_history_records(
+                effective_records,
+                test_limit=config.history_test_runs,
+                scientist_limit=config.history_scientist_runs,
+            )
             history = self._scientist_history(history_records)
             history_case_ids = tuple(record.case.scenario_id for record in history_records)[:100]
             history_origins = tuple(
@@ -1685,15 +1674,50 @@ class ExperimentRunner:
         )
 
     @staticmethod
-    def _newest_history_records(records: list[CaseRecord]) -> list[CaseRecord]:
+    def _history_recency(record: CaseRecord) -> datetime:
+        stamp = record.source_created_at
+        if stamp is None:
+            return datetime.max.replace(tzinfo=UTC)
+        if stamp.tzinfo is None:
+            return stamp.replace(tzinfo=UTC)
+        return stamp
+
+    @staticmethod
+    def _latest_unique_records(records: list[CaseRecord], limit: int) -> list[CaseRecord]:
+        if limit <= 0:
+            return []
         newest: dict[str, CaseRecord] = {}
-        order: list[str] = []
+        recency: dict[str, datetime] = {}
         for record in records:
             scenario_id = record.case.scenario_id
-            if scenario_id not in newest:
-                order.append(scenario_id)
+            stamp = ExperimentRunner._history_recency(record)
+            previous = recency.get(scenario_id)
+            if previous is not None and previous > stamp:
+                continue
             newest[scenario_id] = record
-        return [newest[scenario_id] for scenario_id in order]
+            recency[scenario_id] = stamp
+        ranked = sorted(
+            newest.values(),
+            key=lambda item: (ExperimentRunner._history_recency(item), item.case.scenario_id),
+            reverse=True,
+        )[:limit]
+        ranked.reverse()
+        return ranked
+
+    @staticmethod
+    def _cap_history_records(
+        records: list[CaseRecord],
+        *,
+        test_limit: int,
+        scientist_limit: int,
+    ) -> list[CaseRecord]:
+        return ExperimentRunner._latest_unique_records(
+            [record for record in records if record.origin == "base"],
+            test_limit,
+        ) + ExperimentRunner._latest_unique_records(
+            [record for record in records if record.origin != "base"],
+            scientist_limit,
+        )
 
     @staticmethod
     def _effective_scientist_history(

@@ -231,10 +231,10 @@ it("sends configured scientist history windows for scientist-only task runs", as
   fireEvent.change(screen.getByLabelText("Scientist iterations"), {
     target: { value: "1" },
   });
-  fireEvent.change(screen.getByLabelText("Test-case runs"), {
+  fireEvent.change(screen.getByLabelText("Base scenarios"), {
     target: { value: "7" },
   });
-  fireEvent.change(screen.getByLabelText("Scientist runs"), {
+  fireEvent.change(screen.getByLabelText("Scientist scenarios"), {
     target: { value: "3" },
   });
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));

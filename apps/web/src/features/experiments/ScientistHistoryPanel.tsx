@@ -33,7 +33,8 @@ export function ScientistHistoryPanel({
         aria-label="Scientist history window"
       >
         <p className="field-help">
-          Recent test-case and scientist runs used to seed the scientist.*
+          Latest executed base and scientist scenarios used to seed the
+          scientist.*
         </p>
         <div className="form-grid-two">
           <label className="history-window-control" htmlFor="history-test-runs">
@@ -46,7 +47,7 @@ export function ScientistHistoryPanel({
               max={100}
               step={1}
               value={testRunsInput}
-              aria-label="Test-case runs"
+              aria-label="Base scenarios"
               onChange={(event) => onTestRunsChange(event.target.value)}
               onBlur={onTestRunsBlur}
             />
@@ -64,14 +65,14 @@ export function ScientistHistoryPanel({
               max={100}
               step={1}
               value={scientistRunsInput}
-              aria-label="Scientist runs"
+              aria-label="Scientist scenarios"
               onChange={(event) => onScientistRunsChange(event.target.value)}
               onBlur={onScientistRunsBlur}
             />
           </label>
         </div>
         <p className="field-help history-window-footnote">
-          * Only the most recent completed run of each type is included.
+          * Each scenario is included once, from its most recent completed run.
         </p>
       </div>
     </aside>

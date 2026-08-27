@@ -127,14 +127,14 @@ def run_experiment(
         "--history-test-runs",
         min=0,
         max=100,
-        help="Use this many recent test-case runs as history.",
+        help="Use this many latest unique base scenarios as history.",
     ),
     history_scientist_runs: int = typer.Option(
         5,
         "--history-scientist-runs",
         min=0,
         max=100,
-        help="Use this many recent scientist runs as history.",
+        help="Use this many latest unique scientist scenarios as history.",
     ),
 ) -> None:
     """Run a task through the shared engine and write a JSON bundle."""

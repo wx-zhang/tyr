@@ -61,7 +61,9 @@ To add a predefined judge pipeline:
 
 `uv run pytest packages/engine/tests` (focused: `uv run pytest packages/engine/tests/judges/`).
 Scientist history archive filtering is covered by
-`packages/engine/tests/test_scientist_history_archive.py`.
+`packages/engine/tests/test_scientist_history_archive.py`. History windows keep
+the latest run of each unique scenario, capped by `historyTestRuns` and
+`historyScientistRuns`.
 
 ## Safety
 
