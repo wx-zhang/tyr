@@ -85,7 +85,7 @@ _RETRY_LIMIT = 2
 _MAX_SCIENTIST_INPUT_TOKENS = 50_000
 _MAX_SCIENTIST_INPUT_BYTES = _MAX_SCIENTIST_INPUT_TOKENS * 3
 _MAX_SCIENTIST_HISTORY_RECORD_BYTES = 10_000
-_SCIENTIST_OUTPUT_TOKENS = 4096
+_SCIENTIST_OUTPUT_TOKENS = 8192
 _SCIENTIST_GENERATION_TIMEOUT_SECONDS = 300
 _MAX_SCIENTIST_SCENARIO_CHARS = 8000
 _RUNTIME_VAR = re.compile(r"\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b")
@@ -257,6 +257,7 @@ class ExperimentRunner:
         delivery_verifier: DeliveryVerifier | None = None,
         content_evidence_provider: ContentEvidenceProvider | None = None,
         sandbox: Sandbox | None = None,
+        scientist_output_tokens: int = _SCIENTIST_OUTPUT_TOKENS,
     ) -> None:
         self._progress = progress
         self._activity_sink = activity_sink
@@ -264,6 +265,7 @@ class ExperimentRunner:
         self._collector_verification = CollectorVerificationService(delivery_verifier)
         self._content_evidence_provider = content_evidence_provider
         self._sandbox = sandbox
+        self._scientist_output_tokens = scientist_output_tokens
 
     async def run(
         self,
@@ -806,7 +808,7 @@ class ExperimentRunner:
                         "estimatedInputTokens": _estimated_tokens(generation_prompt),
                         "promptBytes": prompt_bytes,
                         "historyRecordCount": len(history_records),
-                        "maxOutputTokens": _SCIENTIST_OUTPUT_TOKENS,
+                        "maxOutputTokens": self._scientist_output_tokens,
                     },
                 )
                 try:
@@ -838,7 +840,7 @@ class ExperimentRunner:
                             "request": {
                                 "structured": structured,
                                 "schemaName": "scientist_scenario",
-                                "maxOutputTokens": _SCIENTIST_OUTPUT_TOKENS,
+                                "maxOutputTokens": self._scientist_output_tokens,
                                 "timeoutSeconds": _SCIENTIST_GENERATION_TIMEOUT_SECONDS,
                             },
                             "response": {
@@ -893,7 +895,7 @@ class ExperimentRunner:
                             "request": {
                                 "structured": structured,
                                 "schemaName": "scientist_scenario",
-                                "maxOutputTokens": _SCIENTIST_OUTPUT_TOKENS,
+                                "maxOutputTokens": self._scientist_output_tokens,
                                 "timeoutSeconds": _SCIENTIST_GENERATION_TIMEOUT_SECONDS,
                             },
                             "response": {
@@ -979,7 +981,7 @@ class ExperimentRunner:
                             "request": {
                                 "structured": structured,
                                 "schemaName": "scientist_scenario",
-                                "maxOutputTokens": _SCIENTIST_OUTPUT_TOKENS,
+                                "maxOutputTokens": self._scientist_output_tokens,
                                 "timeoutSeconds": _SCIENTIST_GENERATION_TIMEOUT_SECONDS,
                             },
                             "response": {
@@ -1054,7 +1056,7 @@ class ExperimentRunner:
                         "request": {
                             "structured": structured,
                             "schemaName": "scientist_scenario",
-                            "maxOutputTokens": _SCIENTIST_OUTPUT_TOKENS,
+                            "maxOutputTokens": self._scientist_output_tokens,
                             "timeoutSeconds": _SCIENTIST_GENERATION_TIMEOUT_SECONDS,
                         },
                         "response": {
@@ -1129,7 +1131,7 @@ class ExperimentRunner:
                     dict[str, object], ScientistScenarioDraft.model_json_schema(by_alias=True)
                 ),
                 schema_name="scientist_scenario",
-                max_tokens=_SCIENTIST_OUTPUT_TOKENS,
+                max_tokens=self._scientist_output_tokens,
             )
         else:
             request = model.complete(prompt)

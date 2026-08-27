@@ -127,6 +127,7 @@ def build_run_executor(settings: Settings, registry: JsonRegistry) -> RunExecuto
                 delivery_verifier=collector,
                 content_evidence_provider=collector,
                 sandbox=sandbox,
+                scientist_output_tokens=settings.scientist_output_tokens,
             )
         finally:
             await target.aclose()

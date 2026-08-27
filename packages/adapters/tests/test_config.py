@@ -112,3 +112,36 @@ def test_max_concurrent_decoders_rejects_zero_negative_and_non_integer(
     with pytest.raises(ValidationError):
         Settings()
 
+
+def test_scientist_output_tokens_defaults_to_eight_thousand(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("GAMR_SCIENTIST_OUTPUT_TOKENS", raising=False)
+
+    settings = Settings()
+
+    assert settings.scientist_output_tokens == 8192
+
+
+def test_scientist_output_tokens_uses_environment(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("GAMR_SCIENTIST_OUTPUT_TOKENS", "12288")
+
+    settings = Settings()
+
+    assert settings.scientist_output_tokens == 12288
+
+
+@pytest.mark.parametrize("invalid_value", [0, -1, "abc", "1.5", ""])
+def test_scientist_output_tokens_rejects_invalid_values(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, invalid_value: object
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("GAMR_SCIENTIST_OUTPUT_TOKENS", str(invalid_value))
+
+    with pytest.raises(ValidationError):
+        Settings()
+

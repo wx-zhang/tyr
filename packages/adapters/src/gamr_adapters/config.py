@@ -50,6 +50,11 @@ class Settings(BaseSettings):
         ge=1,
         validation_alias="GAMR_MAX_CONCURRENT_DECODERS",
     )
+    scientist_output_tokens: int = Field(
+        default=8192,
+        ge=1,
+        validation_alias="GAMR_SCIENTIST_OUTPUT_TOKENS",
+    )
     sandbox_backend: Literal["docker", "host-unsafe", "disabled"] = Field(
         default="docker",
         validation_alias="GAMR_SANDBOX_BACKEND",

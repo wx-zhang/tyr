@@ -28,7 +28,7 @@ filtered activity and observed relationship projections, including decoder lifec
 projection, never activity payloads. The run review route carries rationale, attempt hashes, bounded
 execution result states, failure stage, and derived-file lineage without rewriting historical bundles, and
 `routes/collector_artifacts.py` serves run-confined remote-backed previews and downloads. `composition.py`
-wires the shared execution service with global decoder capacity gating (`GAMR_MAX_CONCURRENT_DECODERS`). `dependencies.py`
+wires the shared execution service with global decoder capacity gating (`GAMR_MAX_CONCURRENT_DECODERS`) and the scientist completion budget (`GAMR_SCIENTIST_OUTPUT_TOKENS`). `dependencies.py`
 owns run-scoped evidence authorization and browser allowlists, and `registry.py`
 is the JSON-backed filesystem registry. `case_progress.py` reduces case and finding
 activities into stable lifecycle states. `execution.py` owns the bounded in-process queue.

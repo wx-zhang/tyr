@@ -2709,7 +2709,7 @@ async def test_scientist_uses_structured_bounded_generation_and_records_measurem
         for request in model.structured_requests
         if request["schemaName"] == "scientist_scenario"
     )
-    assert scientist_request["maxTokens"] == 4096
+    assert scientist_request["maxTokens"] == 8192
     schema = cast(dict[str, object], scientist_request["jsonSchema"])
     assert "metadata" in cast(dict[str, object], schema["properties"])
     generation_raw = next(
@@ -2723,7 +2723,7 @@ async def test_scientist_uses_structured_bounded_generation_and_records_measurem
     assert generation_raw["request"] == {
         "structured": True,
         "schemaName": "scientist_scenario",
-        "maxOutputTokens": 4096,
+        "maxOutputTokens": 8192,
         "timeoutSeconds": 300,
     }
     response = cast(dict[str, object], generation_raw["response"])

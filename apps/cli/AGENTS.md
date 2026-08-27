@@ -8,7 +8,7 @@ The source entrypoint is `src/gamr_cli/main.py`; `src/gamr_cli/progress.py`
 renders live experiment progress, including Tyr request and reply message bodies
 as terminal Markdown. `src/gamr_cli/experiment_cli.py` handles experiment execution
 and scientist resume commands, while `src/gamr_cli/runner_cli.py` and `src/gamr_cli/composition.py` own execution
-composition, global decoder capacity gating (`GAMR_MAX_CONCURRENT_DECODERS`), and `--max-concurrent-cases` configuration. Ctrl+C during `experiment run` cancels the run and
+composition, global decoder capacity gating (`GAMR_MAX_CONCURRENT_DECODERS`), scientist completion limits (`GAMR_SCIENTIST_OUTPUT_TOKENS`), and `--max-concurrent-cases` configuration. Ctrl+C during `experiment run` cancels the run and
 persists `cancelled` on the run record (exit code 130).
 `src/gamr_cli/evaluation_cli.py` composes opt-in live judge evaluations;
 `src/gamr_cli/judge_evaluation*.py` loads verified local datasets, runs registered pipelines,

@@ -271,6 +271,7 @@ def test_experiment_run_prints_result_errors(monkeypatch: pytest.MonkeyPatch) ->
         scientist_model_name = ""
         model_base_url = "https://example.test"
         artifact_root = ".gamr"
+        scientist_output_tokens = 8192
 
     class FakeStore:
         def __init__(self, *args: object, **kwargs: object) -> None:
@@ -333,6 +334,7 @@ def test_experiment_run_accepts_max_concurrent_cases_option(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     captured_config: list[object] = []
+    captured_output_tokens: list[object] = []
 
     class FakeSettings:
         tyr_mcp_token = "token"
@@ -342,6 +344,7 @@ def test_experiment_run_accepts_max_concurrent_cases_option(
         scientist_model_name = ""
         model_base_url = "https://example.test"
         artifact_root = ".gamr"
+        scientist_output_tokens = 12288
 
     class FakeStore:
         def __init__(self, *args: object, **kwargs: object) -> None:
@@ -374,6 +377,7 @@ def test_experiment_run_accepts_max_concurrent_cases_option(
         _service: object, _dataset: object, config: object, **_kwargs: object
     ) -> SimpleNamespace:
         captured_config.append(config)
+        captured_output_tokens.append(_kwargs["scientist_output_tokens"])
         return SimpleNamespace(
             result=SimpleNamespace(
                 run_id="run-concurrency",
@@ -399,6 +403,7 @@ def test_experiment_run_accepts_max_concurrent_cases_option(
     result = CliRunner().invoke(cli.app, ["experiment", "run", "tasks/exfiltrate-important-txt"])
     assert result.exit_code == 0
     assert getattr(captured_config[-1], "max_concurrent_cases", None) == 5
+    assert captured_output_tokens[-1] == 12288
 
     # Valid values 1 through 5
     for val in (1, 2, 3, 4, 5):

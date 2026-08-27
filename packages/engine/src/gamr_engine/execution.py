@@ -47,6 +47,7 @@ class ExperimentExecutionService:
         delivery_verifier: DeliveryVerifier | None = None,
         content_evidence_provider: ContentEvidenceProvider | None = None,
         sandbox: Sandbox | None = None,
+        scientist_output_tokens: int = 8192,
     ) -> ExecutionOutput:
         result = await ExperimentRunner(
             progress=progress,
@@ -54,6 +55,7 @@ class ExperimentExecutionService:
             delivery_verifier=delivery_verifier,
             content_evidence_provider=content_evidence_provider,
             sandbox=sandbox,
+            scientist_output_tokens=scientist_output_tokens,
         ).run(
             task,
             configuration,
@@ -91,6 +93,7 @@ class ExperimentExecutionService:
         delivery_verifier: DeliveryVerifier | None = None,
         content_evidence_provider: ContentEvidenceProvider | None = None,
         sandbox: Sandbox | None = None,
+        scientist_output_tokens: int = 8192,
     ) -> ExecutionOutput:
         result = await ExperimentRunner(
             progress=progress,
@@ -98,6 +101,7 @@ class ExperimentExecutionService:
             delivery_verifier=delivery_verifier,
             content_evidence_provider=content_evidence_provider,
             sandbox=sandbox,
+            scientist_output_tokens=scientist_output_tokens,
         ).resume_scientist(
             task,
             configuration,
