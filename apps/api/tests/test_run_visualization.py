@@ -30,6 +30,8 @@ def _activity(
     status: str = "active",
     phase: str | None = None,
     case_id: str | None = None,
+    scenario_id: str | None = None,
+    scenario_execution_id: str | None = None,
     summary: str = "Case is active",
     operation_id: str | None = None,
 ) -> RunActivity:
@@ -43,6 +45,8 @@ def _activity(
             "status": status,
             "phase": phase,
             "caseId": case_id,
+            "scenarioId": scenario_id,
+            "scenarioExecutionId": scenario_execution_id,
             "operationId": operation_id,
             "evidenceType": "event",
             "summary": summary,
@@ -74,15 +78,49 @@ def test_visualization_returns_typed_progress_with_counts_and_current_work() -> 
         assert payload["run"]["state"] == "running"
         assert payload["run"]["actionMode"] == "read_only"
         assert payload["run"]["currentPhase"] == "running"
-        assert payload["run"]["currentCaseIds"] == ["case-2"]
+        assert payload["run"]["currentScenarioExecutionIds"] == ["case-2"]
         assert payload["counts"] == {
             "totalKnown": True,
-            "totalCases": 3,
-            "completedCases": 1,
+            "totalScenarioExecutions": 3,
+            "completedScenarioExecutions": 1,
         }
-        assert payload["cases"][0]["state"] == "completed"
-        assert payload["cases"][1]["state"] == "active"
+        assert payload["scenarioExecutions"][0]["state"] == "completed"
+        assert payload["scenarioExecutions"][1]["state"] == "active"
         assert payload["latestSequence"] == 5
+    finally:
+        app.dependency_overrides.clear()
+
+def test_visualization_preserves_distinct_scenario_and_execution_ids() -> None:
+    registry, run_id = _registry_with_run()
+    run = registry.runs[run_id]
+    registry.set_state(run, RunState.PREPARING)
+    registry.set_state(run, RunState.DISCOVERING)
+    registry.set_state(run, RunState.RUNNING)
+    registry.activities[run_id] = [
+        _activity(
+            run_id,
+            1,
+            phase="running",
+            scenario_id="scenario-1",
+            scenario_execution_id="execution-1",
+        )
+    ]
+    registry.scenario_executions[run_id] = [
+        {
+            "scenarioId": "scenario-1",
+            "scenarioExecutionId": "execution-1",
+            "order": 0,
+            "status": "active",
+        }
+    ]
+
+    try:
+        response = _client(registry).get(f"/api/v1/runs/{run_id}/visualization")
+        assert response.status_code == 200
+        execution = response.json()["scenarioExecutions"][0]
+        assert execution["scenarioId"] == "scenario-1"
+        assert execution["scenarioExecutionId"] == "execution-1"
+        assert "caseId" not in execution
     finally:
         app.dependency_overrides.clear()
 
@@ -104,11 +142,11 @@ def test_visualization_states_unknown_totals_and_concurrent_cases_without_false_
         payload = _client(registry).get(f"/api/v1/runs/{run_id}/visualization").json()
         assert payload["counts"] == {
             "totalKnown": False,
-            "totalCases": None,
-            "completedCases": 0,
+            "totalScenarioExecutions": None,
+            "completedScenarioExecutions": 0,
         }
-        assert payload["run"]["currentCaseIds"] == ["case-a", "case-b"]
-        assert {case["state"] for case in payload["cases"]} == {"active"}
+        assert payload["run"]["currentScenarioExecutionIds"] == ["case-a", "case-b"]
+        assert {case["state"] for case in payload["scenarioExecutions"]} == {"active"}
     finally:
         app.dependency_overrides.clear()
 
@@ -183,7 +221,7 @@ def test_visualization_marks_scientist_active_while_run_state_is_running() -> No
     registry, run_id = _registry_with_run()
     run = registry.runs[run_id]
     run.configuration = run.configuration.model_copy(
-        update={"case_ids": [], "scientist_iterations": 1}
+        update={"scenario_ids": [], "research_iterations": 1}
     )
     registry.set_state(run, RunState.PREPARING)
     registry.set_state(run, RunState.DISCOVERING)
@@ -287,12 +325,15 @@ def test_visualization_concurrent_case_states_and_redaction() -> None:
         assert response.status_code == 200
         payload = response.json()
         # Nonterminal active cases include case-1 (assessing), case-3 (active)
-        assert set(payload["run"]["currentCaseIds"]) == {"case-1", "case-3"}
-        case_map = {c["caseId"]: c for c in payload["cases"]}
-        assert case_map["case-1"]["state"] == "assessing"
-        assert case_map["case-2"]["state"] == "completed"
-        assert case_map["case-3"]["state"] == "active"
-        assert case_map["case-4"]["state"] == "pending"
+        assert set(payload["run"]["currentScenarioExecutionIds"]) == {"case-1", "case-3"}
+        execution_map = {
+            item["scenarioExecutionId"]: item
+            for item in payload["scenarioExecutions"]
+        }
+        assert execution_map["case-1"]["state"] == "assessing"
+        assert execution_map["case-2"]["state"] == "completed"
+        assert execution_map["case-3"]["state"] == "active"
+        assert execution_map["case-4"]["state"] == "pending"
 
         # Check browser redaction - protected checkpoint or operation keys shouldn't leak
         raw_text = json.dumps(payload)
@@ -344,15 +385,18 @@ def test_visualization_keeps_precise_case_lifecycle_through_intermediate_activit
 
     try:
         payload = _client(registry).get(f"/api/v1/runs/{run_id}/visualization").json()
-        case_states = {item["caseId"]: item["state"] for item in payload["cases"]}
-        assert case_states == {
+        execution_states = {
+            item["scenarioExecutionId"]: item["state"]
+            for item in payload["scenarioExecutions"]
+        }
+        assert execution_states == {
             "case-1": "queued",
             "case-2": "active",
             "case-3": "assessing",
             "case-4": "completed",
             "case-5": "pending",
         }
-        assert set(payload["run"]["currentCaseIds"]) == {"case-2", "case-3"}
+        assert set(payload["run"]["currentScenarioExecutionIds"]) == {"case-2", "case-3"}
     finally:
         app.dependency_overrides.clear()
 
@@ -496,11 +540,11 @@ def test_historical_visualization_merges_canonical_case_results(tmp_path: Path) 
     try:
         response = TestClient(app).get("/api/v1/runs/run-results/visualization")
         assert response.status_code == 200
-        case = response.json()["cases"][0]
-        assert case["verdict"] == "protected"
-        assert case["objectiveStatus"] == "not_achieved"
-        assert case["outcome"] == "completed"
-        assert case["summary"] == "The observed request was rejected by the target"
+        execution = response.json()["scenarioExecutions"][0]
+        assert execution["verdict"] == "protected"
+        assert execution["objectiveStatus"] == "not_achieved"
+        assert execution["outcome"] == "completed"
+        assert execution["summary"] == "The observed request was rejected by the target"
     finally:
         app.dependency_overrides.clear()
 
@@ -603,10 +647,10 @@ def test_visualization_includes_content_overlap_and_decoding_provenance(tmp_path
     try:
         response = TestClient(app).get("/api/v1/runs/run-vis-dec/visualization")
         assert response.status_code == 200
-        case = response.json()["cases"][0]
-        assert case["caseId"] == "case-dec-failed"
-        assert case["contentOverlap"]["status"] == "inconclusive"
-        decoding = case["contentOverlap"]["decoding"]
+        execution = response.json()["scenarioExecutions"][0]
+        assert execution["scenarioExecutionId"] == "case-dec-failed"
+        assert execution["contentOverlap"]["status"] == "inconclusive"
+        decoding = execution["contentOverlap"]["decoding"]
         assert decoding["status"] == "failed"
         assert decoding["failureCode"] == "timeout"
         assert decoding["action"] == "execute"

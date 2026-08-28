@@ -25,11 +25,11 @@ const tasks = [
       version: "2.0.0",
     },
     spec: {
-      cases: ["cases/a.json", "cases/b.json"],
+      scenarios: ["scenarios/a.json", "scenarios/b.json"],
       defaults: {
         maxTurns: 40,
         actionMode: "approval_required",
-        defaultCaseIds: ["case-a"],
+        defaultScenarioIds: ["case-a"],
       },
     },
   },
@@ -77,7 +77,7 @@ function installFetch(onCreate?: (body: Record<string, unknown>) => void) {
   const fetchMock = vi.fn(
     async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
-      if (url.includes("/api/v1/tasks/") && url.endsWith("/cases")) {
+      if (url.includes("/api/v1/tasks/") && url.endsWith("/scenarios")) {
         return { ok: true, json: async () => cases };
       }
       if (url.includes("/api/v1/tasks")) {
@@ -116,7 +116,7 @@ it("creates the experiment via the API then redirects to details", async () => {
   renderPage();
 
   expect(
-    await screen.findByRole("heading", { name: "Execute experiment" }),
+    await screen.findByRole("heading", { name: "Run Experiment" }),
   ).toBeInTheDocument();
 
   expect(await screen.findByLabelText(/Case Alpha/)).toBeChecked();
@@ -125,7 +125,7 @@ it("creates the experiment via the API then redirects to details", async () => {
   expect(
     screen.queryByRole("option", { name: "Research new task" }),
   ).not.toBeInTheDocument();
-  expect(screen.getByLabelText("Actions Allowed")).toBeChecked();
+  expect(screen.getByLabelText("Approval-gated")).toBeChecked();
 
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
@@ -137,11 +137,11 @@ it("creates the experiment via the API then redirects to details", async () => {
   expect(createBodies[0]).toMatchObject({
     task: "exfiltrate-important-txt",
     actionMode: "approval_required",
-    caseIds: ["case-a"],
-    maxConcurrentCases: 1,
-    scientistIterations: 0,
+    scenarioIds: ["case-a"],
+    maxConcurrentScenarioExecutions: 1,
+    researchIterations: 0,
     historyTestRuns: 10,
-    historyScientistRuns: 5,
+    historyResearchRuns: 5,
   });
 
   expect(
@@ -153,7 +153,7 @@ it("creates the experiment via the API then redirects to details", async () => {
   ).toBe(true);
 });
 
-it("sends scientist iterations when the operator sets them", async () => {
+it("sends Research Iterations when the operator sets them", async () => {
   const createBodies: Record<string, unknown>[] = [];
   installFetch((body) => {
     createBodies.push(body);
@@ -162,19 +162,19 @@ it("sends scientist iterations when the operator sets them", async () => {
   renderPage();
 
   expect(await screen.findByLabelText(/Case Alpha/)).toBeChecked();
-  expect(screen.getByLabelText("Scientist iterations")).toHaveValue(0);
+  expect(screen.getByLabelText("Research Iterations")).toHaveValue(0);
   expect(
-    screen.getByRole("button", { name: "What scientist iterations means" }),
+    screen.getByRole("button", { name: "What Research Iterations means" }),
   ).toBeInTheDocument();
   expect(
     screen.getByRole("tooltip", {
       name: /task-specific scenarios/i,
     }),
   ).toBeInTheDocument();
-  fireEvent.change(screen.getByLabelText("Scientist iterations"), {
+  fireEvent.change(screen.getByLabelText("Research Iterations"), {
     target: { value: "2" },
   });
-  expect(screen.getByLabelText("Scientist iterations")).toHaveValue(2);
+  expect(screen.getByLabelText("Research Iterations")).toHaveValue(2);
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
   await waitFor(() => {
@@ -182,12 +182,12 @@ it("sends scientist iterations when the operator sets them", async () => {
   });
 
   expect(createBodies[0]).toMatchObject({
-    scientistIterations: 2,
-    caseIds: ["case-a"],
+    researchIterations: 2,
+    scenarioIds: ["case-a"],
   });
 });
 
-it("defaults max concurrent cases to 1 and bounds operator input 1 through 5", async () => {
+it("defaults max concurrent Scenario Executions to 1 and bounds operator input 1 through 5", async () => {
   const createBodies: Record<string, unknown>[] = [];
   installFetch((body) => {
     createBodies.push(body);
@@ -196,7 +196,7 @@ it("defaults max concurrent cases to 1 and bounds operator input 1 through 5", a
   renderPage();
 
   expect(await screen.findByLabelText(/Case Alpha/)).toBeChecked();
-  const concurrencyInput = screen.getByLabelText("Max concurrent cases");
+  const concurrencyInput = screen.getByLabelText("Max concurrent Scenario Executions");
   expect(concurrencyInput).toHaveValue(1);
 
   fireEvent.change(concurrencyInput, { target: { value: "3" } });
@@ -209,11 +209,11 @@ it("defaults max concurrent cases to 1 and bounds operator input 1 through 5", a
   });
 
   expect(createBodies[0]).toMatchObject({
-    maxConcurrentCases: 3,
+    maxConcurrentScenarioExecutions: 3,
   });
 });
 
-it("sends configured scientist history windows for scientist-only task runs", async () => {
+it("sends configured research history windows for researcher-only Experiments", async () => {
   const createBodies: Record<string, unknown>[] = [];
   installFetch((body) => {
     createBodies.push(body);
@@ -223,18 +223,18 @@ it("sends configured scientist history windows for scientist-only task runs", as
   expect(await screen.findByLabelText(/Case Alpha/)).toBeChecked();
   fireEvent.click(screen.getByLabelText(/Case Alpha/));
   expect(
-    screen.getByRole("heading", { name: "Scientist history" }),
+    screen.getByRole("heading", { name: "Research Iteration history" }),
   ).toBeInTheDocument();
   expect(
-    screen.getByRole("heading", { name: "Test cases" }),
+    screen.getByRole("heading", { name: "Scenarios" }),
   ).toBeInTheDocument();
-  fireEvent.change(screen.getByLabelText("Scientist iterations"), {
+  fireEvent.change(screen.getByLabelText("Research Iterations", { selector: "#research-iterations" }), {
     target: { value: "1" },
   });
-  fireEvent.change(screen.getByLabelText("Base scenarios"), {
+  fireEvent.change(screen.getByLabelText("Base Scenarios"), {
     target: { value: "7" },
   });
-  fireEvent.change(screen.getByLabelText("Scientist scenarios"), {
+  fireEvent.change(screen.getByLabelText("Research Iterations", { selector: "#history-research-runs" }), {
     target: { value: "3" },
   });
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
@@ -244,10 +244,10 @@ it("sends configured scientist history windows for scientist-only task runs", as
   });
 
   expect(createBodies[0]).toMatchObject({
-    caseIds: [],
-    scientistIterations: 1,
+    scenarioIds: [],
+    researchIterations: 1,
     historyTestRuns: 7,
-    historyScientistRuns: 3,
+    historyResearchRuns: 3,
   });
 });
 
@@ -256,7 +256,7 @@ it("does not redirect when the API fails to create the experiment", async () => 
     "fetch",
     vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
-      if (url.includes("/api/v1/tasks/") && url.endsWith("/cases")) {
+      if (url.includes("/api/v1/tasks/") && url.endsWith("/scenarios")) {
         return { ok: true, json: async () => cases };
       }
       if (url.includes("/api/v1/tasks")) {
@@ -279,7 +279,7 @@ it("does not redirect when the API fails to create the experiment", async () => 
   expect(navigate).not.toHaveBeenCalled();
 });
 
-it("disables continue when no cases and no scientist iterations are selected", async () => {
+it("disables Continue when no Scenarios and no Research Iterations are selected", async () => {
   renderPage();
 
   expect(await screen.findByLabelText(/Case Alpha/)).toBeChecked();
@@ -289,7 +289,7 @@ it("disables continue when no cases and no scientist iterations are selected", a
   expect(navigate).not.toHaveBeenCalled();
 });
 
-it("allows a selected task to run scientist-only iterations without seed cases", async () => {
+it("allows a selected Task to run researcher-only Research Iterations without seed Scenarios", async () => {
   const createBodies: Record<string, unknown>[] = [];
   installFetch((body) => {
     createBodies.push(body);
@@ -300,11 +300,11 @@ it("allows a selected task to run scientist-only iterations without seed cases",
   expect(await screen.findByLabelText(/Case Alpha/)).toBeChecked();
   fireEvent.click(screen.getByLabelText(/Case Alpha/));
   expect(
-    screen.getByRole("heading", { name: "Scientist history" }),
+    screen.getByRole("heading", { name: "Research Iteration history" }),
   ).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
 
-  fireEvent.change(screen.getByLabelText("Scientist iterations"), {
+  fireEvent.change(screen.getByLabelText("Research Iterations", { selector: "#research-iterations" }), {
     target: { value: "3" },
   });
 
@@ -316,34 +316,34 @@ it("allows a selected task to run scientist-only iterations without seed cases",
   });
 
   expect(createBodies[0]).toMatchObject({
-    caseIds: [],
-    scientistIterations: 3,
+    scenarioIds: [],
+    researchIterations: 3,
   });
 });
 
-it("hides and shows the test case explorer", async () => {
+it("hides and shows the Task Scenario explorer", async () => {
   renderPage();
 
   expect(await screen.findByLabelText(/Case Alpha/)).toBeChecked();
   expect(
-    screen.getByRole("heading", { name: "Test cases" }),
+    screen.getByRole("heading", { name: "Scenarios" }),
   ).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole("button", { name: "Hide" }));
 
   expect(
-    screen.queryByRole("heading", { name: "Test cases" }),
+    screen.queryByRole("heading", { name: "Scenarios" }),
   ).not.toBeInTheDocument();
   expect(screen.queryByLabelText(/Case Alpha/)).not.toBeInTheDocument();
   expect(
-    screen.getByRole("button", { name: "Show test cases" }),
+    screen.getByRole("button", { name: "Show Scenarios" }),
   ).toBeInTheDocument();
   expect(screen.getByText("1 selected")).toBeInTheDocument();
 
-  fireEvent.click(screen.getByRole("button", { name: "Show test cases" }));
+  fireEvent.click(screen.getByRole("button", { name: "Show Scenarios" }));
 
   expect(
-    screen.getByRole("heading", { name: "Test cases" }),
+    screen.getByRole("heading", { name: "Scenarios" }),
   ).toBeInTheDocument();
   expect(screen.getByLabelText(/Case Alpha/)).toBeChecked();
 });

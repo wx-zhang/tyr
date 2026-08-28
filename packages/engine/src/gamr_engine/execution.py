@@ -5,14 +5,13 @@ from datetime import UTC, datetime
 
 from gamr_core import (
     ActivityType,
+    CompletionOutcome,
     EvidenceType,
-    ExecutionOutcome,
-    ExperimentConfig,
-    RunActivity,
-    RunResult,
-    RunState,
+    ExperimentActivity,
+    ExperimentPresetConfig,
+    ExperimentResult,
+    ExperimentState,
 )
-from gamr_core.identifiers import new_id
 
 from .collector_verification import DeliveryVerifier
 from .content_evidence import ContentEvidenceProvider
@@ -27,7 +26,7 @@ from .runner import ExperimentRunner, LoadedTask, ProgressCallback
 
 @dataclass(frozen=True)
 class ExecutionOutput:
-    result: RunResult
+    result: ExperimentResult
     result_path: str
 
 
@@ -35,7 +34,7 @@ class ExperimentExecutionService:
     async def execute(
         self,
         task: LoadedTask,
-        configuration: ExperimentConfig,
+        configuration: ExperimentPresetConfig,
         *,
         target: TargetGateway,
         model: ModelGateway,
@@ -79,10 +78,10 @@ class ExperimentExecutionService:
             self._emit_terminal_activity(activity_sink, result)
         return ExecutionOutput(result, result_path)
 
-    async def resume_scientist(
+    async def resume_research(
         self,
         task: LoadedTask,
-        configuration: ExperimentConfig,
+        configuration: ExperimentPresetConfig,
         *,
         source_run_id: str,
         target: TargetGateway,
@@ -107,7 +106,7 @@ class ExperimentExecutionService:
             sandbox=sandbox,
             scientist_output_tokens=scientist_output_tokens,
             trace_port=trace_port,
-        ).resume_scientist(
+        ).resume_research(
             task,
             configuration,
             source_run_id=source_run_id,
@@ -128,23 +127,26 @@ class ExperimentExecutionService:
             self._emit_terminal_activity(activity_sink, result)
         return ExecutionOutput(result, result_path)
 
-    @staticmethod
-    def _terminal_run_state(outcome: ExecutionOutcome) -> RunState:
-        if outcome is ExecutionOutcome.CANCELLED:
-            return RunState.CANCELLED
-        if outcome is ExecutionOutcome.INTERRUPTED:
-            return RunState.INTERRUPTED
-        if outcome in {ExecutionOutcome.FAILED, ExecutionOutcome.ERROR}:
-            return RunState.FAILED
-        return RunState.COMPLETED
+    resume_scientist = resume_research
 
-    def _emit_terminal_activity(self, activity_sink: ActivitySink, result: RunResult) -> None:
-        status = self._terminal_run_state(result.outcome).value
+    @staticmethod
+    def _terminal_experiment_state(outcome: CompletionOutcome) -> ExperimentState:
+        if outcome is CompletionOutcome.CANCELLED:
+            return ExperimentState.CANCELLED
+        if outcome is CompletionOutcome.INTERRUPTED:
+            return ExperimentState.INTERRUPTED
+        if outcome in {CompletionOutcome.FAILED, CompletionOutcome.ERROR}:
+            return ExperimentState.FAILED
+        return ExperimentState.COMPLETED
+
+    def _emit_terminal_activity(
+        self, activity_sink: ActivitySink, result: ExperimentResult
+    ) -> None:
+        status = self._terminal_experiment_state(result.outcome).value
         sequence = activity_sink.latest_sequence(result.run_id) + 1
         occurred_at = result.finished_at or datetime.now(UTC)
         activity_sink.append(
-            RunActivity(
-                id=new_id(),
+            ExperimentActivity(
                 runId=result.run_id,
                 sequence=sequence,
                 occurredAt=occurred_at,
@@ -164,7 +166,7 @@ class FanoutActivitySink:
     def __init__(self, *sinks: ActivitySink) -> None:
         self.sinks = sinks
 
-    def append(self, activity: RunActivity) -> RunActivity:
+    def append(self, activity: ExperimentActivity) -> ExperimentActivity:
         for sink in self.sinks:
             sink.append(activity)
         return activity

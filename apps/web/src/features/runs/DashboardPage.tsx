@@ -24,8 +24,7 @@ function runWhen(run: Run): string | null {
 
 function label(value: string | null | undefined): string {
   if (!value) return "—";
-  if (value === "read_only") return "Read-only";
-  if (value === "approval_required") return "Actions Allowed";
+  if (value === "approval_required") return "Approval-gated";
   return value
     .replaceAll("_", " ")
     .replace(/\b\w/g, (character) => character.toUpperCase());
@@ -99,8 +98,8 @@ async function deleteRuns(ids: string[]): Promise<void> {
   if (failed > 0) {
     throw new Error(
       failed === ids.length
-        ? `Could not delete ${failed === 1 ? "the session" : `${failed} sessions`}`
-        : `Deleted ${ids.length - failed} of ${ids.length} sessions; ${failed} failed`,
+        ? `Could not delete ${failed === 1 ? "the Experiment" : `${failed} Experiments`}`
+        : `Deleted ${ids.length - failed} of ${ids.length} Experiments; ${failed} failed`,
     );
   }
 }
@@ -139,7 +138,7 @@ export function DashboardPage() {
     },
     onError: (error: unknown) => {
       setDeleteError(
-        error instanceof Error ? error.message : "Could not delete session",
+        error instanceof Error ? error.message : "Could not delete Experiment",
       );
     },
   });
@@ -151,7 +150,7 @@ export function DashboardPage() {
       void queryClient.invalidateQueries({ queryKey: ["runs"] });
     },
     onError: (error: unknown) => {
-      setStopError(error instanceof Error ? error.message : "Could not stop session");
+      setStopError(error instanceof Error ? error.message : "Could not stop Experiment");
     },
   });
 
@@ -189,7 +188,7 @@ export function DashboardPage() {
 
   const requestDelete = (run: Run) => {
     const confirmed = window.confirm(
-      `Delete session ${shortRunId(run.id)}? This permanently removes its evidence and cannot be undone.`,
+      `Delete Experiment ${shortRunId(run.id)}? This permanently removes its evidence and cannot be undone.`,
     );
     if (!confirmed) return;
     deleteMutation.mutate([run.id]);
@@ -201,7 +200,7 @@ export function DashboardPage() {
       .map((run) => run.id);
     if (ids.length === 0) return;
     const confirmed = window.confirm(
-      `Delete ${ids.length} selected session${ids.length === 1 ? "" : "s"}? This permanently removes their evidence and cannot be undone.`,
+      `Delete ${ids.length} selected Experiment${ids.length === 1 ? "" : "s"}? This permanently removes their evidence and cannot be undone.`,
     );
     if (!confirmed) return;
     deleteMutation.mutate(ids);
@@ -209,7 +208,7 @@ export function DashboardPage() {
 
   const requestStop = (run: Run) => {
     const confirmed = window.confirm(
-      `Stop session ${shortRunId(run.id)}? The run will stop. Existing evidence remains reviewable.`,
+      `Stop Experiment ${shortRunId(run.id)}? The Experiment will stop. Existing evidence remains reviewable.`,
     );
     if (!confirmed) return;
     stopMutation.mutate(run.id);
@@ -247,17 +246,17 @@ export function DashboardPage() {
           </span>
         </h2>
         <p>
-          Red team for Tyr. Runs attack scenarios against it and saves the
+          Red team for Tyr. Experiments run attack Scenarios against it and save the
           evidence so you can see what held and what failed.
         </p>
       </section>
 
       <PageHeader
-        title="Recent sessions"
-        description="Red-team runs against Tyr, newest first. Open a session to review state and evidence."
+        title="Recent Experiments"
+        description="Red-team Experiments against Tyr, newest first. Open an Experiment to review its state and evidence."
         actions={
           <Link className="button button-primary" to="/experiments/new">
-            Execute
+            Run Experiment
           </Link>
         }
       />
@@ -266,7 +265,7 @@ export function DashboardPage() {
         <div className="callout callout-warning" role="alert">
           {runsQuery.error instanceof Error
             ? runsQuery.error.message
-            : "Could not load sessions"}
+            : "Could not load Experiments"}
           . Check that the API is running, then refresh.
         </div>
       ) : null}
@@ -286,8 +285,8 @@ export function DashboardPage() {
       {runsQuery.isLoading ? (
         <div className="card empty-state" role="status">
           <div>
-            <h3>Loading sessions</h3>
-            <p>Reading the persisted run index…</p>
+            <h3>Loading Experiments</h3>
+            <p>Reading the persisted Experiment index…</p>
           </div>
         </div>
       ) : null}
@@ -295,13 +294,10 @@ export function DashboardPage() {
       {!runsQuery.isLoading && !runsQuery.isError && recentRuns.length === 0 ? (
         <div className="card empty-state">
           <div>
-            <h3>No sessions yet</h3>
-            <p>
-              When an experiment run is queued, it will appear here with its
-              current state and evidence links.
-            </p>
+            <h3>No Experiments yet</h3>
+            <p>When an Experiment is queued, it will appear here with its current state and evidence links.</p>
             <Link className="button button-secondary" to="/experiments/new">
-              Execute the first experiment
+              Run Experiment
             </Link>
           </div>
         </div>
@@ -310,12 +306,12 @@ export function DashboardPage() {
       {recentRuns.length > 0 ? (
         <div className="card table-wrap">
           {deletableRuns.length > 0 || selecting ? (
-            <div className="session-table-toolbar" aria-label="Session selection">
+            <div className="session-table-toolbar" aria-label="Experiment selection">
               {selecting ? (
                 <>
                   <p className="session-table-toolbar-status muted">
                     {selectedCount === 0
-                      ? "Select sessions to delete"
+                      ? "Select Experiments to delete"
                       : `${selectedCount} selected`}
                   </p>
                   <div className="button-row">
@@ -362,14 +358,14 @@ export function DashboardPage() {
                     <input
                       type="checkbox"
                       className="session-checkbox"
-                      aria-label="Select all deletable sessions"
+                      aria-label="Select all deletable Experiments"
                       checked={allDeletableSelected}
                       disabled={deletableRuns.length === 0 || deleteMutation.isPending}
                       onChange={toggleSelectAll}
                     />
                   </th>
                 ) : null}
-                <th scope="col">Session</th>
+                <th scope="col">Experiment</th>
                 <th scope="col">Status</th>
                 <th scope="col">Mode</th>
                 <th scope="col">When</th>
@@ -398,7 +394,7 @@ export function DashboardPage() {
                         <input
                           type="checkbox"
                           className="session-checkbox"
-                          aria-label={`Select session ${shortRunId(run.id)}`}
+                          aria-label={`Select Experiment ${shortRunId(run.id)}`}
                           checked={isSelected}
                           disabled={!isDeletable || deleteMutation.isPending}
                           onChange={() => toggleSelected(run.id)}
@@ -472,7 +468,7 @@ export function DashboardPage() {
                               type="button"
                               className="button button-ghost run-action"
                               disabled={stopMutation.isPending}
-                              title="Stop this session"
+                              title="Stop this Experiment"
                               onClick={() => requestStop(run)}
                             >
                               {isStopping ? "Stopping…" : "Stop"}
@@ -484,8 +480,8 @@ export function DashboardPage() {
                             disabled={!isDeletable || deleteMutation.isPending}
                             title={
                               isDeletable
-                                ? "Delete this session"
-                                : "Stop the run before deleting it"
+                                ? "Delete this Experiment"
+                                : "Stop the Experiment before deleting it"
                             }
                             onClick={() => requestDelete(run)}
                           >

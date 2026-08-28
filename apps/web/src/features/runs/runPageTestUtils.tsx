@@ -16,7 +16,7 @@ export const visualizationFixture = {
     finishedAt: null,
     outcome: null,
     currentPhase: "running",
-    currentCaseIds: ["case-alpha"],
+    currentScenarioExecutionIds: ["case-alpha"],
   },
   phases: [
     { id: "queued", label: "Queued", state: "completed", latestSequence: 1 },
@@ -35,7 +35,7 @@ export const visualizationFixture = {
     { id: "running", label: "Running", state: "active", latestSequence: 5 },
     {
       id: "scientist",
-      label: "Scientist",
+      label: "Adversarial Researcher",
       state: "pending",
       latestSequence: null,
     },
@@ -52,16 +52,18 @@ export const visualizationFixture = {
       latestSequence: null,
     },
   ],
-  cases: [
+  scenarioExecutions: [
     {
-      caseId: "case-alpha",
+      scenarioId: "scenario-alpha",
+      scenarioExecutionId: "case-alpha",
       order: 1,
       state: "active",
       verdict: null,
       latestSequence: 5,
     },
     {
-      caseId: "case-beta",
+      scenarioId: "scenario-beta",
+      scenarioExecutionId: "case-beta",
       order: 2,
       state: "pending",
       verdict: null,
@@ -69,7 +71,7 @@ export const visualizationFixture = {
     },
   ],
   attention: { pendingApprovalCount: 0, blockers: [], unsettledTyrWork: false },
-  counts: { totalKnown: true, totalCases: 2, completedCases: 0 },
+  counts: { totalKnown: true, totalScenarioExecutions: 2, completedScenarioExecutions: 0 },
   latestSequence: 5,
   latestActivity: null,
 };
@@ -181,13 +183,13 @@ export function setupRunMocks() {
           json: async () => ({
             id: "run-1",
             configuration: {
-              caseIds: ["case-alpha", "case-beta"],
-              scientistIterations: 0,
+              scenarioIds: ["scenario-alpha", "scenario-beta"],
+              researchIterations: 0,
             },
           }),
         };
       }
-      if (url.includes("/api/v1/tasks/") && url.endsWith("/cases")) {
+      if (url.includes("/api/v1/tasks/") && url.endsWith("/scenarios")) {
         return {
           ok: true,
           json: async () => [

@@ -113,7 +113,7 @@ def test_create_experiment_and_run_override_max_concurrent_cases() -> None:
         )
         assert response.status_code == 201
         experiment_id = response.json()["id"]
-        assert response.json()["configuration"]["maxConcurrentCases"] == 5
+        assert response.json()["configuration"]["maxConcurrentScenarioExecutions"] == 5
 
         response = client.post(
             "/api/v1/experiments",
@@ -124,7 +124,7 @@ def test_create_experiment_and_run_override_max_concurrent_cases() -> None:
             },
         )
         assert response.status_code == 201
-        assert response.json()["configuration"]["maxConcurrentCases"] == 2
+        assert response.json()["configuration"]["maxConcurrentScenarioExecutions"] == 2
 
         for invalid in (0, 6, -1, "many"):
             response = client.post(
@@ -143,7 +143,7 @@ def test_create_experiment_and_run_override_max_concurrent_cases() -> None:
         )
         assert response.status_code == 202
         run_payload = client.get(f"/api/v1/runs/{response.json()['id']}").json()
-        assert run_payload["configuration"]["maxConcurrentCases"] == 3
+        assert run_payload["configuration"]["maxConcurrentScenarioExecutions"] == 3
 
         response = client.post(
             f"/api/v1/experiments/{experiment_id}/runs",
@@ -172,7 +172,7 @@ def test_create_experiment_accepts_task_id_and_case_ids() -> None:
         body = response.json()
         assert body["task"] == "exfiltrate-important-txt"
         assert body["configuration"]["actionMode"] == "approval_required"
-        assert body["configuration"]["caseIds"] == ["rename-relocate-fresh-agent-upload"]
+        assert body["configuration"]["scenarioIds"] == ["rename-relocate-fresh-agent-upload"]
     finally:
         app.dependency_overrides.clear()
 
@@ -195,7 +195,7 @@ def test_create_experiment_accepts_configured_scientist_history_windows() -> Non
         assert response.status_code == 201
         configuration = response.json()["configuration"]
         assert configuration["historyTestRuns"] == 7
-        assert configuration["historyScientistRuns"] == 3
+        assert configuration["historyResearchRuns"] == 3
     finally:
         app.dependency_overrides.clear()
 

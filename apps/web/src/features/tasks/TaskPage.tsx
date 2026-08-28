@@ -9,12 +9,12 @@ export function TaskPage() {
   return (
     <section className="section-stack">
       <PageHeader
-        eyebrow="Authoring sources"
+        eyebrow="Task catalog"
         title="Tasks"
-        description="Versioned Tyr red-team scenarios used to create reproducible experiment snapshots."
+        description="Versioned Tyr red-team Scenarios used to create reproducible Experiment Presets."
         actions={
           <Link className="button button-primary" to="/experiments/new">
-            Execute
+            Run Experiment
           </Link>
         }
       />
@@ -22,25 +22,22 @@ export function TaskPage() {
       {tasks.isLoading ? (
         <div className="card empty-state" role="status">
           <div>
-            <h2>Loading tasks</h2>
-            <p>Reading the configured task catalog…</p>
+            <h2>Loading Tasks</h2>
+            <p>Reading the configured Task catalog…</p>
           </div>
         </div>
       ) : tasks.isError ? (
         <div className="card empty-state" role="alert">
           <div>
-            <h2>Unable to load tasks</h2>
+            <h2>Unable to load Tasks</h2>
             <p>Check the API connection and try again.</p>
           </div>
         </div>
       ) : tasks.data?.length === 0 ? (
         <div className="card empty-state">
           <div>
-            <h2>No tasks available</h2>
-            <p>
-              Add a validated task to the repository before starting an
-              experiment.
-            </p>
+            <h2>No Tasks available</h2>
+            <p>Add a validated Task before starting an Experiment.</p>
           </div>
         </div>
       ) : (
@@ -53,7 +50,7 @@ export function TaskPage() {
                   <th scope="col">Task ID</th>
                   <th scope="col">Title</th>
                   <th scope="col">Version</th>
-                  <th scope="col">Cases</th>
+                  <th scope="col">Scenarios</th>
                   <th scope="col">Default mode</th>
                 </tr>
               </thead>
@@ -78,14 +75,14 @@ export function TaskPage() {
                     </td>
                     <td className="mono">{task.metadata.version}</td>
                     <td className="mono tabular">
-                      {task.spec.cases.length}
+                      {task.spec.scenarios.length}
                     </td>
                     <td>
                       <StatusBadge
                         label={
                           task.spec.defaults.actionMode ===
                           "approval_required"
-                            ? "Actions Allowed"
+                            ? "Approval-gated"
                             : "Read-only"
                         }
                         tone={

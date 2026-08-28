@@ -6,7 +6,7 @@ import {
   ScientistHistoryUsed,
 } from "./ScientistHistoryUsed";
 
-it("groups base and scientist history cases with origin labels", () => {
+it("groups base and Adversarial Researcher history Scenarios with origin labels", () => {
   render(
     <ScientistHistoryUsed
       cases={[
@@ -16,22 +16,22 @@ it("groups base and scientist history cases with origin labels", () => {
     />,
   );
 
-  const panel = screen.getByLabelText("Tests used from history");
+  const panel = screen.getByLabelText("Scenarios used from history");
   expect(within(panel).getByText("Seed history")).toBeInTheDocument();
-  expect(within(panel).getByText(/2 prior tests/)).toBeInTheDocument();
-  expect(within(panel).getByLabelText("Base scenarios")).toBeInTheDocument();
+  expect(within(panel).getByText(/2 prior Scenarios/)).toBeInTheDocument();
+  expect(within(panel).getByLabelText("Base Scenarios")).toBeInTheDocument();
   expect(
-    within(panel).getByLabelText("Scientist scenarios"),
+    within(panel).getByLabelText("Adversarial Researcher Scenarios"),
   ).toBeInTheDocument();
   expect(within(panel).getByText("base-case")).toBeInTheDocument();
   expect(within(panel).getByText("sci-case")).toBeInTheDocument();
   expect(within(panel).getAllByText("Base").length).toBeGreaterThan(0);
-  expect(within(panel).getAllByText("Scientist").length).toBeGreaterThan(0);
+  expect(within(panel).getAllByText("Adversarial Researcher").length).toBeGreaterThan(0);
 });
 
-it("shows an empty state when no prior tests exist", () => {
+it("shows an empty state when no prior Scenarios exist", () => {
   render(<ScientistHistoryUsed cases={[]} />);
-  expect(screen.getByText("No prior tests were available.")).toBeInTheDocument();
+  expect(screen.getByText("No prior Scenarios were available.")).toBeInTheDocument();
 });
 
 it("builds origin map from configured base ids and scientist turns", () => {

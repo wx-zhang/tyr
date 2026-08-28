@@ -130,13 +130,13 @@ export function useRunEvents(
       invalidationQueued.current = false;
       void queryClient.invalidateQueries({
         predicate: (query) => {
-          const [key, keyRunId] = query.queryKey;
+          const [key, keyExperimentId] = query.queryKey;
           return (
-            keyRunId === runId &&
+            keyExperimentId === runId &&
             [
-              "run",
-              "run-approvals",
-              "run-cases",
+              "experiment",
+              "experiment-visualization",
+              "scenario-executions",
               "run-visualization",
               "run-turns",
               "run-relationships",

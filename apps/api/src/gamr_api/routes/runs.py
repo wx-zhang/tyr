@@ -17,7 +17,7 @@ from gamr_core import (
     RunResult,
     RunState,
 )
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field, model_validator
 
 from ..dependencies import (
     browser_safe_activity,
@@ -30,20 +30,22 @@ from ..errors import browser_safe_value, conflict, not_found
 from ..execution import RunTaskManager
 from ..registry import InMemoryRegistry, RunRecord
 
-router = APIRouter(prefix="/api/v1/runs", tags=["runs"])
+router = APIRouter(prefix="/api/v1/runs", tags=["experiments"])
+
 
 MAX_REPLAY_NOTIFICATIONS = 1000
 HEARTBEAT_SECONDS = 15
 EVENT_POLL_SECONDS = 1
-TERMINAL_RUN_STATES = {
+TERMINAL_EXPERIMENT_STATES = {
     RunState.COMPLETED,
     RunState.FAILED,
     RunState.CANCELLED,
     RunState.INTERRUPTED,
 }
-DELETABLE_RUN_STATES = TERMINAL_RUN_STATES | {RunState.QUEUED}
+DELETABLE_EXPERIMENT_STATES = TERMINAL_EXPERIMENT_STATES | {RunState.QUEUED}
 
-
+TERMINAL_RUN_STATES = TERMINAL_EXPERIMENT_STATES
+DELETABLE_RUN_STATES = DELETABLE_EXPERIMENT_STATES
 class ProgressItem(BaseModel):
     id: str
     label: str
@@ -53,8 +55,13 @@ class ProgressItem(BaseModel):
     model_config = {"populate_by_name": True}
 
 
-class CaseProgress(BaseModel):
-    case_id: str = Field(alias="caseId")
+class ScenarioExecutionProgress(BaseModel):
+    scenario_id: str | None = Field(default=None, alias="scenarioId")
+    scenario_execution_id: str | None = Field(
+        default=None,
+        alias="scenarioExecutionId",
+        validation_alias=AliasChoices("scenarioExecutionId", "caseId"),
+    )
     order: int
     state: str
     verdict: str | None = None
@@ -70,8 +77,28 @@ class CaseProgress(BaseModel):
 
     model_config = {"populate_by_name": True}
 
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_historical_identity(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+        payload = dict(value)
+        legacy_id = payload.pop("caseId", None)
+        if payload.get("scenarioExecutionId") is None and legacy_id is not None:
+            payload["scenarioExecutionId"] = legacy_id
+        if payload.get("scenarioId") is None and legacy_id is not None:
+            payload["scenarioId"] = legacy_id
+        return payload
 
-class RunVisualizationSummary(BaseModel):
+    @property
+    def case_id(self) -> str | None:
+        return self.scenario_execution_id
+
+
+CaseProgress = ScenarioExecutionProgress
+
+
+class ExperimentVisualizationSummary(BaseModel):
     id: str
     state: str
     action_mode: str = Field(alias="actionMode")
@@ -81,10 +108,17 @@ class RunVisualizationSummary(BaseModel):
     finished_at: datetime | None = Field(default=None, alias="finishedAt")
     outcome: str | None = None
     current_phase: str | None = Field(default=None, alias="currentPhase")
-    current_case_ids: list[str] = Field(default_factory=list, alias="currentCaseIds")
+    current_scenario_execution_ids: list[str] = Field(
+        default_factory=list,
+        alias="currentScenarioExecutionIds",
+        validation_alias=AliasChoices("currentScenarioExecutionIds", "currentCaseIds"),
+    )
     execution_mode: str = Field(alias="executionMode")
 
     model_config = {"populate_by_name": True}
+
+
+RunVisualizationSummary = ExperimentVisualizationSummary
 
 
 class RunAttention(BaseModel):
@@ -97,8 +131,15 @@ class RunAttention(BaseModel):
 
 class RunCounts(BaseModel):
     total_known: bool = Field(alias="totalKnown")
-    total_cases: int | None = Field(default=None, alias="totalCases")
-    completed_cases: int = Field(alias="completedCases")
+    total_scenario_executions: int | None = Field(
+        default=None,
+        alias="totalScenarioExecutions",
+        validation_alias=AliasChoices("totalScenarioExecutions", "totalCases"),
+    )
+    completed_scenario_executions: int = Field(
+        alias="completedScenarioExecutions",
+        validation_alias=AliasChoices("completedScenarioExecutions", "completedCases"),
+    )
 
     model_config = {"populate_by_name": True}
 
@@ -110,7 +151,12 @@ class ActivityPreview(BaseModel):
     activity_type: str = Field(alias="activityType")
     status: str
     phase: str | None = None
-    case_id: str | None = Field(default=None, alias="caseId")
+    scenario_id: str | None = Field(default=None, alias="scenarioId")
+    scenario_execution_id: str | None = Field(
+        default=None,
+        alias="scenarioExecutionId",
+        validation_alias=AliasChoices("scenarioExecutionId", "caseId"),
+    )
     summary: str
 
     model_config = {"populate_by_name": True}
@@ -133,9 +179,12 @@ class DiscoveryResult(BaseModel):
 
 
 class RunVisualization(BaseModel):
-    run: RunVisualizationSummary
+    run: ExperimentVisualizationSummary
     phases: list[ProgressItem]
-    cases: list[CaseProgress]
+    scenario_executions: list[ScenarioExecutionProgress] = Field(
+        alias="scenarioExecutions",
+        validation_alias=AliasChoices("scenarioExecutions", "cases"),
+    )
     attention: RunAttention
     counts: RunCounts
     latest_sequence: int = Field(alias="latestSequence")
@@ -144,11 +193,25 @@ class RunVisualization(BaseModel):
 
     model_config = {"populate_by_name": True}
 
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_historical_scenarios(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+        payload = dict(value)
+        legacy_cases = payload.pop("cases", None)
+        if "scenarioExecutions" not in payload and legacy_cases is not None:
+            payload["scenarioExecutions"] = legacy_cases
+        return payload
 
-def _run_payload(run: RunRecord) -> dict[str, object]:
+    @property
+    def cases(self) -> list[ScenarioExecutionProgress]:
+        return self.scenario_executions
+
+def _experiment_payload(run: RunRecord) -> dict[str, object]:
     return {
         "id": run.id,
-        "experimentId": run.experiment_id,
+        "experimentPresetId": run.experiment_preset_id,
         "source": run.source,
         "retryOf": run.retry_of,
         "name": run.name,
@@ -160,6 +223,9 @@ def _run_payload(run: RunRecord) -> dict[str, object]:
         "updatedAt": run.updated_at,
         "finishedAt": run.finished_at,
     }
+
+
+_run_payload = _experiment_payload
 
 
 def _find_run(run_id: str, registry: InMemoryRegistry) -> RunRecord:
@@ -271,7 +337,10 @@ async def events(
                     "activityType": getattr(item, "activity_type", "system"),
                     "status": getattr(item, "status", "unknown"),
                     "phase": getattr(item, "phase", None),
-                    "caseId": getattr(item, "case_id", None),
+                    "scenarioId": getattr(item, "scenario_id", getattr(item, "case_id", None)),
+                    "scenarioExecutionId": getattr(
+                        item, "scenario_execution_id", getattr(item, "case_id", None)
+                    ),
                     "turnId": getattr(item, "turn_id", None),
                     "operationId": getattr(item, "operation_id", None),
                     "approvalId": getattr(item, "approval_id", None),
@@ -289,13 +358,6 @@ async def events(
             return value
         if isinstance(item, RunEvent) or hasattr(item, "event_type"):
             event_type = getattr(item, "event_type", "run.activity")
-            activity_type = (
-                "run_state"
-                if event_type.startswith("run.")
-                else "error"
-                if event_type.endswith((".failed", ".error"))
-                else "system"
-            )
             event_payload = getattr(item, "payload", {})
             safe_payload = browser_safe_value(event_payload, secrets)
             summary = event_type.replace(".", " ")
@@ -306,10 +368,18 @@ async def events(
                 "runId": run_id,
                 "sequence": getattr(item, "sequence", 0),
                 "occurredAt": getattr(item, "occurred_at", None),
-                "activityType": activity_type,
+                "scenarioId": (
+                    safe_payload.get("scenarioId", safe_payload.get("caseId"))
+                    if isinstance(safe_payload, dict)
+                    else None
+                ),
+                "scenarioExecutionId": (
+                    safe_payload.get("scenarioExecutionId", safe_payload.get("caseId"))
+                    if isinstance(safe_payload, dict)
+                    else None
+                ),
                 "status": getattr(item, "state", "unknown"),
                 "phase": safe_payload.get("phase") if isinstance(safe_payload, dict) else None,
-                "caseId": safe_payload.get("caseId") if isinstance(safe_payload, dict) else None,
                 "summary": summary,
                 "evidenceIds": [],
                 "detailAvailability": "available",

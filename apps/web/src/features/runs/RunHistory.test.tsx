@@ -82,8 +82,8 @@ describe("RunHistory", () => {
       screen.getByRole("list", { name: "Discovery updates" }),
     ).toBeInTheDocument();
 
-    const casesToggle = screen.getByRole("button", { name: /Test cases/ });
-    expect(casesToggle).toBeInTheDocument();
+    const executionsToggle = screen.getByRole("button", { name: /Scenario Executions/ });
+    expect(executionsToggle).toBeInTheDocument();
 
     const caseAlphaToggle = screen.getByRole("button", { name: /case-alpha/ });
     expect(caseAlphaToggle).toHaveAttribute("aria-expanded", "false");
@@ -92,7 +92,7 @@ describe("RunHistory", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("renders active cases collapsed with their status and update count visible", () => {
+  it("renders active Scenario Executions collapsed with their status and update count visible", () => {
     const turnAlpha = makeTurn({
       id: "turn-a",
       sequence: 1,
@@ -146,7 +146,7 @@ describe("RunHistory", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("renders Iteration 1 group containing generation update and generated case entries while base-case group is unchanged", () => {
+  it("renders Research Iteration 1 group containing generation update and generated Scenario entries while the base group is unchanged", () => {
     const baseTurn = makeTurn({
       id: "base-1",
       sequence: 1,
@@ -195,15 +195,16 @@ describe("RunHistory", () => {
     );
 
     expect(
-      screen.getByRole("button", { name: /Test cases/ }),
+      screen.getByRole("button", { name: /Scenario Executions/ }),
     ).toBeInTheDocument();
-    const iterToggle = screen.getByRole("button", { name: /^Iteration 1/ });
+    const iterationGroup = screen.getByRole("list", { name: "Research Iteration 1" });
+    const iterToggle = within(iterationGroup).getByRole("button", { name: /^Research Iteration 1/ });
     expect(iterToggle).toBeInTheDocument();
-    const baseCases = screen.getByRole("list", { name: "Test cases" });
+    const baseCases = screen.getByRole("list", { name: "Scenario Executions" });
     expect(within(baseCases).getByText("case-alpha")).toBeInTheDocument();
     expect(within(baseCases).queryByText("case-gen-1")).not.toBeInTheDocument();
     expect(
-      within(screen.getByRole("list", { name: "Iteration 1" })).getByText(
+      within(screen.getByRole("list", { name: "Research Iteration 1" })).getByText(
         "case-gen-1",
       ),
     ).toBeInTheDocument();
@@ -257,12 +258,10 @@ describe("RunHistory", () => {
 
     const caseAlphaToggle = screen.getByRole("button", { name: /case-alpha/ });
     expect(caseAlphaToggle).toHaveAttribute("aria-expanded", "false");
-    expect(within(caseAlphaToggle).getByText("Case 01")).toBeInTheDocument();
-    expect(
-      within(caseAlphaToggle).getByText(
-        "Tyr denied the unsafe request before execution.",
-      ),
-    ).toBeInTheDocument();
+    expect(within(caseAlphaToggle).getByText("Scenario Execution 01")).toBeInTheDocument();
+    expect(caseAlphaToggle).toHaveTextContent(
+      "Tyr denied the unsafe request before execution.",
+    );
     expect(within(caseAlphaToggle).getByText("1 update")).toBeInTheDocument();
     expect(
       screen.queryByRole("list", { name: "Updates for case-alpha" }),
@@ -274,9 +273,9 @@ describe("RunHistory", () => {
       screen.queryByRole("list", { name: "Updates for case-beta" }),
     ).not.toBeInTheDocument();
 
-    const casesToggle = screen.getByRole("button", { name: /Test cases/ });
+    const executionsToggle = screen.getByRole("button", { name: /Scenario Executions/ });
     expect(
-      within(casesToggle).getByText("1 of 2 cases complete"),
+      within(executionsToggle).getByText("1 of 2 Scenario Executions complete"),
     ).toBeInTheDocument();
   });
 });

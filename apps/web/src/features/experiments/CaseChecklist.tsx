@@ -1,57 +1,44 @@
-import type { TaskCase } from "../../api/client";
+import type { Scenario } from "../../api/client";
 
-type CaseChecklistProps = {
-  cases: TaskCase[];
-  selectedCaseIds: string[];
-  onToggle: (caseId: string) => void;
+type ScenarioChecklistProps = {
+  scenarios: Scenario[];
+  selectedScenarioIds: string[];
+  onToggle: (scenarioId: string) => void;
   onSelectDefaults: () => void;
   onSelectAll: () => void;
   onClear: () => void;
 };
 
-export function CaseChecklist({
-  cases,
-  selectedCaseIds,
+export function ScenarioChecklist({
+  scenarios,
+  selectedScenarioIds,
   onToggle,
   onSelectDefaults,
   onSelectAll,
   onClear,
-}: CaseChecklistProps) {
+}: ScenarioChecklistProps) {
   return (
     <>
       <div className="button-row">
-        <button
-          type="button"
-          className="button button-ghost"
-          onClick={onSelectDefaults}
-        >
-          Select defaults
-        </button>
-        <button
-          type="button"
-          className="button button-ghost"
-          onClick={onSelectAll}
-        >
-          Select all
-        </button>
-        <button type="button" className="button button-ghost" onClick={onClear}>
-          Clear
-        </button>
+        <button type="button" className="button button-ghost" onClick={onSelectDefaults}>Select defaults</button>
+        <button type="button" className="button button-ghost" onClick={onSelectAll}>Select all</button>
+        <button type="button" className="button button-ghost" onClick={onClear}>Clear</button>
       </div>
-      <div className="case-checklist" role="group" aria-label="Cases">
-        {cases.map((item) => {
-          const checked = selectedCaseIds.includes(item.id);
+      <div className="case-checklist" role="group" aria-label="Scenarios">
+        {scenarios.map((scenario) => {
+          const scenarioId = scenario.metadata.id;
+          const checked = selectedScenarioIds.includes(scenarioId);
           return (
-            <label key={item.id} className="choice-card case-choice">
+            <label key={scenarioId} className="choice-card case-choice">
               <input
                 type="checkbox"
                 checked={checked}
-                onChange={() => onToggle(item.id)}
-                aria-label={`${item.title} (${item.id})`}
+                onChange={() => onToggle(scenarioId)}
+                aria-label={`${scenario.metadata.title} (${scenarioId})`}
               />
               <span>
-                <span className="choice-title">{item.title}</span>
-                <span className="choice-description mono">{item.id}</span>
+                <span className="choice-title">{scenario.metadata.title}</span>
+                <span className="choice-description mono">{scenarioId}</span>
               </span>
             </label>
           );
@@ -60,3 +47,5 @@ export function CaseChecklist({
     </>
   );
 }
+
+export const CaseChecklist = ScenarioChecklist;

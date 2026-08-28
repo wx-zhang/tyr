@@ -11,7 +11,9 @@ from gamr_adapters.artifacts.filesystem import FilesystemArtifactStore
 from gamr_core import (
     ActivityType,
     EvidenceType,
-    ExperimentConfig,
+    ExperimentPresetConfig,
+    ExperimentSource,
+    ExperimentState,
     RunActivity,
     RunEvent,
     RunSource,
@@ -19,10 +21,10 @@ from gamr_core import (
     transition,
 )
 from gamr_core import (
-    ExperimentRecord as ExperimentDocument,
+    ExperimentPresetRecord as ExperimentPresetDocument,
 )
 from gamr_core import (
-    RunRecord as RunDocument,
+    ExperimentRecord as RunDocument,
 )
 from gamr_core.identifiers import new_id
 from pydantic import ValidationError
@@ -33,44 +35,124 @@ _SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
 
 @dataclass
-class ExperimentRecord:
+class ExperimentPresetRecord:
     id: str
     name: str
     task: str
-    configuration: ExperimentConfig = field(default_factory=ExperimentConfig)
+    configuration: ExperimentPresetConfig = field(default_factory=ExperimentPresetConfig)
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
-@dataclass
-class RunRecord:
+@dataclass(init=False)
+class ExperimentRecord:
     id: str
-    experiment_id: str | None
+    experiment_preset_id: str | None
     task: str
-    state: RunState = RunState.QUEUED
-    configuration: ExperimentConfig = field(default_factory=ExperimentConfig)
-    result_path: str | None = None
-    events: list[RunEvent] = field(default_factory=list)
-    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
-    finished_at: datetime | None = None
-    source: RunSource = RunSource.SERVICE
-    retry_of: str | None = None
-    error_summary: str | None = None
-    name: str | None = None
+    state: ExperimentState
+    configuration: ExperimentPresetConfig
+    result_path: str | None
+    events: list[RunEvent]
+    created_at: datetime
+    updated_at: datetime
+    finished_at: datetime | None
+    source: ExperimentSource
+    retry_of: str | None
+    error_summary: str | None
+    name: str | None
+
+    def __init__(
+        self,
+        id: str,
+        experiment_preset_id: str | None = None,
+        task: str = "",
+        state: ExperimentState = ExperimentState.QUEUED,
+        configuration: ExperimentPresetConfig | None = None,
+        result_path: str | None = None,
+        events: list[RunEvent] | None = None,
+        created_at: datetime | None = None,
+        updated_at: datetime | None = None,
+        finished_at: datetime | None = None,
+        source: ExperimentSource = ExperimentSource.SERVICE,
+        retry_of: str | None = None,
+        error_summary: str | None = None,
+        name: str | None = None,
+        *,
+        experiment_id: str | None = None,
+    ) -> None:
+        self.id = id
+        self.experiment_preset_id = (
+            experiment_preset_id if experiment_preset_id is not None else experiment_id
+        )
+        self.task = task
+        self.state = state
+        self.configuration = configuration or ExperimentPresetConfig()
+        self.result_path = result_path
+        self.events = events if events is not None else []
+        now = datetime.now(UTC)
+        self.created_at = created_at or now
+        self.updated_at = updated_at or now
+        self.finished_at = finished_at
+        self.source = source
+        self.retry_of = retry_of
+        self.error_summary = error_summary
+        self.name = name
+
+    @property
+    def experiment_id(self) -> str | None:
+        return self.experiment_preset_id
 
 
-@dataclass
+ExperimentDocumentRecord = ExperimentPresetRecord
+RunRecord = ExperimentRecord
+ExperimentConfig = ExperimentPresetConfig
+
+@dataclass(init=False)
 class InMemoryRegistry:
-    experiments: dict[str, ExperimentRecord] = field(default_factory=dict)
-    runs: dict[str, RunRecord] = field(default_factory=dict)
-    activities: dict[str, list[RunActivity]] = field(default_factory=dict)
-    case_runs: dict[str, list[dict[str, object]]] = field(default_factory=dict)
+    experiment_presets: dict[str, ExperimentPresetRecord]
+    experiments: dict[str, ExperimentRecord]
+    activities: dict[str, list[RunActivity]]
+    scenario_executions: dict[str, list[dict[str, object]]]
+
+    def __init__(
+        self,
+        experiment_presets: dict[str, ExperimentPresetRecord] | None = None,
+        experiments: dict[str, ExperimentRecord] | None = None,
+        activities: dict[str, list[RunActivity]] | None = None,
+        scenario_executions: dict[str, list[dict[str, object]]] | None = None,
+        *,
+        runs: dict[str, ExperimentRecord] | None = None,
+        case_runs: dict[str, list[dict[str, object]]] | None = None,
+    ) -> None:
+        self.experiment_presets = experiment_presets or {}
+        self.experiments = experiments or runs or {}
+        self.activities = activities or {}
+        self.scenario_executions = scenario_executions or case_runs or {}
+
+    @property
+    def runs(self) -> dict[str, ExperimentRecord]:
+        return self.experiments
+
+    @runs.setter
+    def runs(self, value: dict[str, ExperimentRecord]) -> None:
+        self.experiments = value
+
+    @property
+    def case_runs(self) -> dict[str, list[dict[str, object]]]:
+        return self.scenario_executions
+
+    @case_runs.setter
+    def case_runs(self, value: dict[str, list[dict[str, object]]]) -> None:
+        self.scenario_executions = value
+    @property
+    def experiment_executions(self) -> dict[str, ExperimentRecord]:
+        return self.experiments
+
 
     def create_experiment(
         self, name: str, task: str, configuration: ExperimentConfig | None = None
-    ) -> ExperimentRecord:
-        item = ExperimentRecord(new_id(), name, task, configuration or ExperimentConfig())
-        self.experiments[item.id] = item
+    ) -> ExperimentPresetRecord:
+        item = ExperimentPresetRecord(new_id(), name, task, configuration or ExperimentConfig())
+        self.experiment_presets[item.id] = item
         return item
 
     def create_run(
@@ -166,23 +248,30 @@ class InMemoryRegistry:
             return None
         activities = sorted(self.activities.get(run_id, []), key=lambda item: item.sequence)
         cases: dict[str, dict[str, object]] = {}
-        for order, item in enumerate(self.case_runs.get(run_id, [])):
-            case_id = str(item.get("caseId") or item.get("scenarioId") or "")
-            if case_id:
-                cases[case_id] = {
-                    "caseId": case_id,
+        for order, item in enumerate(self.scenario_executions.get(run_id, [])):
+            scenario_id = str(item.get("scenarioId") or item.get("caseId") or "")
+            scenario_execution_id = str(
+                item.get("scenarioExecutionId") or item.get("caseId") or scenario_id
+            )
+            if scenario_execution_id:
+                cases[scenario_execution_id] = {
+                    "scenarioId": scenario_id,
+                    "scenarioExecutionId": scenario_execution_id,
+                    "caseId": scenario_execution_id,
                     "order": item.get("order", order),
                     "state": normalize_case_state(str(item.get("status", "pending"))),
                     "verdict": item.get("verdict"),
                     "latestSequence": None,
                 }
         for activity in activities:
-            if not activity.case_id:
+            if not activity.scenario_execution_id:
                 continue
             item = cases.setdefault(
-                activity.case_id,
+                activity.scenario_execution_id,
                 {
-                    "caseId": activity.case_id,
+                    "scenarioId": activity.scenario_id or activity.scenario_execution_id,
+                    "scenarioExecutionId": activity.scenario_execution_id,
+                    "caseId": activity.scenario_execution_id,
                     "order": len(cases),
                     "state": "pending",
                     "verdict": None,
@@ -313,6 +402,7 @@ class InMemoryRegistry:
                 "outcome": run.state.value if run.finished_at else None,
                 "currentPhase": current_phase,
                 "currentCaseIds": current_cases,
+                "currentScenarioExecutionIds": current_cases,
                 "executionMode": (
                     "scientist_only"
                     if run.configuration.case_ids == []
@@ -322,6 +412,7 @@ class InMemoryRegistry:
             },
             "phases": phases,
             "cases": sorted(cases.values(), key=lambda item: int(str(item["order"]))),
+            "scenarioExecutions": sorted(cases.values(), key=lambda item: int(str(item["order"]))),
             "attention": {
                 "pendingApprovalCount": pending_approvals,
                 "blockers": blockers,
@@ -331,6 +422,8 @@ class InMemoryRegistry:
                 "totalKnown": bool(self.case_runs.get(run_id)),
                 "totalCases": len(cases) if self.case_runs.get(run_id) else None,
                 "completedCases": completed_cases,
+                "totalScenarioExecutions": len(cases) if self.case_runs.get(run_id) else None,
+                "completedScenarioExecutions": completed_cases,
             },
             "latestSequence": latest_sequence,
             "latestActivity": (
@@ -358,19 +451,19 @@ class JsonRegistry(InMemoryRegistry):
         self.store = FilesystemArtifactStore(self.root, secrets=self.secrets)
         self.refresh()
 
-    def refresh(self) -> None:
+        self.experiment_presets = {}
         self.experiments = {}
-        self.runs = {}
+        self.scenario_executions = {}
         experiments_root = self.root / "experiments"
         if experiments_root.is_dir():
             for path in sorted(experiments_root.glob("*.json")):
                 try:
-                    document = ExperimentDocument.model_validate_json(
+                    document = ExperimentPresetDocument.model_validate_json(
                         path.read_text(encoding="utf-8")
                     )
                 except OSError, ValueError:
                     continue
-                self.experiments[document.id] = ExperimentRecord(
+                self.experiment_presets[document.id] = ExperimentPresetRecord(
                     document.id,
                     document.name,
                     document.task,
@@ -382,15 +475,15 @@ class JsonRegistry(InMemoryRegistry):
             for path in sorted(runs_root.glob("*/run.json")):
                 item = self._load_run(path)
                 if item is not None:
-                    self.runs[item.id] = item
+                    self.experiments[item.id] = item
 
     def create_experiment(
         self, name: str, task: str, configuration: ExperimentConfig | None = None
-    ) -> ExperimentRecord:
+    ) -> ExperimentPresetRecord:
         item = super().create_experiment(name, task, configuration)
         self.store.write_json(
             f"experiments/{item.id}.json",
-            ExperimentDocument(
+            ExperimentPresetDocument(
                 id=item.id,
                 name=item.name,
                 task=item.task,
@@ -549,7 +642,7 @@ class JsonRegistry(InMemoryRegistry):
         result_path = str(path.parent / document.result_path) if document.result_path else None
         return RunRecord(
             id=document.id,
-            experiment_id=document.experiment_id,
+            experiment_preset_id=document.experiment_id,
             name=document.name,
             task=document.task,
             state=document.state,

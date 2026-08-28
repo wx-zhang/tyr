@@ -42,7 +42,7 @@ it("does not render raw HTML from conversation markdown", async () => {
   });
 
   const { container } = renderRunPage();
-  await screen.findByRole("heading", { name: "Run history" });
+  await screen.findByRole("heading", { name: "Experiment history" });
   expect(container.querySelector("script")).toBeNull();
   expect(container.querySelector("img")).toBeNull();
 });

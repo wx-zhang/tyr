@@ -61,7 +61,8 @@ def test_turns_route_returns_grouped_conversation_verbatim(tmp_path: Path) -> No
             "sequence": 1,
             "number": 1,
             "stage": "discovery",
-            "caseId": None,
+            "scenarioId": None,
+            "scenarioExecutionId": None,
             "status": "completed",
             "agentMessage": "**Ask** Tyr to inspect /home/alice/work with top-secret",
             "tyrMessage": "- First result\n- Second result",
@@ -78,14 +79,14 @@ def test_turns_route_returns_grouped_conversation_verbatim(tmp_path: Path) -> No
             "missingEvidence": [],
             "contentOverlap": None,
             "judgePipeline": None,
-            "historyCaseIds": [],
-            "historyCaseOrigins": [],
+            "historyResearchRunScenarioIds": [],
+            "historyResearchRunOrigins": [],
             "sandboxOperation": None,
             "scenario": None,
         }
         assert payload["items"][1]["status"] == "waiting_for_tyr"
-        assert payload["items"][1]["caseId"] == "case-alpha"
-        assert payload["items"][1]["occurredAt"] == "2026-08-08T10:02:00Z"
+        assert payload["items"][1]["scenarioId"] == "case-alpha"
+        assert payload["items"][1]["scenarioExecutionId"] == "case-alpha"
         assert payload["items"][1]["repliedAt"] is None
         assert TestClient(app).get("/api/v1/runs/missing/turns").status_code == 404
     finally:
@@ -185,8 +186,8 @@ def test_turns_route_includes_scientist_generation_events(tmp_path: Path) -> Non
         assert scientist["number"] == 1
         assert "not json" in scientist["agentMessage"]
         assert scientist["tyrMessage"] is None
-        assert scientist["historyCaseIds"] == ["case-alpha"]
-        assert scientist["historyCaseOrigins"] == ["base"]
+        assert scientist["historyResearchRunScenarioIds"] == ["case-alpha"]
+        assert scientist["historyResearchRunOrigins"] == ["base"]
     finally:
         app.dependency_overrides.clear()
 

@@ -5,14 +5,17 @@
 Own the installed `gamr` Typer command and Rich terminal presentation.
 
 The source entrypoint is `src/gamr_cli/main.py`; `src/gamr_cli/progress.py`
-renders live experiment progress, including Tyr request and reply message bodies
-as terminal Markdown. `src/gamr_cli/experiment_cli.py` handles experiment execution
-and scientist resume commands, while `src/gamr_cli/runner_cli.py` and `src/gamr_cli/composition.py` own execution
-composition, global decoder capacity gating (`GAMR_MAX_CONCURRENT_DECODERS`), scientist completion limits (`GAMR_SCIENTIST_OUTPUT_TOKENS`), and `--max-concurrent-cases` configuration. Ctrl+C during `experiment run` cancels the run and
-persists `cancelled` on the run record (exit code 130).
+renders live Experiment progress, including Tyr request and reply message bodies
+as terminal Markdown. `src/gamr_cli/experiment_cli.py` handles Experiment execution
+and Adversarial Researcher resume commands, while `src/gamr_cli/runner_cli.py` and
+`src/gamr_cli/composition.py` own execution composition, global decoder capacity gating
+(`GAMR_MAX_CONCURRENT_DECODERS`), Adversarial Researcher completion limits
+(`GAMR_ADVERSARIAL_RESEARCHER_OUTPUT_TOKENS`), and Scenario Execution concurrency.
+Ctrl+C during `experiment run` cancels the Experiment and persists `cancelled`
+on the Experiment record (exit code 130).
 `src/gamr_cli/evaluation_cli.py` composes opt-in live judge evaluations;
-`src/gamr_cli/judge_evaluation*.py` loads verified local datasets, runs registered pipelines,
-records safe model traces, and applies categorical expectations without contacting Tyr.
+`src/gamr_cli/judge_evaluation*.py` loads verified local Scenario collections, runs registered
+pipelines, records safe model traces, and applies categorical expectations without contacting Tyr.
 
 ## Standards
 

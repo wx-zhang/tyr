@@ -77,6 +77,8 @@ class CollectorVerificationService:
         transcript: list[dict[str, str]],
         run_id: str,
         artifacts: JsonArtifactStore | None,
+        *,
+        scenario_execution_id: str | None = None,
     ) -> CollectorVerificationBatch:
         request_ids = extract_request_ids(transcript)
         if not request_ids:
@@ -102,14 +104,16 @@ class CollectorVerificationService:
             if any(item.status == "unavailable" for item in items)
             else "verified"
         )
-        safe_id = re.sub(r"[^A-Za-z0-9_-]+", "-", case_id)[:128] or "case"
+        execution_id = scenario_execution_id or case_id
+        safe_id = re.sub(r"[^A-Za-z0-9_-]+", "-", execution_id)[:128] or "scenario-execution"
         relative = f"collector-verifications/{safe_id}.json"
         if artifacts is not None:
             artifacts.write_json(
                 f"runs/{run_id}/{relative}",
                 {
                     "schemaVersion": "1.0",
-                    "caseId": case_id,
+                    "scenarioId": case_id,
+                    "scenarioExecutionId": execution_id,
                     "requirement": requirement,
                     "status": status,
                     "verifiedAt": datetime.now(UTC).isoformat().replace("+00:00", "Z"),

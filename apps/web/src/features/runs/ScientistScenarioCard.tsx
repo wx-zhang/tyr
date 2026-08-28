@@ -2,7 +2,7 @@ import { useId, useState } from "react";
 import type { RunTurn } from "../../api/client";
 import { MarkdownMessage } from "./MarkdownMessage";
 
-type ScientistScenarioCardProps = {
+type AdversarialResearcherScenarioCardProps = {
   turn: RunTurn;
 };
 
@@ -10,13 +10,13 @@ function statusCopy(status: string): { label: string; detail: string } {
   if (status === "generating") {
     return {
       label: "Designing",
-      detail: "The scientist is designing a new scenario from seed history.",
+      detail: "The Adversarial Researcher is designing a new Scenario from seed history.",
     };
   }
   if (status === "failed") {
     return {
       label: "Generation failed",
-      detail: "The scientist could not produce a valid scenario.",
+      detail: "The Adversarial Researcher could not produce a valid Scenario.",
     };
   }
   if (status === "ready" || status === "completed") {
@@ -27,7 +27,7 @@ function statusCopy(status: string): { label: string; detail: string } {
   }
   return {
     label: status,
-    detail: "Scientist scenario update.",
+    detail: "Adversarial Researcher Scenario update.",
   };
 }
 
@@ -88,7 +88,7 @@ function ScenarioSpecBlock({
   );
 }
 
-export function ScientistScenarioCard({ turn }: ScientistScenarioCardProps) {
+export function AdversarialResearcherScenarioCard({ turn }: AdversarialResearcherScenarioCardProps) {
   const [expanded, setExpanded] = useState(false);
   const definitionId = useId();
   const copy = statusCopy(turn.status);
@@ -101,14 +101,16 @@ export function ScientistScenarioCard({ turn }: ScientistScenarioCardProps) {
     (turn.status === "ready" || turn.status === "completed") && turn.scenario?.spec
       ? turn.scenario.spec
       : null;
-  const showError = turn.status === "failed" && Boolean(message);
   const showWorkingDetail =
     turn.status === "generating" && Boolean(message) && !isHistorySummary(message);
+  const scenarioId = turn.scenarioId ?? turn.caseId;
+  const scenarioExecutionId = turn.scenarioExecutionId ?? turn.caseId ?? scenarioId;
+  const showError = turn.status === "failed" && Boolean(message);
 
   return (
     <section
       className={`scientist-scenario status-${turn.status}`}
-      aria-label="New scientist scenario"
+      aria-label="New Adversarial Researcher Scenario"
     >
       <header className="scientist-scenario-header">
         <div className="scientist-scenario-heading">
@@ -118,9 +120,9 @@ export function ScientistScenarioCard({ turn }: ScientistScenarioCardProps) {
           </p>
           <p className="scientist-scenario-detail">{copy.detail}</p>
         </div>
-        {turn.caseId ? (
-          <p className="scientist-scenario-id mono" title={turn.caseId}>
-            {turn.caseId}
+        {scenarioId || scenarioExecutionId ? (
+          <p className="scientist-scenario-id mono" title={scenarioId ?? undefined}>
+            Scenario {scenarioId ?? "—"} · Execution {scenarioExecutionId ?? "—"}
           </p>
         ) : null}
       </header>
@@ -166,3 +168,4 @@ export function ScientistScenarioCard({ turn }: ScientistScenarioCardProps) {
     </section>
   );
 }
+export const ScientistScenarioCard = AdversarialResearcherScenarioCard;

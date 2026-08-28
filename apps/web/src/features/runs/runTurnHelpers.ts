@@ -1,14 +1,14 @@
-import type { CaseProgress, RunTurn } from "../../api/client";
+import type { RunTurn, ScenarioExecutionProgress } from "../../api/client";
 
 export function label(value: string | null | undefined): string {
   if (!value) return "—";
   if (value === "read_only") return "Read-only";
-  if (value === "approval_required") return "Actions Allowed";
-  if (value === "scientist_only") return "Scientist only";
-  if (value === "cases") return "Test cases";
+  if (value === "approval_required") return "Approval-gated";
+  if (value === "scientist_only") return "Adversarial Researcher only";
+  if (value === "cases") return "Scenario Executions";
   if (value === "waiting_for_tyr") return "Waiting for Tyr";
-  if (value === "case") return "Executing evaluation";
-  if (value === "scientist") return "Scientist";
+  if (value === "case") return "Scenario Execution";
+  if (value === "scientist") return "Adversarial Researcher";
   if (value === "generating") return "Generating";
   if (value === "ready") return "Ready";
   if (value === "skipped") return "Skipped";
@@ -17,9 +17,9 @@ export function label(value: string | null | undefined): string {
     .replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
-export function tone(
-  state: string | null | undefined,
-): "info" | "success" | "warning" | "danger" | "neutral" {
+export type StatusTone = "info" | "success" | "warning" | "danger" | "neutral";
+
+export function tone(state: string | null | undefined): StatusTone {
   if (
     state === "completed" ||
     state === "ready" ||
@@ -52,9 +52,12 @@ export function tone(
   return "neutral";
 }
 
-export type ResultDisplay = {
+export type StatusDisplay = {
   label: string;
-  tone: ReturnType<typeof tone>;
+  tone: StatusTone;
+};
+
+export type ResultDisplay = StatusDisplay & {
   className: string;
 };
 
@@ -86,20 +89,16 @@ export function resultDisplay(
   };
 }
 
-export function caseStatus(item: CaseProgress): {
-  label: string;
-  tone: ReturnType<typeof tone>;
-} {
+export function caseStatus(item: ScenarioExecutionProgress): StatusDisplay {
   if (item.verdict) {
     return resultDisplay(item.verdict, item.objectiveStatus, item.outcome);
   }
   return caseLifecycleStatus(item);
 }
 
-export function caseLifecycleStatus(item: CaseProgress): {
-  label: string;
-  tone: ReturnType<typeof tone>;
-} {
+export function caseLifecycleStatus(
+  item: ScenarioExecutionProgress,
+): StatusDisplay {
   if (item.state === "pending")
     return { label: "Not started", tone: "neutral" };
   if (item.state === "queued") return { label: "Queued", tone: "neutral" };

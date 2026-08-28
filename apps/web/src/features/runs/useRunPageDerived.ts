@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { RunTurn } from "../../api/client";
 import { buildCaseOriginMap } from "./ScientistHistoryUsed";
 
@@ -13,8 +13,13 @@ export function useRunPageDerived({
   turnsData?: { latestSequence?: number };
   olderTurns: RunTurn[];
   visibleLatestTurns: RunTurn[];
+  runRecordData?: {
+    configuration?: {
+      scenarioIds?: string[] | null;
+      caseIds?: string[] | null;
+    };
+  };
   datasetCasesData?: Array<{ metadata: { id: string } }>;
-  runRecordData?: { configuration?: { caseIds?: string[] | null } };
   isLive: boolean;
 }) {
   const allTurns = useMemo(() => {
@@ -38,11 +43,18 @@ export function useRunPageDerived({
     () =>
       buildCaseOriginMap(
         allTurns,
-        runRecordData?.configuration?.caseIds?.length
-          ? runRecordData.configuration.caseIds
-          : datasetCaseIds,
+        runRecordData?.configuration?.scenarioIds?.length
+          ? runRecordData.configuration.scenarioIds
+          : runRecordData?.configuration?.caseIds?.length
+            ? runRecordData.configuration.caseIds
+            : datasetCaseIds,
       ),
-    [allTurns, runRecordData?.configuration?.caseIds, datasetCaseIds],
+    [
+      allTurns,
+      runRecordData?.configuration?.scenarioIds,
+      runRecordData?.configuration?.caseIds,
+      datasetCaseIds,
+    ],
   );
 
   const hasOpenTurnWork = Boolean(

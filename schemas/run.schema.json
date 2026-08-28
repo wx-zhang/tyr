@@ -1,6 +1,6 @@
 {
   "$defs": {
-    "ExperimentConfig": {
+    "ExperimentPresetConfig": {
       "additionalProperties": false,
       "properties": {
         "actionMode": {
@@ -14,9 +14,9 @@
           "title": "Model",
           "type": "string"
         },
-        "scientistModel": {
+        "adversarialResearcherModel": {
           "default": "",
-          "title": "Scientistmodel",
+          "title": "Adversarialresearchermodel",
           "type": "string"
         },
         "judgeModel": {
@@ -36,7 +36,7 @@
           "title": "Discoveryturns",
           "type": "integer"
         },
-        "caseIds": {
+        "scenarioIds": {
           "anyOf": [
             {
               "items": {
@@ -49,12 +49,12 @@
             }
           ],
           "default": null,
-          "title": "Caseids"
+          "title": "Scenarioids"
         },
-        "scientistIterations": {
+        "researchIterations": {
           "default": 0,
           "minimum": 0,
-          "title": "Scientistiterations",
+          "title": "Researchiterations",
           "type": "integer"
         },
         "historyTestRuns": {
@@ -64,33 +64,33 @@
           "title": "Historytestruns",
           "type": "integer"
         },
-        "historyScientistRuns": {
+        "historyResearchRuns": {
           "default": 5,
           "maximum": 100,
           "minimum": 0,
-          "title": "Historyscientistruns",
+          "title": "Historyresearchruns",
           "type": "integer"
         },
-        "maxConcurrentCases": {
+        "maxConcurrentScenarioExecutions": {
           "default": 5,
           "maximum": 5,
           "minimum": 1,
-          "title": "Maxconcurrentcases",
+          "title": "Maxconcurrentscenarioexecutions",
           "type": "integer"
         }
       },
-      "title": "ExperimentConfig",
+      "title": "ExperimentPresetConfig",
       "type": "object"
     },
-    "RunSource": {
+    "ExperimentSource": {
       "enum": [
         "cli",
         "service"
       ],
-      "title": "RunSource",
+      "title": "ExperimentSource",
       "type": "string"
     },
-    "RunState": {
+    "ExperimentState": {
       "enum": [
         "queued",
         "preparing",
@@ -104,7 +104,7 @@
         "cancelled",
         "interrupted"
       ],
-      "title": "RunState",
+      "title": "ExperimentState",
       "type": "string"
     }
   },
@@ -121,9 +121,10 @@
       "type": "string"
     },
     "source": {
-      "$ref": "#/$defs/RunSource"
+      "$ref": "#/$defs/ExperimentSource",
+      "default": "cli"
     },
-    "experimentId": {
+    "experimentPresetId": {
       "anyOf": [
         {
           "type": "string"
@@ -133,7 +134,7 @@
         }
       ],
       "default": null,
-      "title": "Experimentid"
+      "title": "Experimentpresetid"
     },
     "retryOf": {
       "anyOf": [
@@ -165,10 +166,11 @@
       "type": "string"
     },
     "state": {
-      "$ref": "#/$defs/RunState"
+      "$ref": "#/$defs/ExperimentState",
+      "default": "queued"
     },
     "configuration": {
-      "$ref": "#/$defs/ExperimentConfig"
+      "$ref": "#/$defs/ExperimentPresetConfig"
     },
     "resultPath": {
       "anyOf": [
@@ -220,13 +222,9 @@
   },
   "required": [
     "id",
-    "source",
-    "task",
-    "state",
-    "createdAt",
-    "updatedAt"
+    "task"
   ],
-  "title": "RunRecord",
+  "title": "ExperimentRecord",
   "type": "object",
   "$id": "https://gamr.local/schemas/run.schema.json"
 }

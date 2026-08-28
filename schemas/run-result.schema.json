@@ -31,86 +31,6 @@
       "title": "AssessmentStatus",
       "type": "string"
     },
-    "CaseResult": {
-      "additionalProperties": false,
-      "properties": {
-        "scenarioId": {
-          "title": "Scenarioid",
-          "type": "string"
-        },
-        "outcome": {
-          "$ref": "#/$defs/ExecutionOutcome"
-        },
-        "objectiveStatus": {
-          "$ref": "#/$defs/ObjectiveStatus",
-          "default": "unknown"
-        },
-        "verdict": {
-          "$ref": "#/$defs/SecurityVerdict"
-        },
-        "summary": {
-          "title": "Summary",
-          "type": "string"
-        },
-        "evidence": {
-          "items": {
-            "$ref": "#/$defs/Evidence"
-          },
-          "title": "Evidence",
-          "type": "array"
-        },
-        "assessmentStatus": {
-          "$ref": "#/$defs/AssessmentStatus",
-          "default": "unknown"
-        },
-        "assessmentFailure": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Assessmentfailure"
-        },
-        "reasonCodes": {
-          "items": {
-            "$ref": "#/$defs/AssessmentReasonCode"
-          },
-          "title": "Reasoncodes",
-          "type": "array"
-        },
-        "missingEvidence": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Missingevidence",
-          "type": "array"
-        },
-        "contentOverlap": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/ContentOverlapResult"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null
-        }
-      },
-      "required": [
-        "scenarioId",
-        "outcome",
-        "verdict",
-        "summary",
-        "evidence"
-      ],
-      "title": "CaseResult",
-      "type": "object"
-    },
     "CheckedContentFile": {
       "additionalProperties": false,
       "properties": {
@@ -149,6 +69,18 @@
       ],
       "title": "CheckedContentFile",
       "type": "object"
+    },
+    "CompletionOutcome": {
+      "enum": [
+        "completed",
+        "blocked",
+        "failed",
+        "error",
+        "cancelled",
+        "interrupted"
+      ],
+      "title": "CompletionOutcome",
+      "type": "string"
     },
     "ContentMatch": {
       "additionalProperties": false,
@@ -654,19 +586,7 @@
       "title": "Evidence",
       "type": "object"
     },
-    "ExecutionOutcome": {
-      "enum": [
-        "completed",
-        "blocked",
-        "failed",
-        "error",
-        "cancelled",
-        "interrupted"
-      ],
-      "title": "ExecutionOutcome",
-      "type": "string"
-    },
-    "ExperimentConfig": {
+    "ExperimentPresetConfig": {
       "additionalProperties": false,
       "properties": {
         "actionMode": {
@@ -680,9 +600,9 @@
           "title": "Model",
           "type": "string"
         },
-        "scientistModel": {
+        "adversarialResearcherModel": {
           "default": "",
-          "title": "Scientistmodel",
+          "title": "Adversarialresearchermodel",
           "type": "string"
         },
         "judgeModel": {
@@ -702,7 +622,7 @@
           "title": "Discoveryturns",
           "type": "integer"
         },
-        "caseIds": {
+        "scenarioIds": {
           "anyOf": [
             {
               "items": {
@@ -715,12 +635,12 @@
             }
           ],
           "default": null,
-          "title": "Caseids"
+          "title": "Scenarioids"
         },
-        "scientistIterations": {
+        "researchIterations": {
           "default": 0,
           "minimum": 0,
-          "title": "Scientistiterations",
+          "title": "Researchiterations",
           "type": "integer"
         },
         "historyTestRuns": {
@@ -730,22 +650,22 @@
           "title": "Historytestruns",
           "type": "integer"
         },
-        "historyScientistRuns": {
+        "historyResearchRuns": {
           "default": 5,
           "maximum": 100,
           "minimum": 0,
-          "title": "Historyscientistruns",
+          "title": "Historyresearchruns",
           "type": "integer"
         },
-        "maxConcurrentCases": {
+        "maxConcurrentScenarioExecutions": {
           "default": 5,
           "maximum": 5,
           "minimum": 1,
-          "title": "Maxconcurrentcases",
+          "title": "Maxconcurrentscenarioexecutions",
           "type": "integer"
         }
       },
-      "title": "ExperimentConfig",
+      "title": "ExperimentPresetConfig",
       "type": "object"
     },
     "ObjectiveStatus": {
@@ -784,6 +704,93 @@
         "inconclusive"
       ],
       "title": "ResultSummary",
+      "type": "object"
+    },
+    "ScenarioExecutionResult": {
+      "additionalProperties": false,
+      "properties": {
+        "scenarioId": {
+          "minLength": 1,
+          "title": "Scenarioid",
+          "type": "string"
+        },
+        "scenarioExecutionId": {
+          "minLength": 1,
+          "title": "Scenarioexecutionid",
+          "type": "string"
+        },
+        "outcome": {
+          "$ref": "#/$defs/CompletionOutcome"
+        },
+        "objectiveStatus": {
+          "$ref": "#/$defs/ObjectiveStatus",
+          "default": "unknown"
+        },
+        "verdict": {
+          "$ref": "#/$defs/SecurityVerdict"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "assessmentStatus": {
+          "$ref": "#/$defs/AssessmentStatus",
+          "default": "unknown"
+        },
+        "assessmentFailure": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Assessmentfailure"
+        },
+        "reasonCodes": {
+          "items": {
+            "$ref": "#/$defs/AssessmentReasonCode"
+          },
+          "title": "Reasoncodes",
+          "type": "array"
+        },
+        "missingEvidence": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Missingevidence",
+          "type": "array"
+        },
+        "contentOverlap": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ContentOverlapResult"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "scenarioId",
+        "scenarioExecutionId",
+        "outcome",
+        "verdict",
+        "summary",
+        "evidence"
+      ],
+      "title": "ScenarioExecutionResult",
       "type": "object"
     },
     "SecurityVerdict": {
@@ -841,6 +848,7 @@
       "type": "string"
     },
     "runId": {
+      "minLength": 1,
       "title": "Runid",
       "type": "string"
     },
@@ -879,19 +887,19 @@
       "title": "Finishedat"
     },
     "outcome": {
-      "$ref": "#/$defs/ExecutionOutcome"
+      "$ref": "#/$defs/CompletionOutcome"
     },
     "configuration": {
-      "$ref": "#/$defs/ExperimentConfig"
+      "$ref": "#/$defs/ExperimentPresetConfig"
     },
     "summary": {
       "$ref": "#/$defs/ResultSummary"
     },
-    "cases": {
+    "scenarioExecutions": {
       "items": {
-        "$ref": "#/$defs/CaseResult"
+        "$ref": "#/$defs/ScenarioExecutionResult"
       },
-      "title": "Cases",
+      "title": "Scenarioexecutions",
       "type": "array"
     },
     "findings": {
@@ -917,11 +925,10 @@
     "outcome",
     "configuration",
     "summary",
-    "cases",
     "findings",
     "errors"
   ],
-  "title": "RunResult",
+  "title": "ExperimentResult",
   "type": "object",
   "$id": "https://gamr.local/schemas/run-result.schema.json"
 }

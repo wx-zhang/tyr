@@ -22,6 +22,29 @@ export type {
   HistoryUpdate,
 } from "./runHistoryTypes";
 
+function turnExecutionId(turn: RunTurn): string | undefined {
+  return turn.scenarioExecutionId ?? turn.caseId ?? undefined;
+}
+
+function progressExecutionId(progress: CaseProgress): string | undefined {
+  const executionId = progress.scenarioExecutionId ?? progress.caseId;
+  if (executionId) return executionId;
+  return "id" in progress && typeof progress.id === "string" ? progress.id : undefined;
+}
+function historyEntry(
+  executionId: string,
+  progress: CaseProgress | undefined,
+  updates: HistoryUpdate[],
+): HistoryCaseEntry {
+  return {
+    scenarioId: progress?.scenarioId ?? executionId,
+    scenarioExecutionId: progress ? progressExecutionId(progress) ?? executionId : executionId,
+    caseId: executionId,
+    progress,
+    updates: sortUpdates(updates),
+  };
+}
+
 export function groupRunHistory(input: {
   turns: RunTurn[];
   cases: CaseProgress[];
@@ -32,12 +55,13 @@ export function groupRunHistory(input: {
 
   const scientistIterationByCaseId = new Map<string, number>();
   for (const turn of turns) {
-    if (turn.stage === "scientist" && turn.caseId) {
+    const executionId = turnExecutionId(turn);
+    if (turn.stage === "scientist" && executionId) {
       if (isScientistGeneration(turn)) {
-        scientistIterationByCaseId.set(turn.caseId, turn.number);
-      } else if (!scientistIterationByCaseId.has(turn.caseId)) {
+        scientistIterationByCaseId.set(executionId, turn.number);
+      } else if (!scientistIterationByCaseId.has(executionId)) {
         scientistIterationByCaseId.set(
-          turn.caseId,
+          executionId,
           resolveScientistIteration(turn, turns),
         );
       }
@@ -51,6 +75,7 @@ export function groupRunHistory(input: {
   const otherUpdates: HistoryUpdate[] = [];
 
   for (const turn of turns) {
+    const executionId = turnExecutionId(turn);
     const ts = parseTimestamp(turn.occurredAt);
     const update: HistoryUpdate = {
       kind: "turn",
@@ -63,8 +88,8 @@ export function groupRunHistory(input: {
       discoveryUpdates.push(update);
     } else if (turn.stage === "scientist") {
       let iter = 1;
-      if (turn.caseId && scientistIterationByCaseId.has(turn.caseId)) {
-        iter = scientistIterationByCaseId.get(turn.caseId)!;
+      if (executionId && scientistIterationByCaseId.has(executionId)) {
+        iter = scientistIterationByCaseId.get(executionId)!;
       } else if (turn.updateType === "scientist_generation" && turn.number) {
         iter = turn.number;
       } else {
@@ -75,27 +100,28 @@ export function groupRunHistory(input: {
         if (!iterationUpdatesByIteration.has(iter))
           iterationUpdatesByIteration.set(iter, []);
         iterationUpdatesByIteration.get(iter)!.push(update);
-      } else if (turn.caseId) {
+      } else if (executionId) {
         if (!iterationCaseUpdates.has(iter))
           iterationCaseUpdates.set(iter, new Map());
         const caseMap = iterationCaseUpdates.get(iter)!;
-        if (!caseMap.has(turn.caseId)) caseMap.set(turn.caseId, []);
-        caseMap.get(turn.caseId)!.push(update);
+        if (!caseMap.has(executionId)) caseMap.set(executionId, []);
+        caseMap.get(executionId)!.push(update);
       } else {
         if (!iterationUpdatesByIteration.has(iter))
           iterationUpdatesByIteration.set(iter, []);
         iterationUpdatesByIteration.get(iter)!.push(update);
       }
-    } else if (turn.caseId) {
-      if (!baseCaseUpdatesByCaseId.has(turn.caseId))
-        baseCaseUpdatesByCaseId.set(turn.caseId, []);
-      baseCaseUpdatesByCaseId.get(turn.caseId)!.push(update);
+    } else if (executionId) {
+      if (!baseCaseUpdatesByCaseId.has(executionId))
+        baseCaseUpdatesByCaseId.set(executionId, []);
+      baseCaseUpdatesByCaseId.get(executionId)!.push(update);
     } else {
       otherUpdates.push(update);
     }
   }
 
   for (const artifact of artifacts) {
+    const executionId = artifact.scenarioExecutionId ?? artifact.caseId;
     const ts = parseTimestamp(artifact.verifiedAt);
     const update: HistoryUpdate = {
       kind: "artifact",
@@ -104,22 +130,22 @@ export function groupRunHistory(input: {
       artifact,
     };
 
-    if (artifact.caseId) {
-      if (scientistIterationByCaseId.has(artifact.caseId)) {
-        const iter = scientistIterationByCaseId.get(artifact.caseId)!;
+    if (executionId) {
+      if (scientistIterationByCaseId.has(executionId)) {
+        const iter = scientistIterationByCaseId.get(executionId)!;
         if (!iterationCaseUpdates.has(iter)) {
           iterationCaseUpdates.set(iter, new Map());
         }
         const caseMap = iterationCaseUpdates.get(iter)!;
-        if (!caseMap.has(artifact.caseId)) {
-          caseMap.set(artifact.caseId, []);
+        if (!caseMap.has(executionId)) {
+          caseMap.set(executionId, []);
         }
-        caseMap.get(artifact.caseId)!.push(update);
+        caseMap.get(executionId)!.push(update);
       } else {
-        if (!baseCaseUpdatesByCaseId.has(artifact.caseId)) {
-          baseCaseUpdatesByCaseId.set(artifact.caseId, []);
+        if (!baseCaseUpdatesByCaseId.has(executionId)) {
+          baseCaseUpdatesByCaseId.set(executionId, []);
         }
-        baseCaseUpdatesByCaseId.get(artifact.caseId)!.push(update);
+        baseCaseUpdatesByCaseId.get(executionId)!.push(update);
       }
     } else {
       otherUpdates.push(update);
@@ -156,41 +182,33 @@ export function groupRunHistory(input: {
   }
 
   const knownCaseMap = new Map<string, CaseProgress>();
-  for (const c of cases) {
-    const id = c.caseId ?? (c as { id?: string }).id;
-    if (id) {
-      knownCaseMap.set(id, c);
+  for (const progress of cases) {
+    const executionId = progressExecutionId(progress);
+    if (executionId) {
+      knownCaseMap.set(executionId, progress);
     }
   }
 
   const sortedCases = cases
     .filter((item) => {
-      const id = item.caseId ?? (item as { id?: string }).id;
-      return !id || !scientistIterationByCaseId.has(id);
+      const executionId = progressExecutionId(item);
+      return !executionId || !scientistIterationByCaseId.has(executionId);
     })
     .sort((a, b) => a.order - b.order);
   const baseCaseEntries: HistoryCaseEntry[] = [];
   const processedCaseIds = new Set<string>();
 
-  for (const c of sortedCases) {
-    const id = c.caseId ?? (c as { id?: string }).id;
-    if (!id) continue;
-    processedCaseIds.add(id);
-    const rawUpdates = baseCaseUpdatesByCaseId.get(id) ?? [];
-    baseCaseEntries.push({
-      caseId: id,
-      progress: c,
-      updates: sortUpdates(rawUpdates),
-    });
+  for (const progress of sortedCases) {
+    const executionId = progressExecutionId(progress);
+    if (!executionId) continue;
+    processedCaseIds.add(executionId);
+    const rawUpdates = baseCaseUpdatesByCaseId.get(executionId) ?? [];
+    baseCaseEntries.push(historyEntry(executionId, progress, rawUpdates));
   }
 
-  for (const [caseId, rawUpdates] of baseCaseUpdatesByCaseId.entries()) {
-    if (!processedCaseIds.has(caseId)) {
-      baseCaseEntries.push({
-        caseId,
-        progress: undefined,
-        updates: sortUpdates(rawUpdates),
-      });
+  for (const [executionId, rawUpdates] of baseCaseUpdatesByCaseId.entries()) {
+    if (!processedCaseIds.has(executionId)) {
+      baseCaseEntries.push(historyEntry(executionId, undefined, rawUpdates));
     }
   }
 
@@ -220,8 +238,8 @@ export function groupRunHistory(input: {
             ? "queued"
             : "pending";
     result.push({
-      id: "cases",
-      label: "Test cases",
+      id: "scenario-executions",
+      label: "Scenario Executions",
       updates: [],
       cases: baseCaseEntries,
       state,
@@ -243,12 +261,10 @@ export function groupRunHistory(input: {
     const caseMap = iterationCaseUpdates.get(iter) ?? new Map();
     const caseEntries: HistoryCaseEntry[] = [];
 
-    for (const [caseId, rawUpdates] of caseMap.entries()) {
-      caseEntries.push({
-        caseId,
-        progress: knownCaseMap.get(caseId),
-        updates: sortUpdates(rawUpdates),
-      });
+    for (const [executionId, rawUpdates] of caseMap.entries()) {
+      caseEntries.push(
+        historyEntry(executionId, knownCaseMap.get(executionId), rawUpdates),
+      );
     }
 
     const isBusy =
@@ -261,8 +277,8 @@ export function groupRunHistory(input: {
       (groupUpdates.length > 0 || caseEntries.length > 0) && !isBusy;
 
     result.push({
-      id: `iteration-${iter}`,
-      label: `Iteration ${iter}`,
+      id: `research-iteration-${iter}`,
+      label: `Research Iteration ${iter}`,
       updates: groupUpdates,
       cases: caseEntries,
       state: isBusy ? "active" : isTerminal ? "completed" : "pending",

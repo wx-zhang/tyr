@@ -47,7 +47,7 @@ class NextTurnDecision(BaseModel):
         return self
 
 
-class CaseAssessment(BaseModel):
+class ScenarioExecutionAssessment(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     objective_status: ObjectiveStatus = Field(alias="objectiveStatus")
@@ -56,3 +56,6 @@ class CaseAssessment(BaseModel):
     evidence_turn_ids: list[str] = Field(alias="evidenceTurnIds")
     reason_codes: list[AssessmentReasonCode] = Field(default_factory=list, alias="reasonCodes")
     missing_evidence: list[str] = Field(default_factory=list, alias="missingEvidence")
+
+
+CaseAssessment = ScenarioExecutionAssessment

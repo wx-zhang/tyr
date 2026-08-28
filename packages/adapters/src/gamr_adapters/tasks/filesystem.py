@@ -63,15 +63,17 @@ class FilesystemTaskRepository:
         directory = self._task_directory(reference)
         manifest = TaskManifest.model_validate(parse_json_file(self._file(directory, "task.json")))
         scenarios = [
-            Scenario.model_validate(parse_json_file(self._file(directory, case_path)))
-            for case_path in manifest.spec.cases
+            Scenario.model_validate(parse_json_file(self._file(directory, scenario_path)))
+            for scenario_path in manifest.spec.scenarios
         ]
         scenario_ids = [scenario.metadata.id for scenario in scenarios]
         if len(scenario_ids) != len(set(scenario_ids)):
             raise ValueError("task scenario IDs must be unique")
-        missing_defaults = set(manifest.spec.defaults.default_case_ids) - set(scenario_ids)
+        missing_defaults = set(manifest.spec.defaults.default_scenario_ids) - set(scenario_ids)
         if missing_defaults:
-            raise ValueError(f"default case IDs are not in the task: {sorted(missing_defaults)}")
+            raise ValueError(
+                f"default scenario IDs are not in the task: {sorted(missing_defaults)}"
+            )
         declared = set(manifest.spec.variables)
         for scenario in scenarios:
             texts = [scenario.metadata.title, scenario.spec.objective, *scenario.spec.steps]

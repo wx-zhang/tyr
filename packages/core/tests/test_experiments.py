@@ -304,7 +304,7 @@ def test_max_concurrent_cases_accepts_values_one_through_five(value: int) -> Non
 @pytest.mark.parametrize("value", [0, 6, -1, 10, "many", 3.5, None])
 def test_max_concurrent_cases_rejects_out_of_range_and_non_integer(value: object) -> None:
     with pytest.raises(ValidationError):
-        ExperimentConfig(maxConcurrentCases=value)  # type: ignore[arg-type]
+        ExperimentConfig(maxConcurrentCases=value)
 
 
 def test_experiment_config_loads_without_max_concurrent_cases() -> None:

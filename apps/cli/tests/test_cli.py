@@ -31,7 +31,7 @@ def test_experiment_run_requires_provider_configuration(
         tyr_mcp_token = ""
         model_api_key = ""
         model_name = ""
-        scientist_model_name = ""
+        adversarial_researcher_model_name = ""
 
     monkeypatch.setattr(cli, "Settings", MissingSettings)
     result = CliRunner().invoke(cli.app, ["experiment", "run", "tasks/exfiltrate-important-txt"])
@@ -48,7 +48,7 @@ def test_experiment_run_ctrl_c_cancels_run(monkeypatch: pytest.MonkeyPatch) -> N
         tyr_mcp_url = "https://example.test/mcp"
         model_api_key = "key"
         model_name = "model"
-        scientist_model_name = ""
+        adversarial_researcher_model_name = ""
         model_base_url = "https://example.test"
         artifact_root = ".gamr"
 
@@ -251,7 +251,7 @@ def test_progress_renderer_shows_scientist_events(monkeypatch: pytest.MonkeyPatc
     )
 
     rendered = output.getvalue()
-    assert "Scientist" in rendered
+    assert "Adversarial Researcher" in rendered
     assert "Thinking" not in rendered
     assert "scientist-1" in rendered
     assert "Missing id delivery" in rendered
@@ -268,10 +268,10 @@ def test_experiment_run_prints_result_errors(monkeypatch: pytest.MonkeyPatch) ->
         tyr_mcp_url = "https://example.test/mcp"
         model_api_key = "key"
         model_name = "model"
-        scientist_model_name = ""
+        adversarial_researcher_model_name = ""
         model_base_url = "https://example.test"
         artifact_root = ".gamr"
-        scientist_output_tokens = 8192
+        adversarial_researcher_output_tokens = 8192
 
     class FakeStore:
         def __init__(self, *args: object, **kwargs: object) -> None:
@@ -339,10 +339,10 @@ def test_experiment_run_accepts_max_concurrent_cases_option(
         tyr_mcp_url = "https://example.test/mcp"
         model_api_key = "key"
         model_name = "model"
-        scientist_model_name = ""
+        adversarial_researcher_model_name = ""
         model_base_url = "https://example.test"
         artifact_root = ".gamr"
-        scientist_output_tokens = 12288
+        adversarial_researcher_output_tokens = 12288
 
     class FakeStore:
         def __init__(self, *args: object, **kwargs: object) -> None:

@@ -12,10 +12,10 @@ from gamr_adapters.config import Settings
 from gamr_adapters.tasks.filesystem import load_task, resolve_task_directory
 from gamr_adapters.tracing import create_trace_port
 from gamr_core import (
-    ExperimentConfig,
-    RunRecord,
-    RunSource,
-    RunState,
+    ExperimentPresetConfig,
+    ExperimentRecord,
+    ExperimentSource,
+    ExperimentState,
 )
 from gamr_core.identifiers import new_id
 from gamr_engine import ExecutionOutput, ExperimentExecutionService
@@ -36,16 +36,16 @@ def run_experiment_command(
     directory: Path,
     action_mode: str,
     model: str,
-    scientist_model: str,
+    adversarial_researcher_model: str,
     judge_model: str,
     allow_actions: bool,
     confirm_actions: bool,
-    case_id: list[str],
-    all_cases: bool,
-    max_concurrent_cases: int,
-    scientist_iterations: int,
+    scenario_id: list[str],
+    all_scenarios: bool,
+    max_concurrent_scenario_executions: int,
+    research_iterations: int,
     history_test_runs: int,
-    history_scientist_runs: int,
+    history_research_runs: int,
     render_progress_cb: Any,
 ) -> None:
     from . import main as main_cli
@@ -58,16 +58,22 @@ def run_experiment_command(
     )
     load_fn = getattr(main_cli, "load_task", load_task)
     task = load_fn(directory)
-    if case_id and all_cases:
-        raise typer.BadParameter("use --case-id or --all-cases, not both")
-    selected_case_ids = (
-        [scenario.metadata.id for scenario in task.scenarios] if all_cases else case_id or None
+    if scenario_id and all_scenarios:
+        raise typer.BadParameter("use --scenario-id or --all-scenarios, not both")
+    selected_scenario_ids = (
+        [scenario.metadata.id for scenario in task.scenarios]
+        if all_scenarios
+        else scenario_id or None
     )
 
     settings_cls = getattr(main_cli, "Settings", Settings)
     settings = settings_cls()
     selected_model = model or settings.model_name
-    selected_scientist_model = scientist_model or settings.scientist_model_name or selected_model
+    selected_adversarial_researcher_model = (
+        adversarial_researcher_model
+        or settings.adversarial_researcher_model_name
+        or selected_model
+    )
     selected_judge_model = (
         judge_model or getattr(settings, "judge_model_name", "") or selected_model
     )
@@ -87,7 +93,7 @@ def run_experiment_command(
         ) = build_fn(
             settings,
             selected_model,
-            selected_scientist_model,
+            selected_adversarial_researcher_model,
             selected_judge_model,
             trace_port=trace_port,
         )
@@ -100,28 +106,33 @@ def run_experiment_command(
             model_gateway,
             scientist_model_gateway,
             judge_model_gateway,
-        ) = build_fn(settings, selected_model, selected_scientist_model, selected_judge_model)
+        ) = build_fn(
+            settings,
+            selected_model,
+            selected_adversarial_researcher_model,
+            selected_judge_model,
+        )
 
-    configuration = ExperimentConfig(
+    configuration = ExperimentPresetConfig(
         actionMode=action_mode,
         model=selected_model,
-        scientistModel=selected_scientist_model,
+        adversarialResearcherModel=selected_adversarial_researcher_model,
         judgeModel=selected_judge_model,
         maxTurns=task.manifest.spec.defaults.max_turns,
         discoveryTurns=20,
-        caseIds=selected_case_ids,
-        maxConcurrentCases=max_concurrent_cases,
-        scientistIterations=scientist_iterations,
+        scenarioIds=selected_scenario_ids,
+        maxConcurrentScenarioExecutions=max_concurrent_scenario_executions,
+        researchIterations=research_iterations,
         historyTestRuns=history_test_runs,
-        historyScientistRuns=history_scientist_runs,
+        historyResearchRuns=history_research_runs,
     )
     run_id = new_id()
     started_at = datetime.now(UTC)
-    run_document = RunRecord(
+    run_document = ExperimentRecord(
         id=run_id,
-        source=RunSource.CLI,
+        source=ExperimentSource.CLI,
         task=str(directory),
-        state=RunState.RUNNING,
+        state=ExperimentState.RUNNING,
         configuration=configuration,
         createdAt=started_at,
         updatedAt=started_at,
@@ -144,7 +155,7 @@ def run_experiment_command(
                 delivery_verifier=collector,
                 content_evidence_provider=collector,
                 sandbox=sandbox,
-                scientist_output_tokens=settings.scientist_output_tokens,
+                scientist_output_tokens=settings.adversarial_researcher_output_tokens,
                 trace_port=trace_port,
             )
         finally:
@@ -155,12 +166,12 @@ def run_experiment_command(
     execute_cli_run(console, run_document, artifact_store, run_live, trace_port=trace_port)
 
 
-def resume_scientist_command(
+def resume_research_command(
     console: Console,
     run_id: str,
-    scientist_iterations: int,
+    research_iterations: int,
     model: str,
-    scientist_model: str,
+    adversarial_researcher_model: str,
     judge_model: str,
     confirm_actions: bool,
     render_progress_cb: Any,
@@ -173,19 +184,21 @@ def resume_scientist_command(
         secrets=configured_secrets(settings),
     )
     try:
-        source_record = RunRecord.model_validate(artifact_store.read_json(run_id, "run.json"))
+        source_record = ExperimentRecord.model_validate(
+            artifact_store.read_json(run_id, "run.json")
+        )
     except FileNotFoundError:
         raise typer.BadParameter(f"run does not exist: {run_id}", param_hint="run_id") from None
 
     configuration = source_record.configuration
-    if scientist_iterations:
+    if research_iterations:
         configuration = configuration.model_copy(
-            update={"scientist_iterations": scientist_iterations}
+            update={"research_iterations": research_iterations}
         )
-    if not configuration.scientist_iterations:
+    if not configuration.research_iterations:
         raise typer.BadParameter(
-            "source run has scientist_iterations=0; pass --scientist-iterations",
-            param_hint="--scientist-iterations",
+            "source experiment has researchIterations=0; pass --research-iterations",
+            param_hint="--research-iterations",
         )
     if configuration.action_mode == "approval_required":
         if not confirm_actions and not sys.stdin.isatty():
@@ -203,7 +216,11 @@ def resume_scientist_command(
     task = load_task(task_directory)
 
     selected_model = model or configuration.model or settings.model_name
-    selected_scientist_model = scientist_model or settings.scientist_model_name or selected_model
+    selected_adversarial_researcher_model = (
+        adversarial_researcher_model
+        or settings.adversarial_researcher_model_name
+        or selected_model
+    )
     selected_judge_model = (
         judge_model or getattr(settings, "judge_model_name", "") or selected_model
     )
@@ -222,7 +239,7 @@ def resume_scientist_command(
         ) = build_experiment_execution(
             settings,
             selected_model,
-            selected_scientist_model,
+            selected_adversarial_researcher_model,
             selected_judge_model,
             trace_port=trace_port,
         )
@@ -236,24 +253,27 @@ def resume_scientist_command(
             scientist_model_gateway,
             judge_model_gateway,
         ) = build_experiment_execution(
-            settings, selected_model, selected_scientist_model, selected_judge_model
+            settings,
+            selected_model,
+            selected_adversarial_researcher_model,
+            selected_judge_model,
         )
 
     configuration = configuration.model_copy(
         update={
             "model": selected_model,
-            "scientist_model": selected_scientist_model,
+            "adversarial_researcher_model": selected_adversarial_researcher_model,
             "judge_model": selected_judge_model,
         }
     )
 
     new_run_id = new_id()
     started_at = datetime.now(UTC)
-    run_document = RunRecord(
+    run_document = ExperimentRecord(
         id=new_run_id,
-        source=RunSource.CLI,
+        source=ExperimentSource.CLI,
         task=source_record.task,
-        state=RunState.RUNNING,
+        state=ExperimentState.RUNNING,
         configuration=configuration,
         retryOf=run_id,
         createdAt=started_at,
@@ -262,7 +282,7 @@ def resume_scientist_command(
 
     async def run_live() -> ExecutionOutput:
         try:
-            return await ExperimentExecutionService().resume_scientist(
+            return await ExperimentExecutionService().resume_research(
                 task,
                 configuration,
                 source_run_id=run_id,
@@ -270,14 +290,13 @@ def resume_scientist_command(
                 target=target,
                 model=model_gateway,
                 scientist_model=scientist_model_gateway,
-                judge_model=judge_model_gateway,
                 artifacts=artifact_store,
                 activity_sink=FilesystemActivitySink(artifact_store),
                 progress=render_progress_cb,
                 delivery_verifier=collector,
                 content_evidence_provider=collector,
                 sandbox=sandbox,
-                scientist_output_tokens=settings.scientist_output_tokens,
+                scientist_output_tokens=settings.adversarial_researcher_output_tokens,
                 trace_port=trace_port,
             )
         finally:

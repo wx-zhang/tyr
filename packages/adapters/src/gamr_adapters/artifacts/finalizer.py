@@ -4,25 +4,25 @@ import json
 from pathlib import Path
 from typing import Any
 
-from gamr_core import ExecutionOutcome, RunResult, RunState
+from gamr_core import CompletionOutcome, ExperimentResult, ExperimentState
 
 from .redaction import redact_payload
 
 
-def terminal_run_state(outcome: ExecutionOutcome) -> RunState:
-    if outcome is ExecutionOutcome.CANCELLED:
-        return RunState.CANCELLED
-    if outcome is ExecutionOutcome.INTERRUPTED:
-        return RunState.INTERRUPTED
-    if outcome in {ExecutionOutcome.FAILED, ExecutionOutcome.ERROR}:
-        return RunState.FAILED
-    return RunState.COMPLETED
+def terminal_experiment_state(outcome: CompletionOutcome) -> ExperimentState:
+    if outcome is CompletionOutcome.CANCELLED:
+        return ExperimentState.CANCELLED
+    if outcome is CompletionOutcome.INTERRUPTED:
+        return ExperimentState.INTERRUPTED
+    if outcome in {CompletionOutcome.FAILED, CompletionOutcome.ERROR}:
+        return ExperimentState.FAILED
+    return ExperimentState.COMPLETED
 
 
-def mark_run_document_terminal(
+def mark_experiment_document_terminal(
     run_path: Path,
     *,
-    terminal_state: RunState,
+    terminal_state: ExperimentState,
     finished_at: str,
     secrets: tuple[str, ...],
     atomic_json_fn: Any,
@@ -46,7 +46,7 @@ def mark_run_document_terminal(
 def finalize_result(
     store: Any,
     run_id: str,
-    result: RunResult,
+    result: ExperimentResult,
     task_snapshot: dict[str, object] | None = None,
 ) -> str:
     run_root = store._run_root(run_id)
@@ -54,7 +54,7 @@ def finalize_result(
     payload["$schema"] = "../../../schemas/run-result.schema.json"
     store._atomic_json(run_root / "result.json", redact_payload(payload, store.secrets))
     run_path = run_root / "run.json"
-    terminal_state = terminal_run_state(result.outcome)
+    terminal_state = terminal_experiment_state(result.outcome)
     finished_at = (
         result.finished_at.isoformat().replace("+00:00", "Z")
         if result.finished_at is not None
@@ -63,7 +63,7 @@ def finalize_result(
     if not isinstance(finished_at, str) or not finished_at:
         finished_at = payload.get("startedAt") or ""
     if run_path.exists():
-        mark_run_document_terminal(
+        mark_experiment_document_terminal(
             run_path,
             terminal_state=terminal_state,
             finished_at=str(finished_at),
@@ -88,13 +88,24 @@ def finalize_result(
     if not transcript_path.exists():
         store.append_transcript(
             run_id,
-            [{"scenarioId": case.scenario_id, "summary": case.summary} for case in result.cases],
+            [
+                {
+                    "scenarioId": scenario.scenario_id,
+                    "scenarioExecutionId": scenario.scenario_execution_id,
+                    "summary": scenario.summary,
+                }
+                for scenario in result.scenario_executions
+            ],
         )
-    for case in result.cases:
-        for evidence in case.evidence:
+    for scenario in result.scenario_executions:
+        for evidence in scenario.evidence:
             evidence_path = (run_root / evidence.artifact).resolve()
             if run_root not in evidence_path.parents:
                 raise ValueError("evidence path escapes run root")
             if not evidence_path.exists():
                 evidence_path.parent.mkdir(parents=True, exist_ok=True)
     return str(run_root / "result.json")
+
+
+terminal_run_state = terminal_experiment_state
+mark_run_document_terminal = mark_experiment_document_terminal

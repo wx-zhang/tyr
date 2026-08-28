@@ -46,11 +46,11 @@ def validate_task(
         manifest, scenarios = FilesystemTaskRepository(settings.task_root).load(directory)
     except Exception as error:
         return {"valid": False, "errors": [str(error)]}
-    return {"valid": True, "taskId": manifest.metadata.id, "caseCount": len(scenarios)}
+    return {"valid": True, "taskId": manifest.metadata.id, "scenarioCount": len(scenarios)}
 
 
-@router.get("/{task_id}/cases")
-def list_task_cases(
+@router.get("/{task_id}/scenarios")
+def list_task_scenarios(
     task_id: str, settings: Settings = Depends(get_settings)
 ) -> list[dict[str, object]]:
     try:
@@ -59,6 +59,13 @@ def list_task_cases(
     except ValueError as error:
         raise not_found("task") from error
     return [scenario.model_dump(by_alias=True, exclude_none=True) for scenario in scenarios]
+
+
+@router.get("/{task_id}/cases")
+def list_task_cases(
+    task_id: str, settings: Settings = Depends(get_settings)
+) -> list[dict[str, object]]:
+    return list_task_scenarios(task_id, settings)
 
 
 @router.get("/{task_id}/plans")

@@ -11,7 +11,7 @@ beforeEach(() => {
   setupRunMocks();
 });
 
-it("shows configured and scientist evaluation outcomes as updates", async () => {
+it("shows configured and researcher evaluation outcomes as updates", async () => {
   vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
     const url = String(input);
     if (url.includes("/visualization")) {
@@ -24,9 +24,10 @@ it("shows configured and scientist evaluation outcomes as updates", async () => 
             state: "completed",
             currentPhase: null,
           },
-          cases: [
+          scenarioExecutions: [
             {
-              caseId: "case-alpha",
+              scenarioId: "scenario-alpha",
+              scenarioExecutionId: "case-alpha",
               order: 1,
               state: "completed",
               verdict: "protected",
@@ -94,7 +95,7 @@ it("shows configured and scientist evaluation outcomes as updates", async () => 
   const { container } = renderRunPage();
 
   expect(
-    await screen.findByRole("heading", { name: "Run history" }),
+    await screen.findByRole("heading", { name: "Experiment history" }),
   ).toBeInTheDocument();
   const caseAlphaToggle = await screen.findByRole("button", {
     name: /case-alpha/,
@@ -102,12 +103,12 @@ it("shows configured and scientist evaluation outcomes as updates", async () => 
   fireEvent.click(caseAlphaToggle);
   expect(
     await screen.findByRole("heading", {
-      name: "Evaluation result - case-alpha",
+      name: "Scenario Execution assessment - case-alpha",
     }),
   ).toBeInTheDocument();
   expect(
     await screen.findByRole("heading", {
-      name: "Scientist evaluation - scientist-alpha",
+      name: "Research Iteration assessment - scientist-alpha",
     }),
   ).toBeInTheDocument();
   expect(screen.getAllByText("No breach").length).toBeGreaterThan(0);
@@ -122,7 +123,7 @@ it("shows configured and scientist evaluation outcomes as updates", async () => 
   expect(
     container.querySelector('[data-turn-id="evaluation-scientist-alpha"]'),
   ).not.toHaveClass("turn-failed");
-  expect(screen.getAllByText("Case assessment")).toHaveLength(2);
+  expect(screen.getAllByText("Scenario Execution assessment")).toHaveLength(2);
   expect(screen.queryByText("LLM evaluation")).not.toBeInTheDocument();
 });
 
@@ -460,7 +461,7 @@ it("shows agent working when the run is live and the latest turn is complete", a
   fireEvent.click(await screen.findByRole("button", { name: /case-alpha/ }));
   expect(
     await screen.findByRole("heading", {
-      name: "Executing evaluation - Turn 1",
+      name: "Scenario Execution - Turn 1",
     }),
   ).toBeInTheDocument();
   expect(screen.getAllByText("Agent working").length).toBeGreaterThan(0);

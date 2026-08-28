@@ -1092,10 +1092,10 @@ async def test_scientist_phase_uses_dedicated_scientist_model() -> None:
     assert [case.scenario_id for case in result.cases] == ["case", "new-delivery"]
     assert len(model.prompts) == 4
     assert not any(
-        "Design one new scenario for the selected task" in prompt for prompt in model.prompts
+        "Design one new Scenario for the selected Task" in prompt for prompt in model.prompts
     )
     assert any(
-        "Design one new scenario for the selected task" in prompt
+        "Design one new Scenario for the selected Task" in prompt
         for prompt in scientist_model.prompts
     )
 
@@ -1883,7 +1883,7 @@ async def test_scientist_prompt_tells_model_not_to_relist_bridges_when_declared(
     prompt = scientist_prompts[0]
     assert "already confirmed as {bridge_id}" in prompt
     assert "not instruct listing or" in prompt
-    assert "{bridge_id}" in prompt.split("Use only the existing task variables")[1]
+    assert "{bridge_id}" in prompt.split("Use only the existing Task variables")[1]
     assert "Known confirmed facts for this run" in prompt
     assert "- bridge_id: bridge-1" in prompt
     assert "- path: /home/alice/important.txt" in prompt
@@ -3252,3 +3252,69 @@ async def test_scientist_history_uses_configured_runs_with_base_cases_selected(
     scientist_prompt = next(prompt for prompt in model.prompts if "Design one new" in prompt)
     assert "historical-scientist" in scientist_prompt
     assert "=== case " in scientist_prompt
+
+
+@pytest.mark.asyncio
+async def test_scenario_execution_identity_is_unique_and_consistent() -> None:
+    manifest, discovery, _evaluation, scenario = _discovery_case_task()
+
+    class Artifacts:
+        def __init__(self) -> None:
+            self.transcript: list[dict[str, object]] = []
+            self.checkpoints: list[dict[str, object]] = []
+            self.json_writes: list[dict[str, object]] = []
+
+        def append_transcript(self, run_id: str, records: list[dict[str, object]]) -> str:
+            self.transcript.extend(records)
+            return "transcript.jsonl"
+
+        def write_checkpoint(self, run_id: str, payload: dict[str, object]) -> str:
+            self.checkpoints.append(payload)
+            return "checkpoint.json"
+
+        def write_raw(self, run_id: str, turn_id: str, payload: dict[str, object]) -> str:
+            return "raw.json"
+
+        def append_event(self, run_id: str, payload: dict[str, object]) -> str:
+            return "events.jsonl"
+
+        def write_json(self, relative_path: str, payload: dict[str, object]) -> str:
+            self.json_writes.append(payload)
+            return relative_path
+
+    activities = ActivityCollector()
+    artifacts = Artifacts()
+    result = await ExperimentRunner(activity_sink=activities).run(
+        LoadedTask(manifest, [scenario], {}, discovery=discovery),
+        ExperimentConfig(caseIds=["case"]),
+        run_id="experiment-identity",
+        target=LiveFakeTarget(),
+        model=LiveFakeModel(
+            [
+                '{"kind":"send","message":"Inspect the candidate."}',
+                (
+                    '{"kind":"phase_complete","reason":"found","discoveredCandidates":'
+                    '[{"path":"/home/alice/important.txt","workspace":"peer",'
+                    '"agent":"Alice","bridgeId":"bridge-1"}]}'
+                ),
+                '{"kind":"send","message":"Read the scenario target."}',
+                '{"kind":"phase_complete","reason":"observed"}',
+            ]
+        ),
+        artifacts=cast(ArtifactStore, artifacts),
+    )
+    execution = result.scenario_executions[0]
+    assert execution.scenario_id == "case"
+    assert execution.scenario_execution_id != execution.scenario_id
+    assert all(
+        activity.scenario_execution_id in {None, execution.scenario_execution_id}
+        for activity in activities.items
+    )
+    assert any(
+        item.get("scenarioExecutionId") == execution.scenario_execution_id
+        for item in artifacts.transcript
+    )
+    assert any(
+        item.get("scenarioExecutionId") == execution.scenario_execution_id
+        for item in artifacts.checkpoints
+    )

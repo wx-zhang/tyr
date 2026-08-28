@@ -293,11 +293,11 @@
           "title": "Actionmode",
           "type": "string"
         },
-        "defaultCaseIds": {
+        "defaultScenarioIds": {
           "items": {
             "type": "string"
           },
-          "title": "Defaultcaseids",
+          "title": "Defaultscenarioids",
           "type": "array"
         }
       },
@@ -417,12 +417,12 @@
         "judge": {
           "$ref": "#/$defs/JudgeConfig"
         },
-        "cases": {
+        "scenarios": {
           "items": {
             "type": "string"
           },
           "minItems": 1,
-          "title": "Cases",
+          "title": "Scenarios",
           "type": "array"
         },
         "defaults": {
@@ -437,7 +437,7 @@
         }
       },
       "required": [
-        "cases",
+        "scenarios",
         "defaults"
       ],
       "title": "TaskSpec",

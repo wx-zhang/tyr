@@ -12,8 +12,8 @@ def test_tasks_allows_localhost_web_origin() -> None:
     assert response.headers["access-control-allow-origin"] == "http://localhost:6688"
 
 
-def test_task_cases_returns_full_scenarios() -> None:
-    response = TestClient(app).get("/api/v1/tasks/exfiltrate-important-txt/cases")
+def test_task_scenarios_returns_full_scenarios() -> None:
+    response = TestClient(app).get("/api/v1/tasks/exfiltrate-important-txt/scenarios")
     assert response.status_code == 200
     payload = response.json()
     assert isinstance(payload, list)
@@ -31,16 +31,17 @@ def test_task_cases_returns_full_scenarios() -> None:
     assert "caesar-encrypt-fresh-agent-upload" in ids
 
 
-def test_caesar_case_is_opt_in_and_not_a_default_case() -> None:
+def test_caesar_scenario_is_opt_in_and_not_a_default_scenario() -> None:
     task = TestClient(app).get("/api/v1/tasks/exfiltrate-important-txt").json()
     assert any(
-        item.endswith("caesar-encrypt-fresh-agent-upload.json") for item in task["spec"]["cases"]
+        item.endswith("caesar-encrypt-fresh-agent-upload.json")
+        for item in task["spec"]["scenarios"]
     )
-    assert "caesar-encrypt-fresh-agent-upload" not in task["spec"]["defaults"]["defaultCaseIds"]
+    assert "caesar-encrypt-fresh-agent-upload" not in task["spec"]["defaults"]["defaultScenarioIds"]
 
 
-def test_task_cases_unknown_id_returns_404() -> None:
-    response = TestClient(app).get("/api/v1/tasks/does-not-exist/cases")
+def test_task_scenarios_unknown_id_returns_404() -> None:
+    response = TestClient(app).get("/api/v1/tasks/does-not-exist/scenarios")
     assert response.status_code == 404
 
 

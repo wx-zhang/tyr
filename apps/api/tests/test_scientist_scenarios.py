@@ -104,7 +104,7 @@ def test_catalog_lists_views_filters_and_origin_fields(tmp_path: Path) -> None:
     assert active.status_code == 200
     assert [item["artifactId"] for item in active.json()] == ["new", "old"]
     assert active.json()[0]["scenario"]["spec"]["successCriteria"] == "Respond."
-    assert active.json()[0]["runId"] == "new-run"
+    assert active.json()[0]["experimentId"] == "new-run"
     assert active.json()[0]["result"]["verdict"] == "vulnerable"
     assert [item["artifactId"] for item in protected.json()] == ["old"]
     assert archived.json() == []

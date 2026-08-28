@@ -1,23 +1,12 @@
 import { useMemo, useState } from "react";
-import type {
-  CaseProgress,
-  CollectorArtifact,
-  ProgressItem,
-  RunTurn,
-} from "../../api/client";
+import type { CaseProgress, CollectorArtifact, ProgressItem, RunTurn } from "../../api/client";
 import { groupRunHistory, type HistoryGroup } from "./runHistoryGroups";
 import { RunHistoryGroup } from "./RunHistoryGroup";
 import type { HistoryCaseOrigin } from "./ScientistHistoryUsed";
 
-const terminalCaseStates = new Set([
-  "completed",
-  "failed",
-  "cancelled",
-  "blocked",
-]);
-
 export function RunHistory({
   turns,
+  scenarioExecutions,
   cases,
   phases,
   artifacts,
@@ -36,7 +25,8 @@ export function RunHistory({
   datasetCaseIds,
 }: {
   turns: RunTurn[];
-  cases: CaseProgress[];
+  scenarioExecutions?: CaseProgress[];
+  cases?: CaseProgress[];
   phases?: ProgressItem[];
   artifacts: CollectorArtifact[];
   runId: string;
@@ -53,114 +43,52 @@ export function RunHistory({
   caseOriginById?: Map<string, HistoryCaseOrigin>;
   datasetCaseIds?: string[];
 }) {
-  const [operatorOverrides, setOperatorOverrides] = useState<
-    Map<string, boolean>
-  >(() => new Map());
-
+  const [operatorOverrides, setOperatorOverrides] = useState<Map<string, boolean>>(() => new Map());
+  const executions = scenarioExecutions ?? cases ?? [];
   const groups = useMemo(
-    () => groupRunHistory({ turns, cases, artifacts, phases }),
-    [turns, cases, artifacts, phases],
+    () => groupRunHistory({ turns, cases: executions, artifacts, phases }),
+    [turns, executions, artifacts, phases],
   );
-
   const groupOpenStates = useMemo(() => {
     const states = new Map<string, boolean>();
-    for (const g of groups) {
-      if (operatorOverrides.has(g.id)) {
-        states.set(g.id, operatorOverrides.get(g.id)!);
-      } else {
-        states.set(g.id, g.id === "discovery" ? !g.isTerminal : true);
-      }
+    for (const group of groups) {
+      states.set(group.id, operatorOverrides.has(group.id) ? operatorOverrides.get(group.id)! : group.id === "discovery" ? !group.isTerminal : true);
     }
     return states;
   }, [groups, operatorOverrides]);
-
-  const caseOpenStates = useMemo(() => {
+  const executionOpenStates = useMemo(() => {
     const states = new Map<string, boolean>();
-    for (const g of groups) {
-      for (const c of g.cases) {
-        if (operatorOverrides.has(c.caseId)) {
-          states.set(c.caseId, operatorOverrides.get(c.caseId)!);
-        } else {
-          states.set(c.caseId, false);
-        }
+    for (const group of groups) {
+      for (const execution of group.cases) {
+        states.set(execution.caseId, operatorOverrides.has(execution.caseId) ? operatorOverrides.get(execution.caseId)! : false);
       }
     }
     return states;
   }, [groups, operatorOverrides]);
-
   const handleToggleGroup = (groupId: string) => {
-    setOperatorOverrides((prev) => {
-      const next = new Map(prev);
-      const current = groupOpenStates.get(groupId) ?? false;
-      next.set(groupId, !current);
+    setOperatorOverrides((previous) => {
+      const next = new Map(previous);
+      next.set(groupId, !(groupOpenStates.get(groupId) ?? false));
       return next;
     });
   };
-
-  const handleToggleCase = (caseId: string) => {
-    setOperatorOverrides((prev) => {
-      const next = new Map(prev);
-      const current = caseOpenStates.get(caseId) ?? false;
-      next.set(caseId, !current);
+  const handleToggleExecution = (executionId: string) => {
+    setOperatorOverrides((previous) => {
+      const next = new Map(previous);
+      next.set(executionId, !(executionOpenStates.get(executionId) ?? false));
       return next;
     });
   };
-
-  const totalLoaded = turns.length;
-  const count = persistedTurnsCount ?? totalLoaded;
+  const count = persistedTurnsCount ?? turns.length;
   const hasUpdates = turns.length > 0 || artifacts.length > 0;
-
   return (
     <section className="run-history" aria-labelledby="history-title">
-      <div className="section-heading">
-        <h2 id="history-title">Run history</h2>
-        <span className="turn-count mono">{count} updates persisted</span>
-      </div>
-
-      {hasMoreTurns && onLoadMore ? (
-        <button
-          type="button"
-          className="button button-secondary pagination-button"
-          onClick={onLoadMore}
-          disabled={isLoadingMore}
-        >
-          {isLoadingMore ? "Loading earlier updates…" : "Load earlier updates"}
-        </button>
-      ) : null}
-
-      {isLoadingTurns ? (
-        <p className="secondary">Loading persisted updates…</p>
-      ) : null}
-
-      {turnsError ? (
-        <p className="callout callout-warning" role="alert">
-          {turnsError.message}
-        </p>
-      ) : null}
-
-      {!isLoadingTurns && !isLoadingArtifacts && !hasUpdates ? (
-        <p className="empty-state run-empty">
-          {isLive
-            ? "Waiting for the first update…"
-            : "No updates have been persisted yet."}
-        </p>
-      ) : null}
-
-      {groups.map((group) => (
-        <RunHistoryGroup
-          key={group.id}
-          group={group}
-          runId={runId}
-          isOpen={groupOpenStates.get(group.id) ?? false}
-          onToggle={() => handleToggleGroup(group.id)}
-          caseOpenStates={caseOpenStates}
-          onToggleCase={handleToggleCase}
-          now={now}
-          flashIds={flashIds}
-          caseOriginById={caseOriginById}
-          datasetCaseIds={datasetCaseIds}
-        />
-      ))}
+      <div className="section-heading"><h2 id="history-title">Experiment history</h2><span className="turn-count mono">{count} updates persisted</span></div>
+      {hasMoreTurns && onLoadMore ? <button type="button" className="button button-secondary pagination-button" onClick={onLoadMore} disabled={isLoadingMore}>{isLoadingMore ? "Loading earlier updates…" : "Load earlier updates"}</button> : null}
+      {isLoadingTurns ? <p className="secondary">Loading persisted updates…</p> : null}
+      {turnsError ? <p className="callout callout-warning" role="alert">{turnsError.message}</p> : null}
+      {!isLoadingTurns && !isLoadingArtifacts && !hasUpdates ? <p className="empty-state run-empty">{isLive ? "Waiting for the first update…" : "No updates have been persisted yet."}</p> : null}
+      {groups.map((group: HistoryGroup) => <RunHistoryGroup key={group.id} group={group} runId={runId} isOpen={groupOpenStates.get(group.id) ?? false} onToggle={() => handleToggleGroup(group.id)} caseOpenStates={executionOpenStates} onToggleCase={handleToggleExecution} now={now} flashIds={flashIds} caseOriginById={caseOriginById} datasetCaseIds={datasetCaseIds} />)}
     </section>
   );
 }

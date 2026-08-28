@@ -11,14 +11,14 @@ type ScientistHistoryUsedProps = {
 
 const ORIGIN_LABEL: Record<HistoryCaseOrigin, string> = {
   base: "Base",
-  scientist: "Scientist",
-  prior: "Prior run",
+  scientist: "Adversarial Researcher",
+  prior: "Prior Experiment",
 };
 
 const ORIGIN_TITLE: Record<HistoryCaseOrigin, string> = {
-  base: "Base scenarios",
-  scientist: "Scientist scenarios",
-  prior: "Prior-run scenarios",
+  base: "Base Scenarios",
+  scientist: "Adversarial Researcher Scenarios",
+  prior: "Prior-Experiment Scenarios",
 };
 
 const GROUP_ORDER: HistoryCaseOrigin[] = ["base", "scientist", "prior"];
@@ -57,12 +57,12 @@ export function ScientistHistoryUsed({ cases }: ScientistHistoryUsedProps) {
   const multiColumn = groups.length > 1;
 
   return (
-    <section className="scientist-history" aria-label="Tests used from history">
+    <section className="scientist-history" aria-label="Scenarios used from history">
       <header className="scientist-history-header">
         <div className="scientist-history-heading">
           <p className="scientist-history-label">Seed history</p>
           <p className="scientist-history-lede">
-            Prior base and scientist scenarios studied for this iteration
+            Prior base and Adversarial Researcher Scenarios studied for this iteration
           </p>
         </div>
         {cases.length ? (
@@ -86,7 +86,7 @@ export function ScientistHistoryUsed({ cases }: ScientistHistoryUsedProps) {
                 <span className="scientist-history-metric-value mono">
                   {counts.scientist}
                 </span>
-                <span className="scientist-history-metric-label">Scientist</span>
+                <span className="scientist-history-metric-label">Adversarial Researcher</span>
               </div>
             ) : null}
             {counts.prior > 0 ? (
@@ -103,7 +103,7 @@ export function ScientistHistoryUsed({ cases }: ScientistHistoryUsedProps) {
 
       {!cases.length ? (
         <p className="scientist-history-empty">
-          No prior tests were available.
+          No prior Scenarios were available.
         </p>
       ) : (
         <div
@@ -159,10 +159,10 @@ export function ScientistHistoryUsed({ cases }: ScientistHistoryUsedProps) {
 
       {cases.length ? (
         <p className="scientist-history-sr-summary">
-          {cases.length} prior test{cases.length === 1 ? "" : "s"}
+          {cases.length} prior Scenario{cases.length === 1 ? "" : "s"}
           {counts.base ? ` · ${counts.base} base` : ""}
-          {counts.scientist ? ` · ${counts.scientist} scientist` : ""}
-          {counts.prior ? ` · ${counts.prior} prior-run` : ""}
+          {counts.scientist ? ` · ${counts.scientist} Adversarial Researcher` : ""}
+          {counts.prior ? ` · ${counts.prior} prior-Experiment` : ""}
         </p>
       ) : null}
     </section>

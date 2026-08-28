@@ -11,7 +11,7 @@ from tempfile import NamedTemporaryFile
 from threading import RLock
 from typing import Any, cast
 
-from gamr_core import RunResult
+from gamr_core import ExperimentResult
 
 from .finalizer import finalize_result
 from .redaction import redact_payload
@@ -217,6 +217,47 @@ class FilesystemArtifactStore:
         self._atomic_json(path, redact_payload(payload, self.secrets))
         return str(path)
 
+    def write_scenario_execution_checkpoint(
+        self, experiment_id: str, scenario_execution_id: str, payload: dict[str, Any]
+    ) -> str:
+        if (
+            "/" in scenario_execution_id
+            or "\\" in scenario_execution_id
+            or ".." in scenario_execution_id
+        ):
+            raise ValueError("scenario execution checkpoint path escapes run root")
+        run_root = self._run_root(experiment_id)
+        safe_id = (
+            re.sub(r"[^A-Za-z0-9_-]", "-", scenario_execution_id)[:128]
+            or "scenario-execution"
+        )
+        checkpoint_dir = (run_root / "checkpoints" / "scenario-executions").resolve()
+        path = (checkpoint_dir / f"{safe_id}.json").resolve()
+        if run_root not in path.parents or checkpoint_dir not in path.parents:
+            raise ValueError("scenario execution checkpoint path escapes run root")
+        checkpoint_dir.mkdir(parents=True, exist_ok=True)
+        self._atomic_json(path, redact_payload(payload, self.secrets))
+        return str(path)
+
+    def read_scenario_execution_checkpoint(
+        self, experiment_id: str, scenario_execution_id: str
+    ) -> dict[str, Any]:
+        run_root = self._run_root(experiment_id, create=False)
+        safe_id = (
+            re.sub(r"[^A-Za-z0-9_-]", "-", scenario_execution_id)[:128]
+            or "scenario-execution"
+        )
+        path = (run_root / "checkpoints" / "scenario-executions" / f"{safe_id}.json").resolve()
+        if run_root not in path.parents:
+            raise ValueError("scenario execution checkpoint path escapes run root")
+        if not path.is_file():
+            return self.read_case_checkpoint(experiment_id, scenario_execution_id)
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as error:
+            raise ValueError("scenario execution checkpoint is malformed JSON") from error
+        return cast(dict[str, Any], redact_payload(payload, self.secrets))
+
     def write_case_checkpoint(self, run_id: str, case_id: str, payload: dict[str, Any]) -> str:
         if "/" in case_id or "\\" in case_id or ".." in case_id:
             raise ValueError("case checkpoint path escapes run root")
@@ -264,7 +305,7 @@ class FilesystemArtifactStore:
     def write_result(
         self,
         run_id: str,
-        result: RunResult,
+        result: ExperimentResult,
         task_snapshot: dict[str, object] | None = None,
     ) -> str:
         return finalize_result(self, run_id, result, task_snapshot=task_snapshot)

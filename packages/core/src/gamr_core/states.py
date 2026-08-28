@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import StrEnum
 
 
-class RunState(StrEnum):
+class ExperimentState(StrEnum):
     QUEUED = "queued"
     PREPARING = "preparing"
     DISCOVERING = "discovering"
@@ -17,7 +17,7 @@ class RunState(StrEnum):
     INTERRUPTED = "interrupted"
 
 
-class ExecutionOutcome(StrEnum):
+class CompletionOutcome(StrEnum):
     COMPLETED = "completed"
     BLOCKED = "blocked"
     FAILED = "failed"
@@ -103,52 +103,64 @@ class DecodingFailureCode(StrEnum):
     PREPARATION_FAILURE = "preparation_failure"
 
 
-_ALLOWED: dict[RunState, set[RunState]] = {
-    RunState.QUEUED: {RunState.PREPARING, RunState.CANCELLED, RunState.INTERRUPTED},
-    RunState.PREPARING: {
-        RunState.DISCOVERING,
-        RunState.FAILED,
-        RunState.CANCELLED,
-        RunState.INTERRUPTED,
+_ALLOWED: dict[ExperimentState, set[ExperimentState]] = {
+    ExperimentState.QUEUED: {
+        ExperimentState.PREPARING,
+        ExperimentState.CANCELLED,
+        ExperimentState.INTERRUPTED,
     },
-    RunState.DISCOVERING: {
-        RunState.RUNNING,
-        RunState.FAILED,
-        RunState.CANCELLED,
-        RunState.INTERRUPTED,
+    ExperimentState.PREPARING: {
+        ExperimentState.DISCOVERING,
+        ExperimentState.FAILED,
+        ExperimentState.CANCELLED,
+        ExperimentState.INTERRUPTED,
     },
-    RunState.RUNNING: {
-        RunState.WAITING_FOR_APPROVAL,
-        RunState.EVALUATING,
-        RunState.FAILED,
-        RunState.CANCELLED,
-        RunState.INTERRUPTED,
+    ExperimentState.DISCOVERING: {
+        ExperimentState.RUNNING,
+        ExperimentState.FAILED,
+        ExperimentState.CANCELLED,
+        ExperimentState.INTERRUPTED,
     },
-    RunState.WAITING_FOR_APPROVAL: {RunState.QUEUED, RunState.CANCELLED, RunState.INTERRUPTED},
-    RunState.EVALUATING: {
-        RunState.REPORTING,
-        RunState.FAILED,
-        RunState.CANCELLED,
-        RunState.INTERRUPTED,
+    ExperimentState.RUNNING: {
+        ExperimentState.WAITING_FOR_APPROVAL,
+        ExperimentState.EVALUATING,
+        ExperimentState.FAILED,
+        ExperimentState.CANCELLED,
+        ExperimentState.INTERRUPTED,
     },
-    RunState.REPORTING: {
-        RunState.COMPLETED,
-        RunState.FAILED,
-        RunState.CANCELLED,
-        RunState.INTERRUPTED,
+    ExperimentState.WAITING_FOR_APPROVAL: {
+        ExperimentState.QUEUED,
+        ExperimentState.CANCELLED,
+        ExperimentState.INTERRUPTED,
     },
-    RunState.COMPLETED: set(),
-    RunState.FAILED: set(),
-    RunState.CANCELLED: set(),
-    RunState.INTERRUPTED: {RunState.QUEUED, RunState.FAILED},
+    ExperimentState.EVALUATING: {
+        ExperimentState.REPORTING,
+        ExperimentState.FAILED,
+        ExperimentState.CANCELLED,
+        ExperimentState.INTERRUPTED,
+    },
+    ExperimentState.REPORTING: {
+        ExperimentState.COMPLETED,
+        ExperimentState.FAILED,
+        ExperimentState.CANCELLED,
+        ExperimentState.INTERRUPTED,
+    },
+    ExperimentState.COMPLETED: set(),
+    ExperimentState.FAILED: set(),
+    ExperimentState.CANCELLED: set(),
+    ExperimentState.INTERRUPTED: {ExperimentState.QUEUED, ExperimentState.FAILED},
 }
 
 
-def can_transition(source: RunState, target: RunState) -> bool:
+def can_transition(source: ExperimentState, target: ExperimentState) -> bool:
     return target in _ALLOWED[source]
 
 
-def transition(source: RunState, target: RunState) -> RunState:
+def transition(source: ExperimentState, target: ExperimentState) -> ExperimentState:
     if not can_transition(source, target):
-        raise ValueError(f"invalid run transition: {source} -> {target}")
+        raise ValueError(f"invalid experiment transition: {source} -> {target}")
     return target
+
+
+RunState = ExperimentState
+ExecutionOutcome = CompletionOutcome

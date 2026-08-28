@@ -6,10 +6,7 @@ from pathlib import Path
 import typer
 from gamr_adapters.config import Settings
 from gamr_adapters.tasks.filesystem import FilesystemTaskRepository, load_task
-from gamr_core import (
-    ExperimentConfig,
-    RunResult,
-)
+from gamr_core import ExperimentPresetConfig, ExperimentResult
 from gamr_engine.runner import ProgressEvent
 from rich.console import Console
 from rich.table import Table
@@ -18,7 +15,7 @@ from .chat_cli import run_chat_loop
 from .composition import configured_secrets
 from .evaluation_cli import run_judge_evaluation_command
 from .experiment_cli import (
-    resume_scientist_command,
+    resume_research_command,
     run_experiment_command,
 )
 from .progress import render_progress
@@ -32,8 +29,8 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 task_app = typer.Typer(help="Inspect and validate JSON tasks")
-experiment_app = typer.Typer(help="Create and inspect experiment runs")
-result_app = typer.Typer(help="Validate canonical run results")
+experiment_app = typer.Typer(help="Create and inspect Experiment Presets and Experiments")
+result_app = typer.Typer(help="Validate canonical experiment results")
 evaluate_app = typer.Typer(help="Run focused live regression evaluations")
 
 app.add_typer(task_app, name="task")
@@ -57,7 +54,7 @@ def doctor() -> None:
     checks = {
         "task_root": Path("tasks").is_dir(),
         "schema_root": Path("schemas").is_dir(),
-        "read_only_default": ExperimentConfig().action_mode == "read_only",
+        "read_only_default": ExperimentPresetConfig().action_mode == "read_only",
     }
     for name, passed in checks.items():
         console.print(f"[green]OK[/green] {name}" if passed else f"[red]FAIL[/red] {name}")
@@ -84,128 +81,163 @@ def validate_task(directory: Path) -> None:
     except Exception as error:
         console.print(f"[red]Invalid task:[/red] {error}")
         raise typer.Exit(code=1) from error
-    console.print(f"[green]Valid[/green] {task.manifest.metadata.id} ({len(task.scenarios)} cases)")
+    console.print(
+        f"[green]Valid[/green] {task.manifest.metadata.id} ({len(task.scenarios)} Scenarios)"
+    )
 
 
 @experiment_app.command("run")
 def run_experiment(
     directory: Path,
     action_mode: str = typer.Option("read_only", "--action-mode"),
-    model: str = typer.Option("", "--model", help="Override TYR_LOOP_MODEL."),
-    scientist_model: str = typer.Option(
-        "", "--scientist-model", help="Override TYR_LOOP_SCIENTIST_MODEL."
+    model: str = typer.Option("", "--model", help="Override GAMR_MODEL_NAME."),
+    adversarial_researcher_model: str = typer.Option(
+        "",
+        "--adversarial-researcher-model",
+        "--scientist-model",
+        help="Override GAMR_ADVERSARIAL_RESEARCHER_MODEL_NAME.",
     ),
-    judge_model: str = typer.Option("", "--judge-model", help="Override TYR_LOOP_JUDGE_MODEL."),
-    allow_actions: bool = typer.Option(
+    judge_model: str = typer.Option(
+        "", "--judge-model", help="Override GAMR_JUDGE_MODEL_NAME."
+    ),
+    approval_gated: bool = typer.Option(
         False,
+        "--approval-gated",
         "--allow-actions",
-        help="Enable approval_required mode for a live run.",
+        help=(
+            "Enable Approval-gated mode. GAMR requests actions; Tyr requires a "
+            "human decision for every action."
+        ),
     ),
     confirm_actions: bool = typer.Option(
         False,
         "--confirm-actions",
-        help="Confirm an action-enabled run without an interactive prompt.",
+        help="Confirm an Approval-gated experiment without an interactive prompt.",
     ),
-    case_id: list[str] = typer.Option(
-        [], "--case-id", help="Select a case; repeat to run multiple cases in manifest order."
+    scenario_id: list[str] = typer.Option(
+        [],
+        "--scenario-id",
+        "--case-id",
+        help="Select a Scenario; repeat to run multiple Scenarios in manifest order.",
     ),
-    all_cases: bool = typer.Option(False, "--all-cases", help="Run every case in the task."),
-    max_concurrent_cases: int = typer.Option(
+    all_scenarios: bool = typer.Option(
+        False, "--all-scenarios", "--all-cases", help="Run every Scenario in the Task."
+    ),
+    max_concurrent_scenario_executions: int = typer.Option(
         5,
+        "--max-concurrent-scenario-executions",
         "--max-concurrent-cases",
         min=1,
         max=5,
-        help="Maximum concurrent base cases to run.",
+        help="Maximum concurrent Scenario Executions.",
     ),
-    scientist_iterations: int = typer.Option(
-        0, "--scientist-iterations", min=0, help="Generate and run bounded follow-up scenarios."
+    research_iterations: int = typer.Option(
+        0,
+        "--research-iterations",
+        "--scientist-iterations",
+        min=0,
+        help="Generate and run bounded Research Iterations.",
     ),
     history_test_runs: int = typer.Option(
-        10,
-        "--history-test-runs",
-        min=0,
-        max=100,
-        help="Use this many latest unique base scenarios as history.",
+        10, "--history-test-runs", min=0, max=100, help="Use latest base Scenarios as history."
     ),
-    history_scientist_runs: int = typer.Option(
+    history_research_runs: int = typer.Option(
         5,
+        "--history-research-runs",
         "--history-scientist-runs",
         min=0,
         max=100,
-        help="Use this many latest unique scientist scenarios as history.",
+        help="Use latest Research Iterations as history.",
     ),
 ) -> None:
-    """Run a task through the shared engine and write a JSON bundle."""
+    """Run a Task through the shared engine and write an Experiment bundle."""
 
     run_experiment_command(
         console=console,
         directory=directory,
         action_mode=action_mode,
         model=model,
-        scientist_model=scientist_model,
+        adversarial_researcher_model=adversarial_researcher_model,
         judge_model=judge_model,
-        allow_actions=allow_actions,
+        allow_actions=approval_gated,
         confirm_actions=confirm_actions,
-        case_id=case_id,
-        all_cases=all_cases,
-        max_concurrent_cases=max_concurrent_cases,
-        scientist_iterations=scientist_iterations,
+        scenario_id=scenario_id,
+        all_scenarios=all_scenarios,
+        max_concurrent_scenario_executions=max_concurrent_scenario_executions,
+        research_iterations=research_iterations,
         history_test_runs=history_test_runs,
-        history_scientist_runs=history_scientist_runs,
+        history_research_runs=history_research_runs,
+        render_progress_cb=_render_progress,
+    )
+
+
+@experiment_app.command("resume-research")
+def resume_research_experiment(
+    run_id: str,
+    research_iterations: int = typer.Option(
+        0,
+        "--research-iterations",
+        "--scientist-iterations",
+        min=0,
+        help="Override the source Experiment's researchIterations.",
+    ),
+    model: str = typer.Option("", "--model", help="Override GAMR_MODEL_NAME."),
+    adversarial_researcher_model: str = typer.Option(
+        "",
+        "--adversarial-researcher-model",
+        "--scientist-model",
+        help="Override GAMR_ADVERSARIAL_RESEARCHER_MODEL_NAME.",
+    ),
+    judge_model: str = typer.Option("", "--judge-model", help="Override GAMR_JUDGE_MODEL_NAME."),
+    confirm_actions: bool = typer.Option(
+        False,
+        "--confirm-actions",
+        help="Confirm an Approval-gated resume without an interactive prompt.",
+    ),
+) -> None:
+    """Resume the Adversarial Researcher with prior Scenario history."""
+
+    resume_research_command(
+        console=console,
+        run_id=run_id,
+        research_iterations=research_iterations,
+        model=model,
+        adversarial_researcher_model=adversarial_researcher_model,
+        judge_model=judge_model,
+        confirm_actions=confirm_actions,
         render_progress_cb=_render_progress,
     )
 
 
 @experiment_app.command("resume-scientist")
-def resume_scientist_experiment(
+def resume_scientist_compatibility(
     run_id: str,
     scientist_iterations: int = typer.Option(
-        0,
-        "--scientist-iterations",
-        min=0,
-        help="Override the source run's scientist_iterations.",
+        0, "--scientist-iterations", min=0, help="Legacy alias for --research-iterations."
     ),
-    model: str = typer.Option("", "--model", help="Override TYR_LOOP_MODEL."),
-    scientist_model: str = typer.Option(
-        "", "--scientist-model", help="Override TYR_LOOP_SCIENTIST_MODEL."
-    ),
-    judge_model: str = typer.Option("", "--judge-model", help="Override TYR_LOOP_JUDGE_MODEL."),
-    confirm_actions: bool = typer.Option(
-        False,
-        "--confirm-actions",
-        help="Confirm an action-enabled resume without an interactive prompt.",
-    ),
+    model: str = typer.Option("", "--model"),
+    scientist_model: str = typer.Option("", "--scientist-model"),
+    judge_model: str = typer.Option("", "--judge-model"),
+    confirm_actions: bool = typer.Option(False, "--confirm-actions"),
 ) -> None:
-    """Resume only the scientist phase of a prior run, seeded with its case history."""
-
-    resume_scientist_command(
+    resume_research_command(
         console=console,
         run_id=run_id,
-        scientist_iterations=scientist_iterations,
+        research_iterations=scientist_iterations,
         model=model,
-        scientist_model=scientist_model,
+        adversarial_researcher_model=scientist_model,
         judge_model=judge_model,
         confirm_actions=confirm_actions,
         render_progress_cb=_render_progress,
     )
 
 
-@experiment_app.command("show")
-def show_experiment(run_id: str) -> None:
-    """Show a stored run result."""
-
-    path = Path(".gamr") / "runs" / run_id / "result.json"
-    if not path.exists():
-        raise typer.BadParameter(f"run does not exist: {run_id}")
-    console.print_json(path.read_text(encoding="utf-8"))
-
-
 @result_app.command("validate")
 def validate_result(path: Path) -> None:
-    """Validate a canonical result JSON file."""
+    """Validate a canonical Experiment result JSON file."""
 
     try:
-        RunResult.model_validate_json(path.read_text(encoding="utf-8"))
+        ExperimentResult.model_validate_json(path.read_text(encoding="utf-8"))
     except Exception as error:
         console.print(f"[red]Invalid result:[/red] {error}")
         raise typer.Exit(code=1) from error
@@ -240,26 +272,27 @@ def evaluate_judges(
 @app.command()
 def chat(
     prompt: str = typer.Option("", "--prompt"),
-    allow_actions: bool = typer.Option(
+    approval_gated: bool = typer.Option(
         False,
+        "--approval-gated",
         "--allow-actions",
-        help="Expose action-capable Tyr tools; every call still requires approval.",
+        help="Use Approval-gated mode; Tyr requires a human decision for every action.",
     ),
     confirm_actions: bool = typer.Option(
         False,
         "--confirm-actions",
-        help="Confirm action-capable chat without an interactive prompt.",
+        help="Confirm Approval-gated chat without an interactive prompt.",
     ),
-    model: str = typer.Option("", "--model", help="Override TYR_LOOP_CHAT_MODEL."),
+    model: str = typer.Option("", "--model", help="Override GAMR_CHAT_MODEL_NAME."),
     base_url: str = typer.Option("", "--base-url", help="Override OPENROUTER_BASE_URL."),
 ) -> None:
     """Connect to Tyr through a read-only interactive chat session."""
 
     action_mode = validate_action_mode(
-        "approval_required" if allow_actions else "read_only",
-        allow_actions,
+        "approval_required" if approval_gated else "read_only",
+        approval_gated,
         confirm_actions,
-        "Enable action-capable tools? Each action still requires approval",
+        "Use Approval-gated tools? Tyr requires an explicit human decision for every action",
     )
     try:
         asyncio.run(

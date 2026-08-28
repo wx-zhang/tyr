@@ -69,9 +69,11 @@ class NormalizedTurn:
     number: int
     stage: str
     case_id: str | None
-    status: str
-    agent_message: str
-    tyr_message: str | None
+    scenario_id: str | None = None
+    scenario_execution_id: str | None = None
+    status: str = ""
+    agent_message: str = ""
+    tyr_message: str | None = None
     occurred_at: datetime | None = None
     replied_at: datetime | None = None
     update_type: str = "conversation"
@@ -89,7 +91,6 @@ class NormalizedTurn:
     history_case_origins: tuple[str, ...] = ()
     sandbox_operation: SandboxOperationPreview | None = None
     scenario: Scenario | None = None
-
 
 class _SandboxSession(TypedDict):
     owner: str
@@ -112,8 +113,9 @@ def _parse_occurred_at(value: object) -> datetime | None:
 
 
 def _related_case_ids(value: dict[str, object]) -> tuple[str, ...]:
-    return _stored_case_ids(value.get("relatedCaseIds"))
-
+    return _stored_case_ids(
+        value.get("relatedScenarioExecutionIds", value.get("relatedCaseIds"))
+    )
 
 def _stored_case_ids(value: object) -> tuple[str, ...]:
     if not isinstance(value, (list, tuple)):
@@ -234,9 +236,17 @@ def _scientist_turns_from_activity(
             occurred_at = _parse_occurred_at(value.get("occurredAt"))
             summary = value.get("summary")
             message = str(summary).strip() if isinstance(summary, str) and summary.strip() else ""
-            case_value = value.get("caseId")
+            scenario_value = value.get("scenarioId", value.get("caseId"))
+            execution_value = value.get("scenarioExecutionId", value.get("caseId"))
             activity_case_id = (
-                str(case_value) if isinstance(case_value, str) and case_value else None
+                str(scenario_value)
+                if isinstance(scenario_value, str) and scenario_value
+                else None
+            )
+            activity_execution_id = (
+                str(execution_value)
+                if isinstance(execution_value, str) and execution_value
+                else activity_case_id
             )
             if status == "model_thinking" or event_type == "model.thinking":
                 if activity_case_id is None and turn_meta is not None:
@@ -287,6 +297,8 @@ def _scientist_turns_from_activity(
                     "status": "ready",
                     "agent_message": message or f"Scientist scenario {index} ready",
                     "case_id": activity_case_id,
+                    "scenario_id": activity_case_id,
+                    "scenario_execution_id": activity_execution_id,
                     "occurred_at": occurred_at,
                     "history_case_ids": previous.get("history_case_ids", ()),
                     "history_case_origins": previous.get("history_case_origins", ()),
@@ -328,6 +340,12 @@ def _scientist_turns_from_activity(
                 number=number,
                 stage="scientist",
                 case_id=str(item["case_id"]) if item.get("case_id") else None,
+                scenario_id=str(item["scenario_id"]) if item.get("scenario_id") else None,
+                scenario_execution_id=(
+                    str(item["scenario_execution_id"])
+                    if item.get("scenario_execution_id")
+                    else None
+                ),
                 status=str(item["status"]),
                 agent_message=message,
                 tyr_message=None,
@@ -520,8 +538,9 @@ def _evaluation_turn_from_case(
         number=number,
         stage=stage,
         case_id=case.scenario_id,
+        scenario_id=case.scenario_id,
+        scenario_execution_id=case.scenario_execution_id,
         status=case.outcome.value,
-        agent_message=case.summary,
         tyr_message=None,
         occurred_at=occurred_at,
         replied_at=None,
@@ -550,7 +569,9 @@ def _evaluation_turns_from_case_results(
     secrets: Iterable[str] = (),
     judge_pipeline: str | None = None,
 ) -> list[NormalizedTurn]:
-    directory = root / "case-results"
+    directory = root / "scenario-execution-results"
+    if not directory.is_dir():
+        directory = root / "case-results"
     if not directory.is_dir():
         return []
     contexts = _case_completion_context(root)
@@ -777,12 +798,22 @@ def normalize_turns(
                         if isinstance(legacy_phase, str) and legacy_phase in _TURN_STAGES
                         else "unknown"
                     )
-                case_value = value.get("caseId")
-                case_id = str(case_value) if isinstance(case_value, str) and case_value else None
+                scenario_value = value.get("scenarioId", value.get("caseId"))
+                execution_value = value.get("scenarioExecutionId", value.get("caseId"))
+                scenario_id = (
+                    str(scenario_value)
+                    if isinstance(scenario_value, str) and scenario_value
+                    else None
+                )
+                scenario_execution_id = (
+                    str(execution_value)
+                    if isinstance(execution_value, str) and execution_value
+                    else scenario_id
+                )
                 item = grouped.get(turn_id)
                 occurred_at = _parse_occurred_at(value.get("occurredAt"))
                 if item is None:
-                    context = (stage_value, case_id)
+                    context = (stage_value, scenario_id)
                     context_counts[context] = context_counts.get(context, 0) + 1
                     turn_value = value.get("turn")
                     item = {
@@ -792,7 +823,9 @@ def normalize_turns(
                         if isinstance(turn_value, int) and turn_value > 0
                         else context_counts[context],
                         "stage": stage_value,
-                        "case_id": case_id,
+                        "case_id": scenario_id,
+                        "scenario_id": scenario_id,
+                        "scenario_execution_id": scenario_execution_id,
                         "agent_message": "",
                         "tyr_message": None,
                         "occurred_at": None,
@@ -834,8 +867,14 @@ def normalize_turns(
                 number=number,
                 stage=str(item["stage"]),
                 case_id=str(item["case_id"]) if item["case_id"] else None,
-                status="completed" if item["tyr_message"] is not None else "waiting_for_tyr",
+                scenario_id=str(item["scenario_id"]) if item.get("scenario_id") else None,
+                scenario_execution_id=(
+                    str(item["scenario_execution_id"])
+                    if item.get("scenario_execution_id")
+                    else None
+                ),
                 agent_message=str(item["agent_message"]),
+                status="completed" if item["tyr_message"] is not None else "waiting_for_tyr",
                 tyr_message=str(item["tyr_message"]) if item["tyr_message"] is not None else None,
                 occurred_at=occurred_at if isinstance(occurred_at, datetime) else None,
                 replied_at=replied_at if isinstance(replied_at, datetime) else None,
@@ -861,11 +900,13 @@ def normalize_turns(
     ordered = sorted(combined, key=sort_key)
     return [
         NormalizedTurn(
-            id=turn.id,
             sequence=index,
             number=turn.number,
+            id=turn.id,
             stage=turn.stage,
             case_id=turn.case_id,
+            scenario_id=turn.scenario_id,
+            scenario_execution_id=turn.scenario_execution_id,
             status=turn.status,
             agent_message=turn.agent_message,
             tyr_message=turn.tyr_message,
@@ -970,6 +1011,8 @@ class BundleNormalizer:
                 "activityType",
                 "status",
                 "phase",
+                "scenarioId",
+                "scenarioExecutionId",
                 "caseId",
                 "turnId",
                 "operationId",
@@ -979,6 +1022,8 @@ class BundleNormalizer:
                 "evidenceType",
                 "summary",
                 "evidenceRefs",
+                "relatedScenarioExecutionIds",
+                "relatedCaseIds",
                 "detailAvailability",
                 "sandboxEvent",
             }
@@ -1152,7 +1197,10 @@ class BundleNormalizer:
                             occurredAt=datetime(1970, 1, 1, tzinfo=UTC),
                             activityType=ActivityType.COMMUNICATION,
                             status="observed",
-                            caseId=record.get("caseId"),
+                            scenarioId=record.get("scenarioId", record.get("caseId")),
+                            scenarioExecutionId=record.get(
+                                "scenarioExecutionId", record.get("caseId")
+                            ),
                             turnId=record.get("turnId"),
                             evidenceType=EvidenceType.TRANSCRIPT,
                             summary=str(
@@ -1190,12 +1238,23 @@ class BundleNormalizer:
                         Availability.MALFORMED,
                     )
                 )
-        cases = result_payload.get("cases", []) if result_payload else []
-        for case in cases if isinstance(cases, list) else []:
-            if not isinstance(case, dict):
+        scenario_executions = (
+            result_payload.get("scenarioExecutions", result_payload.get("cases", []))
+            if result_payload
+            else []
+        )
+        for scenario_execution in (
+            scenario_executions if isinstance(scenario_executions, list) else []
+        ):
+            if not isinstance(scenario_execution, dict):
                 continue
-            case_id = str(case.get("scenarioId") or "unknown-case")
-            for entry in case.get("evidence", []):
+            scenario_id = str(scenario_execution.get("scenarioId") or "unknown-scenario")
+            scenario_execution_id = str(
+                scenario_execution.get("scenarioExecutionId")
+                or scenario_execution.get("caseId")
+                or scenario_id
+            )
+            for entry in scenario_execution.get("evidence", []):
                 if not isinstance(entry, dict):
                     continue
                 relative = str(entry.get("artifact") or "")
@@ -1204,7 +1263,7 @@ class BundleNormalizer:
                     (
                         item
                         for activity in activities
-                        if activity.case_id == case_id
+                        if activity.scenario_execution_id == scenario_execution_id
                         for item in activity.evidence_refs
                         if item not in used_refs
                     ),
@@ -1212,7 +1271,9 @@ class BundleNormalizer:
                 )
                 used_refs.add(ref)
                 result.append(
-                    self._artifact_item(root, run_id, ref, relative, case_id, entry.get("turnId"))
+                    self._artifact_item(
+                        root, run_id, ref, relative, scenario_id, entry.get("turnId")
+                    )
                 )
         for path in sorted((root / "raw").glob("**/*")) if (root / "raw").is_dir() else []:
             if not path.is_file():

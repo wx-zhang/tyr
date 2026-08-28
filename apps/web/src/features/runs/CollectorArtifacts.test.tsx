@@ -4,7 +4,8 @@ import { CollectorArtifactUpdate } from "./CollectorArtifacts";
 
 const artifacts = [
   {
-    caseId: "case-1",
+    scenarioId: "scenario-1",
+    scenarioExecutionId: "execution-1",
     requirement: "file",
     status: "verified",
     requestIds: ["0123456789abcdef0123456789abcdef"],
@@ -46,17 +47,20 @@ beforeEach(() => {
 
 afterEach(() => vi.useRealTimers());
 
-it("shows verified remote-backed files with a run-scoped download", async () => {
+it("shows verified remote-backed files with a Scenario Execution-scoped download", async () => {
   render(
-    <ol aria-label="Run updates">
+    <ol aria-label="Experiment updates">
       <CollectorArtifactUpdate runId="run-1" artifact={artifacts[0]} />
     </ol>,
   );
 
   expect(screen.getByText("evidence.md")).toBeInTheDocument();
   expect(
-    screen.getByRole("heading", { name: "File received - case-1" }),
+    screen.getByRole("heading", { name: "File received - Scenario Execution execution-1" }),
   ).toBeInTheDocument();
+  const identity = screen.getByRole("heading", { name: "File received - Scenario Execution execution-1" }).parentElement;
+  expect(identity).toHaveTextContent("Scenario scenario-1");
+  expect(identity).toHaveTextContent("Execution execution-1");
   expect(screen.queryByRole("heading", { name: "Collector artifacts" })).toBeNull();
   expect(screen.getByText("Verified")).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "Download evidence.md" })).toHaveAttribute(

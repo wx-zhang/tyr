@@ -157,8 +157,8 @@ describe("RunHistory activity presentation", () => {
       ),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("Waiting for an execution slot"),
-    ).toBeInTheDocument();
+      screen.getByRole("button", { name: /case-queued/ }),
+    ).toHaveTextContent("Waiting for a Scenario Execution slot");
   });
 
   it("does not mark discovery complete while its lifecycle phase is active", () => {
@@ -185,7 +185,7 @@ describe("RunHistory activity presentation", () => {
     expect(within(toggle).queryByText("Completed")).not.toBeInTheDocument();
   });
 
-  it("shows explicit aggregate progress and the latest activity in a collapsed case", () => {
+  it("shows explicit aggregate progress and the latest activity in a collapsed Scenario Execution", () => {
     const completedCase: CaseProgress = {
       caseId: "case-alpha",
       order: 1,
@@ -207,21 +207,19 @@ describe("RunHistory activity presentation", () => {
       ),
     );
 
-    const groupToggle = screen.getByRole("button", { name: /Test cases/ });
+    const groupToggle = screen.getByRole("button", { name: /Scenario Executions/ });
     const progress = screen.getByRole("progressbar", {
-      name: "Test case progress",
+      name: "Scenario Execution progress",
     });
     expect(progress).toHaveAttribute("aria-valuenow", "1");
     expect(progress).toHaveAttribute("aria-valuemax", "2");
     expect(
-      within(groupToggle).getByText("1 of 2 cases complete"),
+      within(groupToggle).getByText("1 of 2 Scenario Executions complete"),
     ).toBeInTheDocument();
 
     const caseToggle = screen.getByRole("button", { name: /case-alpha/ });
     expect(caseToggle).toHaveAttribute("aria-expanded", "false");
-    expect(
-      within(caseToggle).getByText("Latest evaluation summary"),
-    ).toBeInTheDocument();
+    expect(caseToggle).toHaveTextContent("Latest evaluation summary");
   });
 
   it("keeps older activity compact and expands the latest activity", () => {
@@ -238,7 +236,7 @@ describe("RunHistory activity presentation", () => {
     fireEvent.click(screen.getByRole("button", { name: /case-alpha/ }));
 
     const updates = screen.getByRole("list", {
-      name: "Updates for case-alpha",
+      name: "Updates for Scenario Execution case-alpha",
     });
     const activityToggles = within(updates).getAllByRole("button");
     expect(activityToggles).toHaveLength(2);
@@ -255,7 +253,7 @@ describe("RunHistory activity presentation", () => {
     const { rerender } = render(history([first, second], [activeCase]));
     fireEvent.click(screen.getByRole("button", { name: /case-alpha/ }));
     const updates = screen.getByRole("list", {
-      name: "Updates for case-alpha",
+      name: "Updates for Scenario Execution case-alpha",
     });
     const firstToggle = within(updates).getAllByRole("button")[0];
 
@@ -278,7 +276,7 @@ describe("RunHistory activity presentation", () => {
     fireEvent.click(screen.getByRole("button", { name: /case-alpha/ }));
 
     expect(
-      screen.getByText("No updates recorded for this case yet."),
+      screen.getByText("No updates recorded for this Scenario Execution yet."),
     ).toBeInTheDocument();
   });
 });

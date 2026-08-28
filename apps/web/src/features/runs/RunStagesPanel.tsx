@@ -28,7 +28,7 @@ export function RunStagesPanel({
       aria-labelledby="stages-title"
     >
       <div className="section-heading">
-        <h2 id="stages-title">Stage</h2>
+        <h2 id="stages-title">Experiment State</h2>
         <span className="muted" role="status" aria-live="polite">
           {waitingForTyr
             ? "Waiting for Tyr"
@@ -37,8 +37,8 @@ export function RunStagesPanel({
               : currentPhaseLabel(run, phases)}
         </span>
       </div>
-      {isLoading ? <p className="secondary">Loading run stages…</p> : null}
-      <ol className="run-stages" aria-label="Run stages">
+      {isLoading ? <p className="secondary">Loading Experiment stages…</p> : null}
+      <ol className="run-stages" aria-label="Experiment State stages">
         {(phases ?? []).map((phase) => {
           const active = phase.state === "active";
           const statusText = stageStatusLabel(

@@ -13,9 +13,9 @@ beforeEach(() => {
 
 it("removes the previous evidence navigation and controls", async () => {
   renderRunPage();
-  await screen.findByRole("heading", { name: "Run history" });
+  await screen.findByRole("heading", { name: "Experiment history" });
 
-  expect(screen.queryByRole("link", { name: "Cases" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: "Scenarios" })).not.toBeInTheDocument();
   expect(
     screen.queryByRole("link", { name: "Artifacts" }),
   ).not.toBeInTheDocument();
@@ -64,14 +64,14 @@ it("keeps the Tyr network panel closed by default and expands on demand", async 
   expect(window.localStorage.getItem("gamr-tyr-network-open")).toBe("0");
 });
 
-it("shows Cancel run while the run is live", async () => {
+it("shows Cancel Experiment while the Experiment is live", async () => {
   renderRunPage();
   expect(
-    await screen.findByRole("button", { name: "Cancel run" }),
+    await screen.findByRole("button", { name: "Cancel Experiment" }),
   ).toBeInTheDocument();
 });
 
-it("hides Cancel run after the run ends", async () => {
+it("hides Cancel Experiment after the Experiment ends", async () => {
   vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
     const url = String(input);
     if (url.includes("/visualization")) {
@@ -103,6 +103,6 @@ it("hides Cancel run after the run ends", async () => {
   });
 
   renderRunPage();
-  await screen.findByRole("heading", { name: "Run history" });
-  expect(screen.queryByRole("button", { name: "Cancel run" })).not.toBeInTheDocument();
+  await screen.findByRole("heading", { name: "Experiment history" });
+  expect(screen.queryByRole("button", { name: "Cancel Experiment" })).not.toBeInTheDocument();
 });

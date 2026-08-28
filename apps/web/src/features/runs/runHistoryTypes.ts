@@ -1,26 +1,25 @@
-import type {
-  CaseProgress,
-  CollectorArtifact,
-  RunTurn,
-} from "../../api/client";
+import type { CaseProgress, CollectorArtifact, RunTurn } from "../../api/client";
 
 export type HistoryUpdate =
   | { kind: "turn"; sequence: number; timestamp: number; turn: RunTurn }
-  | {
-      kind: "artifact";
-      sequence: number;
-      timestamp: number;
-      artifact: CollectorArtifact;
-    };
+  | { kind: "artifact"; sequence: number; timestamp: number; artifact: CollectorArtifact };
 
 export type HistoryCaseEntry = {
+  scenarioId?: string;
+  scenarioExecutionId?: string;
   caseId: string;
   progress: CaseProgress | undefined;
   updates: HistoryUpdate[];
 };
 
 export type HistoryGroup = {
-  id: "discovery" | "cases" | "other" | `iteration-${number}`;
+  id:
+    | "discovery"
+    | "scenario-executions"
+    | "cases"
+    | "other"
+    | `research-iteration-${number}`
+    | `iteration-${number}`;
   label: string;
   updates: HistoryUpdate[];
   cases: HistoryCaseEntry[];
@@ -29,12 +28,7 @@ export type HistoryGroup = {
   isBusy: boolean;
 };
 
-export const terminalCaseStates = new Set([
-  "completed",
-  "failed",
-  "cancelled",
-  "blocked",
-]);
+export const terminalCaseStates = new Set(["completed", "failed", "cancelled", "blocked"]);
 
 export function isTurnBusy(turn: RunTurn): boolean {
   return turn.status === "waiting_for_tyr" || turn.status === "generating";
@@ -47,44 +41,25 @@ export function parseTimestamp(value: string | null | undefined): number {
 }
 
 export function sortUpdates(updates: HistoryUpdate[]): HistoryUpdate[] {
-  return [...updates].sort((a, b) => {
-    if (a.timestamp !== b.timestamp) return a.timestamp - b.timestamp;
-    return a.sequence - b.sequence;
-  });
+  return [...updates].sort((a, b) => a.timestamp !== b.timestamp ? a.timestamp - b.timestamp : a.sequence - b.sequence);
 }
 
-export function isScientistGeneration(turn: RunTurn): boolean {
-  return (
-    turn.stage === "scientist" &&
-    (turn.updateType === "scientist_generation" ||
-      (!turn.tyrMessage &&
-        ["generating", "failed", "ready", "completed"].includes(turn.status)))
-  );
+export function isResearchGeneration(turn: RunTurn): boolean {
+  return turn.stage === "scientist" && (turn.updateType === "scientist_generation" || (!turn.tyrMessage && ["generating", "failed", "ready", "completed"].includes(turn.status)));
 }
 
-export function resolveScientistIteration(
-  turn: RunTurn,
-  turns: RunTurn[],
-): number {
-  if (
-    turn.updateType === "scientist_generation" ||
-    turn.stage === "scientist"
-  ) {
-    if (
-      turn.number &&
-      (turn.updateType === "scientist_generation" || !turn.caseId)
-    ) {
-      return turn.number;
-    }
-    if (turn.caseId) {
-      const generations = turns.filter(
-        (candidate) =>
-          candidate.updateType === "scientist_generation" &&
-          candidate.number != null,
-      );
-      if (generations.length > 0)
-        return generations[generations.length - 1].number;
+export const isScientistGeneration = isResearchGeneration;
+
+export function resolveResearchIteration(turn: RunTurn, turns: RunTurn[]): number {
+  const executionId = turn.scenarioExecutionId ?? turn.caseId;
+  if (turn.updateType === "scientist_generation" || turn.stage === "scientist") {
+    if (turn.number && (turn.updateType === "scientist_generation" || !executionId)) return turn.number;
+    if (executionId) {
+      const generations = turns.filter((candidate) => candidate.updateType === "scientist_generation" && candidate.number != null);
+      if (generations.length > 0) return generations[generations.length - 1].number;
     }
   }
   return 1;
 }
+
+export const resolveScientistIteration = resolveResearchIteration;

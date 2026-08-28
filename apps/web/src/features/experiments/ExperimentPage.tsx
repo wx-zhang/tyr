@@ -2,29 +2,24 @@ import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
-  createExperiment,
-  fetchTaskCases,
+  createExperimentPreset,
+  fetchTaskScenarios,
   fetchTasks,
-  scenarioToCase,
   type Task,
 } from "../../api/client";
 import { PageHeader } from "../../components/PageHeader";
-import { CaseChecklist } from "./CaseChecklist";
-import { ScientistHistoryPanel } from "./ScientistHistoryPanel";
+import { ScenarioChecklist } from "./CaseChecklist";
+import { ResearchHistoryPanel } from "./ScientistHistoryPanel";
 
-function defaultCaseSelection(
-  task: Task | undefined,
-  caseIds: string[],
-): string[] {
+function defaultScenarioSelection(task: Task | undefined, scenarioIds: string[]): string[] {
   if (!task) return [];
-  const defaults = task.spec.defaults.defaultCaseIds ?? [];
-  const known = new Set(caseIds);
+  const defaults = task.spec.defaults.defaultScenarioIds ?? task.spec.defaults.defaultCaseIds ?? [];
+  const known = new Set(scenarioIds);
   const fromDefaults = defaults.filter((id: string) => known.has(id));
-  if (fromDefaults.length > 0) return fromDefaults;
-  return caseIds;
+  return fromDefaults.length > 0 ? fromDefaults : scenarioIds;
 }
 
-function defaultExperimentName(taskTitle: string): string {
+function defaultPresetName(taskTitle: string): string {
   const stamp = new Intl.DateTimeFormat(undefined, {
     dateStyle: "medium",
     timeStyle: "short",
@@ -48,75 +43,63 @@ export function ExperimentPage() {
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [taskId, setTaskId] = useState("");
-  const [selectedCaseIds, setSelectedCaseIds] = useState<string[]>([]);
-  const [allowActions, setAllowActions] = useState(true);
-  const [maxConcurrentCasesInput, setMaxConcurrentCasesInput] = useState("1");
-  const [scientistIterationsInput, setScientistIterationsInput] = useState("0");
+  const [selectedScenarioIds, setSelectedScenarioIds] = useState<string[]>([]);
+  const [approvalGated, setApprovalGated] = useState(true);
+  const [maxConcurrentScenarioExecutionsInput, setMaxConcurrentScenarioExecutionsInput] = useState("1");
+  const [researchIterationsInput, setResearchIterationsInput] = useState("0");
   const [historyTestRunsInput, setHistoryTestRunsInput] = useState("10");
-  const [historyScientistRunsInput, setHistoryScientistRunsInput] =
-    useState("5");
-  const maxConcurrentCases = useMemo(
-    () => boundedConcurrency(maxConcurrentCasesInput),
-    [maxConcurrentCasesInput],
+  const [historyResearchRunsInput, setHistoryResearchRunsInput] = useState("5");
+  const maxConcurrentScenarioExecutions = useMemo(
+    () => boundedConcurrency(maxConcurrentScenarioExecutionsInput),
+    [maxConcurrentScenarioExecutionsInput],
   );
-  const scientistIterations = useMemo(() => {
-    const parsed = Number(scientistIterationsInput);
+  const researchIterations = useMemo(() => {
+    const parsed = Number(researchIterationsInput);
     return Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)) : 0;
-  }, [scientistIterationsInput]);
-  const historyTestRuns = useMemo(
-    () => boundedCount(historyTestRunsInput),
-    [historyTestRunsInput],
-  );
-  const historyScientistRuns = useMemo(
-    () => boundedCount(historyScientistRunsInput),
-    [historyScientistRunsInput],
+  }, [researchIterationsInput]);
+  const historyTestRuns = useMemo(() => boundedCount(historyTestRunsInput), [historyTestRunsInput]);
+  const historyResearchRuns = useMemo(
+    () => boundedCount(historyResearchRunsInput),
+    [historyResearchRunsInput],
   );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [casesOpen, setCasesOpen] = useState(true);
+  const [scenariosOpen, setScenariosOpen] = useState(true);
 
-  const tasks = useQuery({
-    queryKey: ["tasks"],
-    queryFn: fetchTasks,
-  });
+  const tasks = useQuery({ queryKey: ["tasks"], queryFn: fetchTasks });
 
   useEffect(() => {
     if (taskId || !tasks.data?.length) return;
     const preferred =
-      tasks.data.find(
-        (item) => item.metadata.id === "exfiltrate-important-txt",
-      ) ?? tasks.data[0];
-    if (preferred) {
-      setTaskId(preferred.metadata.id);
-    }
+      tasks.data.find((item) => item.metadata.id === "exfiltrate-important-txt") ?? tasks.data[0];
+    if (preferred) setTaskId(preferred.metadata.id);
   }, [tasks.data, taskId]);
 
   const selectedTask = useMemo(
     () => tasks.data?.find((item) => item.metadata.id === taskId),
     [tasks.data, taskId],
   );
-
-  const cases = useQuery({
-    queryKey: ["task-cases", taskId],
-    queryFn: () => fetchTaskCases(taskId),
+  const scenarios = useQuery({
+    queryKey: ["task-scenarios", taskId],
+    queryFn: () => fetchTaskScenarios(taskId),
     enabled: Boolean(taskId),
   });
 
   useEffect(() => {
-    if (!cases.data) return;
-    setSelectedCaseIds(
-      defaultCaseSelection(
+    if (!scenarios.data) return;
+    setSelectedScenarioIds(
+      defaultScenarioSelection(
         selectedTask,
-        cases.data.map((item) => item.metadata.id),
+        scenarios.data.map((item) => item.metadata.id),
       ),
     );
-  }, [cases.data, selectedTask]);
+  }, [scenarios.data, selectedTask]);
 
-  const toggleCase = (caseId: string) => {
-    setSelectedCaseIds((current) =>
-      current.includes(caseId)
-        ? current.filter((id) => id !== caseId)
-        : [...current, caseId],
+  const toggleScenario = (scenarioId: string) => {
+    setSelectedScenarioIds((current) =>
+      current.includes(scenarioId)
+        ? current.filter((id) => id !== scenarioId)
+        : [...current, scenarioId],
     );
   };
 
@@ -124,78 +107,68 @@ export function ExperimentPage() {
     event.preventDefault();
     setError(null);
     if (!taskId) {
-      setError("Select a task.");
+      setError("Select a Task.");
       return;
     }
-    if (selectedCaseIds.length === 0 && scientistIterations === 0) {
-      setError(
-        "Select at least one test case or set scientist iterations above 0.",
-      );
+    if (selectedScenarioIds.length === 0 && researchIterations === 0) {
+      setError("Select at least one Scenario or set Research Iterations above 0.");
       return;
     }
     const taskTitle = selectedTask?.metadata.title ?? taskId;
-    const experimentName = name.trim() || defaultExperimentName(taskTitle);
+    const presetName = name.trim() || defaultPresetName(taskTitle);
     setSubmitting(true);
     try {
-      const experiment = await createExperiment({
-        name: experimentName,
+      const preset = await createExperimentPreset({
+        name: presetName,
         task: taskId,
-        actionMode: allowActions ? "approval_required" : "read_only",
-        caseIds: selectedCaseIds,
-        maxConcurrentCases,
-        scientistIterations,
+        actionMode: approvalGated ? "approval_required" : "read_only",
+        scenarioIds: selectedScenarioIds,
+        maxConcurrentScenarioExecutions,
+        researchIterations,
         historyTestRuns,
-        historyScientistRuns,
+        historyResearchRuns,
       });
-      if (!experiment.id) throw new Error("Experiment was not created");
-      navigate(`/experiments/${experiment.id}`);
+      if (!preset.id) throw new Error("Experiment Preset was not created");
+      navigate(`/experiments/${preset.id}`);
     } catch (reason) {
-      setError(
-        reason instanceof Error
-          ? reason.message
-          : "Could not create experiment",
-      );
+      setError(reason instanceof Error ? reason.message : "Could not create Experiment Preset");
     } finally {
       setSubmitting(false);
     }
   };
 
-  const caseList = (cases.data ?? []).map(scenarioToCase);
-  const scientistOnly = Boolean(taskId) && selectedCaseIds.length === 0;
+  const scenarioList = scenarios.data ?? [];
+  const researcherOnly = Boolean(taskId) && selectedScenarioIds.length === 0;
   const canSubmit =
     Boolean(taskId) &&
-    (selectedCaseIds.length > 0 || scientistIterations > 0) &&
+    (selectedScenarioIds.length > 0 || researchIterations > 0) &&
     !submitting &&
-    !cases.isLoading;
+    !scenarios.isLoading;
 
   return (
     <section className="section-stack">
       <PageHeader
-        eyebrow="Experiment execution"
-        title="Execute experiment"
-        description="Choose a task and execution mode, then start a live red-team run against Tyr."
+        eyebrow="Experiment Preset"
+        title="Run Experiment"
+        description="Choose a Task and execution settings, then start an Experiment against Tyr."
         actions={
           <Link className="button button-secondary" to="/tasks">
-            Browse tasks
+            Browse Tasks
           </Link>
         }
       />
-
-      <div
-        className={`execute-layout${!casesOpen ? " execute-layout-collapsed" : ""}`}
-      >
+      <div className={`execute-layout${!scenariosOpen ? " execute-layout-collapsed" : ""}`}>
         <form className="card form-card" onSubmit={submit}>
           <div className="field-group">
-            <label htmlFor="experiment-name">Name</label>
+            <label htmlFor="experiment-name">Preset name</label>
             <input
               id="experiment-name"
               name="name"
               value={name}
               onChange={(event) => setName(event.target.value)}
-              placeholder="Optional · defaults to task and time"
+              placeholder="Optional · defaults to Task and time"
             />
           </div>
-
           <div className="field-group">
             <label htmlFor="experiment-task">Task</label>
             <select
@@ -203,17 +176,16 @@ export function ExperimentPage() {
               name="task"
               value={taskId}
               onChange={(event) => {
-                const nextTaskId = event.target.value;
-                setTaskId(nextTaskId);
-                setSelectedCaseIds([]);
+                setTaskId(event.target.value);
+                setSelectedScenarioIds([]);
                 setError(null);
-                setCasesOpen(true);
+                setScenariosOpen(true);
               }}
               required
               disabled={tasks.isLoading}
             >
               <option value="" disabled>
-                {tasks.isLoading ? "Loading tasks…" : "Select a task"}
+                {tasks.isLoading ? "Loading Tasks…" : "Select a Task"}
               </option>
               {(tasks.data ?? []).map((task) => (
                 <option key={task.metadata.id} value={task.metadata.id}>
@@ -221,214 +193,104 @@ export function ExperimentPage() {
                 </option>
               ))}
             </select>
-            {tasks.isError ? (
-              <p className="field-help" role="alert">
-                Could not load tasks. Check the API connection.
-              </p>
-            ) : null}
+            {tasks.isError ? <p className="field-help" role="alert">Could not load Tasks. Check the API connection.</p> : null}
           </div>
-
-          {!casesOpen ? (
+          {!scenariosOpen ? (
             <div className="field-group">
-              <span className="field-label">Test cases</span>
+              <span className="field-label">Scenarios</span>
               <div className="case-explorer-actions">
-                <button
-                  type="button"
-                  className="button button-secondary"
-                  onClick={() => setCasesOpen(true)}
-                  aria-expanded={false}
-                  aria-controls="test-cases-panel"
-                >
-                  Show test cases
+                <button type="button" className="button button-secondary" onClick={() => setScenariosOpen(true)} aria-expanded={false} aria-controls="scenarios-panel">
+                  Show Scenarios
                 </button>
-                <span className="field-help mono tabular">
-                  {selectedCaseIds.length} selected
-                </span>
+                <span className="field-help mono tabular">{selectedScenarioIds.length} selected</span>
               </div>
             </div>
           ) : null}
-
           <label className="choice-card choice-card-compact choice-card-risk">
             <input
               type="checkbox"
-              checked={allowActions}
-              onChange={(event) => setAllowActions(event.target.checked)}
-              aria-label="Actions Allowed"
+              checked={approvalGated}
+              onChange={(event) => setApprovalGated(event.target.checked)}
+              aria-label="Approval-gated"
             />
             <span className="choice-inline-content">
-              <span className="choice-title" aria-hidden="true">
-                Actions Allowed
-              </span>
-              <span className="choice-description">
-                (approval required per action)
-              </span>
+              <span className="choice-title" aria-hidden="true">Approval-gated</span>
+              <span className="choice-description">GAMR requests actions; Tyr requires an explicit human decision for every action.</span>
             </span>
           </label>
-
           <div className="field-group">
-            <label htmlFor="max-concurrent-cases">Max concurrent cases</label>
+            <label htmlFor="max-concurrent-scenarios">Max concurrent Scenario Executions</label>
             <input
-              id="max-concurrent-cases"
-              name="maxConcurrentCases"
+              id="max-concurrent-scenarios"
+              name="maxConcurrentScenarioExecutions"
               type="number"
               min={1}
               max={5}
               step={1}
               inputMode="numeric"
-              value={maxConcurrentCasesInput}
-              onChange={(event) => {
-                setMaxConcurrentCasesInput(event.target.value);
-              }}
-              onBlur={() => {
-                setMaxConcurrentCasesInput(String(maxConcurrentCases));
-              }}
+              value={maxConcurrentScenarioExecutionsInput}
+              onChange={(event) => setMaxConcurrentScenarioExecutionsInput(event.target.value)}
+              onBlur={() => setMaxConcurrentScenarioExecutionsInput(String(maxConcurrentScenarioExecutions))}
             />
-            <p className="field-help">
-              Number of base test cases to execute simultaneously (1 to 5,
-              default 1).
-            </p>
+            <p className="field-help">Number of base Scenario Executions to run simultaneously (1 to 5, default 1).</p>
           </div>
-
           <div className="field-group">
             <div className="field-label-row">
-              <label htmlFor="scientist-iterations">Scientist iterations</label>
-              <button
-                type="button"
-                className="info-tip"
-                aria-label="What scientist iterations means"
-                aria-describedby="scientist-iterations-tip"
-              >
+              <label htmlFor="research-iterations">Research Iterations</label>
+              <button type="button" className="info-tip" aria-label="What Research Iterations means" aria-describedby="research-iterations-tip">
                 <span aria-hidden="true">i</span>
-                <span
-                  id="scientist-iterations-tip"
-                  role="tooltip"
-                  className="info-tip-bubble"
-                >
-                  The maximum number of new, task-specific scenarios the
-                  scientist will generate and run after discovery.
-                </span>
+                <span id="research-iterations-tip" role="tooltip" className="info-tip-bubble">The maximum number of new Task-specific Scenarios the Adversarial Researcher generates and runs after discovery.</span>
               </button>
             </div>
             <input
-              id="scientist-iterations"
-              name="scientistIterations"
+              id="research-iterations"
+              name="researchIterations"
               type="number"
               min={0}
               step={1}
               inputMode="numeric"
-              value={scientistIterationsInput}
-              onChange={(event) => {
-                setScientistIterationsInput(event.target.value);
-              }}
-              onBlur={() => {
-                setScientistIterationsInput(String(scientistIterations));
-              }}
+              value={researchIterationsInput}
+              onChange={(event) => setResearchIterationsInput(event.target.value)}
+              onBlur={() => setResearchIterationsInput(String(researchIterations))}
             />
             <p className="field-help">
-              {scientistIterations === 0
-                ? scientistOnly
-                  ? "Select cases or set scientist iterations above 0."
-                  : "Off. Selected cases run only."
-                : scientistOnly
-                  ? `Scientist-only for this task: use recent history to generate and run up to ${scientistIterations} scenario${scientistIterations === 1 ? "" : "s"}.`
-                  : `After selected cases finish, generate and run up to ${scientistIterations} task-specific follow-up scenario${scientistIterations === 1 ? "" : "s"}.`}
+              {researchIterations === 0
+                ? researcherOnly
+                  ? "Select Scenarios or set Research Iterations above 0."
+                  : "Off. Selected Scenarios run only."
+                : researcherOnly
+                  ? `Adversarial Researcher only: use recent history to generate and run up to ${researchIterations} Scenario${researchIterations === 1 ? "" : "s"}.`
+                  : `After selected Scenarios finish, generate and run up to ${researchIterations} Task-specific follow-up Scenario${researchIterations === 1 ? "" : "s"}.`}
             </p>
           </div>
-
           <div className="form-actions">
-            {error ? (
-              <p className="form-status form-status-error" role="alert">
-                {error}
-              </p>
-            ) : null}
-            <button
-              className="button button-primary"
-              type="submit"
-              disabled={!canSubmit}
-            >
-              {submitting ? "Creating…" : "Continue"}
-            </button>
+            {error ? <p className="form-status form-status-error" role="alert">{error}</p> : null}
+            <button className="button button-primary" type="submit" disabled={!canSubmit}>{submitting ? "Creating…" : "Continue"}</button>
           </div>
         </form>
-
         <div className="execute-side-stack">
-          {casesOpen ? (
-            <aside
-              id="test-cases-panel"
-              className="card form-card"
-              aria-labelledby="test-cases-title"
-            >
+          {scenariosOpen ? (
+            <aside id="scenarios-panel" className="card form-card" aria-labelledby="scenarios-title">
               <div className="card-header">
-                <div>
-                  <p className="eyebrow">Task cases</p>
-                  <h2 id="test-cases-title">Test cases</h2>
-                </div>
+                <div><p className="eyebrow">Task Scenarios</p><h2 id="scenarios-title">Scenarios</h2></div>
                 <div className="case-explorer-actions">
-                  {taskId && selectedCaseIds.length > 0 ? (
-                    <span className="secondary mono tabular">
-                      {selectedCaseIds.length} selected
-                    </span>
-                  ) : null}
-                  <button
-                    type="button"
-                    className="button button-ghost"
-                    onClick={() => setCasesOpen(false)}
-                    aria-expanded={true}
-                    aria-controls="test-cases-panel"
-                  >
-                    Hide
-                  </button>
+                  {taskId && selectedScenarioIds.length > 0 ? <span className="secondary mono tabular">{selectedScenarioIds.length} selected</span> : null}
+                  <button type="button" className="button button-ghost" onClick={() => setScenariosOpen(false)} aria-expanded={true} aria-controls="scenarios-panel">Hide</button>
                 </div>
               </div>
-              {!taskId ? (
-                <p className="field-help">Select a task to load cases.</p>
-              ) : cases.isLoading ? (
-                <p className="field-help" role="status">
-                  Loading cases…
-                </p>
-              ) : cases.isError ? (
-                <p className="field-help" role="alert">
-                  Could not load cases for this task.
-                </p>
-              ) : caseList.length === 0 ? (
-                <p className="field-help">No cases in this task.</p>
-              ) : (
-                <CaseChecklist
-                  cases={caseList}
-                  selectedCaseIds={selectedCaseIds}
-                  onToggle={toggleCase}
-                  onSelectDefaults={() =>
-                    setSelectedCaseIds(
-                      defaultCaseSelection(
-                        selectedTask,
-                        caseList.map((item) => item.id),
-                      ),
-                    )
-                  }
-                  onSelectAll={() =>
-                    setSelectedCaseIds(caseList.map((item) => item.id))
-                  }
-                  onClear={() => setSelectedCaseIds([])}
+              {!taskId ? <p className="field-help">Select a Task to load Scenarios.</p> : scenarios.isLoading ? <p className="field-help" role="status">Loading Scenarios…</p> : scenarios.isError ? <p className="field-help" role="alert">Could not load Scenarios for this Task.</p> : scenarioList.length === 0 ? <p className="field-help">No Scenarios in this Task.</p> : (
+                <ScenarioChecklist
+                  scenarios={scenarioList}
+                  selectedScenarioIds={selectedScenarioIds}
+                  onToggle={toggleScenario}
+                  onSelectDefaults={() => setSelectedScenarioIds(defaultScenarioSelection(selectedTask, scenarioList.map((item) => item.metadata.id)))}
+                  onSelectAll={() => setSelectedScenarioIds(scenarioList.map((item) => item.metadata.id))}
+                  onClear={() => setSelectedScenarioIds([])}
                 />
               )}
             </aside>
           ) : null}
-          {scientistOnly ? (
-            <ScientistHistoryPanel
-              testRunsInput={historyTestRunsInput}
-              scientistRunsInput={historyScientistRunsInput}
-              testRuns={historyTestRuns}
-              scientistRuns={historyScientistRuns}
-              onTestRunsChange={setHistoryTestRunsInput}
-              onTestRunsBlur={() =>
-                setHistoryTestRunsInput(String(historyTestRuns))
-              }
-              onScientistRunsChange={setHistoryScientistRunsInput}
-              onScientistRunsBlur={() =>
-                setHistoryScientistRunsInput(String(historyScientistRuns))
-              }
-            />
-          ) : null}
+          {researcherOnly ? <ResearchHistoryPanel testRunsInput={historyTestRunsInput} scientistRunsInput={historyResearchRunsInput} testRuns={historyTestRuns} scientistRuns={historyResearchRuns} onTestRunsChange={setHistoryTestRunsInput} onTestRunsBlur={() => setHistoryTestRunsInput(String(historyTestRuns))} onScientistRunsChange={setHistoryResearchRunsInput} onScientistRunsBlur={() => setHistoryResearchRunsInput(String(historyResearchRuns))} /> : null}
         </div>
       </div>
     </section>

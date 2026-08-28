@@ -169,14 +169,14 @@ it("hides selection checkboxes until Select is chosen", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Select" }));
 
   expect(
-    screen.getByRole("checkbox", { name: "Select all deletable sessions" }),
+    screen.getByRole("checkbox", { name: "Select all deletable Experiments" }),
   ).toBeInTheDocument();
-  expect(screen.getAllByRole("checkbox", { name: /Select session/ }).length).toBeGreaterThan(0);
+  expect(screen.getAllByRole("checkbox", { name: /Select Experiment/ }).length).toBeGreaterThan(0);
   expect(screen.getByRole("button", { name: "Delete selected" })).toBeDisabled();
 
   const liveRow = findRow("second-plan");
   expect(
-    within(liveRow).getByRole("checkbox", { name: /Select session/ }),
+    within(liveRow).getByRole("checkbox", { name: /Select Experiment/ }),
   ).toBeDisabled();
 });
 
@@ -191,7 +191,7 @@ it("bulk-deletes selected sessions from the toolbar", async () => {
   await screen.findByText("exfiltrate-important-txt");
   await screen.findByText("third-plan");
   fireEvent.click(screen.getByRole("button", { name: "Select" }));
-  const selectAll = screen.getByRole("checkbox", { name: "Select all deletable sessions" });
+  const selectAll = screen.getByRole("checkbox", { name: "Select all deletable Experiments" });
   fireEvent.click(selectAll);
 
   const bulkButton = await screen.findByRole("button", { name: "Delete 2 selected" });

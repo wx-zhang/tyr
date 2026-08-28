@@ -230,7 +230,9 @@ class ActivityMemoryRepository:
             return False
         return all(
             (
-                not query.case_id or activity.case_id == query.case_id,
+                not query.scenario_id or activity.scenario_id == query.scenario_id,
+                not query.scenario_execution_id
+                or activity.scenario_execution_id == query.scenario_execution_id,
                 not query.participant_id
                 or query.participant_id
                 in {activity.source_participant_id, activity.target_participant_id},
@@ -246,8 +248,8 @@ class ActivityMemoryRepository:
     def _scope(cls, query: EvidenceQuery) -> dict[str, object]:
         return {
             "q": query.query,
-            "caseId": query.case_id,
-            "participantId": query.participant_id,
+            "scenarioId": query.scenario_id,
+            "scenarioExecutionId": query.scenario_execution_id,
             "activityType": cls._serialize(query.activity_type),
             "status": query.status,
             "evidenceType": cls._serialize(query.evidence_type),

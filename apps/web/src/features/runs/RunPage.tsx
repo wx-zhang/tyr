@@ -2,9 +2,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
-  cancelRun,
+  cancelExperiment,
   fetchCollectorArtifacts,
-  fetchTaskCases,
+  fetchTaskScenarios,
   fetchRun,
   fetchRunTurns,
   fetchRunVisualization,
@@ -56,11 +56,12 @@ export function RunPage() {
     queryFn: () => fetchRun(runId),
   });
   const taskId = visualization.data?.run?.task ?? runRecord.data?.task ?? null;
-  const taskCases = useQuery({
-    queryKey: ["task-cases", taskId],
-    queryFn: () => fetchTaskCases(taskId!),
+  const taskScenarios = useQuery({
+    queryKey: ["task-scenarios", taskId],
+    queryFn: () => fetchTaskScenarios(taskId!),
     enabled: Boolean(taskId),
   });
+  const taskCases = taskScenarios;
   const turns = useQuery({
     queryKey: ["run-turns", runId],
     queryFn: () => fetchRunTurns(runId),
@@ -90,8 +91,8 @@ export function RunPage() {
   const previousVisible = useRef<Map<string, RunTurn>>(new Map());
 
   const run = visualization.data?.run;
-  const scientistIterations =
-    runRecord.data?.configuration?.scientistIterations ?? 0;
+  const researchIterations =
+    runRecord.data?.configuration?.researchIterations ?? 0;
   const latestTurns = turns.data?.items;
   const isLive = Boolean(run && !terminalStates.has(run.state));
   const waitingForTyr = Boolean(
@@ -125,22 +126,20 @@ export function RunPage() {
   const requestCancel = async () => {
     if (cancelling || !isLive) return;
     const confirmed = window.confirm(
-      `Cancel run ${runId}? The run will stop. Existing evidence remains reviewable.`,
+      `Cancel Experiment ${runId}? The Experiment will stop. Existing evidence remains reviewable.`,
     );
     if (!confirmed) return;
     setCancelling(true);
     setCancelError(null);
     try {
-      await cancelRun(runId);
-      await queryClient.invalidateQueries({
-        queryKey: ["run-visualization", runId],
-      });
+      await cancelExperiment(runId);
+      await queryClient.invalidateQueries({ queryKey: ["run-visualization", runId] });
       await queryClient.invalidateQueries({ queryKey: ["run-turns", runId] });
     } catch (error) {
       setCancelError(
         error instanceof Error
-          ? `Could not cancel run: ${error.message}`
-          : "Could not cancel run",
+          ? `Could not cancel Experiment: ${error.message}`
+          : "Could not cancel Experiment",
       );
     } finally {
       setCancelling(false);
@@ -208,7 +207,7 @@ export function RunPage() {
         run={run}
         now={now}
         isLive={isLive}
-        scientistIterations={scientistIterations}
+        researchIterations={researchIterations}
         refreshMs={refreshMs}
         onSelectRefreshMs={selectRefreshMs}
         connectionState={events.connectionState}
@@ -240,7 +239,7 @@ export function RunPage() {
 
       <RunHistory
         turns={allTurns}
-        cases={visualization.data?.cases ?? []}
+        scenarioExecutions={visualization.data?.scenarioExecutions ?? visualization.data?.cases ?? []}
         phases={visualization.data?.phases}
         artifacts={
           Array.isArray(collectorArtifacts.data) ? collectorArtifacts.data : []

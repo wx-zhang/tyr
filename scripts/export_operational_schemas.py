@@ -3,12 +3,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from gamr_core import ExperimentRecord, RunRecord
+from gamr_core import ExperimentPresetRecord, ExperimentRecord
 
 
 def main() -> None:
     output = Path("schemas")
-    for name, model in (("experiment", ExperimentRecord), ("run", RunRecord)):
+    for name, model in (("experiment", ExperimentPresetRecord), ("run", ExperimentRecord)):
         schema = model.model_json_schema(by_alias=True)
         schema["$id"] = f"https://gamr.local/schemas/{name}.schema.json"
         (output / f"{name}.schema.json").write_text(

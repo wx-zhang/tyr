@@ -10,7 +10,7 @@ Keep all provider and persistence access behind protocols. CLI and API use the s
 
 ## Source map
 
-`runner.py` is the shared discovery/case engine and emits typed activities,
+`runner.py` is the shared discovery and Scenario Execution engine and emits typed activities,
 `sandbox_preview.py` decorates sandbox ports with append-only, verbatim
 operation lifecycle events and logical generation/attempt tracking,
 `assessment.py` builds and validates the evidence judge contract,
@@ -31,23 +31,24 @@ and `content_evidence.py` owns the in-memory contracts,
 - `judges/contracts.py`: `JudgeRequest`, `JudgeRuntime`, `JudgeResult`, and `JudgePipeline` protocol
 - `judges/registry.py`: immutable registry mapping `JudgePipelineId` to pipeline implementations
 - `judges/evidence_and_content/`: `evidence-and-content` StateGraph implementation
-`execution.py` finalizes the shared JSON result and report,
+`execution.py` finalizes the shared JSON Experiment result and report,
 `chat.py` is the interactive tool loop, `reporting.py` derives Markdown, and
-`scientist_prompt.py` builds task-specific scientist generation prompts;
-scientist generation retries empty completions up to `_RETRY_LIMIT` extra
+`scientist_prompt.py` builds Task-specific Adversarial Researcher prompts;
+research generation retries empty completions up to `_RETRY_LIMIT` extra
 attempts, and
 `ports/` contains provider, artifact, activity-sink, ephemeral Python sandbox, and tracing interfaces (`ports/tracing.py` defines vendor-neutral `TracePort`, `TraceObservation`, and fail-open context managers);
 the artifact port exposes the archive-state query used immediately before each
-scientist prompt.
+Research Iteration prompt.
 
 
 Keep activity emission changes covered in `packages/engine/tests/test_runner.py`;
 the CLI and API must continue to consume this same execution path.
-Cases waiting for bounded capacity emit `case.queued`; `case.started` is emitted only after a case acquires a slot.
+Scenario Executions waiting for bounded capacity emit `case.queued`; `case.started` is emitted only
+after an execution acquires a slot. These event values remain historical compatibility tokens.
 
 ### Judge pipeline conventions
 
-Predefined judges use LangGraph StateGraph with stable node names (`prepare_verified_content`, `decode_trajectory_content`, `compare_reference_content`, `preserve_execution_failure`, `assess_evidence`, `finalize_judgment`). They run without checkpointers or persistent stores. Trajectory decoding reuses the judge model with a standard-library Docker sandbox across up to three attempts per case, fails closed on errors, and is capacity-governed via `DecoderCapacityGate`. Sensitive references and credentials are strictly excluded from decoder execution.
+Predefined judges use LangGraph StateGraph with stable node names (`prepare_verified_content`, `decode_trajectory_content`, `compare_reference_content`, `preserve_execution_failure`, `assess_evidence`, `finalize_judgment`). They run without checkpointers or persistent stores. Trajectory decoding reuses the judge model with a standard-library Docker sandbox across up to three attempts per Scenario Execution, fails closed on errors, and is capacity-governed via `DecoderCapacityGate`. Sensitive references and credentials are strictly excluded from decoder execution.
 Decoder feedback never exposes stdout or stderr. Executions require derived files, while an inspection-only route may be revised to direct evaluation with its attempt provenance retained.
 Usable derived text or images survive unsupported auxiliary outputs, but incomplete evidence cannot support a definitive negative comparison. Missing approval evidence is an unknown approval state, not evidence of an unapproved action.
 
@@ -61,10 +62,10 @@ To add a predefined judge pipeline:
 ## Commands
 
 `uv run pytest packages/engine/tests` (focused: `uv run pytest packages/engine/tests/judges/`).
-Scientist history archive filtering is covered by
+Adversarial Researcher history archive filtering is covered by
 `packages/engine/tests/test_scientist_history_archive.py`. History windows keep
-the latest run of each unique scenario, capped by `historyTestRuns` and
-`historyScientistRuns`.
+the latest Experiment of each unique Scenario, capped by
+`historyTestRuns` and `historyResearchRuns`.
 
 ## Safety
 

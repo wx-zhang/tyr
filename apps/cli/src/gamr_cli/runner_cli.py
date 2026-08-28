@@ -13,11 +13,7 @@ from gamr_adapters.config import Settings
 from gamr_adapters.models.openai_compatible import OpenAICompatibleModel
 from gamr_adapters.tracing import create_trace_port
 from gamr_adapters.tyr.client import TyrMcpClient
-from gamr_core import (
-    ExecutionOutcome,
-    RunRecord,
-    RunState,
-)
+from gamr_core import CompletionOutcome, ExperimentRecord, ExperimentState
 from gamr_engine import ExecutionOutput
 from gamr_engine.ports.sandbox import Sandbox
 from gamr_engine.ports.tracing import TracePort
@@ -86,7 +82,7 @@ def build_experiment_execution(
     if not settings.model_api_key:
         raise typer.BadParameter("OPENROUTER_API_KEY is required")
     if not selected_model:
-        raise typer.BadParameter("TYR_LOOP_MODEL is required")
+        raise typer.BadParameter("GAMR_MODEL_NAME is required")
     from . import main as main_cli
 
     store_cls = getattr(main_cli, "FilesystemArtifactStore", FilesystemArtifactStore)
@@ -142,7 +138,7 @@ def build_experiment_execution(
 
 def execute_cli_run(
     console: Console,
-    run_document: RunRecord,
+    run_document: ExperimentRecord,
     artifact_store: FilesystemArtifactStore,
     execute_coro_fn: Callable[[], Coroutine[Any, Any, ExecutionOutput]],
     trace_port: TracePort | None = None,
@@ -160,7 +156,7 @@ def execute_cli_run(
             f"runs/{run_id}/run.json",
             run_document.model_copy(
                 update={
-                    "state": RunState.CANCELLED,
+                    "state": ExperimentState.CANCELLED,
                     "error_summary": "Cancelled by operator (Ctrl+C)",
                     "updated_at": cancelled_at,
                     "finished_at": cancelled_at,
@@ -175,7 +171,7 @@ def execute_cli_run(
             f"runs/{run_id}/run.json",
             run_document.model_copy(
                 update={
-                    "state": RunState.FAILED,
+                    "state": ExperimentState.FAILED,
                     "error_summary": f"{type(error).__name__}: {error}",
                     "updated_at": failed_at,
                     "finished_at": failed_at,
@@ -188,12 +184,12 @@ def execute_cli_run(
             trace_port.flush(timeout=5.0)
     finished_at = datetime.now(UTC)
     terminal_state = (
-        RunState.FAILED
+        ExperimentState.FAILED
         if output.result.outcome
-        in {ExecutionOutcome.FAILED, ExecutionOutcome.ERROR, ExecutionOutcome.INTERRUPTED}
-        else RunState.CANCELLED
-        if output.result.outcome is ExecutionOutcome.CANCELLED
-        else RunState.COMPLETED
+        in {CompletionOutcome.FAILED, CompletionOutcome.ERROR, CompletionOutcome.INTERRUPTED}
+        else ExperimentState.CANCELLED
+        if output.result.outcome is CompletionOutcome.CANCELLED
+        else ExperimentState.COMPLETED
     )
     artifact_store.write_json(
         f"runs/{run_id}/run.json",
@@ -206,7 +202,7 @@ def execute_cli_run(
             }
         ).model_dump(by_alias=True, mode="json"),
     )
-    console.print(f"Run [cyan]{output.result.run_id}[/cyan] {terminal_state.value}")
+    console.print(f"Experiment [cyan]{output.result.run_id}[/cyan] {terminal_state.value}")
     for result_error in output.result.errors:
         console.print(f"[red]✗[/] {result_error}")
     console.print(output.result_path)

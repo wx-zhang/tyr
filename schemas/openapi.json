@@ -129,6 +129,53 @@
         }
       }
     },
+    "/api/v1/tasks/{task_id}/scenarios": {
+      "get": {
+        "tags": [
+          "tasks"
+        ],
+        "summary": "List Task Scenarios",
+        "operationId": "list_task_scenarios_api_v1_tasks__task_id__scenarios_get",
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response List Task Scenarios Api V1 Tasks  Task Id  Scenarios Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/tasks/{task_id}/cases": {
       "get": {
         "tags": [
@@ -276,8 +323,8 @@
         "tags": [
           "experiments"
         ],
-        "summary": "List Experiments",
-        "operationId": "list_experiments_api_v1_experiments_get",
+        "summary": "List Experiment Presets",
+        "operationId": "list_experiment_presets_api_v1_experiments_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -289,7 +336,7 @@
                     "type": "object"
                   },
                   "type": "array",
-                  "title": "Response List Experiments Api V1 Experiments Get"
+                  "title": "Response List Experiment Presets Api V1 Experiments Get"
                 }
               }
             }
@@ -300,13 +347,13 @@
         "tags": [
           "experiments"
         ],
-        "summary": "Create Experiment",
-        "operationId": "create_experiment_api_v1_experiments_post",
+        "summary": "Create Experiment Preset",
+        "operationId": "create_experiment_preset_api_v1_experiments_post",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ExperimentCreate"
+                "$ref": "#/components/schemas/ExperimentPresetCreate"
               }
             }
           },
@@ -320,7 +367,7 @@
                 "schema": {
                   "additionalProperties": true,
                   "type": "object",
-                  "title": "Response Create Experiment Api V1 Experiments Post"
+                  "title": "Response Create Experiment Preset Api V1 Experiments Post"
                 }
               }
             }
@@ -343,8 +390,8 @@
         "tags": [
           "experiments"
         ],
-        "summary": "Get Experiment",
-        "operationId": "get_experiment_api_v1_experiments__experiment_id__get",
+        "summary": "Get Experiment Preset",
+        "operationId": "get_experiment_preset_api_v1_experiments__experiment_id__get",
         "parameters": [
           {
             "name": "experiment_id",
@@ -364,7 +411,7 @@
                 "schema": {
                   "type": "object",
                   "additionalProperties": true,
-                  "title": "Response Get Experiment Api V1 Experiments  Experiment Id  Get"
+                  "title": "Response Get Experiment Preset Api V1 Experiments  Experiment Id  Get"
                 }
               }
             }
@@ -387,8 +434,8 @@
         "tags": [
           "experiments"
         ],
-        "summary": "Start Run",
-        "operationId": "start_run_api_v1_experiments__experiment_id__runs_post",
+        "summary": "Start Experiment",
+        "operationId": "start_experiment_api_v1_experiments__experiment_id__runs_post",
         "parameters": [
           {
             "name": "experiment_id",
@@ -406,7 +453,7 @@
               "schema": {
                 "anyOf": [
                   {
-                    "$ref": "#/components/schemas/RunCreate"
+                    "$ref": "#/components/schemas/ExperimentStart"
                   },
                   {
                     "type": "null"
@@ -425,7 +472,7 @@
                 "schema": {
                   "type": "object",
                   "additionalProperties": true,
-                  "title": "Response Start Run Api V1 Experiments  Experiment Id  Runs Post"
+                  "title": "Response Start Experiment Api V1 Experiments  Experiment Id  Runs Post"
                 }
               }
             }
@@ -446,7 +493,7 @@
     "/api/v1/runs": {
       "get": {
         "tags": [
-          "runs"
+          "experiments"
         ],
         "summary": "List Runs",
         "operationId": "list_runs_api_v1_runs_get",
@@ -472,7 +519,7 @@
     "/api/v1/runs/{run_id}": {
       "get": {
         "tags": [
-          "runs"
+          "experiments"
         ],
         "summary": "Get Run",
         "operationId": "get_run_api_v1_runs__run_id__get",
@@ -514,7 +561,7 @@
       },
       "delete": {
         "tags": [
-          "runs"
+          "experiments"
         ],
         "summary": "Delete Run",
         "operationId": "delete_run_api_v1_runs__run_id__delete",
@@ -549,7 +596,7 @@
     "/api/v1/runs/{run_id}/cancel": {
       "post": {
         "tags": [
-          "runs"
+          "experiments"
         ],
         "summary": "Cancel Run",
         "operationId": "cancel_run_api_v1_runs__run_id__cancel_post",
@@ -593,7 +640,7 @@
     "/api/v1/runs/{run_id}/retry": {
       "post": {
         "tags": [
-          "runs"
+          "experiments"
         ],
         "summary": "Retry Run",
         "operationId": "retry_run_api_v1_runs__run_id__retry_post",
@@ -637,7 +684,7 @@
     "/api/v1/runs/{run_id}/events": {
       "get": {
         "tags": [
-          "runs"
+          "experiments"
         ],
         "summary": "Events",
         "operationId": "events_api_v1_runs__run_id__events_get",
@@ -688,7 +735,7 @@
     "/api/v1/runs/{run_id}/cases": {
       "get": {
         "tags": [
-          "runs"
+          "experiments"
         ],
         "summary": "Cases",
         "operationId": "cases_api_v1_runs__run_id__cases_get",
@@ -735,7 +782,7 @@
     "/api/v1/runs/{run_id}/artifacts": {
       "get": {
         "tags": [
-          "runs"
+          "experiments"
         ],
         "summary": "Artifacts",
         "operationId": "artifacts_api_v1_runs__run_id__artifacts_get",
@@ -926,6 +973,38 @@
             }
           },
           {
+            "name": "scenarioId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scenarioid"
+            }
+          },
+          {
+            "name": "scenarioExecutionId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scenarioexecutionid"
+            }
+          },
+          {
             "name": "caseId",
             "in": "query",
             "required": false,
@@ -1095,6 +1174,38 @@
                 }
               ],
               "title": "Q"
+            }
+          },
+          {
+            "name": "scenarioId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scenarioid"
+            }
+          },
+          {
+            "name": "scenarioExecutionId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scenarioexecutionid"
             }
           },
           {
@@ -1576,10 +1687,10 @@
     "/api/v1/scientist-scenarios": {
       "get": {
         "tags": [
-          "scientist-scenarios"
+          "adversarial-researcher"
         ],
-        "summary": "List Scientist Scenarios",
-        "operationId": "list_scientist_scenarios_api_v1_scientist_scenarios_get",
+        "summary": "List Adversarial Researcher Scenarios",
+        "operationId": "list_adversarial_researcher_scenarios_api_v1_scientist_scenarios_get",
         "parameters": [
           {
             "name": "state",
@@ -1628,9 +1739,9 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/ScientistScenarioResponse"
+                    "$ref": "#/components/schemas/AdversarialResearcherScenarioResponse"
                   },
-                  "title": "Response List Scientist Scenarios Api V1 Scientist Scenarios Get"
+                  "title": "Response List Adversarial Researcher Scenarios Api V1 Scientist Scenarios Get"
                 }
               }
             }
@@ -1651,10 +1762,10 @@
     "/api/v1/scientist-scenarios/{run_id}/{artifact_id}/archive": {
       "put": {
         "tags": [
-          "scientist-scenarios"
+          "adversarial-researcher"
         ],
-        "summary": "Archive Scientist Scenario",
-        "operationId": "archive_scientist_scenario_api_v1_scientist_scenarios__run_id___artifact_id__archive_put",
+        "summary": "Archive Adversarial Researcher Scenario",
+        "operationId": "archive_adversarial_researcher_scenario_api_v1_scientist_scenarios__run_id___artifact_id__archive_put",
         "parameters": [
           {
             "name": "run_id",
@@ -1681,7 +1792,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ScientistScenarioResponse"
+                  "$ref": "#/components/schemas/AdversarialResearcherScenarioResponse"
                 }
               }
             }
@@ -1700,10 +1811,10 @@
       },
       "delete": {
         "tags": [
-          "scientist-scenarios"
+          "adversarial-researcher"
         ],
-        "summary": "Restore Scientist Scenario",
-        "operationId": "restore_scientist_scenario_api_v1_scientist_scenarios__run_id___artifact_id__archive_delete",
+        "summary": "Restore Adversarial Researcher Scenario",
+        "operationId": "restore_adversarial_researcher_scenario_api_v1_scientist_scenarios__run_id___artifact_id__archive_delete",
         "parameters": [
           {
             "name": "run_id",
@@ -1730,7 +1841,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ScientistScenarioResponse"
+                  "$ref": "#/components/schemas/AdversarialResearcherScenarioResponse"
                 }
               }
             }
@@ -1751,10 +1862,10 @@
     "/api/v1/scientist-scenarios/{run_id}/{artifact_id}/export": {
       "get": {
         "tags": [
-          "scientist-scenarios"
+          "adversarial-researcher"
         ],
-        "summary": "Export Scientist Scenario",
-        "operationId": "export_scientist_scenario_api_v1_scientist_scenarios__run_id___artifact_id__export_get",
+        "summary": "Export Adversarial Researcher Scenario",
+        "operationId": "export_adversarial_researcher_scenario_api_v1_scientist_scenarios__run_id___artifact_id__export_get",
         "parameters": [
           {
             "name": "run_id",
@@ -1834,7 +1945,7 @@
             ],
             "title": "Phase"
           },
-          "caseId": {
+          "scenarioId": {
             "anyOf": [
               {
                 "type": "string"
@@ -1843,7 +1954,18 @@
                 "type": "null"
               }
             ],
-            "title": "Caseid"
+            "title": "Scenarioid"
+          },
+          "scenarioExecutionId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scenarioexecutionid"
           },
           "turnId": {
             "anyOf": [
@@ -1915,12 +2037,12 @@
             "type": "array",
             "title": "Evidenceids"
           },
-          "relatedCaseIds": {
+          "relatedScenarioExecutionIds": {
             "items": {
               "type": "string"
             },
             "type": "array",
-            "title": "Relatedcaseids"
+            "title": "Relatedscenarioexecutionids"
           },
           "detailAvailability": {
             "$ref": "#/components/schemas/Availability"
@@ -2035,7 +2157,7 @@
             ],
             "title": "Phase"
           },
-          "caseId": {
+          "scenarioId": {
             "anyOf": [
               {
                 "type": "string"
@@ -2044,7 +2166,18 @@
                 "type": "null"
               }
             ],
-            "title": "Caseid"
+            "title": "Scenarioid"
+          },
+          "scenarioExecutionId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scenarioexecutionid"
           },
           "summary": {
             "type": "string",
@@ -2061,6 +2194,96 @@
           "summary"
         ],
         "title": "ActivityPreview"
+      },
+      "AdversarialResearcherScenarioResponse": {
+        "properties": {
+          "artifactId": {
+            "type": "string",
+            "title": "Artifactid"
+          },
+          "scenario": {
+            "$ref": "#/components/schemas/Scenario"
+          },
+          "task": {
+            "type": "string",
+            "title": "Task"
+          },
+          "experimentId": {
+            "type": "string",
+            "title": "Experimentid"
+          },
+          "experimentState": {
+            "$ref": "#/components/schemas/ExperimentState"
+          },
+          "experimentCreatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Experimentcreatedat"
+          },
+          "experimentUpdatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Experimentupdatedat"
+          },
+          "experimentFinishedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Experimentfinishedat"
+          },
+          "archivedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archivedat"
+          },
+          "resultState": {
+            "type": "string",
+            "enum": [
+              "vulnerable",
+              "protected",
+              "inconclusive",
+              "not_applicable",
+              "pending",
+              "unavailable"
+            ],
+            "title": "Resultstate"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScenarioExecutionResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "artifactId",
+          "scenario",
+          "task",
+          "experimentId",
+          "experimentState",
+          "experimentCreatedAt",
+          "experimentUpdatedAt",
+          "resultState"
+        ],
+        "title": "AdversarialResearcherScenarioResponse"
       },
       "AssessmentReasonCode": {
         "type": "string",
@@ -2103,208 +2326,6 @@
           "malformed"
         ],
         "title": "Availability"
-      },
-      "CaseProgress": {
-        "properties": {
-          "caseId": {
-            "type": "string",
-            "title": "Caseid"
-          },
-          "order": {
-            "type": "integer",
-            "title": "Order"
-          },
-          "state": {
-            "type": "string",
-            "title": "State"
-          },
-          "verdict": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Verdict"
-          },
-          "objectiveStatus": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Objectivestatus"
-          },
-          "outcome": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Outcome"
-          },
-          "summary": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Summary"
-          },
-          "assessmentStatus": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Assessmentstatus"
-          },
-          "assessmentFailure": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Assessmentfailure"
-          },
-          "reasonCodes": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Reasoncodes"
-          },
-          "missingEvidence": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Missingevidence"
-          },
-          "contentOverlap": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ContentOverlapResult"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "latestSequence": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Latestsequence"
-          }
-        },
-        "type": "object",
-        "required": [
-          "caseId",
-          "order",
-          "state"
-        ],
-        "title": "CaseProgress"
-      },
-      "CaseResult": {
-        "properties": {
-          "scenarioId": {
-            "type": "string",
-            "title": "Scenarioid"
-          },
-          "outcome": {
-            "$ref": "#/components/schemas/ExecutionOutcome"
-          },
-          "objectiveStatus": {
-            "$ref": "#/components/schemas/ObjectiveStatus",
-            "default": "unknown"
-          },
-          "verdict": {
-            "$ref": "#/components/schemas/SecurityVerdict"
-          },
-          "summary": {
-            "type": "string",
-            "title": "Summary"
-          },
-          "evidence": {
-            "items": {
-              "$ref": "#/components/schemas/Evidence"
-            },
-            "type": "array",
-            "title": "Evidence"
-          },
-          "assessmentStatus": {
-            "$ref": "#/components/schemas/AssessmentStatus",
-            "default": "unknown"
-          },
-          "assessmentFailure": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Assessmentfailure"
-          },
-          "reasonCodes": {
-            "items": {
-              "$ref": "#/components/schemas/AssessmentReasonCode"
-            },
-            "type": "array",
-            "title": "Reasoncodes"
-          },
-          "missingEvidence": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Missingevidence"
-          },
-          "contentOverlap": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ContentOverlapResult"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "scenarioId",
-          "outcome",
-          "verdict",
-          "summary",
-          "evidence"
-        ],
-        "title": "CaseResult"
       },
       "CheckedContentFile": {
         "properties": {
@@ -2385,9 +2406,27 @@
       },
       "CollectorVerificationResponse": {
         "properties": {
-          "caseId": {
-            "type": "string",
-            "title": "Caseid"
+          "scenarioId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scenarioid"
+          },
+          "scenarioExecutionId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scenarioexecutionid"
           },
           "requirement": {
             "type": "string",
@@ -2425,13 +2464,24 @@
         },
         "type": "object",
         "required": [
-          "caseId",
           "requirement",
           "status",
           "requestIds",
           "files"
         ],
         "title": "CollectorVerificationResponse"
+      },
+      "CompletionOutcome": {
+        "type": "string",
+        "enum": [
+          "completed",
+          "blocked",
+          "failed",
+          "error",
+          "cancelled",
+          "interrupted"
+        ],
+        "title": "CompletionOutcome"
       },
       "ContentMatch": {
         "properties": {
@@ -3057,19 +3107,7 @@
         ],
         "title": "EvidenceSummaryResponse"
       },
-      "ExecutionOutcome": {
-        "type": "string",
-        "enum": [
-          "completed",
-          "blocked",
-          "failed",
-          "error",
-          "cancelled",
-          "interrupted"
-        ],
-        "title": "ExecutionOutcome"
-      },
-      "ExperimentCreate": {
+      "ExperimentPresetCreate": {
         "properties": {
           "name": {
             "type": "string",
@@ -3092,6 +3130,16 @@
             "title": "Model",
             "default": ""
           },
+          "adversarialResearcherModel": {
+            "type": "string",
+            "title": "Adversarialresearchermodel",
+            "default": ""
+          },
+          "judgeModel": {
+            "type": "string",
+            "title": "Judgemodel",
+            "default": ""
+          },
           "maxTurns": {
             "type": "integer",
             "minimum": 1.0,
@@ -3104,7 +3152,7 @@
             "title": "Discoveryturns",
             "default": 20
           },
-          "caseIds": {
+          "scenarioIds": {
             "anyOf": [
               {
                 "items": {
@@ -3116,19 +3164,19 @@
                 "type": "null"
               }
             ],
-            "title": "Caseids"
+            "title": "Scenarioids"
           },
-          "scientistIterations": {
+          "researchIterations": {
             "type": "integer",
             "minimum": 0.0,
-            "title": "Scientistiterations",
+            "title": "Researchiterations",
             "default": 0
           },
-          "maxConcurrentCases": {
+          "maxConcurrentScenarioExecutions": {
             "type": "integer",
             "maximum": 5.0,
             "minimum": 1.0,
-            "title": "Maxconcurrentcases",
+            "title": "Maxconcurrentscenarioexecutions",
             "default": 5
           },
           "historyTestRuns": {
@@ -3138,11 +3186,11 @@
             "title": "Historytestruns",
             "default": 10
           },
-          "historyScientistRuns": {
+          "historyResearchRuns": {
             "type": "integer",
             "maximum": 100.0,
             "minimum": 0.0,
-            "title": "Historyscientistruns",
+            "title": "Historyresearchruns",
             "default": 5
           }
         },
@@ -3151,7 +3199,182 @@
         "required": [
           "name"
         ],
-        "title": "ExperimentCreate"
+        "title": "ExperimentPresetCreate"
+      },
+      "ExperimentStart": {
+        "properties": {
+          "scenarioIds": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scenarioids"
+          },
+          "maxConcurrentScenarioExecutions": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 5.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maxconcurrentscenarioexecutions"
+          },
+          "researchIterations": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Researchiterations"
+          },
+          "historyTestRuns": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Historytestruns"
+          },
+          "historyResearchRuns": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Historyresearchruns"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ExperimentStart"
+      },
+      "ExperimentState": {
+        "type": "string",
+        "enum": [
+          "queued",
+          "preparing",
+          "discovering",
+          "running",
+          "waiting_for_approval",
+          "evaluating",
+          "reporting",
+          "completed",
+          "failed",
+          "cancelled",
+          "interrupted"
+        ],
+        "title": "ExperimentState"
+      },
+      "ExperimentVisualizationSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          },
+          "actionMode": {
+            "type": "string",
+            "title": "Actionmode"
+          },
+          "task": {
+            "type": "string",
+            "title": "Task"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Startedat"
+          },
+          "latestUpdateAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Latestupdateat"
+          },
+          "finishedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finishedat"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome"
+          },
+          "currentPhase": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currentphase"
+          },
+          "currentScenarioExecutionIds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Currentscenarioexecutionids"
+          },
+          "executionMode": {
+            "type": "string",
+            "title": "Executionmode"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "state",
+          "actionMode",
+          "task",
+          "startedAt",
+          "latestUpdateAt",
+          "executionMode"
+        ],
+        "title": "ExperimentVisualizationSummary"
       },
       "HTTPValidationError": {
         "properties": {
@@ -3362,7 +3585,7 @@
             "type": "boolean",
             "title": "Totalknown"
           },
-          "totalCases": {
+          "totalScenarioExecutions": {
             "anyOf": [
               {
                 "type": "integer"
@@ -3371,108 +3594,19 @@
                 "type": "null"
               }
             ],
-            "title": "Totalcases"
+            "title": "Totalscenarioexecutions"
           },
-          "completedCases": {
+          "completedScenarioExecutions": {
             "type": "integer",
-            "title": "Completedcases"
+            "title": "Completedscenarioexecutions"
           }
         },
         "type": "object",
         "required": [
           "totalKnown",
-          "completedCases"
+          "completedScenarioExecutions"
         ],
         "title": "RunCounts"
-      },
-      "RunCreate": {
-        "properties": {
-          "caseIds": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Caseids"
-          },
-          "maxConcurrentCases": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "maximum": 5.0,
-                "minimum": 1.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Maxconcurrentcases"
-          },
-          "scientistIterations": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "minimum": 0.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Scientistiterations"
-          },
-          "historyTestRuns": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "maximum": 100.0,
-                "minimum": 0.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Historytestruns"
-          },
-          "historyScientistRuns": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "maximum": 100.0,
-                "minimum": 0.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Historyscientistruns"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "title": "RunCreate"
-      },
-      "RunState": {
-        "type": "string",
-        "enum": [
-          "queued",
-          "preparing",
-          "discovering",
-          "running",
-          "waiting_for_approval",
-          "evaluating",
-          "reporting",
-          "completed",
-          "failed",
-          "cancelled",
-          "interrupted"
-        ],
-        "title": "RunState"
       },
       "RunTurnPageResponse": {
         "properties": {
@@ -3531,7 +3665,7 @@
             "type": "string",
             "title": "Stage"
           },
-          "caseId": {
+          "scenarioId": {
             "anyOf": [
               {
                 "type": "string"
@@ -3540,7 +3674,18 @@
                 "type": "null"
               }
             ],
-            "title": "Caseid"
+            "title": "Scenarioid"
+          },
+          "scenarioExecutionId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scenarioexecutionid"
           },
           "status": {
             "type": "string",
@@ -3691,19 +3836,19 @@
             ],
             "title": "Judgepipeline"
           },
-          "historyCaseIds": {
+          "historyResearchRunScenarioIds": {
             "items": {
               "type": "string"
             },
             "type": "array",
-            "title": "Historycaseids"
+            "title": "Historyresearchrunscenarioids"
           },
-          "historyCaseOrigins": {
+          "historyResearchRunOrigins": {
             "items": {
               "type": "string"
             },
             "type": "array",
-            "title": "Historycaseorigins"
+            "title": "Historyresearchrunorigins"
           },
           "sandboxOperation": {
             "anyOf": [
@@ -3740,7 +3885,7 @@
       "RunVisualization": {
         "properties": {
           "run": {
-            "$ref": "#/components/schemas/RunVisualizationSummary"
+            "$ref": "#/components/schemas/ExperimentVisualizationSummary"
           },
           "phases": {
             "items": {
@@ -3749,12 +3894,12 @@
             "type": "array",
             "title": "Phases"
           },
-          "cases": {
+          "scenarioExecutions": {
             "items": {
-              "$ref": "#/components/schemas/CaseProgress"
+              "$ref": "#/components/schemas/ScenarioExecutionProgress"
             },
             "type": "array",
-            "title": "Cases"
+            "title": "Scenarioexecutions"
           },
           "attention": {
             "$ref": "#/components/schemas/RunAttention"
@@ -3791,98 +3936,12 @@
         "required": [
           "run",
           "phases",
-          "cases",
+          "scenarioExecutions",
           "attention",
           "counts",
           "latestSequence"
         ],
         "title": "RunVisualization"
-      },
-      "RunVisualizationSummary": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "state": {
-            "type": "string",
-            "title": "State"
-          },
-          "actionMode": {
-            "type": "string",
-            "title": "Actionmode"
-          },
-          "task": {
-            "type": "string",
-            "title": "Task"
-          },
-          "startedAt": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Startedat"
-          },
-          "latestUpdateAt": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Latestupdateat"
-          },
-          "finishedAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Finishedat"
-          },
-          "outcome": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Outcome"
-          },
-          "currentPhase": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Currentphase"
-          },
-          "currentCaseIds": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Currentcaseids"
-          },
-          "executionMode": {
-            "type": "string",
-            "title": "Executionmode"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "state",
-          "actionMode",
-          "task",
-          "startedAt",
-          "latestUpdateAt",
-          "executionMode"
-        ],
-        "title": "RunVisualizationSummary"
       },
       "SandboxExecutionPreview": {
         "properties": {
@@ -4354,6 +4413,232 @@
         ],
         "title": "Scenario"
       },
+      "ScenarioExecutionProgress": {
+        "properties": {
+          "scenarioId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scenarioid"
+          },
+          "scenarioExecutionId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scenarioexecutionid"
+          },
+          "order": {
+            "type": "integer",
+            "title": "Order"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          },
+          "verdict": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verdict"
+          },
+          "objectiveStatus": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Objectivestatus"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "assessmentStatus": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assessmentstatus"
+          },
+          "assessmentFailure": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assessmentfailure"
+          },
+          "reasonCodes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasoncodes"
+          },
+          "missingEvidence": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missingevidence"
+          },
+          "contentOverlap": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ContentOverlapResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "latestSequence": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latestsequence"
+          }
+        },
+        "type": "object",
+        "required": [
+          "order",
+          "state"
+        ],
+        "title": "ScenarioExecutionProgress"
+      },
+      "ScenarioExecutionResult": {
+        "properties": {
+          "scenarioId": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Scenarioid"
+          },
+          "scenarioExecutionId": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Scenarioexecutionid"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/CompletionOutcome"
+          },
+          "objectiveStatus": {
+            "$ref": "#/components/schemas/ObjectiveStatus",
+            "default": "unknown"
+          },
+          "verdict": {
+            "$ref": "#/components/schemas/SecurityVerdict"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/Evidence"
+            },
+            "type": "array",
+            "title": "Evidence"
+          },
+          "assessmentStatus": {
+            "$ref": "#/components/schemas/AssessmentStatus",
+            "default": "unknown"
+          },
+          "assessmentFailure": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assessmentfailure"
+          },
+          "reasonCodes": {
+            "items": {
+              "$ref": "#/components/schemas/AssessmentReasonCode"
+            },
+            "type": "array",
+            "title": "Reasoncodes"
+          },
+          "missingEvidence": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missingevidence"
+          },
+          "contentOverlap": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ContentOverlapResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "scenarioId",
+          "scenarioExecutionId",
+          "outcome",
+          "verdict",
+          "summary",
+          "evidence"
+        ],
+        "title": "ScenarioExecutionResult"
+      },
       "ScenarioMetadata": {
         "properties": {
           "id": {
@@ -4459,96 +4744,6 @@
           "evidenceRequirements"
         ],
         "title": "ScenarioSpec"
-      },
-      "ScientistScenarioResponse": {
-        "properties": {
-          "artifactId": {
-            "type": "string",
-            "title": "Artifactid"
-          },
-          "scenario": {
-            "$ref": "#/components/schemas/Scenario"
-          },
-          "task": {
-            "type": "string",
-            "title": "Task"
-          },
-          "runId": {
-            "type": "string",
-            "title": "Runid"
-          },
-          "runState": {
-            "$ref": "#/components/schemas/RunState"
-          },
-          "runCreatedAt": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Runcreatedat"
-          },
-          "runUpdatedAt": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Runupdatedat"
-          },
-          "runFinishedAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Runfinishedat"
-          },
-          "archivedAt": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Archivedat"
-          },
-          "resultState": {
-            "type": "string",
-            "enum": [
-              "vulnerable",
-              "protected",
-              "inconclusive",
-              "not_applicable",
-              "pending",
-              "unavailable"
-            ],
-            "title": "Resultstate"
-          },
-          "result": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/CaseResult"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "type": "object",
-        "required": [
-          "artifactId",
-          "scenario",
-          "task",
-          "runId",
-          "runState",
-          "runCreatedAt",
-          "runUpdatedAt",
-          "resultState"
-        ],
-        "title": "ScientistScenarioResponse"
       },
       "SecurityVerdict": {
         "type": "string",

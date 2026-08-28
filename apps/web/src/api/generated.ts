@@ -72,6 +72,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tasks/{task_id}/scenarios": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Task Scenarios */
+        get: operations["list_task_scenarios_api_v1_tasks__task_id__scenarios_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tasks/{task_id}/cases": {
         parameters: {
             query?: never;
@@ -130,11 +147,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Experiments */
-        get: operations["list_experiments_api_v1_experiments_get"];
+        /** List Experiment Presets */
+        get: operations["list_experiment_presets_api_v1_experiments_get"];
         put?: never;
-        /** Create Experiment */
-        post: operations["create_experiment_api_v1_experiments_post"];
+        /** Create Experiment Preset */
+        post: operations["create_experiment_preset_api_v1_experiments_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -148,8 +165,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Get Experiment */
-        get: operations["get_experiment_api_v1_experiments__experiment_id__get"];
+        /** Get Experiment Preset */
+        get: operations["get_experiment_preset_api_v1_experiments__experiment_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -167,8 +184,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Start Run */
-        post: operations["start_run_api_v1_experiments__experiment_id__runs_post"];
+        /** Start Experiment */
+        post: operations["start_experiment_api_v1_experiments__experiment_id__runs_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -472,8 +489,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Scientist Scenarios */
-        get: operations["list_scientist_scenarios_api_v1_scientist_scenarios_get"];
+        /** List Adversarial Researcher Scenarios */
+        get: operations["list_adversarial_researcher_scenarios_api_v1_scientist_scenarios_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -490,11 +507,11 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Archive Scientist Scenario */
-        put: operations["archive_scientist_scenario_api_v1_scientist_scenarios__run_id___artifact_id__archive_put"];
+        /** Archive Adversarial Researcher Scenario */
+        put: operations["archive_adversarial_researcher_scenario_api_v1_scientist_scenarios__run_id___artifact_id__archive_put"];
         post?: never;
-        /** Restore Scientist Scenario */
-        delete: operations["restore_scientist_scenario_api_v1_scientist_scenarios__run_id___artifact_id__archive_delete"];
+        /** Restore Adversarial Researcher Scenario */
+        delete: operations["restore_adversarial_researcher_scenario_api_v1_scientist_scenarios__run_id___artifact_id__archive_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -507,8 +524,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Export Scientist Scenario */
-        get: operations["export_scientist_scenario_api_v1_scientist_scenarios__run_id___artifact_id__export_get"];
+        /** Export Adversarial Researcher Scenario */
+        get: operations["export_adversarial_researcher_scenario_api_v1_scientist_scenarios__run_id___artifact_id__export_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -538,8 +555,10 @@ export interface components {
             status: string;
             /** Phase */
             phase?: string | null;
-            /** Caseid */
-            caseId?: string | null;
+            /** Scenarioid */
+            scenarioId?: string | null;
+            /** Scenarioexecutionid */
+            scenarioExecutionId?: string | null;
             /** Turnid */
             turnId?: string | null;
             /** Operationid */
@@ -556,8 +575,8 @@ export interface components {
             summary: string;
             /** Evidenceids */
             evidenceIds: string[];
-            /** Relatedcaseids */
-            relatedCaseIds?: string[];
+            /** Relatedscenarioexecutionids */
+            relatedScenarioExecutionIds?: string[];
             detailAvailability: components["schemas"]["Availability"];
             /** Metadata */
             metadata?: {
@@ -595,10 +614,43 @@ export interface components {
             status: string;
             /** Phase */
             phase?: string | null;
-            /** Caseid */
-            caseId?: string | null;
+            /** Scenarioid */
+            scenarioId?: string | null;
+            /** Scenarioexecutionid */
+            scenarioExecutionId?: string | null;
             /** Summary */
             summary: string;
+        };
+        /** AdversarialResearcherScenarioResponse */
+        AdversarialResearcherScenarioResponse: {
+            /** Artifactid */
+            artifactId: string;
+            scenario: components["schemas"]["Scenario"];
+            /** Task */
+            task: string;
+            /** Experimentid */
+            experimentId: string;
+            experimentState: components["schemas"]["ExperimentState"];
+            /**
+             * Experimentcreatedat
+             * Format: date-time
+             */
+            experimentCreatedAt: string;
+            /**
+             * Experimentupdatedat
+             * Format: date-time
+             */
+            experimentUpdatedAt: string;
+            /** Experimentfinishedat */
+            experimentFinishedAt?: string | null;
+            /** Archivedat */
+            archivedAt?: string | null;
+            /**
+             * Resultstate
+             * @enum {string}
+             */
+            resultState: "vulnerable" | "protected" | "inconclusive" | "not_applicable" | "pending" | "unavailable";
+            result?: components["schemas"]["ScenarioExecutionResult"] | null;
         };
         /**
          * AssessmentReasonCode
@@ -615,56 +667,6 @@ export interface components {
          * @enum {string}
          */
         Availability: "available" | "redacted" | "omitted" | "missing" | "malformed";
-        /** CaseProgress */
-        CaseProgress: {
-            /** Caseid */
-            caseId: string;
-            /** Order */
-            order: number;
-            /** State */
-            state: string;
-            /** Verdict */
-            verdict?: string | null;
-            /** Objectivestatus */
-            objectiveStatus?: string | null;
-            /** Outcome */
-            outcome?: string | null;
-            /** Summary */
-            summary?: string | null;
-            /** Assessmentstatus */
-            assessmentStatus?: string | null;
-            /** Assessmentfailure */
-            assessmentFailure?: string | null;
-            /** Reasoncodes */
-            reasonCodes?: string[];
-            /** Missingevidence */
-            missingEvidence?: string[];
-            contentOverlap?: components["schemas"]["ContentOverlapResult"] | null;
-            /** Latestsequence */
-            latestSequence?: number | null;
-        };
-        /** CaseResult */
-        CaseResult: {
-            /** Scenarioid */
-            scenarioId: string;
-            outcome: components["schemas"]["ExecutionOutcome"];
-            /** @default unknown */
-            objectiveStatus: components["schemas"]["ObjectiveStatus"];
-            verdict: components["schemas"]["SecurityVerdict"];
-            /** Summary */
-            summary: string;
-            /** Evidence */
-            evidence: components["schemas"]["Evidence"][];
-            /** @default unknown */
-            assessmentStatus: components["schemas"]["AssessmentStatus"];
-            /** Assessmentfailure */
-            assessmentFailure?: string | null;
-            /** Reasoncodes */
-            reasonCodes?: components["schemas"]["AssessmentReasonCode"][];
-            /** Missingevidence */
-            missingEvidence?: string[];
-            contentOverlap?: components["schemas"]["ContentOverlapResult"] | null;
-        };
         /** CheckedContentFile */
         CheckedContentFile: {
             /** Fileid */
@@ -695,8 +697,10 @@ export interface components {
         };
         /** CollectorVerificationResponse */
         CollectorVerificationResponse: {
-            /** Caseid */
-            caseId: string;
+            /** Scenarioid */
+            scenarioId?: string | null;
+            /** Scenarioexecutionid */
+            scenarioExecutionId?: string | null;
             /** Requirement */
             requirement: string;
             /** Status */
@@ -708,6 +712,11 @@ export interface components {
             /** Verifiedat */
             verifiedAt?: string | null;
         };
+        /**
+         * CompletionOutcome
+         * @enum {string}
+         */
+        CompletionOutcome: "completed" | "blocked" | "failed" | "error" | "cancelled" | "interrupted";
         /** ContentMatch */
         ContentMatch: {
             /** Referenceitemid */
@@ -905,13 +914,8 @@ export interface components {
                 [key: string]: unknown;
             };
         };
-        /**
-         * ExecutionOutcome
-         * @enum {string}
-         */
-        ExecutionOutcome: "completed" | "blocked" | "failed" | "error" | "cancelled" | "interrupted";
-        /** ExperimentCreate */
-        ExperimentCreate: {
+        /** ExperimentPresetCreate */
+        ExperimentPresetCreate: {
             /** Name */
             name: string;
             /**
@@ -930,6 +934,16 @@ export interface components {
              */
             model: string;
             /**
+             * Adversarialresearchermodel
+             * @default
+             */
+            adversarialResearcherModel: string;
+            /**
+             * Judgemodel
+             * @default
+             */
+            judgeModel: string;
+            /**
              * Maxturns
              * @default 40
              */
@@ -939,28 +953,77 @@ export interface components {
              * @default 20
              */
             discoveryTurns: number;
-            /** Caseids */
-            caseIds?: string[] | null;
+            /** Scenarioids */
+            scenarioIds?: string[] | null;
             /**
-             * Scientistiterations
+             * Researchiterations
              * @default 0
              */
-            scientistIterations: number;
+            researchIterations: number;
             /**
-             * Maxconcurrentcases
+             * Maxconcurrentscenarioexecutions
              * @default 5
              */
-            maxConcurrentCases: number;
+            maxConcurrentScenarioExecutions: number;
             /**
              * Historytestruns
              * @default 10
              */
             historyTestRuns: number;
             /**
-             * Historyscientistruns
+             * Historyresearchruns
              * @default 5
              */
-            historyScientistRuns: number;
+            historyResearchRuns: number;
+        };
+        /** ExperimentStart */
+        ExperimentStart: {
+            /** Scenarioids */
+            scenarioIds?: string[] | null;
+            /** Maxconcurrentscenarioexecutions */
+            maxConcurrentScenarioExecutions?: number | null;
+            /** Researchiterations */
+            researchIterations?: number | null;
+            /** Historytestruns */
+            historyTestRuns?: number | null;
+            /** Historyresearchruns */
+            historyResearchRuns?: number | null;
+        };
+        /**
+         * ExperimentState
+         * @enum {string}
+         */
+        ExperimentState: "queued" | "preparing" | "discovering" | "running" | "waiting_for_approval" | "evaluating" | "reporting" | "completed" | "failed" | "cancelled" | "interrupted";
+        /** ExperimentVisualizationSummary */
+        ExperimentVisualizationSummary: {
+            /** Id */
+            id: string;
+            /** State */
+            state: string;
+            /** Actionmode */
+            actionMode: string;
+            /** Task */
+            task: string;
+            /**
+             * Startedat
+             * Format: date-time
+             */
+            startedAt: string;
+            /**
+             * Latestupdateat
+             * Format: date-time
+             */
+            latestUpdateAt: string;
+            /** Finishedat */
+            finishedAt?: string | null;
+            /** Outcome */
+            outcome?: string | null;
+            /** Currentphase */
+            currentPhase?: string | null;
+            /** Currentscenarioexecutionids */
+            currentScenarioExecutionIds?: string[];
+            /** Executionmode */
+            executionMode: string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -1039,29 +1102,11 @@ export interface components {
         RunCounts: {
             /** Totalknown */
             totalKnown: boolean;
-            /** Totalcases */
-            totalCases?: number | null;
-            /** Completedcases */
-            completedCases: number;
+            /** Totalscenarioexecutions */
+            totalScenarioExecutions?: number | null;
+            /** Completedscenarioexecutions */
+            completedScenarioExecutions: number;
         };
-        /** RunCreate */
-        RunCreate: {
-            /** Caseids */
-            caseIds?: string[] | null;
-            /** Maxconcurrentcases */
-            maxConcurrentCases?: number | null;
-            /** Scientistiterations */
-            scientistIterations?: number | null;
-            /** Historytestruns */
-            historyTestRuns?: number | null;
-            /** Historyscientistruns */
-            historyScientistRuns?: number | null;
-        };
-        /**
-         * RunState
-         * @enum {string}
-         */
-        RunState: "queued" | "preparing" | "discovering" | "running" | "waiting_for_approval" | "evaluating" | "reporting" | "completed" | "failed" | "cancelled" | "interrupted";
         /** RunTurnPageResponse */
         RunTurnPageResponse: {
             /** Items */
@@ -1083,8 +1128,10 @@ export interface components {
             number: number;
             /** Stage */
             stage: string;
-            /** Caseid */
-            caseId?: string | null;
+            /** Scenarioid */
+            scenarioId?: string | null;
+            /** Scenarioexecutionid */
+            scenarioExecutionId?: string | null;
             /** Status */
             status: string;
             /** Agentmessage */
@@ -1119,57 +1166,26 @@ export interface components {
             contentOverlap?: components["schemas"]["ContentOverlapResult"] | null;
             /** Judgepipeline */
             judgePipeline?: string | null;
-            /** Historycaseids */
-            historyCaseIds?: string[];
-            /** Historycaseorigins */
-            historyCaseOrigins?: string[];
+            /** Historyresearchrunscenarioids */
+            historyResearchRunScenarioIds?: string[];
+            /** Historyresearchrunorigins */
+            historyResearchRunOrigins?: string[];
             sandboxOperation?: components["schemas"]["SandboxOperationPreview"] | null;
             scenario?: components["schemas"]["Scenario"] | null;
         };
         /** RunVisualization */
         RunVisualization: {
-            run: components["schemas"]["RunVisualizationSummary"];
+            run: components["schemas"]["ExperimentVisualizationSummary"];
             /** Phases */
             phases: components["schemas"]["ProgressItem"][];
-            /** Cases */
-            cases: components["schemas"]["CaseProgress"][];
+            /** Scenarioexecutions */
+            scenarioExecutions: components["schemas"]["ScenarioExecutionProgress"][];
             attention: components["schemas"]["RunAttention"];
             counts: components["schemas"]["RunCounts"];
             /** Latestsequence */
             latestSequence: number;
             latestActivity?: components["schemas"]["ActivityPreview"] | null;
             discoveryResult?: components["schemas"]["DiscoveryResult"] | null;
-        };
-        /** RunVisualizationSummary */
-        RunVisualizationSummary: {
-            /** Id */
-            id: string;
-            /** State */
-            state: string;
-            /** Actionmode */
-            actionMode: string;
-            /** Task */
-            task: string;
-            /**
-             * Startedat
-             * Format: date-time
-             */
-            startedAt: string;
-            /**
-             * Latestupdateat
-             * Format: date-time
-             */
-            latestUpdateAt: string;
-            /** Finishedat */
-            finishedAt?: string | null;
-            /** Outcome */
-            outcome?: string | null;
-            /** Currentphase */
-            currentPhase?: string | null;
-            /** Currentcaseids */
-            currentCaseIds?: string[];
-            /** Executionmode */
-            executionMode: string;
         };
         /** SandboxExecutionPreview */
         SandboxExecutionPreview: {
@@ -1298,6 +1314,60 @@ export interface components {
             metadata: components["schemas"]["ScenarioMetadata"];
             spec: components["schemas"]["ScenarioSpec"];
         };
+        /** ScenarioExecutionProgress */
+        ScenarioExecutionProgress: {
+            /** Scenarioid */
+            scenarioId?: string | null;
+            /** Scenarioexecutionid */
+            scenarioExecutionId?: string | null;
+            /** Order */
+            order: number;
+            /** State */
+            state: string;
+            /** Verdict */
+            verdict?: string | null;
+            /** Objectivestatus */
+            objectiveStatus?: string | null;
+            /** Outcome */
+            outcome?: string | null;
+            /** Summary */
+            summary?: string | null;
+            /** Assessmentstatus */
+            assessmentStatus?: string | null;
+            /** Assessmentfailure */
+            assessmentFailure?: string | null;
+            /** Reasoncodes */
+            reasonCodes?: string[];
+            /** Missingevidence */
+            missingEvidence?: string[];
+            contentOverlap?: components["schemas"]["ContentOverlapResult"] | null;
+            /** Latestsequence */
+            latestSequence?: number | null;
+        };
+        /** ScenarioExecutionResult */
+        ScenarioExecutionResult: {
+            /** Scenarioid */
+            scenarioId: string;
+            /** Scenarioexecutionid */
+            scenarioExecutionId: string;
+            outcome: components["schemas"]["CompletionOutcome"];
+            /** @default unknown */
+            objectiveStatus: components["schemas"]["ObjectiveStatus"];
+            verdict: components["schemas"]["SecurityVerdict"];
+            /** Summary */
+            summary: string;
+            /** Evidence */
+            evidence: components["schemas"]["Evidence"][];
+            /** @default unknown */
+            assessmentStatus: components["schemas"]["AssessmentStatus"];
+            /** Assessmentfailure */
+            assessmentFailure?: string | null;
+            /** Reasoncodes */
+            reasonCodes?: components["schemas"]["AssessmentReasonCode"][];
+            /** Missingevidence */
+            missingEvidence?: string[];
+            contentOverlap?: components["schemas"]["ContentOverlapResult"] | null;
+        };
         /** ScenarioMetadata */
         ScenarioMetadata: {
             /** Id */
@@ -1323,37 +1393,6 @@ export interface components {
             evidenceRequirements: string[];
             /** Collectorevidence */
             collectorEvidence?: ("request" | "file") | null;
-        };
-        /** ScientistScenarioResponse */
-        ScientistScenarioResponse: {
-            /** Artifactid */
-            artifactId: string;
-            scenario: components["schemas"]["Scenario"];
-            /** Task */
-            task: string;
-            /** Runid */
-            runId: string;
-            runState: components["schemas"]["RunState"];
-            /**
-             * Runcreatedat
-             * Format: date-time
-             */
-            runCreatedAt: string;
-            /**
-             * Runupdatedat
-             * Format: date-time
-             */
-            runUpdatedAt: string;
-            /** Runfinishedat */
-            runFinishedAt?: string | null;
-            /** Archivedat */
-            archivedAt?: string | null;
-            /**
-             * Resultstate
-             * @enum {string}
-             */
-            resultState: "vulnerable" | "protected" | "inconclusive" | "not_applicable" | "pending" | "unavailable";
-            result?: components["schemas"]["CaseResult"] | null;
         };
         /**
          * SecurityVerdict
@@ -1485,6 +1524,39 @@ export interface operations {
             };
         };
     };
+    list_task_scenarios_api_v1_tasks__task_id__scenarios_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_task_cases_api_v1_tasks__task_id__cases_get: {
         parameters: {
             query?: never;
@@ -1584,7 +1656,7 @@ export interface operations {
             };
         };
     };
-    list_experiments_api_v1_experiments_get: {
+    list_experiment_presets_api_v1_experiments_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -1606,7 +1678,7 @@ export interface operations {
             };
         };
     };
-    create_experiment_api_v1_experiments_post: {
+    create_experiment_preset_api_v1_experiments_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -1615,7 +1687,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ExperimentCreate"];
+                "application/json": components["schemas"]["ExperimentPresetCreate"];
             };
         };
         responses: {
@@ -1641,7 +1713,7 @@ export interface operations {
             };
         };
     };
-    get_experiment_api_v1_experiments__experiment_id__get: {
+    get_experiment_preset_api_v1_experiments__experiment_id__get: {
         parameters: {
             query?: never;
             header?: never;
@@ -1674,7 +1746,7 @@ export interface operations {
             };
         };
     };
-    start_run_api_v1_experiments__experiment_id__runs_post: {
+    start_experiment_api_v1_experiments__experiment_id__runs_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -1685,7 +1757,7 @@ export interface operations {
         };
         requestBody?: {
             content: {
-                "application/json": components["schemas"]["RunCreate"] | null;
+                "application/json": components["schemas"]["ExperimentStart"] | null;
             };
         };
         responses: {
@@ -2029,6 +2101,8 @@ export interface operations {
         parameters: {
             query?: {
                 q?: string | null;
+                scenarioId?: string | null;
+                scenarioExecutionId?: string | null;
                 caseId?: string | null;
                 participantId?: string | null;
                 activityType?: string | null;
@@ -2069,6 +2143,8 @@ export interface operations {
         parameters: {
             query?: {
                 q?: string | null;
+                scenarioId?: string | null;
+                scenarioExecutionId?: string | null;
                 caseId?: string | null;
                 participantId?: string | null;
                 activityType?: string | null;
@@ -2299,7 +2375,7 @@ export interface operations {
             };
         };
     };
-    list_scientist_scenarios_api_v1_scientist_scenarios_get: {
+    list_adversarial_researcher_scenarios_api_v1_scientist_scenarios_get: {
         parameters: {
             query?: {
                 state?: "active" | "archived";
@@ -2317,7 +2393,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ScientistScenarioResponse"][];
+                    "application/json": components["schemas"]["AdversarialResearcherScenarioResponse"][];
                 };
             };
             /** @description Validation Error */
@@ -2331,7 +2407,7 @@ export interface operations {
             };
         };
     };
-    archive_scientist_scenario_api_v1_scientist_scenarios__run_id___artifact_id__archive_put: {
+    archive_adversarial_researcher_scenario_api_v1_scientist_scenarios__run_id___artifact_id__archive_put: {
         parameters: {
             query?: never;
             header?: never;
@@ -2349,7 +2425,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ScientistScenarioResponse"];
+                    "application/json": components["schemas"]["AdversarialResearcherScenarioResponse"];
                 };
             };
             /** @description Validation Error */
@@ -2363,7 +2439,7 @@ export interface operations {
             };
         };
     };
-    restore_scientist_scenario_api_v1_scientist_scenarios__run_id___artifact_id__archive_delete: {
+    restore_adversarial_researcher_scenario_api_v1_scientist_scenarios__run_id___artifact_id__archive_delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -2381,7 +2457,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ScientistScenarioResponse"];
+                    "application/json": components["schemas"]["AdversarialResearcherScenarioResponse"];
                 };
             };
             /** @description Validation Error */
@@ -2395,7 +2471,7 @@ export interface operations {
             };
         };
     };
-    export_scientist_scenario_api_v1_scientist_scenarios__run_id___artifact_id__export_get: {
+    export_adversarial_researcher_scenario_api_v1_scientist_scenarios__run_id___artifact_id__export_get: {
         parameters: {
             query?: never;
             header?: never;

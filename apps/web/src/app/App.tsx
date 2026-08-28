@@ -36,10 +36,10 @@ export function App() {
   const context = location.pathname.startsWith("/tasks")
     ? "Task catalog"
     : location.pathname.startsWith("/experiments")
-      ? "Experiment configuration"
+      ? "Experiment Preset"
       : location.pathname.startsWith("/runs")
-        ? "Run review"
-        : "Run operations";
+        ? "Experiment review"
+        : "Experiment operations";
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -117,13 +117,13 @@ export function App() {
             </NavLink>
             <NavLink
               to="/experiments/new"
-              aria-label="Execute experiment"
+              aria-label="Run Experiment"
               data-short="+"
               className={({ isActive }) =>
                 isActive ? "nav-link active" : "nav-link"
               }
             >
-              <span className="nav-label">Execute</span>
+              <span className="nav-label">Run Experiment</span>
             </NavLink>
           </nav>
           <div className="sidebar-spacer" />

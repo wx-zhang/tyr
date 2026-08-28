@@ -55,7 +55,7 @@ def build_chat_session(
         raise ValueError("OPENROUTER_API_KEY is required for live chat")
     selected_model = model_name or settings.chat_model_name
     if not selected_model:
-        raise ValueError("TYR_LOOP_CHAT_MODEL is required for live chat")
+        raise ValueError("GAMR_CHAT_MODEL_NAME is required for live chat")
     if trace_port is None:
         trace_port = create_trace_port(settings)
     target = TyrMcpClient(settings.tyr_mcp_url, settings.tyr_mcp_token)

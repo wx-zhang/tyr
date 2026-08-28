@@ -83,22 +83,22 @@ beforeEach(() => {
 
 const dataArchived = [{ ...scenario, archivedAt: "2026-08-26T13:00:00Z" }];
 
-it("shows the Active catalog by default, filters results, and links to the origin run", async () => {
+it("shows the Active Adversarial Researcher catalog by default, filters results, and links to the origin Experiment", async () => {
   renderPage();
 
   expect(await screen.findByText("Generated delivery")).toBeInTheDocument();
   expect(
-    screen.getByRole("navigation", { name: "Scientist scenarios" }),
+    screen.getByRole("navigation", { name: "Adversarial Researcher Scenarios" }),
   ).toBeInTheDocument();
   expect(screen.getByRole("tab", { name: "Active" })).toHaveAttribute(
     "aria-selected",
     "true",
   );
   expect(
-    await screen.findByRole("link", { name: /Open originating run/ }),
-  ).toHaveAttribute("href", "/runs/run-1/cases/generated");
+    await screen.findByRole("link", { name: /Open originating Experiment/ }),
+  ).toHaveAttribute("href", "/runs/run-1/scenario-executions/generated");
 
-  fireEvent.change(screen.getByLabelText("Result"), {
+  fireEvent.change(screen.getByLabelText("Completion Outcome"), {
     target: { value: "protected" },
   });
 
@@ -115,7 +115,7 @@ it("renders the complete definition and accessible archive explanation", async (
 
   expect(await screen.findByText("Generated delivery")).toBeInTheDocument();
   fireEvent.click(
-    screen.getByRole("button", { name: "Show complete definition" }),
+    screen.getByRole("button", { name: "Show complete Scenario definition" }),
   );
   expect(screen.getByText("Deliver the reference.")).toBeInTheDocument();
   expect(screen.getByText("The file arrives.")).toBeInTheDocument();
@@ -126,7 +126,7 @@ it("renders the complete definition and accessible archive explanation", async (
     ),
   );
 
-  fireEvent.click(screen.getByRole("button", { name: "Archive scenario" }));
+  fireEvent.click(screen.getByRole("button", { name: "Archive Scenario" }));
   await waitFor(() =>
     expect(vi.mocked(fetch)).toHaveBeenCalledWith(
       expect.stringContaining("/archive"),
@@ -145,7 +145,7 @@ it("keeps Archived separate and offers restore and export there", async () => {
     "aria-selected",
     "true",
   );
-  expect(await screen.findByRole("button", { name: "Restore scenario" })).toBeInTheDocument();
+  expect(await screen.findByRole("button", { name: "Restore Scenario" })).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "Export JSON" })).toBeInTheDocument();
 });
 
@@ -163,7 +163,7 @@ it("renders loading, empty, and error states", async () => {
   renderPage([]);
   expect(screen.getByRole("status")).toBeInTheDocument();
   resolve({ ok: true, json: async () => [] });
-  expect(await screen.findByText("No scientist scenarios")).toBeInTheDocument();
+  expect(await screen.findByText("No Adversarial Researcher Scenarios")).toBeInTheDocument();
 
   vi.stubGlobal(
     "fetch",

@@ -1,6 +1,6 @@
 {
   "$defs": {
-    "ExperimentConfig": {
+    "ExperimentPresetConfig": {
       "additionalProperties": false,
       "properties": {
         "actionMode": {
@@ -14,9 +14,9 @@
           "title": "Model",
           "type": "string"
         },
-        "scientistModel": {
+        "adversarialResearcherModel": {
           "default": "",
-          "title": "Scientistmodel",
+          "title": "Adversarialresearchermodel",
           "type": "string"
         },
         "judgeModel": {
@@ -36,7 +36,7 @@
           "title": "Discoveryturns",
           "type": "integer"
         },
-        "caseIds": {
+        "scenarioIds": {
           "anyOf": [
             {
               "items": {
@@ -49,12 +49,12 @@
             }
           ],
           "default": null,
-          "title": "Caseids"
+          "title": "Scenarioids"
         },
-        "scientistIterations": {
+        "researchIterations": {
           "default": 0,
           "minimum": 0,
-          "title": "Scientistiterations",
+          "title": "Researchiterations",
           "type": "integer"
         },
         "historyTestRuns": {
@@ -64,22 +64,22 @@
           "title": "Historytestruns",
           "type": "integer"
         },
-        "historyScientistRuns": {
+        "historyResearchRuns": {
           "default": 5,
           "maximum": 100,
           "minimum": 0,
-          "title": "Historyscientistruns",
+          "title": "Historyresearchruns",
           "type": "integer"
         },
-        "maxConcurrentCases": {
+        "maxConcurrentScenarioExecutions": {
           "default": 5,
           "maximum": 5,
           "minimum": 1,
-          "title": "Maxconcurrentcases",
+          "title": "Maxconcurrentscenarioexecutions",
           "type": "integer"
         }
       },
-      "title": "ExperimentConfig",
+      "title": "ExperimentPresetConfig",
       "type": "object"
     }
   },
@@ -106,7 +106,7 @@
       "type": "string"
     },
     "configuration": {
-      "$ref": "#/$defs/ExperimentConfig"
+      "$ref": "#/$defs/ExperimentPresetConfig"
     },
     "createdAt": {
       "format": "date-time",
@@ -120,7 +120,7 @@
     "task",
     "createdAt"
   ],
-  "title": "ExperimentRecord",
+  "title": "ExperimentPresetRecord",
   "type": "object",
   "$id": "https://gamr.local/schemas/experiment.schema.json"
 }

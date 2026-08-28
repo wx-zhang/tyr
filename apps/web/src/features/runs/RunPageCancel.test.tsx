@@ -11,7 +11,7 @@ beforeEach(() => {
   setupRunMocks();
 });
 
-it("cancels a live run after confirmation", async () => {
+it("cancels a live Experiment after confirmation", async () => {
   const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
   let cancelled = false;
   vi.mocked(fetch).mockImplementation(
@@ -30,9 +30,13 @@ it("cancels a live run after confirmation", async () => {
             configuration: {
               actionMode: "read_only",
               model: "test",
+              adversarialResearcherModel: "researcher",
+              judgeModel: "judge",
               maxTurns: 10,
               discoveryTurns: 1,
-              scientistIterations: 0,
+              researchIterations: 0,
+              historyTestRuns: 10,
+              historyResearchRuns: 5,
             },
           }),
         } as Response);
@@ -76,21 +80,21 @@ it("cancels a live run after confirmation", async () => {
   );
 
   renderRunPage();
-  fireEvent.click(await screen.findByRole("button", { name: "Cancel run" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Cancel Experiment" }));
   expect(confirm).toHaveBeenCalled();
   await waitFor(() => {
     expect(
-      screen.queryByRole("button", { name: "Cancel run" }),
+      screen.queryByRole("button", { name: "Cancel Experiment" }),
     ).not.toBeInTheDocument();
   });
   expect(screen.getAllByText("Cancelled").length).toBeGreaterThan(0);
   confirm.mockRestore();
 });
 
-it("does not cancel when the operator dismisses confirmation", async () => {
+it("does not cancel when the operator dismisses Experiment confirmation", async () => {
   const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
   renderRunPage();
-  fireEvent.click(await screen.findByRole("button", { name: "Cancel run" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Cancel Experiment" }));
   expect(confirm).toHaveBeenCalled();
   await waitFor(() => {
     const cancelCalls = vi.mocked(fetch).mock.calls.filter(([input, init]) => {
@@ -102,12 +106,12 @@ it("does not cancel when the operator dismisses confirmation", async () => {
     expect(cancelCalls).toHaveLength(0);
   });
   expect(
-    screen.getByRole("button", { name: "Cancel run" }),
+    screen.getByRole("button", { name: "Cancel Experiment" }),
   ).toBeInTheDocument();
   confirm.mockRestore();
 });
 
-it("shows an error when cancel fails", async () => {
+it("shows an error when Experiment cancellation fails", async () => {
   const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
   vi.mocked(fetch).mockImplementation(
     (input: RequestInfo | URL, init?: RequestInit) => {
@@ -139,7 +143,7 @@ it("shows an error when cancel fails", async () => {
   );
 
   renderRunPage();
-  fireEvent.click(await screen.findByRole("button", { name: "Cancel run" }));
-  expect(await screen.findByText(/^Could not cancel run:/)).toBeInTheDocument();
+  fireEvent.click(await screen.findByRole("button", { name: "Cancel Experiment" }));
+  expect(await screen.findByText(/^Could not cancel Experiment:/)).toBeInTheDocument();
   confirm.mockRestore();
 });

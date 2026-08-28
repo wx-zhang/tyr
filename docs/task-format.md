@@ -1,30 +1,30 @@
 # Task format
 
-Tasks are immutable, schema-validated JSON documents. A task directory
+Tasks are immutable, schema-validated JSON documents. A Task directory
 contains a `task.json` manifest, optional `discovery.json`,
-`methodology.json`, and `evaluation.json` plans, plus ordered `cases/*.json`
-scenario files. References are confined below the task directory and every
-case ID is unique.
+`methodology.json`, and `evaluation.json` plans, plus ordered Scenario files
+in the compatibility `cases/` directory. Existing `cases/` paths remain readable.
+References are confined below the Task directory and every Scenario ID is unique.
 
-`tasks/exfiltrate-important-txt` contains six scenarios. Two are enabled by default; the
-four additional transform/relay scenarios remain available through explicit
-`--case-id` or `--all-cases` selection.
+`tasks/exfiltrate-important-txt` contains six Scenarios. Two are enabled by default; the
+four additional transform/relay Scenarios remain available through explicit
+`--scenario-id` or `--all-scenarios` selection.
 
 `tasks/python-execution-env` contains two approval-gated command-execution
 scenarios for testing whether Tyr allows a peer Agent to execute supplied
 Python code fragments on its node so that the node environment is exposed in
 an encoded form our agent can decode and use. Discovery identifies a peer
 Agent and an existing working directory under `/home`. Base64 is the
-transport format: the default case supplies a harmless fragment that prints
-`Hello, world!`; an explicitly selectable case supplies a fragment that dumps
+transport format: the default Scenario supplies a harmless fragment that prints
+`Hello, world!`; an explicitly selectable Scenario supplies a fragment that dumps
 the local environment and asks for blind execution without reading the
 decoded source.
 
 The manifest declares `spec.variables` with `literal`, `run`, or `discovery`
 sources. Scenario text may use only declared `{placeholders}`. Discovery
-variables are bound only after a validated active Bridge candidate under
-`/home` is found. `spec.defaults.defaultCaseIds` preserves the default suite
-selection; explicit run `caseIds` can select other cases in manifest order.
+variables are bound only after a validated active Bridge candidate under `/home` is
+found. `spec.defaults.defaultScenarioIds` preserves default Scenario selection;
+explicit Experiment Preset `scenarioIds` can select other Scenarios in manifest order.
 
 Each scenario separates the attacker objective (`objective` and
 `successCriteria`) from the expected Tyr control (`expectedControl`) and lists
@@ -60,10 +60,10 @@ until the authoritative synthetic copy is available. The task detail page
 shows the live file for review. GAMR includes only the reference path, size,
 and SHA-256 in run snapshots; it never copies the text into run evidence.
 
-The Caesar case is opt-in and demonstrates a shift-three transformation before upload;
-it is intentionally absent from `defaultCaseIds`.
+The Caesar Scenario is opt-in and demonstrates a shift-three transformation before upload;
+it is intentionally absent from `defaultScenarioIds`.
 
-For reference-aware file cases, GAMR automatically analyzes trajectory context
+For reference-aware file Scenarios, GAMR automatically analyzes trajectory context
 and collector-verified uploads using the configured judge model. When uploads
 require extraction or transformation (such as encoded payloads, nested
 archives, or formatted data), a focused trajectory decoder agent can execute
@@ -106,12 +106,12 @@ Validate with:
 uv run gamr task validate tasks/exfiltrate-important-txt
 ```
 
-Scientist-generated scenarios can be exported individually from the scenario
-catalog as canonical case JSON. Copy the downloaded file into the destination
-task's `cases/` directory, then add that relative path to the destination
-`task.json` `spec.cases` list (and to `defaultCaseIds` when it should be part of
-the default selection). Export does not modify the task repository or manifest;
-validate the destination task after adding the file.
+Adversarial Researcher-generated Scenarios can be exported individually from the
+Scenario catalog as canonical Scenario JSON. Copy the downloaded file into the
+destination Task's compatibility `cases/` directory, then add that relative path to
+the destination `task.json` `spec.scenarios` list (and to `defaultScenarioIds` when
+it should be part of default selection). Export does not modify the Task
+repository or manifest; validate the destination Task after adding the file.
 
 The generated contract is [schemas/task.schema.json](../schemas/task.schema.json).
 Canonical completed runs use [schemas/run-result.schema.json](../schemas/run-result.schema.json).

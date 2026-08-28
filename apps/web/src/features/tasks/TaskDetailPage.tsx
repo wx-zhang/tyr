@@ -1,16 +1,16 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { fetchTask, fetchTaskCases, fetchTaskPlans } from "../../api/client";
+import { fetchTask, fetchTaskScenarios, fetchTaskPlans } from "../../api/client";
 import { PageHeader } from "../../components/PageHeader";
 import { StatusBadge } from "../../components/StatusBadge";
-import { TaskCaseDetail } from "./TaskCaseDetail";
+import { ScenarioDetail } from "./TaskCaseDetail";
 import { TaskPlansSection } from "./TaskPlansSection";
 import { TaskReferenceCard } from "./TaskReferenceCard";
 import { ScientistScenarioPage } from "../scientist-scenarios/ScientistScenarioPage";
 
 function modeLabel(mode: string | undefined): string {
-  if (mode === "approval_required") return "Actions Allowed";
+  if (mode === "approval_required") return "Approval-gated";
   return "Read-only";
 }
 
@@ -33,8 +33,9 @@ function variableSummary(variable: {
 }
 
 export function TaskDetailPage() {
-  const { taskId, caseId } = useParams();
-  const [scenarioTab, setScenarioTab] = useState<"cases" | "scientist">("cases");
+  const { taskId, scenarioId: canonicalScenarioId, caseId } = useParams();
+  const scenarioId = canonicalScenarioId ?? caseId;
+  const [scenarioTab, setScenarioTab] = useState<"scenarios" | "research">("scenarios");
 
   const task = useQuery({
     queryKey: ["task", taskId],
@@ -42,9 +43,9 @@ export function TaskDetailPage() {
     enabled: Boolean(taskId),
   });
 
-  const cases = useQuery({
-    queryKey: ["task-cases", taskId],
-    queryFn: () => fetchTaskCases(taskId!),
+  const scenariosQuery = useQuery({
+    queryKey: ["task-scenarios", taskId],
+    queryFn: () => fetchTaskScenarios(taskId!),
     enabled: Boolean(taskId),
   });
 
@@ -53,12 +54,13 @@ export function TaskDetailPage() {
     queryFn: () => fetchTaskPlans(taskId!),
     enabled: Boolean(taskId),
   });
-
-  const scenarios = cases.data ?? [];
-  const defaultCaseIds = new Set(task.data?.spec.defaults.defaultCaseIds ?? []);
+  const scenarios = scenariosQuery.data ?? [];
+  const defaultScenarioIds = new Set(
+    task.data?.spec.defaults.defaultScenarioIds ?? task.data?.spec.defaults.defaultCaseIds ?? [],
+  );
   const selected =
-    scenarios.find((item) => item.metadata.id === caseId) ??
-    scenarios.find((item) => defaultCaseIds.has(item.metadata.id)) ??
+    scenarios.find((item) => item.metadata.id === scenarioId) ??
+    scenarios.find((item) => defaultScenarioIds.has(item.metadata.id)) ??
     scenarios[0];
   const actionMode = task.data?.spec.defaults.actionMode;
   const variableEntries = Object.entries(task.data?.spec.variables ?? {});
@@ -66,40 +68,31 @@ export function TaskDetailPage() {
   return (
     <section className="section-stack">
       <PageHeader
-        eyebrow="Authoring sources"
+        eyebrow="Task"
         title={task.data?.metadata.title ?? taskId ?? "Task"}
         description={
           task.data
             ? `${task.data.metadata.id} · v${task.data.metadata.version}`
-            : "Review task metadata and test cases."
+            : "Review Task metadata and Scenarios."
         }
         actions={
           <div className="button-row">
-            <Link className="button button-secondary" to="/tasks">
-              All tasks
-            </Link>
-            <Link className="button button-primary" to="/experiments/new">
-              Execute
-            </Link>
+            <Link className="button button-secondary" to="/tasks">All Tasks</Link>
+            <Link className="button button-primary" to="/experiments/new">Run Experiment</Link>
           </div>
         }
       />
 
       {task.isLoading ? (
         <div className="card empty-state" role="status">
-          <div>
-            <h2>Loading task</h2>
-            <p>Reading the task manifest…</p>
-          </div>
+          <div><h2>Loading Task</h2><p>Reading the Task manifest…</p></div>
         </div>
       ) : task.isError ? (
         <div className="card empty-state" role="alert">
           <div>
-            <h2>Unable to load task</h2>
-            <p>Check the task ID and API connection, then try again.</p>
-            <Link className="button button-secondary" to="/tasks">
-              Back to tasks
-            </Link>
+            <h2>Unable to load Task</h2>
+            <p>Check the Task ID and API connection, then try again.</p>
+            <Link className="button button-secondary" to="/tasks">Back to Tasks</Link>
           </div>
         </div>
       ) : (
@@ -125,10 +118,8 @@ export function TaskDetailPage() {
                 <dd className="mono">{task.data?.metadata.version ?? "—"}</dd>
               </div>
               <div className="detail-row">
-                <dt>Cases</dt>
-                <dd className="mono tabular">
-                  {task.data?.spec.cases.length ?? scenarios.length}
-                </dd>
+                <dt>Scenarios</dt>
+                <dd className="mono tabular">{task.data?.spec.scenarios.length ?? scenarios.length}</dd>
               </div>
               <div className="detail-row">
                 <dt>Default mode</dt>
@@ -136,15 +127,13 @@ export function TaskDetailPage() {
               </div>
               <div className="detail-row">
                 <dt>Max turns</dt>
-                <dd className="mono tabular">
-                  {task.data?.spec.defaults.maxTurns ?? "—"}
-                </dd>
+                <dd className="mono tabular">{task.data?.spec.defaults.maxTurns ?? "—"}</dd>
               </div>
               <div className="detail-row">
-                <dt>Default cases</dt>
+                <dt>Default Scenarios</dt>
                 <dd className="mono">
-                  {(task.data?.spec.defaults.defaultCaseIds ?? []).length > 0
-                    ? (task.data?.spec.defaults.defaultCaseIds ?? []).join(", ")
+                  {(task.data?.spec.defaults.defaultScenarioIds ?? []).length > 0
+                    ? (task.data?.spec.defaults.defaultScenarioIds ?? []).join(", ")
                     : "None"}
                 </dd>
               </div>
@@ -196,76 +185,37 @@ export function TaskDetailPage() {
 
           <article className="card">
             <div className="card-header">
-              <div>
-                <p className="eyebrow">Scenarios</p>
-                <h2>Test cases</h2>
-              </div>
-              <span className="secondary mono tabular">
-                {scenarios.length} case{scenarios.length === 1 ? "" : "s"}
-              </span>
+              <div><p className="eyebrow">Scenarios</p><h2>Task Scenarios</h2></div>
+              <span className="secondary mono tabular">{scenarios.length} Scenario{scenarios.length === 1 ? "" : "s"}</span>
             </div>
-
-            <div
-              className="task-scenario-tabs"
-              role="tablist"
-              aria-label="Scenario source"
-            >
-              <button
-                className="catalog-tab"
-                type="button"
-                role="tab"
-                aria-selected={scenarioTab === "cases"}
-                onClick={() => setScenarioTab("cases")}
-              >
-                Task cases
-              </button>
-              <button
-                className="catalog-tab"
-                type="button"
-                role="tab"
-                aria-selected={scenarioTab === "scientist"}
-                onClick={() => setScenarioTab("scientist")}
-              >
-                Scientist scenarios
-              </button>
+            <div className="task-scenario-tabs" role="tablist" aria-label="Scenario source">
+              <button className="catalog-tab" type="button" role="tab" aria-selected={scenarioTab === "scenarios"} onClick={() => setScenarioTab("scenarios")}>Task Scenarios</button>
+              <button className="catalog-tab" type="button" role="tab" aria-selected={scenarioTab === "research"} onClick={() => setScenarioTab("research")}>Adversarial Researcher Scenarios</button>
             </div>
-
-            {scenarioTab === "scientist" ? (
+            {scenarioTab === "research" ? (
               <ScientistScenarioPage taskId={taskId!} />
-            ) : cases.isLoading ? (
-              <p className="secondary" role="status">
-                Loading cases…
-              </p>
-            ) : cases.isError ? (
-              <p className="secondary" role="alert">
-                Could not load cases for this task.
-              </p>
+            ) : scenariosQuery.isLoading ? (
+              <p className="secondary" role="status">Loading Scenarios…</p>
+            ) : scenariosQuery.isError ? (
+              <p className="secondary" role="alert">Could not load Scenarios for this Task.</p>
             ) : scenarios.length === 0 ? (
-              <p className="secondary">No cases in this task.</p>
+              <p className="secondary">No Scenarios in this Task.</p>
             ) : (
               <div className="task-case-layout">
-                <nav className="case-nav" aria-label="Task cases">
+                <nav className="case-nav" aria-label="Task Scenarios">
                   <ul className="case-nav-list">
                     {scenarios.map((scenario) => {
                       const id = scenario.metadata.id;
                       const isActive = selected?.metadata.id === id;
-                      const isDefault = defaultCaseIds.has(id);
+                      const isDefault = defaultScenarioIds.has(id);
                       return (
                         <li key={id}>
-                          <Link
-                            to={`/tasks/${encodeURIComponent(taskId!)}/cases/${encodeURIComponent(id)}`}
-                            className={`case-nav-link${isActive ? " is-active" : ""}`}
-                            aria-current={isActive ? "page" : undefined}
-                          >
+                          <Link to={`/tasks/${encodeURIComponent(taskId!)}/scenarios/${encodeURIComponent(id)}`} className={`case-nav-link${isActive ? " is-active" : ""}`} aria-current={isActive ? "page" : undefined}>
                             <span className="choice-title">{scenario.metadata.title}</span>
                             <span className="choice-description mono">{id}</span>
                             <span className="session-meta">
-                              {scenario.metadata.category ? (
-                                <span>{scenario.metadata.category}</span>
-                              ) : null}
-                              {isDefault ? (
-                                <StatusBadge label="Default" tone="info" />
-                              ) : null}
+                              {scenario.metadata.category ? <span>{scenario.metadata.category}</span> : null}
+                              {isDefault ? <StatusBadge label="Default" tone="info" /> : null}
                             </span>
                           </Link>
                         </li>
@@ -274,16 +224,7 @@ export function TaskDetailPage() {
                   </ul>
                 </nav>
                 <div className="case-panel">
-                  {selected ? (
-                    <TaskCaseDetail scenario={selected} />
-                  ) : caseId ? (
-                    <p className="secondary" role="alert">
-                      Case <span className="mono">{caseId}</span> was not found in
-                      this task.
-                    </p>
-                  ) : (
-                    <p className="secondary">Select a case to review its details.</p>
-                  )}
+                  {selected ? <ScenarioDetail scenario={selected} /> : scenarioId ? <p className="secondary" role="alert">Scenario <span className="mono">{scenarioId}</span> was not found in this Task.</p> : <p className="secondary">Select a Scenario to review its details.</p>}
                 </div>
               </div>
             )}

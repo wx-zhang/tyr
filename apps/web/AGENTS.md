@@ -19,34 +19,35 @@ Do not hand-edit the generated browser contract.
 
 ## Safety/accessibility
 
-The web is a trusted test-operator surface and displays evidence verbatim, including secrets. Maintain labels, keyboard navigation, visible focus, reduced-motion behavior, and restrained status announcements. Display run state, action mode, approval state, and finding severity with text rather than color alone. The web may start action-enabled runs when the operator opts in (Actions Allowed); it may display approval evidence but never decides Tyr approvals.
+The web is a trusted test-operator surface and displays evidence verbatim, including secrets. Maintain labels, keyboard navigation, visible focus, reduced-motion behavior, and restrained status announcements. Display Experiment State, action mode, approval state, and finding severity with text rather than color alone. The web may start Approval-gated Experiments when the operator opts in; it may display approval evidence but never decides Tyr approvals.
 
-Task review uses `GET /api/v1/tasks/{id}`, `…/cases` (full scenarios), and
+Task review uses `GET /api/v1/tasks/{id}`, `…/scenarios` (full Scenarios; `…/cases` remains a compatibility path), and
 `…/plans` (discovery/methodology/evaluation plus the live evaluation reference).
 The detail page renders that synthetic reference file when present. Routes:
-`/tasks`, `/tasks/:taskId`, `/tasks/:taskId/cases/:caseId`.
+`/tasks`, `/tasks/:taskId`, `/tasks/:taskId/scenarios/:scenarioId`.
+Legacy `/tasks/:taskId/cases/:caseId` links normalize at the route boundary.
 
-The run review screens consume API run, case, activity, and artifact endpoints;
-Tyr and model calls remain server-side.
-New web experiment forms initialize max concurrent cases to 1; operators may raise it through 5.
+The Experiment review screens consume API Experiment, Scenario Execution, activity, and artifact
+endpoints; Tyr and model calls remain server-side.
+New web Experiment Preset forms initialize max concurrent Scenario Executions to 1; operators may raise it through 5.
 `features/runs/RunHistory.tsx`, `RunHistoryGroup.tsx`, and `RunHistoryCase.tsx` render
-grouped run history partitioned into discovery, test cases, scientist iterations, and other updates.
+grouped Experiment history partitioned into discovery, Scenario Executions, Research Iterations, and other updates.
 `features/runs/runHistoryGroups.ts` performs the grouping, while `runHistoryTypes.ts` owns its
 shared presentation types and chronological sorting helpers.
-Test cases expose aggregate completion progress and summary-first rows. Their activity timelines
+Scenario Executions expose aggregate completion progress and summary-first rows. Their activity timelines
 read oldest to newest; older completed activity is compact, while the latest or current activity
 opens by default. Collapsed rows distinguish not started, queued, running, assessing, and terminal
 work; group completion follows lifecycle progress rather than a nested activity status.
-Completed discovery groups start collapsed when the run history loads; active discovery stays open.
-Every case row starts collapsed when entering the page; operator expansion persists across updates.
-Verdict-bearing case headers show lifecycle and vulnerability outcome as separate text badges.
-Evaluation updates supply the result badge until visualization catches up. Scientist-generated
-cases belong only to their iteration group and never contribute to base test-case progress.
-`features/runs/runHistoryPresentation.ts` derives run summaries, and
+Completed discovery groups start collapsed when the Experiment history loads; active discovery stays open.
+Every Scenario Execution row starts collapsed when entering the page; operator expansion persists across updates.
+Verdict-bearing Scenario Execution headers show lifecycle and vulnerability outcome as separate text badges.
+Evaluation updates supply the result badge until visualization catches up. Researcher-generated
+Scenarios belong only to their Research Iteration group and never contribute to base Scenario Execution progress.
+`features/runs/runHistoryPresentation.ts` derives Experiment summaries, and
 `RunTurnCard.tsx` plus `RunTurnDetail.tsx` render the activity disclosure and bounded evidence.
 `SandboxOperationSession.tsx` renders one bounded Prism-highlighted terminal preview per
-case-owned sandbox operation, including active lifecycle status, attempts, generations, and
-safe stream states. It is the postmortem surface for new runs; legacy decoding provenance
+Scenario Execution-owned sandbox operation, including active lifecycle status, attempts, generations, and
+safe stream states. It is the postmortem surface for new Experiments; legacy decoding provenance
 remains the fallback.
 Evaluation details show judge status, Prism-highlighted exact Markdown comparison diffs, checked
 files, and missing evidence when the API supplies them.
@@ -65,9 +66,9 @@ Run-evidence behavior tests are split across `RunPage.test.tsx`,
 `pnpm --dir apps/web test -- --run` for the complete deterministic web suite and
 regenerate `src/api/generated.ts` with
 `pnpm --dir apps/web generate:api`.
-The task-details Scenarios tab reuses `features/scientist-scenarios/ScientistScenarioPage.tsx`
-for the Active/Archived catalog, list-and-detail scenario review, result filters,
-reversible archive actions, and origin-run navigation. Its API calls are typed in
+The Task-details Scenario tab reuses `features/scientist-scenarios/ScientistScenarioPage.tsx`
+for the Active/Archived Adversarial Researcher catalog, list-and-detail Scenario review, result
+filters, reversible archive actions, and origin-Experiment navigation. Its API calls are typed in
 `src/api/client.ts`, catalog styles live in `src/styles/scientist-scenarios.css`,
 and behavior coverage is in `ScientistScenarioPage.test.tsx` and
-`features/tasks/TaskDetailPage.test.tsx`. There is no standalone scientist-scenarios route.
+`features/tasks/TaskDetailPage.test.tsx`. There is no standalone Adversarial Researcher route.

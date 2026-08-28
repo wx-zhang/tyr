@@ -68,16 +68,17 @@ it("shows discovered variables in Updates after discovery completes", async () =
   expect(list).toHaveTextContent("Alice");
   expect(list).toHaveTextContent("bridgeId");
   expect(list).toHaveTextContent("bridge-1");
-  const stages = screen.getByRole("list", { name: "Run stages" });
+  const stages = screen.getByRole("list", { name: "Experiment State stages" });
   expect(stages).not.toHaveTextContent("Discovered variables");
 });
 
-it("displays multiple simultaneous active and assessing cases without single-case busy indicator", async () => {
+it("displays multiple simultaneous active and assessing Scenario Executions without a single-execution busy indicator", async () => {
   const customVisualization = {
     ...visualizationFixture,
-    cases: [
+    scenarioExecutions: [
       {
-        caseId: "case-alpha",
+        scenarioId: "scenario-alpha",
+        scenarioExecutionId: "case-alpha",
         state: "active",
         order: 0,
         verdict: null,
@@ -85,7 +86,8 @@ it("displays multiple simultaneous active and assessing cases without single-cas
         outcome: null,
       },
       {
-        caseId: "case-beta",
+        scenarioId: "scenario-beta",
+        scenarioExecutionId: "case-beta",
         state: "assessing",
         order: 1,
         verdict: null,
@@ -93,7 +95,7 @@ it("displays multiple simultaneous active and assessing cases without single-cas
         outcome: null,
       },
     ],
-    currentCaseIds: ["case-alpha", "case-beta"],
+    currentScenarioExecutionIds: ["case-alpha", "case-beta"],
   };
 
   vi.stubGlobal(
@@ -136,13 +138,13 @@ it("displays multiple simultaneous active and assessing cases without single-cas
           json: async () => ({
             id: "run-1",
             configuration: {
-              caseIds: ["case-alpha", "case-beta"],
-              scientistIterations: 0,
+              scenarioIds: ["scenario-alpha", "scenario-beta"],
+              researchIterations: 0,
             },
           }),
         };
       }
-      if (url.includes("/api/v1/tasks/") && url.endsWith("/cases")) {
+      if (url.includes("/api/v1/tasks/") && url.endsWith("/scenarios")) {
         return {
           ok: true,
           json: async () => [
@@ -173,14 +175,14 @@ it("displays multiple simultaneous active and assessing cases without single-cas
   ).not.toBeInTheDocument();
 });
 
-it("does not render a redundant selected test cases block below Updates", async () => {
+it("does not render a redundant selected Scenario Executions block below Updates", async () => {
   renderRunPage();
 
   expect(
-    await screen.findByRole("heading", { name: "Run history" }),
+    await screen.findByRole("heading", { name: "Experiment history" }),
   ).toBeInTheDocument();
   expect(
-    screen.queryByLabelText("Selected test cases"),
+    screen.queryByLabelText("Selected Scenario Executions"),
   ).not.toBeInTheDocument();
 });
 
@@ -189,7 +191,7 @@ it("shows the run lifecycle and grouped Agent to Tyr turns chronologically", asy
 
   expect(await screen.findByText("Preparing")).toBeInTheDocument();
   expect(screen.getByText("Read-only")).toBeInTheDocument();
-  expect(screen.getByRole("list", { name: "Run stages" })).toBeInTheDocument();
+  expect(screen.getByRole("list", { name: "Experiment State stages" })).toBeInTheDocument();
   expect(screen.getByText("Preparing")).toBeInTheDocument();
   expect(screen.getByText("Evaluating")).toBeInTheDocument();
   expect(screen.getAllByText("Waiting for Tyr").length).toBeGreaterThan(0);
@@ -206,7 +208,7 @@ it("shows the run lifecycle and grouped Agent to Tyr turns chronologically", asy
   expect(caseAlphaToggle).toHaveAttribute("aria-expanded", "false");
   fireEvent.click(caseAlphaToggle);
   expect(
-    screen.getByRole("heading", { name: "Executing evaluation - Turn 1" }),
+    screen.getByRole("heading", { name: "Scenario Execution - Turn 1" }),
   ).toBeInTheDocument();
   const caseBetaToggle = screen.getByRole("button", { name: /case-beta/ });
   expect(caseBetaToggle).toHaveAttribute("aria-expanded", "false");

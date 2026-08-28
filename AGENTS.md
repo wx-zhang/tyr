@@ -13,6 +13,7 @@ Tyr is a security and governance layer for AI agents. It sits between an AI agen
 - Apps depend on shared packages; packages never depend on apps. CLI and API execution share the same engine.
 - Tasks and canonical run results are schema-validated JSON files. Databases contain rebuildable operational state only.
 - Read-only is the default. Real actions always require explicit, recorded human approval. Test evidence is retained verbatim, including credentials and other sensitive values.
+- `CONTEXT.md` defines the canonical GAMR domain language; use it when naming Tasks, Scenarios, Experiments, research, outcomes, and approval.
 - Put module-specific architecture, commands, conventions, and tests in the nearest child `AGENTS.md`; do not duplicate them here.
 - Keep every `AGENTS.md` below 300 lines and follow the root file's general pattern: purpose, scoped standards, layout or ownership, working commands, safety/testing rules, and coding standards. Omit sections that do not apply.
 - Avoid using lazy-import. Imports should be placed on top, unless it's required by the circurral dependency.

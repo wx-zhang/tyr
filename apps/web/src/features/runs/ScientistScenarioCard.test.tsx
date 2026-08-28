@@ -20,10 +20,10 @@ it("highlights a ready scenario with id and title", () => {
     />,
   );
 
-  expect(screen.getByLabelText("New scientist scenario")).toBeInTheDocument();
+  expect(screen.getByLabelText("New Adversarial Researcher Scenario")).toBeInTheDocument();
   expect(screen.getByText("New scenario")).toBeInTheDocument();
   expect(
-    screen.getByText("http-patch-delivery-approval-gate"),
+    screen.getByTitle("http-patch-delivery-approval-gate"),
   ).toBeInTheDocument();
   expect(
     screen.getByText("HTTP PATCH delivery to store tests Tyr approval gate"),

@@ -297,3 +297,7 @@ class ScientistScenarioCatalog:
             handle.write("\n")
             temporary = Path(handle.name)
         os.replace(temporary, path)
+AdversarialResearcherScenarioNotFound = ScientistScenarioNotFound
+AdversarialResearcherArchiveMarker = ScientistScenarioArchiveMarker
+AdversarialResearcherScenarioEntry = ScientistScenarioEntry
+AdversarialResearcherCatalog = ScientistScenarioCatalog

@@ -216,16 +216,17 @@ function CollectorArtifactUpdateContent({
   artifact: CollectorArtifact;
   onPreview: (file: CollectorFile, opener: HTMLElement) => void;
 }) {
+  const scenarioId = artifact.scenarioId ?? artifact.caseId ?? "—";
+  const scenarioExecutionId = artifact.scenarioExecutionId ?? artifact.caseId ?? scenarioId;
   return (
-    <li className="turn turn-artifact" data-collector-case-id={artifact.caseId}>
+    <li className="turn turn-artifact" data-collector-scenario-execution-id={scenarioExecutionId}>
       <div className="turn-header">
         <div>
           <h3>
-            {artifact.files.length ? "File received" : "Collector verification"} -{" "}
-            {artifact.caseId}
+            {artifact.files.length ? "File received" : "Collector verification"} - Scenario Execution {scenarioExecutionId}
           </h3>
           <span className="muted">
-            Evaluation name <span className="mono">{artifact.caseId}</span>
+            Scenario <span className="mono">{scenarioId}</span> · Execution <span className="mono">{scenarioExecutionId}</span>
           </span>
         </div>
         <div className="turn-header-side">

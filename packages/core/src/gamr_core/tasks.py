@@ -5,7 +5,15 @@ import re
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, field_validator, model_validator
+from pydantic import (
+    AliasChoices,
+    BaseModel,
+    ConfigDict,
+    Field,
+    TypeAdapter,
+    field_validator,
+    model_validator,
+)
 
 
 class TaskMetadata(BaseModel):
@@ -38,18 +46,26 @@ class TaskVariable(BaseModel):
 
 
 class TaskDefaults(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     max_turns: int = Field(alias="maxTurns", ge=1)
     action_mode: str = Field(alias="actionMode", pattern=r"^(read_only|approval_required)$")
-    default_case_ids: list[str] = Field(default_factory=list, alias="defaultCaseIds")
+    default_scenario_ids: list[str] = Field(
+        default_factory=list,
+        alias="defaultScenarioIds",
+        validation_alias=AliasChoices("defaultScenarioIds", "defaultCaseIds"),
+    )
 
-    @field_validator("default_case_ids")
+    @field_validator("default_scenario_ids")
     @classmethod
-    def unique_case_ids(cls, value: list[str]) -> list[str]:
+    def unique_scenario_ids(cls, value: list[str]) -> list[str]:
         if len(value) != len(set(value)):
-            raise ValueError("default case IDs must be unique")
+            raise ValueError("default scenario IDs must be unique")
         return value
+
+    @property
+    def default_case_ids(self) -> list[str]:
+        return self.default_scenario_ids
 
 
 JudgePipelineId = Literal["evidence-and-content"]
@@ -68,9 +84,16 @@ class TaskSpec(BaseModel):
     methodology: str | None = None
     evaluation: str | None = None
     judge: JudgeConfig = Field(default_factory=JudgeConfig)
-    cases: list[str] = Field(min_length=1)
+    scenarios: list[str] = Field(
+        min_length=1,
+        validation_alias=AliasChoices("scenarios", "cases"),
+    )
     defaults: TaskDefaults
     variables: dict[str, TaskVariable] = Field(default_factory=dict)
+
+    @property
+    def cases(self) -> list[str]:
+        return self.scenarios
 
 
 class TaskManifest(BaseModel):

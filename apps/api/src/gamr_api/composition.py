@@ -9,7 +9,7 @@ from gamr_adapters.sandbox.factory import create_sandbox
 from gamr_adapters.tasks.filesystem import load_task, resolve_task_directory
 from gamr_adapters.tracing import create_trace_port
 from gamr_adapters.tyr.client import TyrMcpClient
-from gamr_core import RunState
+from gamr_core import ExperimentState
 from gamr_engine import ExperimentExecutionService, ProgressEvent
 from gamr_engine.capacity_sandbox import CapacitySandbox
 from gamr_engine.decoder_capacity import DecoderCapacityGate
@@ -39,8 +39,8 @@ def _advance_run_state(registry: JsonRegistry, run_id: str, event: ProgressEvent
     if event.phase not in {"case", "assessment", "scientist"}:
         return
     current = registry.get_run(run_id)
-    if current is not None and current.state is RunState.DISCOVERING:
-        registry.set_state(current, RunState.RUNNING)
+    if current is not None and current.state is ExperimentState.DISCOVERING:
+        registry.set_state(current, ExperimentState.RUNNING)
 
 
 def build_run_executor(
@@ -59,9 +59,11 @@ def build_run_executor(
             raise ValueError("TYR_MCP_TOKEN and OPENROUTER_API_KEY are required")
         selected_model = run.configuration.model or settings.model_name
         if not selected_model:
-            raise ValueError("TYR_LOOP_MODEL is required")
-        selected_scientist_model = (
-            run.configuration.scientist_model or settings.scientist_model_name or selected_model
+            raise ValueError("GAMR_MODEL_NAME is required")
+        selected_adversarial_researcher_model = (
+            run.configuration.adversarial_researcher_model
+            or settings.adversarial_researcher_model_name
+            or selected_model
         )
         selected_judge_model = (
             run.configuration.judge_model
@@ -71,7 +73,7 @@ def build_run_executor(
         run.configuration = run.configuration.model_copy(
             update={
                 "model": selected_model,
-                "scientist_model": selected_scientist_model,
+                "adversarial_researcher_model": selected_adversarial_researcher_model,
                 "judge_model": selected_judge_model,
             }
         )
@@ -105,11 +107,11 @@ def build_run_executor(
         )
         scientist_model = (
             model
-            if selected_scientist_model == selected_model
+            if selected_adversarial_researcher_model == selected_model
             else OpenAICompatibleModel(
                 settings.model_base_url,
                 settings.model_api_key,
-                selected_scientist_model,
+                selected_adversarial_researcher_model,
                 trace_port=trace_port,
             )
         )
@@ -139,7 +141,7 @@ def build_run_executor(
                 delivery_verifier=collector,
                 content_evidence_provider=collector,
                 sandbox=sandbox,
-                scientist_output_tokens=settings.scientist_output_tokens,
+                scientist_output_tokens=settings.adversarial_researcher_output_tokens,
                 trace_port=trace_port,
             )
         finally:

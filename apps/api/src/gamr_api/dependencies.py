@@ -82,7 +82,12 @@ def browser_safe_activity(
         "activityType": browser_safe_value(value.get("activityType"), secrets),
         "status": browser_safe_value(value.get("status"), secrets),
         "phase": browser_safe_value(value.get("phase"), secrets),
-        "caseId": browser_safe_value(value.get("caseId"), secrets),
+        "scenarioId": browser_safe_value(
+            value.get("scenarioId", value.get("caseId")), secrets
+        ),
+        "scenarioExecutionId": browser_safe_value(
+            value.get("scenarioExecutionId", value.get("caseId")), secrets
+        ),
         "turnId": browser_safe_value(value.get("turnId"), secrets),
         "operationId": browser_safe_value(value.get("operationId"), secrets),
         "approvalId": browser_safe_value(value.get("approvalId"), secrets),
@@ -97,9 +102,9 @@ def browser_safe_activity(
     sandbox_event = value.get("sandboxEvent")
     if sandbox_event is not None:
         safe["sandboxEvent"] = browser_safe_value(sandbox_event, secrets)
-    related_case_ids = value.get("relatedCaseIds")
-    if isinstance(related_case_ids, list) and related_case_ids:
-        safe["relatedCaseIds"] = browser_safe_value(related_case_ids, secrets)
+    related_ids = value.get("relatedScenarioExecutionIds", value.get("relatedCaseIds"))
+    if isinstance(related_ids, list) and related_ids:
+        safe["relatedScenarioExecutionIds"] = browser_safe_value(related_ids, secrets)
     return safe
 
 

@@ -24,10 +24,15 @@ const experiment = {
   configuration: {
     actionMode: "approval_required" as const,
     model: "test-model",
+    adversarialResearcherModel: "researcher-model",
+    judgeModel: "judge-model",
     maxTurns: 40,
     discoveryTurns: 20,
-    caseIds: ["case-a"],
-    scientistIterations: 3,
+    scenarioIds: ["case-a"],
+    maxConcurrentScenarioExecutions: 5,
+    researchIterations: 3,
+    historyTestRuns: 10,
+    historyResearchRuns: 5,
   },
 };
 
@@ -48,14 +53,14 @@ function renderPage() {
 
 function installFetch(options?: {
   startOk?: boolean;
-  caseIds?: string[];
-  scientistIterations?: number;
+  scenarioIds?: string[];
+  researchIterations?: number;
 }) {
   const startOk = options?.startOk ?? true;
-  const caseIds = options?.caseIds ?? experiment.configuration.caseIds;
-  const scientistIterations =
-    options?.scientistIterations ??
-    experiment.configuration.scientistIterations;
+  const scenarioIds = options?.scenarioIds ?? experiment.configuration.scenarioIds;
+  const researchIterations =
+    options?.researchIterations ??
+    experiment.configuration.researchIterations;
   const fetchMock = vi.fn(
     async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
@@ -66,8 +71,8 @@ function installFetch(options?: {
             ...experiment,
             configuration: {
               ...experiment.configuration,
-              caseIds,
-              scientistIterations,
+              scenarioIds,
+              researchIterations,
             },
           }),
         };
@@ -97,45 +102,45 @@ beforeEach(() => {
   installFetch();
 });
 
-it("shows stored max concurrent cases on the configuration snapshot", async () => {
+it("shows stored Max concurrent Scenario Executions on the configuration snapshot", async () => {
   renderPage();
 
-  const concurrencyLabel = await screen.findByText("Max concurrent cases");
+  const concurrencyLabel = await screen.findByText("Max concurrent Scenario Executions");
   const row = concurrencyLabel.closest(".detail-row");
   expect(row).not.toBeNull();
   expect(row).toHaveTextContent("5");
 });
 
-it("shows stored scientist iterations on the configuration snapshot", async () => {
+it("shows stored Research Iterations on the configuration snapshot", async () => {
   renderPage();
 
-  expect(await screen.findByText("Scientist iterations")).toBeInTheDocument();
+  expect(await screen.findByText("Research Iterations")).toBeInTheDocument();
   expect(screen.getByText("3")).toBeInTheDocument();
 });
 
-it("shows off when scientist iterations are zero", async () => {
-  installFetch({ scientistIterations: 0 });
+it("shows off when Research Iterations are zero", async () => {
+  installFetch({ researchIterations: 0 });
   renderPage();
 
-  expect(await screen.findByText("Scientist iterations")).toBeInTheDocument();
+  expect(await screen.findByText("Research Iterations")).toBeInTheDocument();
   expect(screen.getByText("0 (off)")).toBeInTheDocument();
 });
 
-it("shows no cases for scientist-only experiments", async () => {
-  installFetch({ caseIds: [], scientistIterations: 3 });
+it("shows no Scenarios for researcher-only Experiments", async () => {
+  installFetch({ scenarioIds: [], researchIterations: 3 });
   renderPage();
 
-  expect(await screen.findByText("None (scientist only)")).toBeInTheDocument();
+  expect(await screen.findByText("None (Adversarial Researcher only)")).toBeInTheDocument();
 });
 
-it("starts a run and navigates to the run page", async () => {
+it("starts an Experiment and navigates to the execution page", async () => {
   const fetchMock = installFetch();
   renderPage();
 
   expect(
-    await screen.findByRole("button", { name: "Execute" }),
+    await screen.findByRole("button", { name: "Start Experiment" }),
   ).toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "Execute" }));
+  fireEvent.click(screen.getByRole("button", { name: "Start Experiment" }));
 
   await waitFor(() => {
     expect(navigate).toHaveBeenCalledWith("/runs/run-9");

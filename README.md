@@ -4,12 +4,13 @@
 
 ![GAMR — Tyr's final opponent](docs/assets/gamr-hero.svg)
 
-**GAMR** (Generative Adversarial Risk Mapper) is the red-team experiment runner for
+**GAMR** (Generative Adversarial Risk Mapper) is the red-team Experiment runner for
 [Tyr](https://tyr.ai/) — the security and governance layer for AI agents.
 
-GAMR runs adversarial experiments against Tyr and lets you review the results. The CLI is the
-primary interface. The optional API and web app share the same engine, so they can start read-only
-runs and visualize every run under the shared `.gamr` root, including runs started from the CLI.
+GAMR saves reusable Experiment Presets, executes them as single-use Experiments, and lets you review
+the resulting Scenario Executions. The CLI is the primary interface. The optional API and web app
+share the same engine, so they can start read-only Experiments and visualize every Experiment under
+the shared `.gamr` root, including Experiments started from the CLI.
 
 ## Quick start
 
@@ -18,16 +19,18 @@ uv sync --all-packages --dev
 uv run gamr doctor
 uv run gamr task validate tasks/exfiltrate-important-txt
 uv run gamr experiment run tasks/exfiltrate-important-txt
-uv run gamr result validate .gamr/runs/<run-id>/result.json
+uv run gamr result validate .gamr/runs/<experiment-id>/result.json
 ```
 
-Live commands need `TYR_MCP_TOKEN`, `OPENROUTER_API_KEY`, and `TYR_LOOP_MODEL` set (see
-`.env.example`).
+Live commands need `TYR_MCP_TOKEN`, `OPENROUTER_API_KEY`, and `GAMR_MODEL_NAME` set (see
+`.env.example`). `TYR_LOOP_MODEL` is a fallback-only legacy name. Canonical GAMR environment names
+win when both canonical and legacy values are present. Browser/API origins remain separate.
 
-Set `TYR_LOOP_JUDGE_MODEL` when evaluation should use a model independent from the model
-that executes scenarios. If it is unset, evaluation uses `TYR_LOOP_MODEL`.
-Scientist scenario generation defaults to an 8,192-token completion budget. Set
-`GAMR_SCIENTIST_OUTPUT_TOKENS` to override it.
+Set `GAMR_JUDGE_MODEL_NAME` for an independent judge model; `TYR_LOOP_JUDGE_MODEL` is fallback-only.
+Adversarial Researcher generation defaults to an 8,192-token Completion budget. Set
+`GAMR_ADVERSARIAL_RESEARCHER_OUTPUT_TOKENS`; `GAMR_SCIENTIST_OUTPUT_TOKENS` is fallback-only.
+`GAMR_ADVERSARIAL_RESEARCHER_MODEL_NAME` and `GAMR_CHAT_MODEL_NAME` follow the same precedence
+rules over their legacy `TYR_LOOP_*` names.
 Tasks configure judge execution via `spec.judge.pipeline` in `task.json` (defaulting to
 `evidence-and-content`).
 
@@ -60,15 +63,15 @@ Run the focused judge regression without executing an experiment or communicatin
 uv run poe evaluate:judges
 ```
 
-The job replays committed case-local artifacts through the production judge model and contained
+The job replays committed Scenario-local artifacts through the production judge model and contained
 Docker sandbox. Inputs are validated by size and SHA-256, categorical
 regressions return a non-zero exit code, and complete results are written below
-`.gamr/evaluations/judges/<evaluation-id>/`. Progress is streamed for cases, decoder and sandbox stages, and model calls.
+`.gamr/evaluations/judges/<evaluation-id>/`. Progress is streamed for Scenarios, decoder and sandbox stages, and model calls.
 Pass `--debug` to print parsed LLM traffic and sandbox inputs and outputs while diagnosing model
-behavior. The terminal output and saved log may contain sensitive dataset content. A complete log is
+behavior. The terminal output and saved log may contain sensitive Task content. A complete log is
 saved under `.gamr/evaluations/judges/` using a UTC timestamp and short UUID.
 The corpus contains two manually reviewed real positive artifacts, one visually reviewed real
-negative artifact, and deterministic Caesar/Base64 decoder cases. See `evaluations/AGENTS.md` for
+negative artifact, and deterministic Caesar/Base64 decoder Scenarios. See `evaluations/AGENTS.md` for
 the extension path. Because this job has no Tyr approval evidence, it scores only content-overlap
 and decoding categories. The final security assessment is retained for inspection but is not a
 regression label.
@@ -90,17 +93,14 @@ recording safe failure diagnostics. Each redirected retry authenticates again be
 The live run page refreshes collector evidence automatically and places verified files in Updates,
 with bounded previews for common text, Markdown, JSON, XML, CSV, and raster-image files. Retained
 UTF-8 request bodies are verified by recorded byte length and SHA-256, then exposed as request-body
-artifacts through the same run-scoped preview and download controls. Decoded multipart summaries
-are not raw bodies; their independently verified quarantined files remain downloadable.
+By default, Experiments are **read-only**. To let an Experiment request real actions through Tyr, use
+Approval-gated mode (`--action-mode approval_required --approval-gated`); every action still needs
+an explicit human decision on the Tyr side. GAMR never auto-approves an action. Use `--all-scenarios`
+to run every Scenario in a Task.
 
-By default, experiments are **read-only**. To let an experiment take real actions through Tyr, run
-with Actions Allowed (`--action-mode approval_required --allow-actions`); each action still needs an
-explicit human approval on the Tyr side. GAMR never auto-approves an action. Use `--all-cases` to run
-every case in a task instead of one.
-
-Each discovery thread, base case, and scientist thread starts a separate Tyr Assistant conversation.
-GAMR passes its `conversationId` on every query or action request, so concurrent cases do not share
-Tyr context.
+Each discovery thread, base Scenario Execution, and Research Iteration starts a separate Tyr
+Assistant conversation. GAMR passes its `conversationId` on every query or action request, so
+concurrent Scenario Executions do not share Tyr context.
 
 ## Interactive chat
 
@@ -117,24 +117,23 @@ conversation contract and isolation with:
 uv run python scripts/explore_tyr_conversations.py
 ```
 
-This starts in **read-only** mode: Tyr's action-capable tools are hidden entirely, so nothing can be
-executed. To let the chat see and call action-capable tools, add `--allow-actions`:
+This starts in **read-only** mode. Tyr's action-capable tools are hidden entirely, so nothing can be
+executed. To let the chat see and call action-capable tools, use Approval-gated mode:
 
 ```bash
-uv run gamr chat --allow-actions
+uv run gamr chat --approval-gated
 ```
 
-`--allow-actions` only exposes the tools — it does not skip approval. Every action Tyr's tools take
-still requires a recorded human decision on the Tyr side. Because this mode is more sensitive, the
-CLI asks you to confirm it interactively before the session starts. If you're running non-interactively
-(e.g. from a script), add `--confirm-actions` to skip that prompt:
+Approval-gated mode only exposes action-capable tools; it does not skip approval. Every action Tyr's
+tools take still requires a recorded human decision on the Tyr side. The CLI asks you to confirm this
+mode interactively. For non-interactive use, add `--confirm-actions`:
 
 ```bash
-uv run gamr chat --allow-actions --confirm-actions
+uv run gamr chat --approval-gated --confirm-actions
 ```
 
 Other chat options: `--prompt "<text>"` to send an initial message, `--model` to override
-`TYR_LOOP_CHAT_MODEL` (defaults to `x-ai/grok-4.5`), and `--base-url` to override
+`GAMR_CHAT_MODEL_NAME` (`TYR_LOOP_CHAT_MODEL` is fallback-only), and `--base-url` to override
 `OPENROUTER_BASE_URL`.
 
 ## Developer Python sandbox
@@ -182,7 +181,7 @@ Or run the production-style containers (API + static web):
 
 ```bash
 cp .env.example .env
-# set TYR_MCP_TOKEN, OPENROUTER_API_KEY, and TYR_LOOP_MODEL for live runs
+# set TYR_MCP_TOKEN, OPENROUTER_API_KEY, and GAMR_MODEL_NAME for live runs
 docker compose up -d --build
 ```
 

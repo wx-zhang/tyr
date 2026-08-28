@@ -36,7 +36,7 @@ from gamr_core import (
     SandboxOperationPreview,
     Scenario,
 )
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from ..case_progress import case_state_after_activity
 from ..dependencies import (
@@ -78,7 +78,12 @@ class ActivityItemResponse(BaseModel):
     activity_type: str = Field(alias="activityType")
     status: str
     phase: str | None = None
-    case_id: str | None = Field(default=None, alias="caseId")
+    scenario_id: str | None = Field(default=None, alias="scenarioId")
+    scenario_execution_id: str | None = Field(
+        default=None,
+        alias="scenarioExecutionId",
+        validation_alias=AliasChoices("scenarioExecutionId", "caseId"),
+    )
     turn_id: str | None = Field(default=None, alias="turnId")
     operation_id: str | None = Field(default=None, alias="operationId")
     approval_id: str | None = Field(default=None, alias="approvalId")
@@ -87,12 +92,39 @@ class ActivityItemResponse(BaseModel):
     evidence_type: str = Field(alias="evidenceType")
     summary: str
     evidence_ids: list[str] = Field(alias="evidenceIds")
-    related_case_ids: list[str] = Field(default_factory=list, alias="relatedCaseIds")
+    related_scenario_execution_ids: list[str] = Field(
+        default_factory=list,
+        alias="relatedScenarioExecutionIds",
+        validation_alias=AliasChoices("relatedScenarioExecutionIds", "relatedCaseIds"),
+    )
     detail_availability: Availability = Field(alias="detailAvailability")
     metadata: dict[str, object] = Field(default_factory=dict)
     sandbox_event: SandboxOperationEvent | None = Field(default=None, alias="sandboxEvent")
 
     model_config = ConfigDict(populate_by_name=True)
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_historical_identity(cls, value: Any) -> Any:
+        if not isinstance(value, dict):
+            return value
+        payload = dict(value)
+        legacy_id = payload.pop("caseId", None)
+        if payload.get("scenarioExecutionId") is None and legacy_id is not None:
+            payload["scenarioExecutionId"] = legacy_id
+        if payload.get("scenarioId") is None and legacy_id is not None:
+            payload["scenarioId"] = legacy_id
+        legacy_related = payload.pop("relatedCaseIds", None)
+        if "relatedScenarioExecutionIds" not in payload and legacy_related is not None:
+            payload["relatedScenarioExecutionIds"] = legacy_related
+        return payload
+
+    @property
+    def case_id(self) -> str | None:
+        return self.scenario_execution_id
+
+    @property
+    def related_case_ids(self) -> list[str]:
+        return self.related_scenario_execution_ids
 
 
 class ParticipantResponse(BaseModel):
@@ -120,8 +152,6 @@ class RelationshipResponse(BaseModel):
 class RelationshipProjectionResponse(BaseModel):
     participants: list[ParticipantResponse]
     relationships: list[RelationshipResponse]
-
-
 class ActivityPageResponse(BaseModel):
     items: list[ActivityItemResponse]
     next_cursor: str | None = Field(alias="nextCursor")
@@ -150,13 +180,17 @@ class EvidenceContentResponse(BaseModel):
     redacted: bool = False
     content: object | None = None
 
-
 class RunTurnResponse(BaseModel):
     id: str
     sequence: int
     number: int
     stage: str
-    case_id: str | None = Field(default=None, alias="caseId")
+    scenario_id: str | None = Field(default=None, alias="scenarioId")
+    scenario_execution_id: str | None = Field(
+        default=None,
+        alias="scenarioExecutionId",
+        validation_alias=AliasChoices("scenarioExecutionId", "caseId"),
+    )
     status: str
     agent_message: str = Field(alias="agentMessage")
     tyr_message: str | None = Field(default=None, alias="tyrMessage")
@@ -173,14 +207,54 @@ class RunTurnResponse(BaseModel):
     missing_evidence: list[str] = Field(default_factory=list, alias="missingEvidence")
     content_overlap: ContentOverlapResult | None = Field(default=None, alias="contentOverlap")
     judge_pipeline: str | None = Field(default=None, alias="judgePipeline")
-    history_case_ids: list[str] = Field(default_factory=list, alias="historyCaseIds")
-    history_case_origins: list[str] = Field(default_factory=list, alias="historyCaseOrigins")
+    history_research_run_scenario_ids: list[str] = Field(
+        default_factory=list,
+        alias="historyResearchRunScenarioIds",
+        validation_alias=AliasChoices("historyResearchRunScenarioIds", "historyCaseIds"),
+    )
+    history_research_run_origins: list[str] = Field(
+        default_factory=list,
+        alias="historyResearchRunOrigins",
+        validation_alias=AliasChoices("historyResearchRunOrigins", "historyCaseOrigins"),
+    )
     sandbox_operation: SandboxOperationPreview | None = Field(
         default=None, alias="sandboxOperation"
     )
     scenario: Scenario | None = None
 
     model_config = ConfigDict(populate_by_name=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_historical_identity(cls, value: Any) -> Any:
+        if not isinstance(value, dict):
+            return value
+        payload = dict(value)
+        legacy_id = payload.pop("caseId", None)
+        if payload.get("scenarioExecutionId") is None and legacy_id is not None:
+            payload["scenarioExecutionId"] = legacy_id
+        if payload.get("scenarioId") is None and legacy_id is not None:
+            payload["scenarioId"] = legacy_id
+        legacy_history = payload.pop("historyCaseIds", None)
+        if "historyResearchRunScenarioIds" not in payload and legacy_history is not None:
+            payload["historyResearchRunScenarioIds"] = legacy_history
+        legacy_origins = payload.pop("historyCaseOrigins", None)
+        if "historyResearchRunOrigins" not in payload and legacy_origins is not None:
+            payload["historyResearchRunOrigins"] = legacy_origins
+        return payload
+
+    @property
+    def case_id(self) -> str | None:
+        return self.scenario_execution_id
+
+    @property
+    def history_case_ids(self) -> list[str]:
+        return self.history_research_run_scenario_ids
+
+    @property
+    def history_case_origins(self) -> list[str]:
+        return self.history_research_run_origins
+
 
 
 class RunTurnPageResponse(BaseModel):
@@ -218,6 +292,8 @@ def _query(
     run_id: str,
     *,
     q: str | None,
+    scenario_id: str | None,
+    scenario_execution_id: str | None,
     case_id: str | None,
     participant_id: str | None,
     activity_type: str | None,
@@ -235,7 +311,8 @@ def _query(
         return EvidenceQuery(
             runId=run_id,
             q=q,
-            caseId=case_id,
+            scenarioId=scenario_id,
+            scenarioExecutionId=scenario_execution_id or case_id,
             participantId=participant_id,
             activityType=ActivityType(activity_type) if activity_type else None,
             status=status,
@@ -368,16 +445,20 @@ def _map_activity_stage(phase: str | None) -> str | None:
     return mapped if mapped in _LIFECYCLE_STAGES else None
 
 
-def _activity_case_state(activities: list[RunActivity]) -> dict[str, dict[str, object]]:
-    cases: dict[str, dict[str, object]] = {}
+def _activity_scenario_execution_state(
+    activities: list[RunActivity],
+) -> dict[str, dict[str, object]]:
+    executions: dict[str, dict[str, object]] = {}
     for activity in activities:
-        if not activity.case_id:
+        execution_id = activity.scenario_execution_id
+        if not execution_id:
             continue
-        item = cases.setdefault(
-            activity.case_id,
+        item = executions.setdefault(
+            execution_id,
             {
-                "caseId": activity.case_id,
-                "order": len(cases),
+                "scenarioId": activity.scenario_id or execution_id,
+                "scenarioExecutionId": execution_id,
+                "order": len(executions),
                 "state": "pending",
                 "verdict": None,
                 "latestSequence": None,
@@ -389,7 +470,7 @@ def _activity_case_state(activities: list[RunActivity]) -> dict[str, dict[str, o
                 "latestSequence": activity.sequence,
             }
         )
-    return cases
+    return executions
 
 
 def _activity_current_phase(activities: list[RunActivity]) -> str | None:
@@ -508,58 +589,81 @@ def visualization(
         if snapshot is None:
             raise not_found("run")
         return cast(dict[str, object], browser_safe_value(snapshot, redaction_secrets(settings)))
+
     secrets = redaction_secrets(settings)
     root, bundle = _normalized(run_id, settings, secrets=secrets)
     metadata = _read_run_json(root)
     state = str(metadata.get("state") or metadata.get("status") or run.state.value)
     if state == "blocked":
         state = RunState.COMPLETED.value
-    cases = _activity_case_state(bundle.activities)
+    executions = _activity_scenario_execution_state(bundle.activities)
     result = load_run_result(root, secrets)
     if result is not None:
-        for case in result.cases:
-            item = cases.setdefault(
-                case.scenario_id,
+        for execution in result.scenario_executions:
+            execution_id = execution.scenario_execution_id
+            item = executions.setdefault(
+                execution_id,
                 {
-                    "caseId": case.scenario_id,
-                    "order": len(cases),
+                    "scenarioId": execution.scenario_id,
+                    "scenarioExecutionId": execution_id,
+                    "order": len(executions),
                     "latestSequence": None,
                 },
             )
             item.update(
                 {
-                    "state": case.outcome.value,
-                    "verdict": case.verdict.value,
-                    "objectiveStatus": case.objective_status.value,
-                    "outcome": case.outcome.value,
-                    "summary": case.summary,
-                    "assessmentStatus": case.assessment_status.value,
-                    "assessmentFailure": case.assessment_failure,
-                    "reasonCodes": [item.value for item in case.reason_codes],
-                    "missingEvidence": case.missing_evidence,
+                    "scenarioId": execution.scenario_id,
+                    "scenarioExecutionId": execution_id,
+                    "state": execution.outcome.value,
+                    "verdict": execution.verdict.value,
+                    "objectiveStatus": execution.objective_status.value,
+                    "outcome": execution.outcome.value,
+                    "summary": execution.summary,
+                    "assessmentStatus": execution.assessment_status.value,
+                    "assessmentFailure": execution.assessment_failure,
+                    "reasonCodes": [item.value for item in execution.reason_codes],
+                    "missingEvidence": execution.missing_evidence,
                     "contentOverlap": (
-                        case.content_overlap.model_dump(by_alias=True, mode="json")
-                        if case.content_overlap is not None
+                        execution.content_overlap.model_dump(by_alias=True, mode="json")
+                        if execution.content_overlap is not None
                         else None
                     ),
                 }
             )
-    known_cases = metadata.get("caseIds") or run.configuration.case_ids or list(cases)
-    for order, case_id in enumerate(known_cases if isinstance(known_cases, list) else [], 0):
-        cases.setdefault(
-            str(case_id),
+
+    configured_ids = metadata.get("scenarioIds")
+    if not isinstance(configured_ids, list):
+        configured_ids = metadata.get("caseIds")
+    if not isinstance(configured_ids, list):
+        configured_ids = run.configuration.scenario_ids
+    known_ids = (
+        configured_ids
+        if isinstance(configured_ids, list)
+        else list(executions)
+        if result is not None
+        else None
+    )
+    for order, scenario_id in enumerate(known_ids or [], 0):
+        definition_id = str(scenario_id)
+        executions.setdefault(
+            definition_id,
             {
-                "caseId": str(case_id),
+                "scenarioId": definition_id,
+                "scenarioExecutionId": definition_id,
                 "order": order,
                 "state": "pending",
                 "verdict": None,
                 "latestSequence": None,
             },
         )
-    scientist_enabled = run.configuration.scientist_iterations > 0
+
+    scientist_enabled = run.configuration.research_iterations > 0
     config_meta = metadata.get("configuration")
     if isinstance(config_meta, dict):
-        iterations = config_meta.get("scientistIterations", config_meta.get("scientist_iterations"))
+        iterations = config_meta.get(
+            "researchIterations",
+            config_meta.get("scientistIterations", config_meta.get("research_iterations")),
+        )
         if isinstance(iterations, int):
             scientist_enabled = iterations > 0
     phases, current_phase = _lifecycle_progress(
@@ -589,14 +693,14 @@ def visualization(
         or run.updated_at
         or run.created_at
     )
-    current_case_ids = [
-        str(item["caseId"])
-        for item in cases.values()
+    current_execution_ids = [
+        str(item["scenarioExecutionId"])
+        for item in executions.values()
         if item["state"] in {"active", "blocked", "running", "assessing"}
     ]
     execution_mode = (
         "scientist_only"
-        if run.configuration.case_ids == [] and run.configuration.scientist_iterations > 0
+        if run.configuration.scenario_ids == [] and run.configuration.research_iterations > 0
         else "cases"
     )
     payload = cast(
@@ -613,20 +717,26 @@ def visualization(
                     "finishedAt": metadata.get("finishedAt"),
                     "outcome": state if state in {item.value for item in RunState} else None,
                     "currentPhase": current_phase,
-                    "currentCaseIds": current_case_ids,
+                    "currentScenarioExecutionIds": current_execution_ids,
                     "executionMode": execution_mode,
                 },
                 "phases": phases,
-                "cases": sorted(cases.values(), key=lambda item: int(str(item["order"]))),
+                "scenarioExecutions": sorted(
+                    executions.values(), key=lambda item: int(str(item["order"]))
+                ),
                 "attention": {
                     "pendingApprovalCount": pending_approvals,
                     "blockers": blockers,
                     "unsettledTyrWork": unsettled,
                 },
                 "counts": {
-                    "totalKnown": isinstance(known_cases, list),
-                    "totalCases": len(known_cases) if isinstance(known_cases, list) else None,
-                    "completedCases": sum(item["state"] == "completed" for item in cases.values()),
+                    "totalKnown": isinstance(known_ids, list),
+                    "totalScenarioExecutions": (
+                        len(known_ids) if isinstance(known_ids, list) else None
+                    ),
+                    "completedScenarioExecutions": sum(
+                        item["state"] == "completed" for item in executions.values()
+                    ),
                 },
                 "latestSequence": max((item.sequence for item in bundle.activities), default=0),
             },
@@ -667,7 +777,8 @@ def turns(
             sequence=item.sequence,
             number=item.number,
             stage=item.stage,
-            caseId=item.case_id,
+            scenarioId=item.scenario_id,
+            scenarioExecutionId=item.scenario_execution_id,
             status=("incomplete" if terminal and item.status == "waiting_for_tyr" else item.status),
             agentMessage=item.agent_message,
             tyrMessage=item.tyr_message,
@@ -688,8 +799,8 @@ def turns(
                 else None
             ),
             judgePipeline=item.judge_pipeline,
-            historyCaseIds=list(item.history_case_ids),
-            historyCaseOrigins=list(item.history_case_origins),
+            historyResearchRunScenarioIds=list(item.history_case_ids),
+            historyResearchRunOrigins=list(item.history_case_origins),
             sandboxOperation=item.sandbox_operation,
             scenario=item.scenario,
         )
@@ -707,6 +818,8 @@ def turns(
 def relationships(
     run_id: str,
     q: str | None = Query(default=None),
+    scenario_id: str | None = Query(default=None, alias="scenarioId"),
+    scenario_execution_id: str | None = Query(default=None, alias="scenarioExecutionId"),
     case_id: str | None = Query(default=None, alias="caseId"),
     participant_id: str | None = Query(default=None, alias="participantId"),
     activity_type: str | None = Query(default=None, alias="activityType"),
@@ -722,6 +835,8 @@ def relationships(
         query = _query(
             run_id,
             q=q,
+            scenario_id=scenario_id,
+            scenario_execution_id=scenario_execution_id,
             case_id=case_id,
             participant_id=participant_id,
             activity_type=activity_type,
@@ -741,6 +856,8 @@ def relationships(
 def activity(
     run_id: str,
     q: str | None = Query(default=None),
+    scenario_id: str | None = Query(default=None, alias="scenarioId"),
+    scenario_execution_id: str | None = Query(default=None, alias="scenarioExecutionId"),
     case_id: str | None = Query(default=None, alias="caseId"),
     participant_id: str | None = Query(default=None, alias="participantId"),
     activity_type: str | None = Query(default=None, alias="activityType"),
@@ -759,6 +876,8 @@ def activity(
     evidence_query = _query(
         run_id,
         q=q,
+        scenario_id=scenario_id,
+        scenario_execution_id=scenario_execution_id,
         case_id=case_id,
         participant_id=participant_id,
         activity_type=activity_type,

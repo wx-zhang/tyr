@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  scientistScenarioExportUrl,
-  type ScientistScenario,
+  adversarialResearcherScenarioExportUrl,
+  type AdversarialResearcherScenario,
   type ScientistScenarioResult,
   type ScientistScenarioState,
 } from "../../api/client";
@@ -32,14 +32,16 @@ export function ScientistScenarioDetail({
   pending,
   onArchive,
 }: {
-  entry: ScientistScenario;
+  entry: AdversarialResearcherScenario;
   state: ScientistScenarioState;
   pending: boolean;
   onArchive: () => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const definitionId = `scientist-scenario-definition-${entry.runId}-${entry.artifactId}`;
+  const experimentId = entry.experimentId ?? entry.runId ?? "";
   const scenario = entry.scenario;
+  const [expanded, setExpanded] = useState(false);
+  const scenarioExecutionId = entry.result?.scenarioExecutionId ?? scenario.metadata.id;
+  const definitionId = `adversarial-researcher-scenario-definition-${experimentId}-${entry.artifactId}`;
   const tags = scenario.metadata.tags ?? [];
 
   return (
@@ -47,7 +49,7 @@ export function ScientistScenarioDetail({
       <header className="scientist-catalog-card-header">
         <div>
           <p className="eyebrow">
-            {scenario.metadata.category ?? "Generated scenario"}
+            {scenario.metadata.category ?? "Adversarial Researcher Scenario"}
           </p>
           <h2>{scenario.metadata.title}</h2>
           <p className="mono scientist-catalog-id">{scenario.metadata.id}</p>
@@ -63,12 +65,10 @@ export function ScientistScenarioDetail({
           <dd className="mono">{entry.task}</dd>
         </div>
         <div>
-          <dt>Origin run</dt>
+          <dt>Origin Experiment</dt>
           <dd>
-            <Link
-              to={`/runs/${encodeURIComponent(entry.runId)}/cases/${encodeURIComponent(scenario.metadata.id)}`}
-            >
-              Open originating run
+            <Link to={`/runs/${encodeURIComponent(experimentId)}/scenario-executions/${encodeURIComponent(scenarioExecutionId)}`}>
+              Open originating Experiment
             </Link>
           </dd>
         </div>
@@ -88,11 +88,11 @@ export function ScientistScenarioDetail({
           aria-controls={definitionId}
           onClick={() => setExpanded(!expanded)}
         >
-          {expanded ? "Hide complete definition" : "Show complete definition"}
+          {expanded ? "Hide complete Scenario definition" : "Show complete Scenario definition"}
         </button>
         <a
           className="button button-ghost"
-          href={scientistScenarioExportUrl(entry.runId, entry.artifactId)}
+          href={adversarialResearcherScenarioExportUrl(experimentId, entry.artifactId)}
         >
           Export JSON
         </a>
@@ -102,7 +102,7 @@ export function ScientistScenarioDetail({
           disabled={pending}
           onClick={onArchive}
         >
-          {state === "active" ? "Archive scenario" : "Restore scenario"}
+          {state === "active" ? "Archive Scenario" : "Restore Scenario"}
         </button>
       </div>
       {expanded ? (

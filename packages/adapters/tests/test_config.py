@@ -76,7 +76,7 @@ def test_settings_ignore_removed_gamr_provider_names(
 
     assert settings.tyr_mcp_token == ""
     assert settings.model_api_key == ""
-    assert settings.model_name == ""
+    assert settings.model_name == "gamr/model"
 
 
 def test_max_concurrent_decoders_defaults_to_two(
@@ -211,3 +211,85 @@ def test_settings_langfuse_invalid_enabled_configuration(
 
     assert settings.langfuse_enabled is True
     assert settings.is_langfuse_valid is False
+
+RENAMED_ENVIRONMENTS = {
+    "model_name": (
+        "GAMR_MODEL_NAME",
+        "TYR_LOOP_MODEL",
+        "",
+        "legacy/model",
+        "canonical/model",
+    ),
+    "adversarial_researcher_model_name": (
+        "GAMR_ADVERSARIAL_RESEARCHER_MODEL_NAME",
+        "TYR_LOOP_SCIENTIST_MODEL",
+        "",
+        "legacy/researcher",
+        "canonical/researcher",
+    ),
+    "judge_model_name": (
+        "GAMR_JUDGE_MODEL_NAME",
+        "TYR_LOOP_JUDGE_MODEL",
+        "",
+        "legacy/judge",
+        "canonical/judge",
+    ),
+    "chat_model_name": (
+        "GAMR_CHAT_MODEL_NAME",
+        "TYR_LOOP_CHAT_MODEL",
+        "x-ai/grok-4.5",
+        "legacy/chat",
+        "canonical/chat",
+    ),
+    "adversarial_researcher_output_tokens": (
+        "GAMR_ADVERSARIAL_RESEARCHER_OUTPUT_TOKENS",
+        "GAMR_SCIENTIST_OUTPUT_TOKENS",
+        8192,
+        12288,
+        2048,
+    ),
+}
+MODEL_ENVIRONMENTS = tuple(
+    (field, values[0], values[1])
+    for field, values in RENAMED_ENVIRONMENTS.items()
+    if field != "adversarial_researcher_output_tokens"
+)
+@pytest.mark.parametrize("field,values", RENAMED_ENVIRONMENTS.items())
+def test_renamed_environment_precedence(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    field: str,
+    values: tuple[str, str, str | int, str | int, str | int],
+) -> None:
+    canonical, legacy, default, legacy_value, canonical_value = values
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv(canonical, raising=False)
+    monkeypatch.delenv(legacy, raising=False)
+    assert getattr(Settings(), field) == default
+    monkeypatch.setenv(legacy, str(legacy_value))
+    assert getattr(Settings(), field) == legacy_value
+    monkeypatch.setenv(canonical, str(canonical_value))
+    assert getattr(Settings(), field) == canonical_value
+@pytest.mark.parametrize("field,canonical,legacy", MODEL_ENVIRONMENTS)
+def test_empty_canonical_model_name_does_not_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    field: str,
+    canonical: str,
+    legacy: str,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv(canonical, "")
+    monkeypatch.setenv(legacy, "legacy/model")
+    assert getattr(Settings(), field) == ""
+@pytest.mark.parametrize("invalid_value", ["", "abc", "0"])
+def test_invalid_canonical_researcher_tokens_do_not_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    invalid_value: str,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("GAMR_ADVERSARIAL_RESEARCHER_OUTPUT_TOKENS", invalid_value)
+    monkeypatch.setenv("GAMR_SCIENTIST_OUTPUT_TOKENS", "12288")
+    with pytest.raises(ValidationError):
+        Settings()

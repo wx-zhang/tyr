@@ -11,7 +11,7 @@ beforeEach(() => {
   setupRunMocks();
 });
 
-it("shows scientist generation failures on completed runs without Unknown stage", async () => {
+it("shows Adversarial Researcher generation failures on completed Experiments without Unknown stage", async () => {
   vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
     const url = String(input);
     if (url.includes("/visualization")) {
@@ -67,16 +67,16 @@ it("shows scientist generation failures on completed runs without Unknown stage"
   const { container } = renderRunPage();
 
   expect(
-    await screen.findByRole("heading", { name: "Scientist - Iteration 1" }),
+    await screen.findByRole("heading", { name: "Adversarial Researcher - Research Iteration 1" }),
   ).toBeInTheDocument();
   expect(screen.getAllByText(/missing objective/).length).toBeGreaterThan(0);
   expect(screen.getByText("Failed")).toBeInTheDocument();
   expect(container.querySelector(".turn-scientist")).not.toBeNull();
   expect(screen.queryByText("Unknown")).not.toBeInTheDocument();
-  expect(screen.getAllByText("Scientist").length).toBeGreaterThan(0);
+  expect(screen.getAllByText("Adversarial Researcher").length).toBeGreaterThan(0);
 });
 
-it("shows ready scientist generation turns as iteration cards", async () => {
+it("shows ready Adversarial Researcher generation turns as Research Iteration cards", async () => {
   vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
     const url = String(input);
     if (url.includes("/visualization")) {
@@ -168,34 +168,34 @@ it("shows ready scientist generation turns as iteration cards", async () => {
   const { container } = renderRunPage();
 
   expect(
-    await screen.findByRole("heading", { name: "Scientist - Iteration 2" }),
+    await screen.findByRole("heading", { name: "Adversarial Researcher - Research Iteration 2" }),
   ).toBeInTheDocument();
   expect(
     screen.getAllByText("New delivery path scenario ready")[0],
   ).toBeInTheDocument();
   const iteration2 = screen
-    .getByRole("heading", { name: "Scientist - Iteration 2" })
+    .getByRole("heading", { name: "Adversarial Researcher - Research Iteration 2" })
     .closest(".turn") as HTMLElement;
   expect(
-    within(iteration2).getByLabelText("New scientist scenario"),
+    within(iteration2).getByLabelText("New Adversarial Researcher Scenario"),
   ).toBeInTheDocument();
   expect(
     within(iteration2).getAllByText("New scenario").length,
   ).toBeGreaterThan(0);
-  expect(within(iteration2).getAllByText("scientist-2").length).toBeGreaterThan(
-    0,
-  );
+  expect(
+    within(iteration2).getByTitle("scientist-2"),
+  ).toBeInTheDocument();
   const history = container.querySelector(".scientist-history");
   expect(history).not.toBeNull();
   const iteration2History = within(iteration2).getByLabelText(
-    "Tests used from history",
+    "Scenarios used from history",
   );
   expect(
     within(iteration2History).getByText("scientist-1"),
   ).toBeInTheDocument();
 });
 
-it("distinguishes turns from different scientist scenarios instead of repeating Turn 1", async () => {
+it("distinguishes turns from different Adversarial Researcher Scenarios instead of repeating Turn 1", async () => {
   vi.mocked(fetch).mockImplementation((input: RequestInfo | URL) => {
     const url = String(input);
     if (url.includes("/visualization")) {

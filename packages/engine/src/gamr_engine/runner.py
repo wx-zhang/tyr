@@ -24,7 +24,7 @@ from gamr_core import (
     Evidence,
     EvidenceType,
     ExecutionOutcome,
-    ExperimentConfig,
+    ExperimentPresetConfig,
     NextTurnDecision,
     ObjectiveStatus,
     PromptBundle,
@@ -213,7 +213,7 @@ class TargetConversation:
 
 
 @dataclass(frozen=True)
-class CaseRecord:
+class ScenarioExecutionRecord:
     scenario: Scenario
     rendered_title: str
     rendered_objective: str
@@ -225,12 +225,16 @@ class CaseRecord:
     origin_run_id: str | None = None
     origin_artifact_id: str | None = None
     source_created_at: datetime | None = None
+    scenario_execution_id: str | None = None
+
+
+CaseRecord = ScenarioExecutionRecord
 
 
 @dataclass(frozen=True)
 class _HistorySource:
     run_id: str
-    configuration: ExperimentConfig
+    configuration: ExperimentPresetConfig
     created_at: datetime
     result: RunResult
 
@@ -241,10 +245,19 @@ class ProgressEvent:
     run_id: str
     phase: str | None = None
     case_id: str | None = None
+    scenario_id: str | None = None
+    scenario_execution_id: str | None = None
     turn: int | None = None
     detail: str | None = None
     fields: tuple[tuple[str, str], ...] | None = None
     history_case_ids: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        if self.case_id is not None:
+            if self.scenario_id is None:
+                object.__setattr__(self, "scenario_id", self.case_id)
+            if self.scenario_execution_id is None:
+                object.__setattr__(self, "scenario_execution_id", self.case_id)
 
 
 ProgressCallback = Callable[[ProgressEvent], None]
@@ -264,6 +277,7 @@ class ExperimentRunner:
         self._progress = progress
         self._activity_sink = activity_sink
         self._activity_sequences: dict[str, int] = {}
+        self._scenario_execution_ids: dict[tuple[str, str], str] = {}
         self._collector_verification = CollectorVerificationService(delivery_verifier)
         self._content_evidence_provider = content_evidence_provider
         self._sandbox = sandbox
@@ -273,7 +287,7 @@ class ExperimentRunner:
     async def run(
         self,
         task: LoadedTask,
-        config: ExperimentConfig,
+        config: ExperimentPresetConfig,
         *,
         run_id: str | None = None,
         target: TargetGateway | None = None,
@@ -438,10 +452,10 @@ class ExperimentRunner:
                 )
             return res
 
-    async def resume_scientist(
+    async def resume_research(
         self,
         task: LoadedTask,
-        config: ExperimentConfig,
+        config: ExperimentPresetConfig,
         *,
         source_run_id: str,
         run_id: str | None = None,
@@ -554,6 +568,7 @@ class ExperimentRunner:
                     self._trace_port, "final_run_outcome", res.outcome.value, observation=run_obs
                 )
             return res
+    resume_scientist = resume_research
 
     @staticmethod
     def _load_prior_records(
@@ -580,7 +595,7 @@ class ExperimentRunner:
     def _load_configured_history(
         task: LoadedTask,
         candidate: DiscoveryCandidate,
-        config: ExperimentConfig,
+        config: ExperimentPresetConfig,
         artifacts: ArtifactStore | None,
         current_run_id: str,
     ) -> list[CaseRecord]:
@@ -661,7 +676,7 @@ class ExperimentRunner:
         artifacts: ArtifactStore,
         source_run_id: str,
         source_result: RunResult,
-        source_configuration: ExperimentConfig,
+        source_configuration: ExperimentPresetConfig,
         source_created_at: datetime,
         *,
         include_base: bool,
@@ -723,6 +738,7 @@ class ExperimentRunner:
                     rendered_steps=steps,
                     rendered_success=success,
                     case=case,
+                    scenario_execution_id=case.scenario_execution_id,
                     transcript=transcript_by_case.get(case.scenario_id, []),
                     origin="base" if is_base else "scientist",
                     origin_run_id=None if is_base else source_run_id,
@@ -738,7 +754,7 @@ class ExperimentRunner:
         self,
         task: LoadedTask,
         candidate: DiscoveryCandidate,
-        config: ExperimentConfig,
+        config: ExperimentPresetConfig,
         target: TargetGateway,
         model: ModelGateway,
         judge_model: ModelGateway,
@@ -1271,7 +1287,7 @@ class ExperimentRunner:
         return Scenario.model_validate(data)
 
     @staticmethod
-    def _select_scenarios(task: LoadedTask, config: ExperimentConfig) -> list[Scenario]:
+    def _select_scenarios(task: LoadedTask, config: ExperimentPresetConfig) -> list[Scenario]:
         if config.case_ids is None:
             selected_ids = task.manifest.spec.defaults.default_case_ids
             if not selected_ids:
@@ -1288,7 +1304,7 @@ class ExperimentRunner:
         self,
         run_id: str,
         task: LoadedTask,
-        config: ExperimentConfig,
+        config: ExperimentPresetConfig,
         target: TargetGateway,
         model: ModelGateway,
         artifacts: ArtifactStore | None,
@@ -1329,7 +1345,7 @@ class ExperimentRunner:
         task: LoadedTask,
         scenario: Scenario,
         candidate: DiscoveryCandidate,
-        config: ExperimentConfig,
+        config: ExperimentPresetConfig,
         target: TargetGateway,
         model: ModelGateway,
         judge_model: ModelGateway,
@@ -1340,17 +1356,25 @@ class ExperimentRunner:
         phase: str = "case",
     ) -> tuple[CaseRecord, str | None]:
         case_id = scenario.metadata.id
+        scenario_execution_id = new_id()
+        self._scenario_execution_ids[(run_id, case_id)] = scenario_execution_id
         with trace_span(
             self._trace_port,
             f"case:{case_id}",
             input={"objective": scenario.spec.objective, "steps": list(scenario.spec.steps)},
-            metadata={"caseId": case_id, "runId": run_id, "phase": phase},
+            metadata={
+                "scenarioId": case_id,
+                "scenarioExecutionId": scenario_execution_id,
+                "runId": run_id,
+                "phase": phase,
+            },
         ) as case_obs:
             self._emit(
                 "case.started",
                 run_id,
                 phase=phase,
                 case_id=case_id,
+                scenario_execution_id=scenario_execution_id,
                 detail=scenario.metadata.title,
             )
             values = self._variables(task, candidate)
@@ -1363,6 +1387,7 @@ class ExperimentRunner:
             except KeyError as exc:
                 case = self._case_result(
                     scenario,
+                    scenario_execution_id=scenario_execution_id,
                     outcome=ExecutionOutcome.FAILED,
                     objective_status=ObjectiveStatus.NOT_ATTEMPTED,
                     verdict=SecurityVerdict.INCONCLUSIVE,
@@ -1410,6 +1435,7 @@ class ExperimentRunner:
                     rendered_steps=list(scenario.spec.steps),
                     rendered_success=scenario.spec.success_criteria or "",
                     case=case,
+                    scenario_execution_id=scenario_execution_id,
                     transcript=[],
                     origin="scientist" if phase == "scientist" else "base",
                     origin_run_id=run_id if phase == "scientist" else None,
@@ -1433,6 +1459,7 @@ class ExperimentRunner:
                 target,
                 model,
                 config,
+                scenario_execution_id=scenario_execution_id,
                 max_turns=config.max_turns,
                 conversation=conversation,
                 require_candidates=False,
@@ -1444,13 +1471,19 @@ class ExperimentRunner:
             )
             turn_ids = self._turn_ids(result.transcript)
             verification = await self._verify_collector(
-                scenario, result.transcript, run_id, artifacts, phase
+                scenario,
+                result.transcript,
+                run_id,
+                artifacts,
+                phase,
+                scenario_execution_id,
             )
             verifications = verification.items
 
             if task.evaluation is None:
                 case = self._case_result(
                     scenario,
+                    scenario_execution_id=scenario_execution_id,
                     outcome=ExecutionOutcome.FAILED if result.error else ExecutionOutcome.COMPLETED,
                     objective_status=(
                         ObjectiveStatus.UNKNOWN
@@ -1511,6 +1544,7 @@ class ExperimentRunner:
                     rendered_steps=steps,
                     rendered_success=success,
                     case=case,
+                    scenario_execution_id=scenario_execution_id,
                     transcript=result.transcript,
                     origin="scientist" if phase == "scientist" else "base",
                     origin_run_id=run_id if phase == "scientist" else None,
@@ -1573,6 +1607,7 @@ class ExperimentRunner:
 
             case = self._case_result(
                 scenario,
+                scenario_execution_id=scenario_execution_id,
                 outcome=ExecutionOutcome.FAILED if result.error else ExecutionOutcome.COMPLETED,
                 objective_status=judge_result.objective_status,
                 verdict=judge_result.verdict,
@@ -1626,6 +1661,7 @@ class ExperimentRunner:
                 rendered_steps=steps,
                 rendered_success=success,
                 case=case,
+                scenario_execution_id=scenario_execution_id,
                 transcript=result.transcript,
                 origin="scientist" if phase == "scientist" else "base",
                 origin_run_id=run_id if phase == "scientist" else None,
@@ -1640,7 +1676,7 @@ class ExperimentRunner:
         phase_prompt: str,
         target: TargetGateway,
         model: ModelGateway,
-        config: ExperimentConfig,
+        config: ExperimentPresetConfig,
         *,
         max_turns: int,
         conversation: TargetConversation,
@@ -1649,6 +1685,7 @@ class ExperimentRunner:
         artifacts: ArtifactStore | None,
         phase: str,
         case_id: str | None = None,
+        scenario_execution_id: str | None = None,
         runtime_vars: set[str] | None = None,
     ) -> PhaseResult:
         transcript: list[dict[str, str]] = []
@@ -1832,6 +1869,8 @@ class ExperimentRunner:
                         "content": message,
                         "stage": phase,
                         "caseId": case_id,
+                        "scenarioId": case_id,
+                        "scenarioExecutionId": scenario_execution_id,
                         "occurredAt": requested_at,
                     }
                 ],
@@ -1983,6 +2022,8 @@ class ExperimentRunner:
                 turn_id,
                 {
                     "phase": phase_prompt[:120],
+                    "scenarioId": case_id,
+                    "scenarioExecutionId": scenario_execution_id,
                     "model": {"content": content},
                     "targetRequest": {
                         "message": message,
@@ -2009,6 +2050,8 @@ class ExperimentRunner:
                         "turn": turn,
                         "role": "user",
                         "content": reply,
+                        "scenarioId": case_id,
+                        "scenarioExecutionId": scenario_execution_id,
                         "stage": phase,
                         "caseId": case_id,
                         "settlement": result.get("gamrSettlement"),
@@ -2021,6 +2064,8 @@ class ExperimentRunner:
                 run_id,
                 {
                     "runId": run_id,
+                    "scenarioId": case_id,
+                    "scenarioExecutionId": scenario_execution_id,
                     "phase": phase_prompt[:120],
                     "turnId": turn_id,
                     "operationId": conversation.operation_id,
@@ -2098,6 +2143,7 @@ class ExperimentRunner:
         run_id: str,
         artifacts: ArtifactStore | None,
         phase: str,
+        scenario_execution_id: str | None = None,
     ) -> CollectorVerificationBatch:
         requirement = scenario.spec.collector_evidence
         if requirement is None:
@@ -2107,6 +2153,7 @@ class ExperimentRunner:
             run_id,
             phase=phase,
             case_id=scenario.metadata.id,
+            scenario_execution_id=scenario_execution_id,
         )
         batch = await self._collector_verification.verify(
             scenario.metadata.id,
@@ -2114,12 +2161,14 @@ class ExperimentRunner:
             transcript,
             run_id,
             artifacts,
+            scenario_execution_id=scenario_execution_id,
         )
         self._emit(
             f"collector.{batch.status}",
             run_id,
             phase=phase,
             case_id=scenario.metadata.id,
+            scenario_execution_id=scenario_execution_id,
             detail=f"{len(batch.items)} collector request(s)",
         )
         return batch
@@ -2397,6 +2446,7 @@ class ExperimentRunner:
         *,
         phase: str | None = None,
         case_id: str | None = None,
+        scenario_execution_id: str | None = None,
         turn: int | None = None,
         turn_id: str | None = None,
         detail: str | None = None,
@@ -2427,6 +2477,11 @@ class ExperimentRunner:
                 metadata.update(participant_meta)
                 if metadata_extra:
                     metadata.update(metadata_extra)
+                execution_id = scenario_execution_id or (
+                    self._scenario_execution_ids.get((run_id, case_id))
+                    if case_id is not None
+                    else None
+                )
                 activity_fields: dict[str, Any] = dict(
                     id=new_id(),
                     runId=run_id,
@@ -2435,7 +2490,8 @@ class ExperimentRunner:
                     activityType=activity_type,
                     status=self._activity_status(event_type),
                     phase=phase,
-                    caseId=case_id,
+                    scenarioId=case_id,
+                    scenarioExecutionId=execution_id,
                     turnId=turn_id,
                     sourceParticipantId=source,
                     targetParticipantId=target,
@@ -2444,7 +2500,7 @@ class ExperimentRunner:
                         if event_type.startswith("assessment.")
                         else EvidenceType.EVENT
                     ),
-                    relatedCaseIds=list(related_case_ids),
+                    relatedScenarioExecutionIds=list(related_case_ids),
                     evidenceRefs=list(evidence_refs),
                     metadata=metadata,
                     operationId=operation_id,
@@ -2464,6 +2520,13 @@ class ExperimentRunner:
                     run_id,
                     phase=phase,
                     case_id=case_id,
+                    scenario_id=case_id,
+                    scenario_execution_id=scenario_execution_id
+                    or (
+                        self._scenario_execution_ids.get((run_id, case_id))
+                        if case_id is not None
+                        else None
+                    ),
                     turn=turn,
                     detail=detail,
                     fields=fields,
@@ -2645,16 +2708,21 @@ class ExperimentRunner:
     ) -> None:
         if artifacts is None or not hasattr(artifacts, "write_json"):
             return
-        safe_id = _UNSAFE_ID_CHAR.sub("-", case.scenario_id)[:128] or "case"
+        safe_id = _UNSAFE_ID_CHAR.sub("-", case.scenario_execution_id)[:128] or "scenario-execution"
         payload = case.model_dump(by_alias=True, exclude_none=True, mode="json")
-        payload["stage"] = "scientist" if stage == "scientist" else "case"
+        payload["stage"] = "scientist" if stage == "scientist" else "scenario_execution"
         payload["occurredAt"] = datetime.now(UTC).isoformat().replace("+00:00", "Z")
-        artifacts.write_json(f"runs/{run_id}/case-results/{safe_id}.json", payload)
+        artifacts.write_json(f"runs/{run_id}/scenario-execution-results/{safe_id}.json", payload)
+        legacy_id = _UNSAFE_ID_CHAR.sub("-", case.scenario_id)[:128] or "case"
+        legacy_payload = dict(payload)
+        legacy_payload["stage"] = "scientist" if stage == "scientist" else "case"
+        artifacts.write_json(f"runs/{run_id}/case-results/{legacy_id}.json", legacy_payload)
 
     @staticmethod
     def _case_result(
         scenario: Scenario,
         *,
+        scenario_execution_id: str | None = None,
         outcome: ExecutionOutcome,
         objective_status: ObjectiveStatus,
         verdict: SecurityVerdict,
@@ -2668,6 +2736,7 @@ class ExperimentRunner:
     ) -> CaseResult:
         return CaseResult(
             scenarioId=scenario.metadata.id,
+            scenarioExecutionId=scenario_execution_id or new_id(),
             outcome=outcome,
             objectiveStatus=objective_status,
             verdict=verdict,
@@ -2687,7 +2756,7 @@ class ExperimentRunner:
         run_id: str,
         started_at: datetime,
         task: LoadedTask,
-        config: ExperimentConfig,
+        config: ExperimentPresetConfig,
         results: list[CaseResult],
         *,
         outcome: ExecutionOutcome = ExecutionOutcome.COMPLETED,

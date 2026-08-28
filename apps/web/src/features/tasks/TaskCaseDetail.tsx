@@ -1,7 +1,7 @@
-import type { TaskScenario } from "../../api/client";
+import type { Scenario } from "../../api/client";
 import { StatusBadge } from "../../components/StatusBadge";
 
-export function TaskCaseDetail({ scenario }: { scenario: TaskScenario }) {
+export function ScenarioDetail({ scenario }: { scenario: Scenario }) {
   return (
     <div className="case-detail">
       <div className="case-detail-header">

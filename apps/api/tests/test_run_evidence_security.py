@@ -69,16 +69,17 @@ def test_browser_activity_preserves_server_metadata() -> None:
         "activityType": "error",
         "status": "observed",
         "phase": None,
-        "caseId": None,
-        "turnId": None,
+        "scenarioId": None,
+        "scenarioExecutionId": None,
         "operationId": None,
+        "turnId": None,
         "approvalId": None,
         "sourceParticipantId": None,
         "targetParticipantId": None,
         "evidenceType": "error",
         "summary": "A redacted error",
         "evidenceIds": ["evidence-1"],
-        "relatedCaseIds": ["case-alpha"],
+        "relatedScenarioExecutionIds": ["case-alpha"],
         "detailAvailability": "redacted",
         "metadata": {
             "apiKey": "super-secret",
@@ -323,11 +324,14 @@ def test_api_visualization_and_turns_carry_complete_decoding_provenance(
         assert vis_resp.status_code == 200
         vis_data = vis_resp.json()
         assert secret in json.dumps(vis_data)
-        case = vis_data["cases"][0]
-        assert case["contentOverlap"]["decoding"]["status"] == "succeeded"
-        assert case["contentOverlap"]["decoding"]["attemptCount"] == 1
-        assert len(case["contentOverlap"]["decoding"]["derivedFiles"]) == 1
-        assert case["contentOverlap"]["decoding"]["derivedFiles"][0]["sourceFileId"] == "file-1"
+        execution = vis_data["scenarioExecutions"][0]
+        assert execution["contentOverlap"]["decoding"]["status"] == "succeeded"
+        assert execution["contentOverlap"]["decoding"]["attemptCount"] == 1
+        assert len(execution["contentOverlap"]["decoding"]["derivedFiles"]) == 1
+        assert (
+            execution["contentOverlap"]["decoding"]["derivedFiles"][0]["sourceFileId"]
+            == "file-1"
+        )
 
         turns_resp = client.get("/api/v1/runs/run-dec-sec/turns")
         assert turns_resp.status_code == 200

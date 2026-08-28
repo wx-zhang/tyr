@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from gamr_adapters.collector import CollectorClient, CollectorError
 from gamr_adapters.config import Settings
 from gamr_engine.collector_verification import CollectorFile, CollectorRequirement
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from ..dependencies import get_registry, get_settings, require_run_evidence_access
 from ..errors import not_found
@@ -43,7 +43,12 @@ class CollectorFileResponse(BaseModel):
 
 
 class CollectorVerificationResponse(BaseModel):
-    case_id: str = Field(alias="caseId")
+    scenario_id: str | None = Field(default=None, alias="scenarioId")
+    scenario_execution_id: str | None = Field(
+        default=None,
+        alias="scenarioExecutionId",
+        validation_alias=AliasChoices("scenarioExecutionId", "caseId"),
+    )
     requirement: str
     status: str
     request_ids: list[str] = Field(alias="requestIds")
@@ -106,7 +111,10 @@ async def collector_verifications(
         files.extend(await _remote_files(value, settings))
         results.append(
             {
-                "caseId": value.get("caseId"),
+                "scenarioId": value.get("scenarioId", value.get("caseId")),
+                "scenarioExecutionId": value.get(
+                    "scenarioExecutionId", value.get("caseId")
+                ),
                 "requirement": value.get("requirement"),
                 "status": value.get("status"),
                 "requestIds": [

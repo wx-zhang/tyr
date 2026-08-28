@@ -99,7 +99,7 @@ describe("groupRunHistory", () => {
     expect(groups[0].updates.map((u) => u.sequence)).toEqual([1, 2]);
   });
 
-  it("buckets scientist turns to their resolved iteration group", () => {
+  it("buckets Research Iteration turns to their resolved group", () => {
     const sciGen1 = makeTurn({
       id: "sci-gen-1",
       sequence: 5,
@@ -127,21 +127,21 @@ describe("groupRunHistory", () => {
       artifacts: [],
     });
 
-    const iterGroup = groups.find((g) => g.id === "iteration-1");
+    const iterGroup = groups.find((g) => g.id === "research-iteration-1");
     expect(iterGroup).toBeDefined();
-    expect(iterGroup!.label).toBe("Iteration 1");
+    expect(iterGroup!.label).toBe("Research Iteration 1");
     expect(iterGroup!.updates).toHaveLength(1); // generation update
     expect(iterGroup!.cases).toHaveLength(1); // case entry for sci-case-alpha
     expect(iterGroup!.cases[0].caseId).toBe("sci-case-alpha");
     expect(iterGroup!.cases[0].updates).toHaveLength(1);
-    const baseGroup = groups.find((group) => group.id === "cases");
+    const baseGroup = groups.find((group) => group.id === "scenario-executions");
     expect(baseGroup!.cases.map((entry) => entry.caseId)).toEqual([
       "base-case",
     ]);
     expect(baseGroup!.state).toBe("completed");
   });
 
-  it("buckets remaining caseId turns to the base-case group", () => {
+  it("buckets remaining Scenario Execution turns to the base group", () => {
     const caseTurn = makeTurn({
       id: "turn-1",
       sequence: 3,
@@ -155,12 +155,12 @@ describe("groupRunHistory", () => {
       artifacts: [],
     });
 
-    const casesGroup = groups.find((g) => g.id === "cases");
-    expect(casesGroup).toBeDefined();
-    expect(casesGroup!.label).toBe("Test cases");
-    expect(casesGroup!.cases).toHaveLength(1);
-    expect(casesGroup!.cases[0].caseId).toBe("case-alpha");
-    expect(casesGroup!.cases[0].updates).toHaveLength(1);
+    const executionsGroup = groups.find((g) => g.id === "scenario-executions");
+    expect(executionsGroup).toBeDefined();
+    expect(executionsGroup!.label).toBe("Scenario Executions");
+    expect(executionsGroup!.cases).toHaveLength(1);
+    expect(executionsGroup!.cases[0].caseId).toBe("case-alpha");
+    expect(executionsGroup!.cases[0].updates).toHaveLength(1);
   });
 
   it("keeps sandbox operation turns in their owning case without duplication", () => {
@@ -183,10 +183,10 @@ describe("groupRunHistory", () => {
       cases: [makeCase({ id: "case-alpha", state: "active" })],
       artifacts: [],
     });
-    const casesGroup = groups.find((group) => group.id === "cases");
-    expect(casesGroup?.cases).toHaveLength(1);
-    expect(casesGroup?.cases[0].updates).toHaveLength(1);
-    expect(casesGroup?.cases[0].updates[0]).toMatchObject({
+    const executionsGroup = groups.find((group) => group.id === "scenario-executions");
+    expect(executionsGroup?.cases).toHaveLength(1);
+    expect(executionsGroup?.cases[0].updates).toHaveLength(1);
+    expect(executionsGroup?.cases[0].updates[0]).toMatchObject({
       kind: "turn",
       turn: { id: "sandbox-operation-1" },
     });
@@ -213,7 +213,7 @@ describe("groupRunHistory", () => {
     expect(otherGroup!.updates).toHaveLength(1);
   });
 
-  it("asserts case entries follow visualization.cases order including pending cases", () => {
+  it("asserts Scenario Execution entries follow visualization order including pending entries", () => {
     const turnBeta = makeTurn({
       id: "turn-beta",
       sequence: 2,
@@ -233,19 +233,19 @@ describe("groupRunHistory", () => {
       artifacts: [],
     });
 
-    const casesGroup = groups.find((g) => g.id === "cases");
-    expect(casesGroup).toBeDefined();
-    expect(casesGroup!.cases.map((c) => c.caseId)).toEqual([
+    const executionsGroup = groups.find((g) => g.id === "scenario-executions");
+    expect(executionsGroup).toBeDefined();
+    expect(executionsGroup!.cases.map((c) => c.caseId)).toEqual([
       "case-alpha",
       "case-beta",
       "case-gamma",
     ]);
-    expect(casesGroup!.cases[0].updates).toHaveLength(0);
-    expect(casesGroup!.cases[1].updates).toHaveLength(1);
-    expect(casesGroup!.cases[2].updates).toHaveLength(0);
+    expect(executionsGroup!.cases[0].updates).toHaveLength(0);
+    expect(executionsGroup!.cases[1].updates).toHaveLength(1);
+    expect(executionsGroup!.cases[2].updates).toHaveLength(0);
   });
 
-  it("appends an entry instead of dropping when caseId is unrecognized", () => {
+  it("appends an entry instead of dropping when Scenario Execution ID is unrecognized", () => {
     const unknownCaseTurn = makeTurn({
       id: "turn-custom",
       sequence: 4,
@@ -261,17 +261,17 @@ describe("groupRunHistory", () => {
       artifacts: [],
     });
 
-    const casesGroup = groups.find((g) => g.id === "cases");
-    expect(casesGroup).toBeDefined();
-    expect(casesGroup!.cases.map((c) => c.caseId)).toEqual([
+    const executionsGroup = groups.find((g) => g.id === "scenario-executions");
+    expect(executionsGroup).toBeDefined();
+    expect(executionsGroup!.cases.map((c) => c.caseId)).toEqual([
       "case-alpha",
       "case-custom",
     ]);
-    expect(casesGroup!.cases[1].progress).toBeUndefined();
-    expect(casesGroup!.cases[1].updates).toHaveLength(1);
+    expect(executionsGroup!.cases[1].progress).toBeUndefined();
+    expect(executionsGroup!.cases[1].updates).toHaveLength(1);
   });
 
-  it("attaches collector artifacts by caseId", () => {
+  it("attaches collector artifacts by Scenario Execution ID", () => {
     const artifact: CollectorArtifact = {
       caseId: "case-alpha",
       requirement: "file",
@@ -287,10 +287,10 @@ describe("groupRunHistory", () => {
       artifacts: [artifact],
     });
 
-    const casesGroup = groups.find((g) => g.id === "cases");
-    expect(casesGroup).toBeDefined();
-    expect(casesGroup!.cases[0].updates).toHaveLength(1);
-    expect(casesGroup!.cases[0].updates[0].kind).toBe("artifact");
+    const executionsGroup = groups.find((g) => g.id === "scenario-executions");
+    expect(executionsGroup).toBeDefined();
+    expect(executionsGroup!.cases[0].updates).toHaveLength(1);
+    expect(executionsGroup!.cases[0].updates[0].kind).toBe("artifact");
   });
 
   it("orders updates within a case from oldest to newest", () => {
@@ -323,14 +323,14 @@ describe("groupRunHistory", () => {
       artifacts: [artifact],
     });
 
-    const casesGroup = groups.find((g) => g.id === "cases");
-    expect(casesGroup).toBeDefined();
-    const caseAlpha = casesGroup!.cases[0];
-    expect(caseAlpha.updates).toHaveLength(3);
-    expect(caseAlpha.updates[0].kind).toBe("turn");
-    expect(caseAlpha.updates[0].sequence).toBe(1);
-    expect(caseAlpha.updates[1].kind).toBe("artifact");
-    expect(caseAlpha.updates[2].sequence).toBe(3);
-    expect(caseAlpha.updates[2].kind).toBe("turn");
+    const executionsGroup = groups.find((g) => g.id === "scenario-executions");
+    expect(executionsGroup).toBeDefined();
+    const execution = executionsGroup!.cases[0];
+    expect(execution.updates).toHaveLength(3);
+    expect(execution.updates[0].kind).toBe("turn");
+    expect(execution.updates[0].sequence).toBe(1);
+    expect(execution.updates[1].kind).toBe("artifact");
+    expect(execution.updates[2].sequence).toBe(3);
+    expect(execution.updates[2].kind).toBe("turn");
   });
 });

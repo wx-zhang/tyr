@@ -34,10 +34,22 @@ class Settings(BaseSettings):
         validation_alias="OPENROUTER_BASE_URL",
     )
     model_api_key: str = Field(default="", validation_alias="OPENROUTER_API_KEY")
-    model_name: str = Field(default="", validation_alias="TYR_LOOP_MODEL")
-    scientist_model_name: str = Field(default="", validation_alias="TYR_LOOP_SCIENTIST_MODEL")
-    judge_model_name: str = Field(default="", validation_alias="TYR_LOOP_JUDGE_MODEL")
-    chat_model_name: str = Field(default="x-ai/grok-4.5", validation_alias="TYR_LOOP_CHAT_MODEL")
+    model_name: str = Field(
+        default="", validation_alias=AliasChoices("GAMR_MODEL_NAME", "TYR_LOOP_MODEL")
+    )
+    adversarial_researcher_model_name: str = Field(
+        default="",
+        validation_alias=AliasChoices(
+            "GAMR_ADVERSARIAL_RESEARCHER_MODEL_NAME", "TYR_LOOP_SCIENTIST_MODEL"
+        ),
+    )
+    judge_model_name: str = Field(
+        default="", validation_alias=AliasChoices("GAMR_JUDGE_MODEL_NAME", "TYR_LOOP_JUDGE_MODEL")
+    )
+    chat_model_name: str = Field(
+        default="x-ai/grok-4.5",
+        validation_alias=AliasChoices("GAMR_CHAT_MODEL_NAME", "TYR_LOOP_CHAT_MODEL"),
+    )
     max_concurrent_runs: int = Field(
         default=3,
         ge=1,
@@ -48,10 +60,12 @@ class Settings(BaseSettings):
         ge=1,
         validation_alias="GAMR_MAX_CONCURRENT_DECODERS",
     )
-    scientist_output_tokens: int = Field(
+    adversarial_researcher_output_tokens: int = Field(
         default=8192,
         ge=1,
-        validation_alias="GAMR_SCIENTIST_OUTPUT_TOKENS",
+        validation_alias=AliasChoices(
+            "GAMR_ADVERSARIAL_RESEARCHER_OUTPUT_TOKENS", "GAMR_SCIENTIST_OUTPUT_TOKENS"
+        ),
     )
     sandbox_backend: Literal["docker", "host-unsafe", "disabled"] = Field(
         default="docker",
@@ -83,6 +97,14 @@ class Settings(BaseSettings):
         default="",
         validation_alias=AliasChoices("GAMR_LANGFUSE_ENVIRONMENT", "LANGFUSE_ENVIRONMENT"),
     )
+
+    @property
+    def scientist_model_name(self) -> str:
+        return self.adversarial_researcher_model_name
+
+    @property
+    def scientist_output_tokens(self) -> int:
+        return self.adversarial_researcher_output_tokens
 
     @property
     def is_langfuse_valid(self) -> bool:

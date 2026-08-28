@@ -56,12 +56,12 @@ export function RunHistoryGroup({
       ),
   ).length;
   const countDisplay =
-    group.id === "cases"
-      ? `${completedCases} of ${group.cases.length} cases complete`
+    group.id === "cases" || group.id === "scenario-executions"
+      ? `${completedCases} of ${group.cases.length} Scenario Executions complete`
       : group.updates.length > 0
         ? `${group.updates.length} ${group.updates.length === 1 ? "update" : "updates"}`
         : group.cases.length > 0
-          ? `${group.cases.length} ${group.cases.length === 1 ? "case" : "cases"}`
+          ? `${group.cases.length} ${group.cases.length === 1 ? "Scenario Execution" : "Scenario Executions"}`
           : null;
 
   return (
@@ -89,10 +89,10 @@ export function RunHistoryGroup({
           ) : null}
         </button>
       </h3>
-      {group.id === "cases" && group.cases.length > 0 ? (
+      {(["cases", "scenario-executions"] as string[]).includes(group.id) && group.cases.length > 0 ? (
         <progress
           className="history-case-progress"
-          aria-label="Test case progress"
+          aria-label="Scenario Execution progress"
           aria-valuenow={completedCases}
           aria-valuemax={group.cases.length}
           value={completedCases}
@@ -136,10 +136,8 @@ export function RunHistoryGroup({
           {group.cases.length > 0 ? (
             <ul className="history-case-list" aria-label={group.label}>
               {group.cases.map((caseEntry) => {
-                const iterMatch = group.id.match(/^iteration-(\d+)$/);
-                const scientistIteration = iterMatch
-                  ? Number(iterMatch[1])
-                  : undefined;
+                const iterMatch = group.id.match(/^(?:iteration|research-iteration)-(\d+)$/);
+                const researchIteration = iterMatch ? Number(iterMatch[1]) : undefined;
                 return (
                   <RunHistoryCase
                     key={caseEntry.caseId}
@@ -149,7 +147,7 @@ export function RunHistoryGroup({
                     onToggle={() => onToggleCase(caseEntry.caseId)}
                     now={now}
                     flashIds={flashIds}
-                    scientistIteration={scientistIteration}
+                    scientistIteration={researchIteration}
                     caseOriginById={caseOriginById}
                     datasetCaseIds={datasetCaseIds}
                   />

@@ -195,8 +195,11 @@ def test_historical_visualization_exposes_scientist_phase_and_current_phase(
     phases = {phase["id"]: phase["state"] for phase in payload["phases"]}
     assert phases["scientist"] == "completed"
     assert phases["running"] == "completed"
-    cases = {case["caseId"]: case["state"] for case in payload["cases"]}
-    assert cases["case-alpha"] == "completed"
+    executions = {
+        execution["scenarioExecutionId"]: execution["state"]
+        for execution in payload["scenarioExecutions"]
+    }
+    assert executions["case-alpha"] == "completed"
 
 
 def test_historical_visualization_marks_scientist_skipped_when_unused(

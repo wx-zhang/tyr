@@ -26,7 +26,7 @@ def test_json_registry_persists_and_rediscovers_cli_and_service_runs(tmp_path: P
 
     rediscovered = JsonRegistry(tmp_path)
 
-    assert rediscovered.experiments[experiment.id].name == "Review"
+    assert rediscovered.experiment_presets[experiment.id].name == "Review"
     assert rediscovered.runs[service_run.id].state is RunState.PREPARING
     assert rediscovered.runs[cli_run.id].experiment_id is None
     assert rediscovered.runs[cli_run.id].source is RunSource.CLI

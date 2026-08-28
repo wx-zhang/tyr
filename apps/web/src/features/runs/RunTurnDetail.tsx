@@ -70,17 +70,12 @@ export function RunTurnDetail({
           className={`turn-message evaluation-message verdict-${evaluationResult?.className ?? "unknown"}`}
         >
           <p className="turn-speaker">
-            <span aria-hidden="true">A</span>Case assessment
+            <span aria-hidden="true">A</span>Scenario Execution assessment
           </p>
           <dl className="evaluation-facts">
-            <div>
-              <dt>Objective</dt>
-              <dd>{label(turn.objectiveStatus)}</dd>
-            </div>
-            <div>
-              <dt>Execution</dt>
-              <dd>{label(turn.outcome)}</dd>
-            </div>
+            <div><dt>Objective Status</dt><dd>{label(turn.objectiveStatus)}</dd></div>
+            <div><dt>Completion Outcome</dt><dd>{label(turn.outcome)}</dd></div>
+            <div><dt>Security verdict</dt><dd>{label(turn.verdict)}</dd></div>
             {turn.assessmentStatus ? (
               <div>
                 <dt>Judge</dt>
@@ -236,17 +231,13 @@ export function RunTurnDetail({
   if (presentation.scientistGeneration) {
     return (
       <div className="turn-messages turn-messages-single">
-        <article
-          className={`turn-message scientist-message status-${turn.status}`}
-        >
-          <p className="turn-speaker">
-            <span aria-hidden="true">S</span>Scientist
-          </p>
+        <article className={`turn-message scientist-message status-${turn.status}`}>
+          <p className="turn-speaker"><span aria-hidden="true">S</span>Adversarial Researcher</p>
           <ScientistScenarioCard turn={turn} />
-          {turn.historyCaseIds ? (
+          {(turn.historyResearchRunScenarioIds ?? turn.historyCaseIds) ? (
             <ScientistHistoryUsed
-              cases={resolveHistoryCases(turn.historyCaseIds, {
-                origins: turn.historyCaseOrigins,
+              cases={resolveHistoryCases(turn.historyResearchRunScenarioIds ?? turn.historyCaseIds ?? [], {
+                origins: turn.historyResearchRunOrigins ?? turn.historyCaseOrigins,
                 originByCaseId: caseOriginById,
                 taskCaseIds: datasetCaseIds,
               })}
