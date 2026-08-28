@@ -7,7 +7,7 @@ from gamr_adapters.config import Settings
 from gamr_api.dependencies import get_registry, get_settings
 from gamr_api.main import app
 from gamr_api.registry import InMemoryRegistry, RunRecord
-from gamr_core import RunActivity, RunState
+from gamr_core import ExperimentPresetConfig, RunActivity, RunState
 
 
 def _registry_with_run() -> tuple[InMemoryRegistry, str]:
@@ -661,5 +661,84 @@ def test_visualization_includes_content_overlap_and_decoding_provenance(tmp_path
         assert decoding["limitFlags"]["timedOut"] is True
         assert decoding["programSha256"] == ["e" * 64]
         assert decoding["derivedFiles"] == []
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_visualization_does_not_duplicate_started_scenario_as_pending_definition(
+    tmp_path: Path,
+) -> None:
+    artifact_root = tmp_path / "artifacts"
+    bundle = artifact_root / "runs" / "run-dup"
+    bundle.mkdir(parents=True)
+    (bundle / "run.json").write_text(
+        json.dumps(
+            {
+                "id": "run-dup",
+                "state": "running",
+                "task": "tasks/exfiltrate-important-txt",
+                "configuration": {
+                    "actionMode": "read_only",
+                    "scenarioIds": [
+                        "rename-relocate-fresh-agent-upload",
+                        "visualize-file-as-image-fresh-agent-upload",
+                    ],
+                },
+                "startedAt": "2026-08-08T10:00:00Z",
+            }
+        ),
+        encoding="utf-8",
+    )
+    (bundle / "activity.jsonl").write_text(
+        json.dumps(
+            {
+                "id": "activity-1",
+                "runId": "run-dup",
+                "sequence": 1,
+                "occurredAt": "2026-08-08T10:00:01Z",
+                "activityType": "case",
+                "status": "active",
+                "phase": "running",
+                "scenarioId": "rename-relocate-fresh-agent-upload",
+                "scenarioExecutionId": "execution-uuid-1",
+                "evidenceType": "event",
+                "summary": "Scenario is active",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    registry = InMemoryRegistry(
+        runs={
+            "run-dup": RunRecord(
+                "run-dup",
+                None,
+                "tasks/exfiltrate-important-txt",
+                RunState.RUNNING,
+                configuration=ExperimentPresetConfig(
+                    scenarioIds=[
+                        "rename-relocate-fresh-agent-upload",
+                        "visualize-file-as-image-fresh-agent-upload",
+                    ]
+                ),
+            )
+        }
+    )
+    app.dependency_overrides[get_registry] = lambda: registry
+    app.dependency_overrides[get_settings] = lambda: Settings(artifact_root=str(artifact_root))
+    try:
+        response = TestClient(app).get("/api/v1/runs/run-dup/visualization")
+        assert response.status_code == 200
+        executions = response.json()["scenarioExecutions"]
+        assert [
+            (item["scenarioId"], item["scenarioExecutionId"], item["state"]) for item in executions
+        ] == [
+            ("rename-relocate-fresh-agent-upload", "execution-uuid-1", "active"),
+            (
+                "visualize-file-as-image-fresh-agent-upload",
+                "visualize-file-as-image-fresh-agent-upload",
+                "pending",
+            ),
+        ]
     finally:
         app.dependency_overrides.clear()

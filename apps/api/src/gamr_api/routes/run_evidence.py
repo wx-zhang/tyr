@@ -635,6 +635,10 @@ def visualization(
     if not isinstance(configured_ids, list):
         configured_ids = metadata.get("caseIds")
     if not isinstance(configured_ids, list):
+        config_meta = metadata.get("configuration")
+        if isinstance(config_meta, dict):
+            configured_ids = config_meta.get("scenarioIds", config_meta.get("caseIds"))
+    if not isinstance(configured_ids, list):
         configured_ids = run.configuration.scenario_ids
     known_ids = (
         configured_ids
@@ -643,8 +647,13 @@ def visualization(
         if result is not None
         else None
     )
+    started_scenario_ids = {
+        str(item.get("scenarioId")) for item in executions.values() if item.get("scenarioId")
+    }
     for order, scenario_id in enumerate(known_ids or [], 0):
         definition_id = str(scenario_id)
+        if definition_id in started_scenario_ids:
+            continue
         executions.setdefault(
             definition_id,
             {
