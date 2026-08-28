@@ -13,6 +13,7 @@ def test_settings_load_provider_env_names(monkeypatch: pytest.MonkeyPatch, tmp_p
     monkeypatch.delenv("TYR_MCP_URL", raising=False)
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     monkeypatch.delenv("OPENROUTER_BASE_URL", raising=False)
+    monkeypatch.delenv("GAMR_ADVERSARIAL_RESEARCHER_API_KEY", raising=False)
     monkeypatch.delenv("TYR_LOOP_MODEL", raising=False)
     monkeypatch.delenv("GAMR_TYR_MCP_TOKEN", raising=False)
     monkeypatch.delenv("GAMR_MODEL_API_KEY", raising=False)
@@ -23,6 +24,7 @@ def test_settings_load_provider_env_names(monkeypatch: pytest.MonkeyPatch, tmp_p
     monkeypatch.setenv("OPENROUTER_API_KEY", "key")
     monkeypatch.setenv("OPENROUTER_BASE_URL", "https://example.test/v1")
     monkeypatch.setenv("TYR_LOOP_MODEL", "example/model")
+    monkeypatch.setenv("GAMR_ADVERSARIAL_RESEARCHER_API_KEY", "research-key")
     monkeypatch.setenv("TYR_COLLECTOR_USERNAME", "collector-user")
     monkeypatch.setenv("TYR_COLLECTOR_PASSWORD", "collector-password")
     monkeypatch.setenv("TYR_COLLECTOR_BASE_URL", "https://collector.test/base")
@@ -33,11 +35,54 @@ def test_settings_load_provider_env_names(monkeypatch: pytest.MonkeyPatch, tmp_p
     assert settings.tyr_mcp_url == "https://example.test/mcp"
     assert settings.model_api_key == "key"
     assert settings.model_base_url == "https://example.test/v1"
+    assert settings.adversarial_researcher_api_key == "research-key"
     assert settings.model_name == "example/model"
     assert settings.collector_username == "collector-user"
     assert settings.collector_password == "collector-password"
     assert settings.collector_base_url == "https://collector.test/base"
 
+
+
+def test_adversarial_researcher_endpoint_uses_dedicated_env_without_changing_global(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("OPENROUTER_BASE_URL", "https://openrouter.example/v1")
+    monkeypatch.setenv(
+        "GAMR_ADVERSARIAL_RESEARCHER_BASE_URL", "http://192.168.1.50:11434/v1"
+    )
+
+    settings = Settings()
+
+    assert settings.model_base_url == "https://openrouter.example/v1"
+    assert settings.adversarial_researcher_base_url == "http://192.168.1.50:11434/v1"
+
+
+def test_adversarial_researcher_endpoint_defaults_to_empty(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("OPENROUTER_BASE_URL", raising=False)
+    monkeypatch.delenv("GAMR_ADVERSARIAL_RESEARCHER_BASE_URL", raising=False)
+    monkeypatch.delenv("GAMR_ADVERSARIAL_RESEARCHER_API_KEY", raising=False)
+
+    settings = Settings()
+
+    assert settings.model_base_url == "https://openrouter.ai/api/v1"
+    assert settings.adversarial_researcher_base_url == ""
+    assert settings.adversarial_researcher_api_key is None
+
+
+def test_adversarial_researcher_api_key_can_be_empty(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "global-key")
+    monkeypatch.setenv("GAMR_ADVERSARIAL_RESEARCHER_API_KEY", "")
+
+    settings = Settings()
+
+    assert settings.adversarial_researcher_api_key == ""
 
 def test_chat_model_defaults_independently_of_loop_model(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path

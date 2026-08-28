@@ -105,12 +105,21 @@ def build_experiment_execution(
         selected_model,
         trace_port=trace_port,
     )
+    researcher_base_url = settings.adversarial_researcher_base_url or settings.model_base_url
+    researcher_api_key = (
+        settings.model_api_key
+        if settings.adversarial_researcher_api_key is None
+        else settings.adversarial_researcher_api_key
+    )
     scientist_model_gateway = (
         model_gateway
-        if selected_scientist_model == selected_model
+        if (
+            selected_scientist_model == selected_model
+            and researcher_base_url == settings.model_base_url
+        )
         else model_cls(
-            settings.model_base_url,
-            settings.model_api_key,
+            researcher_base_url,
+            researcher_api_key,
             selected_scientist_model,
             trace_port=trace_port,
         )

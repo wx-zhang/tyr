@@ -27,6 +27,17 @@ When both names are set, the canonical value wins. A present empty or invalid
 canonical value does not revive a legacy value. Browser and API origins remain
 separate (`VITE_API_ORIGIN` is browser build configuration).
 
+`OPENROUTER_BASE_URL` is the global OpenAI-compatible endpoint for the main loop, judge, chat,
+and judge evaluation. `GAMR_ADVERSARIAL_RESEARCHER_BASE_URL` is an optional deployment setting
+for routing only Adversarial Researcher calls to another OpenAI-compatible service; empty or unset
+falls back to `OPENROUTER_BASE_URL`. The configured endpoint must be reachable from the GAMR
+process or container. For host Ollama from Docker, use a LAN URL such as
+`http://192.168.1.50:11434/v1`, not `127.0.0.1`.
+
+Set `GAMR_ADVERSARIAL_RESEARCHER_API_KEY` when the alternate researcher service needs a different
+credential. If unset, it falls back to `OPENROUTER_API_KEY`; leave it explicitly empty for no-auth
+services such as Ollama. Both credentials are server-side and never sent to browser clients.
+
 `poe judge-graph <judge-directory>` renders a deterministic PNG topology image for the specified predefined judge pipeline to `docs/assets/judges/` via atomic file replacement.
 
 `poe evaluate:judges` replays the reviewed Scenario fixtures under

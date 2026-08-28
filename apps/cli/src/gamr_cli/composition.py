@@ -33,6 +33,7 @@ def configured_secrets(settings: Settings) -> tuple[str, ...]:
         for value in (
             settings.tyr_mcp_token,
             settings.model_api_key,
+            getattr(settings, "adversarial_researcher_api_key", "") or "",
             getattr(settings, "collector_username", ""),
             getattr(settings, "collector_password", ""),
         )

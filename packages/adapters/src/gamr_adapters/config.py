@@ -33,7 +33,15 @@ class Settings(BaseSettings):
         default="https://openrouter.ai/api/v1",
         validation_alias="OPENROUTER_BASE_URL",
     )
+    adversarial_researcher_base_url: str = Field(
+        default="",
+        validation_alias="GAMR_ADVERSARIAL_RESEARCHER_BASE_URL",
+    )
     model_api_key: str = Field(default="", validation_alias="OPENROUTER_API_KEY")
+    adversarial_researcher_api_key: str | None = Field(
+        default=None,
+        validation_alias="GAMR_ADVERSARIAL_RESEARCHER_API_KEY",
+    )
     model_name: str = Field(
         default="", validation_alias=AliasChoices("GAMR_MODEL_NAME", "TYR_LOOP_MODEL")
     )

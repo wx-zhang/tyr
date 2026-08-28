@@ -26,6 +26,18 @@ Live commands need `TYR_MCP_TOKEN`, `OPENROUTER_API_KEY`, and `GAMR_MODEL_NAME` 
 `.env.example`). `TYR_LOOP_MODEL` is a fallback-only legacy name. Canonical GAMR environment names
 win when both canonical and legacy values are present. Browser/API origins remain separate.
 
+`OPENROUTER_BASE_URL` is the global OpenAI-compatible endpoint used by the main loop, judge,
+interactive chat, and judge evaluation. Set the optional
+`GAMR_ADVERSARIAL_RESEARCHER_BASE_URL` to route only Adversarial Researcher calls to another
+OpenAI-compatible service; empty or unset falls back to `OPENROUTER_BASE_URL`. The endpoint must
+be reachable from the GAMR process or container. For Ollama on a host reached by Docker, use a LAN
+URL such as `http://192.168.1.50:11434/v1`, not `127.0.0.1`.
+
+Set `GAMR_ADVERSARIAL_RESEARCHER_API_KEY` when the alternate researcher service requires a
+different credential. If unset, it falls back to `OPENROUTER_API_KEY`; leave it explicitly empty
+for no-auth services such as Ollama. Both credentials are server-side and never sent to browser
+clients.
+
 Set `GAMR_JUDGE_MODEL_NAME` for an independent judge model; `TYR_LOOP_JUDGE_MODEL` is fallback-only.
 Adversarial Researcher generation defaults to an 8,192-token Completion budget. Set
 `GAMR_ADVERSARIAL_RESEARCHER_OUTPUT_TOKENS`; `GAMR_SCIENTIST_OUTPUT_TOKENS` is fallback-only.

@@ -85,6 +85,7 @@ def build_run_executor(
             secrets=(
                 settings.tyr_mcp_token,
                 settings.model_api_key,
+                settings.adversarial_researcher_api_key or "",
                 settings.collector_username,
                 settings.collector_password,
             ),
@@ -99,6 +100,14 @@ def build_run_executor(
             else None
         )
         target = TyrMcpClient(settings.tyr_mcp_url, settings.tyr_mcp_token)
+        researcher_base_url = (
+            settings.adversarial_researcher_base_url or settings.model_base_url
+        )
+        researcher_api_key = (
+            settings.model_api_key
+            if settings.adversarial_researcher_api_key is None
+            else settings.adversarial_researcher_api_key
+        )
         model = OpenAICompatibleModel(
             settings.model_base_url,
             settings.model_api_key,
@@ -107,10 +116,13 @@ def build_run_executor(
         )
         scientist_model = (
             model
-            if selected_adversarial_researcher_model == selected_model
+            if (
+                selected_adversarial_researcher_model == selected_model
+                and researcher_base_url == settings.model_base_url
+            )
             else OpenAICompatibleModel(
-                settings.model_base_url,
-                settings.model_api_key,
+                researcher_base_url,
+                researcher_api_key,
                 selected_adversarial_researcher_model,
                 trace_port=trace_port,
             )
