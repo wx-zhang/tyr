@@ -197,8 +197,7 @@ describe("RunHistory", () => {
     expect(
       screen.getByRole("button", { name: /Scenario Executions/ }),
     ).toBeInTheDocument();
-    const iterationGroup = screen.getByRole("list", { name: "Research Iteration 1" });
-    const iterToggle = within(iterationGroup).getByRole("button", { name: /^Research Iteration 1/ });
+    const iterToggle = screen.getByRole("button", { name: /^Research Iteration 1/ });
     expect(iterToggle).toBeInTheDocument();
     const baseCases = screen.getByRole("list", { name: "Scenario Executions" });
     expect(within(baseCases).getByText("case-alpha")).toBeInTheDocument();
@@ -206,6 +205,11 @@ describe("RunHistory", () => {
     expect(
       within(screen.getByRole("list", { name: "Research Iteration 1" })).getByText(
         "case-gen-1",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("list", { name: "Research Iteration 1" })).getByText(
+        "Scenario Execution 02",
       ),
     ).toBeInTheDocument();
   });

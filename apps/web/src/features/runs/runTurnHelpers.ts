@@ -114,12 +114,17 @@ export function caseLifecycleStatus(
 }
 
 export function isScientistGeneration(turn: RunTurn): boolean {
-  return (
-    turn.stage === "scientist" &&
-    (turn.updateType === "scientist_generation" ||
-      (!turn.tyrMessage &&
-        ["generating", "failed", "ready", "completed"].includes(turn.status)))
-  );
+  if (turn.stage !== "scientist") return false;
+  if (turn.updateType === "scientist_generation" || turn.updateType === "scientist") return true;
+  if (
+    turn.updateType === "conversation" ||
+    turn.updateType === "evaluation" ||
+    turn.updateType === "sandbox_operation" ||
+    turn.updateType === "discovery"
+  ) {
+    return false;
+  }
+  return !turn.tyrMessage && ["generating", "failed", "ready"].includes(turn.status);
 }
 
 export function contentOverlapLabel(status: string): string {

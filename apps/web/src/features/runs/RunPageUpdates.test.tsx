@@ -101,6 +101,10 @@ it("shows configured and researcher evaluation outcomes as updates", async () =>
     name: /case-alpha/,
   });
   fireEvent.click(caseAlphaToggle);
+  const scientistAlphaToggle = await screen.findByRole("button", {
+    name: /scientist-alpha/,
+  });
+  fireEvent.click(scientistAlphaToggle);
   expect(
     await screen.findByRole("heading", {
       name: "Scenario Execution assessment - case-alpha",

@@ -8,7 +8,7 @@ import {
   isTurnBusy,
   isScientistGeneration,
   parseTimestamp,
-  resolveScientistIteration,
+  researchIterationMaps,
   sortUpdates,
   terminalCaseStates,
   type HistoryCaseEntry,
@@ -31,6 +31,7 @@ function progressExecutionId(progress: CaseProgress): string | undefined {
   if (executionId) return executionId;
   return "id" in progress && typeof progress.id === "string" ? progress.id : undefined;
 }
+
 function historyEntry(
   executionId: string,
   progress: CaseProgress | undefined,
@@ -52,21 +53,10 @@ export function groupRunHistory(input: {
   phases?: ProgressItem[];
 }): HistoryGroup[] {
   const { turns, cases, artifacts, phases = [] } = input;
-
-  const scientistIterationByCaseId = new Map<string, number>();
-  for (const turn of turns) {
-    const executionId = turnExecutionId(turn);
-    if (turn.stage === "scientist" && executionId) {
-      if (isScientistGeneration(turn)) {
-        scientistIterationByCaseId.set(executionId, turn.number);
-      } else if (!scientistIterationByCaseId.has(executionId)) {
-        scientistIterationByCaseId.set(
-          executionId,
-          resolveScientistIteration(turn, turns),
-        );
-      }
-    }
-  }
+  const {
+    byExecutionId: scientistIterationByCaseId,
+    byScenarioId: scientistIterationByScenarioId,
+  } = researchIterationMaps(turns, cases);
 
   const discoveryUpdates: HistoryUpdate[] = [];
   const baseCaseUpdatesByCaseId = new Map<string, HistoryUpdate[]>();
@@ -86,34 +76,30 @@ export function groupRunHistory(input: {
 
     if (turn.updateType === "discovery" || turn.stage === "discovery") {
       discoveryUpdates.push(update);
-    } else if (turn.stage === "scientist") {
-      let iter = 1;
-      if (executionId && scientistIterationByCaseId.has(executionId)) {
-        iter = scientistIterationByCaseId.get(executionId)!;
-      } else if (turn.updateType === "scientist_generation" && turn.number) {
-        iter = turn.number;
-      } else {
-        iter = resolveScientistIteration(turn, turns);
-      }
+    } else if (
+      turn.stage === "scientist" ||
+      (executionId && scientistIterationByCaseId.has(executionId)) ||
+      (turn.scenarioId && scientistIterationByScenarioId.has(turn.scenarioId))
+    ) {
+      const iter =
+        (executionId ? scientistIterationByCaseId.get(executionId) : undefined) ??
+        (turn.scenarioId ? scientistIterationByScenarioId.get(turn.scenarioId) : undefined) ??
+        (isScientistGeneration(turn) && typeof turn.number === "number" ? turn.number : 1);
 
       if (isScientistGeneration(turn)) {
-        if (!iterationUpdatesByIteration.has(iter))
-          iterationUpdatesByIteration.set(iter, []);
+        if (!iterationUpdatesByIteration.has(iter)) iterationUpdatesByIteration.set(iter, []);
         iterationUpdatesByIteration.get(iter)!.push(update);
       } else if (executionId) {
-        if (!iterationCaseUpdates.has(iter))
-          iterationCaseUpdates.set(iter, new Map());
+        if (!iterationCaseUpdates.has(iter)) iterationCaseUpdates.set(iter, new Map());
         const caseMap = iterationCaseUpdates.get(iter)!;
         if (!caseMap.has(executionId)) caseMap.set(executionId, []);
         caseMap.get(executionId)!.push(update);
       } else {
-        if (!iterationUpdatesByIteration.has(iter))
-          iterationUpdatesByIteration.set(iter, []);
+        if (!iterationUpdatesByIteration.has(iter)) iterationUpdatesByIteration.set(iter, []);
         iterationUpdatesByIteration.get(iter)!.push(update);
       }
     } else if (executionId) {
-      if (!baseCaseUpdatesByCaseId.has(executionId))
-        baseCaseUpdatesByCaseId.set(executionId, []);
+      if (!baseCaseUpdatesByCaseId.has(executionId)) baseCaseUpdatesByCaseId.set(executionId, []);
       baseCaseUpdatesByCaseId.get(executionId)!.push(update);
     } else {
       otherUpdates.push(update);
@@ -133,18 +119,12 @@ export function groupRunHistory(input: {
     if (executionId) {
       if (scientistIterationByCaseId.has(executionId)) {
         const iter = scientistIterationByCaseId.get(executionId)!;
-        if (!iterationCaseUpdates.has(iter)) {
-          iterationCaseUpdates.set(iter, new Map());
-        }
+        if (!iterationCaseUpdates.has(iter)) iterationCaseUpdates.set(iter, new Map());
         const caseMap = iterationCaseUpdates.get(iter)!;
-        if (!caseMap.has(executionId)) {
-          caseMap.set(executionId, []);
-        }
+        if (!caseMap.has(executionId)) caseMap.set(executionId, []);
         caseMap.get(executionId)!.push(update);
       } else {
-        if (!baseCaseUpdatesByCaseId.has(executionId)) {
-          baseCaseUpdatesByCaseId.set(executionId, []);
-        }
+        if (!baseCaseUpdatesByCaseId.has(executionId)) baseCaseUpdatesByCaseId.set(executionId, []);
         baseCaseUpdatesByCaseId.get(executionId)!.push(update);
       }
     } else {
@@ -156,18 +136,10 @@ export function groupRunHistory(input: {
 
   if (discoveryUpdates.length > 0) {
     const sorted = sortUpdates(discoveryUpdates);
-    const phaseState = phases.find(
-      (phase) => phase.id === "discovering",
-    )?.state;
-    const hasBusyTurn = sorted.some(
-      (update) => update.kind === "turn" && isTurnBusy(update.turn),
-    );
-    const resultTurn = sorted.find(
-      (update) =>
-        update.kind === "turn" && update.turn.updateType === "discovery",
-    );
-    const resultState =
-      resultTurn?.kind === "turn" ? resultTurn.turn.status : "active";
+    const phaseState = phases.find((phase) => phase.id === "discovering")?.state;
+    const hasBusyTurn = sorted.some((update) => update.kind === "turn" && isTurnBusy(update.turn));
+    const resultTurn = sorted.find((update) => update.kind === "turn" && update.turn.updateType === "discovery");
+    const resultState = resultTurn?.kind === "turn" ? resultTurn.turn.status : "active";
     const state = phaseState ?? (hasBusyTurn ? "active" : resultState);
     const isTerminal = terminalCaseStates.has(state);
     result.push({
@@ -184,9 +156,7 @@ export function groupRunHistory(input: {
   const knownCaseMap = new Map<string, CaseProgress>();
   for (const progress of cases) {
     const executionId = progressExecutionId(progress);
-    if (executionId) {
-      knownCaseMap.set(executionId, progress);
-    }
+    if (executionId) knownCaseMap.set(executionId, progress);
   }
 
   const sortedCases = cases
@@ -218,25 +188,17 @@ export function groupRunHistory(input: {
     for (const entry of baseCaseEntries) {
       const state = entry.progress?.state;
       const isCaseTerminal = state ? terminalCaseStates.has(state) : false;
-      if (!isCaseTerminal && entry.progress) {
-        allTerminal = false;
-      }
-      if (entry.updates.some((u) => u.kind === "turn" && isTurnBusy(u.turn))) {
-        anyBusy = true;
-      }
+      if (!isCaseTerminal && entry.progress) allTerminal = false;
+      if (entry.updates.some((u) => u.kind === "turn" && isTurnBusy(u.turn))) anyBusy = true;
     }
-    const states = baseCaseEntries.map(
-      (entry) => entry.progress?.state ?? "pending",
-    );
-    const state =
-      anyBusy ||
-      states.some((caseState) => ["active", "assessing"].includes(caseState))
-        ? "active"
-        : allTerminal
-          ? "completed"
-          : states.some((caseState) => caseState === "queued")
-            ? "queued"
-            : "pending";
+    const states = baseCaseEntries.map((entry) => entry.progress?.state ?? "pending");
+    const state = anyBusy || states.some((caseState) => ["active", "assessing"].includes(caseState))
+      ? "active"
+      : allTerminal
+        ? "completed"
+        : states.some((caseState) => caseState === "queued")
+          ? "queued"
+          : "pending";
     result.push({
       id: "scenario-executions",
       label: "Scenario Executions",
@@ -255,26 +217,29 @@ export function groupRunHistory(input: {
   const sortedIterations = [...allIterations].sort((a, b) => a - b);
 
   for (const iter of sortedIterations) {
-    const groupUpdates = sortUpdates(
-      iterationUpdatesByIteration.get(iter) ?? [],
-    );
+    const groupUpdates = sortUpdates(iterationUpdatesByIteration.get(iter) ?? []);
     const caseMap = iterationCaseUpdates.get(iter) ?? new Map();
     const caseEntries: HistoryCaseEntry[] = [];
+    const processedExecutionIds = new Set<string>();
 
-    for (const [executionId, rawUpdates] of caseMap.entries()) {
-      caseEntries.push(
-        historyEntry(executionId, knownCaseMap.get(executionId), rawUpdates),
-      );
+    for (const [executionId, progress] of knownCaseMap.entries()) {
+      if (scientistIterationByCaseId.get(executionId) === iter) {
+        processedExecutionIds.add(executionId);
+        const rawUpdates = caseMap.get(executionId) ?? [];
+        caseEntries.push(historyEntry(executionId, progress, rawUpdates));
+      }
     }
 
-    const isBusy =
-      groupUpdates.some((u) => u.kind === "turn" && isTurnBusy(u.turn)) ||
-      caseEntries.some((c) =>
-        c.updates.some((u) => u.kind === "turn" && isTurnBusy(u.turn)),
-      );
+    for (const [executionId, rawUpdates] of caseMap.entries()) {
+      if (!processedExecutionIds.has(executionId)) {
+        caseEntries.push(historyEntry(executionId, knownCaseMap.get(executionId), rawUpdates));
+      }
+    }
 
-    const isTerminal =
-      (groupUpdates.length > 0 || caseEntries.length > 0) && !isBusy;
+    const isBusy = groupUpdates.some((u) => u.kind === "turn" && isTurnBusy(u.turn)) ||
+      caseEntries.some((c) => c.updates.some((u) => u.kind === "turn" && isTurnBusy(u.turn)));
+
+    const isTerminal = (groupUpdates.length > 0 || caseEntries.length > 0) && !isBusy;
 
     result.push({
       id: `research-iteration-${iter}`,

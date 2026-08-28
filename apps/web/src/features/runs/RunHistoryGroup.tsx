@@ -47,6 +47,8 @@ export function RunHistoryGroup({
 }) {
   const controlId = `history-${group.id}`;
   const status = groupStatus(group.state);
+  const iterMatch = group.id.match(/^(?:iteration|research-iteration)-(\d+)$/);
+  const researchIteration = iterMatch ? Number(iterMatch[1]) : undefined;
 
   const completedCases = group.cases.filter(
     (entry) =>
@@ -126,6 +128,7 @@ export function RunHistoryGroup({
                     newest={index === group.updates.length - 1}
                     flash={flashIds?.has(update.turn.id)}
                     now={now}
+                    scientistIteration={researchIteration}
                     caseOriginById={caseOriginById}
                     datasetCaseIds={datasetCaseIds}
                   />
@@ -135,24 +138,20 @@ export function RunHistoryGroup({
           ) : null}
           {group.cases.length > 0 ? (
             <ul className="history-case-list" aria-label={group.label}>
-              {group.cases.map((caseEntry) => {
-                const iterMatch = group.id.match(/^(?:iteration|research-iteration)-(\d+)$/);
-                const researchIteration = iterMatch ? Number(iterMatch[1]) : undefined;
-                return (
-                  <RunHistoryCase
-                    key={caseEntry.caseId}
-                    entry={caseEntry}
-                    runId={runId}
-                    isOpen={caseOpenStates.get(caseEntry.caseId) ?? false}
-                    onToggle={() => onToggleCase(caseEntry.caseId)}
-                    now={now}
-                    flashIds={flashIds}
-                    scientistIteration={researchIteration}
-                    caseOriginById={caseOriginById}
-                    datasetCaseIds={datasetCaseIds}
-                  />
-                );
-              })}
+              {group.cases.map((caseEntry) => (
+                <RunHistoryCase
+                  key={caseEntry.caseId}
+                  entry={caseEntry}
+                  runId={runId}
+                  isOpen={caseOpenStates.get(caseEntry.caseId) ?? false}
+                  onToggle={() => onToggleCase(caseEntry.caseId)}
+                  now={now}
+                  flashIds={flashIds}
+                  scientistIteration={researchIteration}
+                  caseOriginById={caseOriginById}
+                  datasetCaseIds={datasetCaseIds}
+                />
+              ))}
             </ul>
           ) : null}
         </div>

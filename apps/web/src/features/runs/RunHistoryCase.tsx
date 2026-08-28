@@ -38,7 +38,9 @@ export function RunHistoryCase({
   const result = verdict ? resultDisplay(verdict, entry.progress?.objectiveStatus ?? verdictTurn?.objectiveStatus, entry.progress?.outcome ?? verdictTurn?.outcome) : null;
   const controlId = `history-scenario-execution-${safeSlug(entry.scenarioExecutionId ?? entry.caseId)}`;
   const updateLabel = `${entry.updates.length} ${entry.updates.length === 1 ? "update" : "updates"}`;
-  const executionLabel = scientistIteration ? `Research Iteration ${scientistIteration}` : entry.progress ? `Scenario Execution ${String(entry.progress.order).padStart(2, "0")}` : "Scenario Execution";
+  const executionLabel = entry.progress
+    ? `Scenario Execution ${String(entry.progress.order).padStart(2, "0")}`
+    : "Scenario Execution";
   const scenarioId = entry.scenarioId ?? entry.progress?.scenarioId ?? "—";
   const scenarioExecutionId = entry.scenarioExecutionId ?? entry.caseId;
   return (

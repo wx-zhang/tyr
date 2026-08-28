@@ -408,7 +408,7 @@ def _case_completion_context(root: Path) -> dict[str, tuple[str, datetime | None
                 continue
             if not isinstance(value, dict):
                 continue
-            case_id = value.get("caseId")
+            case_id = value.get("scenarioId", value.get("caseId"))
             if not isinstance(case_id, str) or not case_id:
                 continue
             metadata = value.get("metadata")

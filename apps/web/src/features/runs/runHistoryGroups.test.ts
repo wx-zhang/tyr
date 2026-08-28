@@ -141,6 +141,187 @@ describe("groupRunHistory", () => {
     expect(baseGroup!.state).toBe("completed");
   });
 
+  it("buckets multiple Research Iterations and their respective scenario executions accurately", () => {
+    const baseTurn = makeTurn({
+      id: "base-1",
+      sequence: 1,
+      stage: "case",
+      scenarioId: "base-scenario",
+      scenarioExecutionId: "exec-base",
+      status: "completed",
+    });
+    const sciGen1 = makeTurn({
+      id: "sci-gen-1",
+      sequence: 2,
+      number: 1,
+      stage: "scientist",
+      updateType: "scientist",
+      scenarioId: "sci-scenario-1",
+      scenarioExecutionId: "sci-scenario-1",
+      status: "ready",
+    });
+    const sciCaseTurn1 = makeTurn({
+      id: "sci-turn-1",
+      sequence: 3,
+      number: 1,
+      stage: "scientist",
+      updateType: "conversation",
+      scenarioId: "sci-scenario-1",
+      scenarioExecutionId: "exec-sci-1",
+      status: "completed",
+    });
+    const evalTurn1 = makeTurn({
+      id: "eval-1",
+      sequence: 4,
+      number: 2,
+      stage: "case",
+      updateType: "evaluation",
+      scenarioId: "sci-scenario-1",
+      scenarioExecutionId: "exec-sci-1",
+      status: "failed",
+    });
+    const sciGen2 = makeTurn({
+      id: "sci-gen-2",
+      sequence: 5,
+      number: 2,
+      stage: "scientist",
+      updateType: "scientist",
+      scenarioId: "sci-scenario-2",
+      scenarioExecutionId: "sci-scenario-2",
+      status: "ready",
+    });
+    const sciCaseTurn2 = makeTurn({
+      id: "sci-turn-2",
+      sequence: 6,
+      number: 1,
+      stage: "scientist",
+      updateType: "conversation",
+      scenarioId: "sci-scenario-2",
+      scenarioExecutionId: "exec-sci-2",
+      status: "completed",
+    });
+
+    const chronological = [
+      baseTurn,
+      sciGen1,
+      sciCaseTurn1,
+      evalTurn1,
+      sciGen2,
+      sciCaseTurn2,
+    ];
+    const groups = groupRunHistory({
+      turns: [...chronological].reverse(),
+      cases: [
+        makeCase({ id: "exec-base", caseId: "exec-base", scenarioId: "base-scenario", order: 0, state: "completed" }),
+        makeCase({ id: "exec-sci-1", caseId: "exec-sci-1", scenarioId: "sci-scenario-1", order: 1, state: "failed" }),
+        makeCase({ id: "exec-sci-2", caseId: "exec-sci-2", scenarioId: "sci-scenario-2", order: 2, state: "completed" }),
+      ],
+      artifacts: [],
+    });
+
+    const iter1 = groups.find((g) => g.id === "research-iteration-1");
+    const iter2 = groups.find((g) => g.id === "research-iteration-2");
+    const baseGroup = groups.find((g) => g.id === "scenario-executions");
+
+    expect(baseGroup).toBeDefined();
+    expect(baseGroup!.cases.map((c) => c.scenarioExecutionId)).toEqual(["exec-base"]);
+
+    expect(iter1).toBeDefined();
+    expect(iter1!.label).toBe("Research Iteration 1");
+    expect(iter1!.updates).toHaveLength(1);
+    expect(iter1!.cases).toHaveLength(1);
+    expect(iter1!.cases[0].scenarioExecutionId).toBe("exec-sci-1");
+    expect(iter1!.cases[0].updates).toHaveLength(2);
+
+    expect(iter2).toBeDefined();
+    expect(iter2!.label).toBe("Research Iteration 2");
+    expect(iter2!.updates).toHaveLength(1);
+    expect(iter2!.cases).toHaveLength(1);
+    expect(iter2!.cases[0].scenarioExecutionId).toBe("exec-sci-2");
+    expect(iter2!.cases[0].updates).toHaveLength(1);
+  });
+
+  it("keeps later researcher executions out of Research Iteration 1 when the page supplies newest-first turns", () => {
+    const researcher = [
+      { iter: 1, scenarioId: "single-shot-decrypt-execute-joe", executionId: "01a049a0-8736-71a3-9ded-f026ab2b8910" },
+      { iter: 2, scenarioId: "visible-logic-approval-submission-joe", executionId: "01a049a2-d06b-71a1-9583-8976d87495a4" },
+      { iter: 3, scenarioId: "approval-decision-ack-exec-joe", executionId: "01a049a6-a144-71d1-8b5d-0b639116bb66" },
+      { iter: 4, scenarioId: "policy-gate-then-execute-joe", executionId: "01a049ad-a614-7771-905c-3e60a43ee00e" },
+      { iter: 5, scenarioId: "encrypted-blind-env-dump-joe", executionId: "01a049b3-d4ee-705b-8e61-98a3d7f4662a" },
+    ];
+    const turns: RunTurn[] = [
+      makeTurn({
+        id: "base-1",
+        sequence: 1,
+        stage: "case",
+        scenarioId: "decode-and-print-hello-world",
+        scenarioExecutionId: "01a04998-e94a-7486-b80f-f8c8a50d09bd",
+      }),
+    ];
+    let sequence = 2;
+    for (const item of researcher) {
+      turns.push(
+        makeTurn({
+          id: `gen-${item.iter}`,
+          sequence: sequence++,
+          number: item.iter,
+          stage: "scientist",
+          updateType: "scientist",
+          status: "ready",
+          scenarioId: item.scenarioId,
+          scenarioExecutionId: item.scenarioId,
+        }),
+        makeTurn({
+          id: `conv-${item.iter}`,
+          sequence: sequence++,
+          number: 1,
+          stage: "scientist",
+          updateType: "conversation",
+          tyrMessage: "peer reply",
+          scenarioId: item.scenarioId,
+          scenarioExecutionId: item.executionId,
+        }),
+      );
+    }
+    const groups = groupRunHistory({
+      turns: [...turns].reverse(),
+      cases: [
+        makeCase({
+          id: "01a04998-e94a-7486-b80f-f8c8a50d09bd",
+          caseId: "01a04998-e94a-7486-b80f-f8c8a50d09bd",
+          scenarioId: "decode-and-print-hello-world",
+          order: 0,
+          state: "completed",
+        }),
+        ...researcher.map((item) =>
+          makeCase({
+            id: item.executionId,
+            caseId: item.executionId,
+            scenarioId: item.scenarioId,
+            order: item.iter,
+            state: "completed",
+          }),
+        ),
+      ],
+      artifacts: [],
+    });
+
+    expect(
+      groups.find((group) => group.id === "scenario-executions")?.cases.map((entry) => entry.scenarioId),
+    ).toEqual(["decode-and-print-hello-world"]);
+    expect(
+      groups.find((group) => group.id === "research-iteration-1")?.cases.map((entry) => entry.scenarioId),
+    ).toEqual(["single-shot-decrypt-execute-joe"]);
+    expect(
+      groups.find((group) => group.id === "research-iteration-2")?.cases.map((entry) => entry.scenarioId),
+    ).toEqual(["visible-logic-approval-submission-joe"]);
+    for (const item of researcher) {
+      const group = groups.find((candidate) => candidate.id === `research-iteration-${item.iter}`);
+      expect(group?.cases).toHaveLength(1);
+      expect(group?.cases[0].scenarioExecutionId).toBe(item.executionId);
+    }
+  });
+
   it("buckets remaining Scenario Execution turns to the base group", () => {
     const caseTurn = makeTurn({
       id: "turn-1",
