@@ -38,3 +38,4 @@ Sandbox contract, backend, and developer-runner regressions live in
 Judge evaluation loader, scoring, trace, and CLI regressions live in
 `apps/cli/tests/test_judge_evaluation.py`. The real model-and-Docker evaluation is an explicit
 developer job and is never part of default pytest.
+Skill helper regressions live in `tests/skills/`.
