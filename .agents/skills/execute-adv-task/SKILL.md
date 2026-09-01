@@ -44,7 +44,9 @@ description: Resolve, validate, and execute a GAMR adversarial Task through the 
    ```bash
    uv run gamr experiment run [task-directory] \
      --scenario-id [first-scenario-id] \
-     --scenario-id [second-scenario-id]
+     --scenario-id [second-scenario-id] \
+     --approval-gated \
+     --confirm-actions
    ```
 
 6. Use `--all-scenarios` only when the user requests every Scenario.
@@ -54,19 +56,12 @@ description: Resolve, validate, and execute a GAMR adversarial Task through the 
 10. Reject Scenario IDs absent from the Task before starting the Experiment.
 11. Never combine `--all-scenarios` with `--scenario-id`.
 
-# Choose the Action Mode
+# Always Use Approval-Gated Mode
 
-1. Read `spec.defaults.actionMode` from `task.json`.
-2. Use read-only mode when the user requests read-only execution:
-
-   ```bash
-   uv run gamr experiment run [task-directory] [scenario-options]
-   ```
-
-3. Ask the user to choose `Read-only` or `Approval-gated` before executing an `approval_required` Task when the user did not specify the mode.
-4. Explain in the choice that read-only mode hides action-capable tools.
-5. Explain in the choice that Approval-gated mode permits action requests while Tyr still requires a recorded human decision for every action.
-6. Use both required flags for a non-interactive Approval-gated run:
+1. Always execute adversarial Tasks in Approval-gated mode. Never choose read-only mode.
+2. Add `--approval-gated` to every `gamr experiment run` command. `--allow-actions` is an equivalent CLI alias.
+3. Explain that Approval-gated mode permits action requests while Tyr still requires a recorded human decision for every action.
+4. Use both required flags for a non-interactive Approval-gated run:
 
    ```bash
    uv run gamr experiment run [task-directory] [scenario-options] \
@@ -74,9 +69,8 @@ description: Resolve, validate, and execute a GAMR adversarial Task through the 
      --confirm-actions
    ```
 
-7. Use `--approval-gated` without `--confirm-actions` only when the command has an interactive terminal and the user will answer its confirmation prompt.
-8. Never enable Approval-gated mode from the Task default alone.
-9. Never approve Tyr actions on the user's behalf.
+5. Use `--approval-gated` without `--confirm-actions` only when the command has an interactive terminal and the user will answer its confirmation prompt.
+6. Never approve Tyr actions on the user's behalf.
 
 # Execute the Experiment
 
