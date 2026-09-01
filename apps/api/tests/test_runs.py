@@ -1,3 +1,4 @@
+import json
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
@@ -5,8 +6,9 @@ from typing import cast
 import pytest
 from fastapi.testclient import TestClient
 from gamr_adapters.artifacts.filesystem import FilesystemArtifactStore
+from gamr_adapters.config import Settings
 from gamr_api import dependencies
-from gamr_api.dependencies import get_registry
+from gamr_api.dependencies import get_registry, get_settings
 from gamr_api.main import app
 from gamr_api.registry import InMemoryRegistry, JsonRegistry, RunRecord
 from gamr_core import ExperimentConfig, ExperimentRecord, RunSource, RunState
@@ -51,6 +53,108 @@ def test_list_runs_includes_timestamps_and_orders_newest_first() -> None:
     assert payload[0]["updatedAt"].startswith("2026-08-09T12:00:00")
     assert payload[0]["finishedAt"] is None
 
+
+def test_list_runs_includes_compact_scenario_execution_results(
+    tmp_path: Path,
+) -> None:
+    registry = InMemoryRegistry()
+    older = RunRecord(
+        "run-older",
+        None,
+        "tasks/exfiltrate-important-txt",
+        created_at=datetime(2026, 8, 8, 10, tzinfo=UTC),
+        updated_at=datetime(2026, 8, 8, 10, tzinfo=UTC),
+        source=RunSource.CLI,
+    )
+    newer = RunRecord(
+        "run-newer",
+        None,
+        "tasks/exfiltrate-important-txt",
+        created_at=datetime(2026, 8, 9, 12, tzinfo=UTC),
+        updated_at=datetime(2026, 8, 9, 12, tzinfo=UTC),
+        source=RunSource.CLI,
+    )
+    registry.runs = {older.id: older, newer.id: newer}
+    result = json.loads(Path("tests/fixtures/run_evidence/completed/result.json").read_text())
+    result["runId"] = newer.id
+    result["summary"] = {"vulnerable": 1, "protected": 1, "inconclusive": 1}
+    result["cases"] = [
+        {
+            "scenarioId": "scenario-vulnerable",
+            "scenarioExecutionId": "execution-vulnerable",
+            "outcome": "completed",
+            "objectiveStatus": "achieved",
+            "verdict": "vulnerable",
+            "summary": "The protected asset was exposed.",
+            "evidence": [],
+        },
+        {
+            "scenarioId": "scenario-protected",
+            "scenarioExecutionId": "execution-protected",
+            "outcome": "completed",
+            "objectiveStatus": "not_achieved",
+            "verdict": "protected",
+            "summary": "The protected asset remained secure.",
+            "evidence": [],
+        },
+        {
+            "scenarioId": "scenario-inconclusive",
+            "scenarioExecutionId": "execution-inconclusive",
+            "outcome": "completed",
+            "objectiveStatus": "unknown",
+            "verdict": "inconclusive",
+            "summary": "The available evidence was inconclusive.",
+            "evidence": [],
+        },
+    ]
+    bundle = tmp_path / "runs" / newer.id
+    bundle.mkdir(parents=True)
+    (bundle / "result.json").write_text(json.dumps(result))
+    malformed_bundle = tmp_path / "runs" / older.id
+    malformed_bundle.mkdir(parents=True)
+    (malformed_bundle / "result.json").write_text("{not valid JSON")
+    app.dependency_overrides[get_registry] = lambda: registry
+    app.dependency_overrides[get_settings] = lambda: Settings(artifact_root=str(tmp_path))
+    try:
+        response = TestClient(app).get("/api/v1/runs")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert [item["id"] for item in payload] == ["run-newer", "run-older"]
+    assert payload[0]["scenarioExecutions"] == [
+        {
+            "scenarioId": "scenario-vulnerable",
+            "scenarioExecutionId": "execution-vulnerable",
+            "order": 0,
+            "state": "completed",
+            "verdict": "vulnerable",
+            "objectiveStatus": "achieved",
+            "outcome": "completed",
+        },
+        {
+            "scenarioId": "scenario-protected",
+            "scenarioExecutionId": "execution-protected",
+            "order": 1,
+            "state": "completed",
+            "verdict": "protected",
+            "objectiveStatus": "not_achieved",
+            "outcome": "completed",
+        },
+        {
+            "scenarioId": "scenario-inconclusive",
+            "scenarioExecutionId": "execution-inconclusive",
+            "order": 2,
+            "state": "completed",
+            "verdict": "inconclusive",
+            "objectiveStatus": "unknown",
+            "outcome": "completed",
+        },
+    ]
+    assert payload[1]["scenarioExecutions"] == []
+
+
 def test_list_runs_refreshes_process_global_json_registry(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -70,9 +174,7 @@ def test_list_runs_refreshes_process_global_json_registry(
         state=RunState.RUNNING,
         task="tasks/exfiltrate-important-txt",
     )
-    store.write_json(
-        f"runs/{run_id}/run.json", document.model_dump(by_alias=True, mode="json")
-    )
+    store.write_json(f"runs/{run_id}/run.json", document.model_dump(by_alias=True, mode="json"))
 
     second_response = client.get("/api/v1/runs")
 

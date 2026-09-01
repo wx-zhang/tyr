@@ -155,6 +155,7 @@ export type Experiment = {
   createdAt?: string | null;
   updatedAt?: string | null;
   finishedAt?: string | null;
+  scenarioExecutions?: ScenarioExecutionProgress[];
 };
 
 export type ExperimentPresetConfiguration = {
@@ -208,7 +209,11 @@ export type ActivityItem = components["schemas"]["ActivityItemResponse"];
 export type ActivityPage = components["schemas"]["ActivityPageResponse"];
 export type AdversarialResearcherScenario = Omit<
   components["schemas"]["AdversarialResearcherScenarioResponse"],
-  "experimentId" | "experimentState" | "experimentCreatedAt" | "experimentUpdatedAt" | "experimentFinishedAt"
+  | "experimentId"
+  | "experimentState"
+  | "experimentCreatedAt"
+  | "experimentUpdatedAt"
+  | "experimentFinishedAt"
 > & {
   experimentId?: string;
   runId?: string;
@@ -223,7 +228,8 @@ export type AdversarialResearcherScenario = Omit<
 };
 export type ScientistScenario = AdversarialResearcherScenario;
 export type ScientistScenarioState = "active" | "archived";
-export type ScientistScenarioResult = AdversarialResearcherScenario["resultState"];
+export type ScientistScenarioResult =
+  AdversarialResearcherScenario["resultState"];
 
 export type EvidenceFilters = {
   q?: string;
@@ -249,7 +255,9 @@ function normalizeTask(payload: {
   metadata: Task["metadata"];
   spec: Partial<Task["spec"]> & {
     cases?: string[];
-    defaults?: Partial<Task["spec"]["defaults"]> & { defaultCaseIds?: string[] };
+    defaults?: Partial<Task["spec"]["defaults"]> & {
+      defaultCaseIds?: string[];
+    };
   };
 }): Task {
   const spec = payload.spec;
@@ -263,33 +271,51 @@ function normalizeTask(payload: {
         maxTurns: spec.defaults?.maxTurns ?? 40,
         actionMode: spec.defaults?.actionMode ?? "read_only",
         defaultScenarioIds:
-          spec.defaults?.defaultScenarioIds ?? spec.defaults?.defaultCaseIds ?? [],
-        defaultCaseIds: spec.defaults?.defaultScenarioIds ?? spec.defaults?.defaultCaseIds ?? [],
+          spec.defaults?.defaultScenarioIds ??
+          spec.defaults?.defaultCaseIds ??
+          [],
+        defaultCaseIds:
+          spec.defaults?.defaultScenarioIds ??
+          spec.defaults?.defaultCaseIds ??
+          [],
       },
     },
   } as Task;
 }
 
-function normalizeConfiguration(configuration: Record<string, unknown>): ExperimentPresetConfiguration {
+function normalizeConfiguration(
+  configuration: Record<string, unknown>,
+): ExperimentPresetConfiguration {
   return {
-    actionMode: (configuration.actionMode as ExperimentPresetConfiguration["actionMode"]) ?? "read_only",
+    actionMode:
+      (configuration.actionMode as ExperimentPresetConfiguration["actionMode"]) ??
+      "read_only",
     model: String(configuration.model ?? ""),
     adversarialResearcherModel: String(
-      configuration.adversarialResearcherModel ?? configuration.scientistModel ?? "",
+      configuration.adversarialResearcherModel ??
+        configuration.scientistModel ??
+        "",
     ),
     judgeModel: String(configuration.judgeModel ?? ""),
     maxTurns: Number(configuration.maxTurns ?? 40),
     discoveryTurns: Number(configuration.discoveryTurns ?? 20),
-    scenarioIds: (configuration.scenarioIds ?? configuration.caseIds) as string[] | null | undefined,
+    scenarioIds: (configuration.scenarioIds ?? configuration.caseIds) as
+      string[] | null | undefined,
     maxConcurrentScenarioExecutions: Number(
-      configuration.maxConcurrentScenarioExecutions ?? configuration.maxConcurrentCases ?? 5,
+      configuration.maxConcurrentScenarioExecutions ??
+        configuration.maxConcurrentCases ??
+        5,
     ),
     researchIterations: Number(
-      configuration.researchIterations ?? configuration.scientistIterations ?? 0,
+      configuration.researchIterations ??
+        configuration.scientistIterations ??
+        0,
     ),
     historyTestRuns: Number(configuration.historyTestRuns ?? 10),
     historyResearchRuns: Number(
-      configuration.historyResearchRuns ?? configuration.historyScientistRuns ?? 5,
+      configuration.historyResearchRuns ??
+        configuration.historyScientistRuns ??
+        5,
     ),
   };
 }
@@ -297,13 +323,16 @@ function normalizeConfiguration(configuration: Record<string, unknown>): Experim
 function normalizeExperiment(payload: Record<string, unknown>): Experiment {
   return {
     ...(payload as unknown as Experiment),
-    experimentPresetId: String(payload.experimentPresetId ?? payload.experimentId ?? "") || null,
+    experimentPresetId:
+      String(payload.experimentPresetId ?? payload.experimentId ?? "") || null,
     configuration: normalizeConfiguration(
       (payload.configuration as Record<string, unknown> | undefined) ?? {},
     ),
+    scenarioExecutions: Array.isArray(payload.scenarioExecutions)
+      ? (payload.scenarioExecutions as ScenarioExecutionProgress[])
+      : [],
   };
 }
-
 
 export async function fetchTasks(): Promise<Task[]> {
   const response = await fetch(`${apiOrigin}/api/v1/tasks`);
@@ -313,11 +342,15 @@ export async function fetchTasks(): Promise<Task[]> {
 }
 
 export async function fetchTask(taskId: string): Promise<Task> {
-  return normalizeTask(await get<Task>(`/api/v1/tasks/${encodeURIComponent(taskId)}`));
+  return normalizeTask(
+    await get<Task>(`/api/v1/tasks/${encodeURIComponent(taskId)}`),
+  );
 }
 
 export function fetchTaskScenarios(taskId: string): Promise<Scenario[]> {
-  return get<Scenario[]>(`/api/v1/tasks/${encodeURIComponent(taskId)}/scenarios`);
+  return get<Scenario[]>(
+    `/api/v1/tasks/${encodeURIComponent(taskId)}/scenarios`,
+  );
 }
 
 export const fetchTaskCases = fetchTaskScenarios;
@@ -339,7 +372,8 @@ export async function fetchExperiments(): Promise<Experiment[]> {
     const experiments = await get<Record<string, unknown>[]>("/api/v1/runs", {
       signal: controller.signal,
     });
-    if (!Array.isArray(experiments)) throw new Error("Experiment index response was not a list");
+    if (!Array.isArray(experiments))
+      throw new Error("Experiment index response was not a list");
     return experiments.map(normalizeExperiment);
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
@@ -353,7 +387,9 @@ export async function fetchExperiments(): Promise<Experiment[]> {
 
 export const fetchRuns = fetchExperiments;
 
-export async function fetchExperimentPreset(experimentId: string): Promise<ExperimentPreset> {
+export async function fetchExperimentPreset(
+  experimentId: string,
+): Promise<ExperimentPreset> {
   const payload = await get<Record<string, unknown>>(
     `/api/v1/experiments/${encodeURIComponent(experimentId)}`,
   );
@@ -392,7 +428,8 @@ export async function createExperimentPreset(payload: {
   return {
     ...preset,
     configuration: normalizeConfiguration(
-      (preset.configuration as unknown as Record<string, unknown> | undefined) ?? {},
+      (preset.configuration as unknown as
+        Record<string, unknown> | undefined) ?? {},
     ),
   };
 }
@@ -411,24 +448,34 @@ export async function startExperiment(
     },
   );
   if (!response.ok) throw new Error(`Request failed: ${response.status}`);
-  return response.json() as Promise<{ id: string; state: ExperimentState; statusUrl: string }>;
+  return response.json() as Promise<{
+    id: string;
+    state: ExperimentState;
+    statusUrl: string;
+  }>;
 }
 
-export function fetchExperimentExecution(experimentId: string): Promise<Experiment> {
-  return get<Record<string, unknown>>(`/api/v1/runs/${encodeURIComponent(experimentId)}`).then(
-    normalizeExperiment,
-  );
+export function fetchExperimentExecution(
+  experimentId: string,
+): Promise<Experiment> {
+  return get<Record<string, unknown>>(
+    `/api/v1/runs/${encodeURIComponent(experimentId)}`,
+  ).then(normalizeExperiment);
 }
 
 export const fetchRun = fetchExperimentExecution;
 
-export async function cancelExperiment(experimentId: string): Promise<Experiment> {
+export async function cancelExperiment(
+  experimentId: string,
+): Promise<Experiment> {
   const response = await fetch(
     `${apiOrigin}/api/v1/runs/${encodeURIComponent(experimentId)}/cancel`,
     { method: "POST" },
   );
   if (!response.ok) throw new Error(`Request failed: ${response.status}`);
-  return normalizeExperiment((await response.json()) as Record<string, unknown>);
+  return normalizeExperiment(
+    (await response.json()) as Record<string, unknown>,
+  );
 }
 
 export const cancelRun = cancelExperiment;
@@ -443,30 +490,54 @@ export async function deleteExperiment(experimentId: string): Promise<void> {
 
 export const deleteRun = deleteExperiment;
 
-export async function fetchRunVisualization(experimentId: string): Promise<RunVisualization> {
+export async function fetchRunVisualization(
+  experimentId: string,
+): Promise<RunVisualization> {
   const payload = await get<Record<string, unknown>>(
     `/api/v1/runs/${encodeURIComponent(experimentId)}/visualization`,
   );
-  const rawExecutions = (payload.scenarioExecutions ?? payload.cases ?? []) as Record<string, unknown>[];
+  const rawExecutions = (payload.scenarioExecutions ??
+    payload.cases ??
+    []) as Record<string, unknown>[];
   const scenarioExecutions = rawExecutions.map((execution) => ({
     ...(execution as unknown as ScenarioExecutionProgress),
     scenarioId: String(execution.scenarioId ?? execution.caseId ?? "") || null,
-    scenarioExecutionId: String(execution.scenarioExecutionId ?? execution.caseId ?? execution.scenarioId ?? "") || null,
-    caseId: String(execution.caseId ?? execution.scenarioExecutionId ?? execution.scenarioId ?? "") || null,
+    scenarioExecutionId:
+      String(
+        execution.scenarioExecutionId ??
+          execution.caseId ??
+          execution.scenarioId ??
+          "",
+      ) || null,
+    caseId:
+      String(
+        execution.caseId ??
+          execution.scenarioExecutionId ??
+          execution.scenarioId ??
+          "",
+      ) || null,
   }));
-  const rawCounts = (payload.counts as Record<string, unknown> | undefined) ?? {};
+  const rawCounts =
+    (payload.counts as Record<string, unknown> | undefined) ?? {};
   return {
     ...(payload as unknown as RunVisualization),
     scenarioExecutions,
     counts: {
       totalKnown: Boolean(rawCounts.totalKnown),
-      totalScenarioExecutions: Number(rawCounts.totalScenarioExecutions ?? rawCounts.totalCases ?? 0),
-      completedScenarioExecutions: Number(rawCounts.completedScenarioExecutions ?? rawCounts.completedCases ?? 0),
+      totalScenarioExecutions: Number(
+        rawCounts.totalScenarioExecutions ?? rawCounts.totalCases ?? 0,
+      ),
+      completedScenarioExecutions: Number(
+        rawCounts.completedScenarioExecutions ?? rawCounts.completedCases ?? 0,
+      ),
     },
   };
 }
 
-export async function fetchRunTurns(experimentId: string, cursor?: string): Promise<RunTurnPage> {
+export async function fetchRunTurns(
+  experimentId: string,
+  cursor?: string,
+): Promise<RunTurnPage> {
   const params = new URLSearchParams({ limit: "100" });
   if (cursor) params.set("cursor", cursor);
   const page = await get<RunTurnPage>(
@@ -479,27 +550,41 @@ export async function fetchRunTurns(experimentId: string, cursor?: string): Prom
       scenarioId: item.scenarioId ?? item.caseId ?? null,
       scenarioExecutionId: item.scenarioExecutionId ?? item.caseId ?? null,
       caseId: item.caseId ?? item.scenarioExecutionId ?? null,
-      historyCaseIds: item.historyCaseIds ?? item.historyResearchRunScenarioIds ?? [],
-      historyCaseOrigins: item.historyCaseOrigins ?? item.historyResearchRunOrigins ?? [],
+      historyCaseIds:
+        item.historyCaseIds ?? item.historyResearchRunScenarioIds ?? [],
+      historyCaseOrigins:
+        item.historyCaseOrigins ?? item.historyResearchRunOrigins ?? [],
     })),
   };
 }
 
-export async function fetchCollectorArtifacts(experimentId: string): Promise<CollectorArtifact[]> {
+export async function fetchCollectorArtifacts(
+  experimentId: string,
+): Promise<CollectorArtifact[]> {
   const artifacts = await get<CollectorArtifact[]>(
     `/api/v1/runs/${encodeURIComponent(experimentId)}/collector-verifications`,
   );
   return artifacts.map((artifact) => ({
     ...artifact,
-    caseId: artifact.caseId ?? artifact.scenarioExecutionId ?? artifact.scenarioId ?? null,
+    caseId:
+      artifact.caseId ??
+      artifact.scenarioExecutionId ??
+      artifact.scenarioId ??
+      null,
   }));
 }
 
-export function collectorFileDownloadUrl(experimentId: string, fileId: string): string {
+export function collectorFileDownloadUrl(
+  experimentId: string,
+  fileId: string,
+): string {
   return `${apiOrigin}/api/v1/runs/${encodeURIComponent(experimentId)}/collector-files/${encodeURIComponent(fileId)}/download`;
 }
 
-export function collectorFilePreviewUrl(experimentId: string, fileId: string): string {
+export function collectorFilePreviewUrl(
+  experimentId: string,
+  fileId: string,
+): string {
   return `${apiOrigin}/api/v1/runs/${encodeURIComponent(experimentId)}/collector-files/${encodeURIComponent(fileId)}/preview`;
 }
 
@@ -508,18 +593,25 @@ export async function fetchCollectorFilePreview(
   fileId: string,
   signal?: AbortSignal,
 ): Promise<Response> {
-  const response = await fetch(collectorFilePreviewUrl(experimentId, fileId), { signal });
+  const response = await fetch(collectorFilePreviewUrl(experimentId, fileId), {
+    signal,
+  });
   if (!response.ok) throw new Error(`Preview failed: ${response.status}`);
   return response;
 }
 
-export type RelationshipParticipant = components["schemas"]["ParticipantResponse"];
+export type RelationshipParticipant =
+  components["schemas"]["ParticipantResponse"];
 export type RelationshipEdge = components["schemas"]["RelationshipResponse"];
-export type RelationshipProjection = components["schemas"]["RelationshipProjectionResponse"];
+export type RelationshipProjection =
+  components["schemas"]["RelationshipProjectionResponse"];
 
 export function fetchRunRelationships(
   experimentId: string,
-  filters: Pick<EvidenceFilters, "scenarioId" | "scenarioExecutionId" | "participantId" | "activityType"> = {},
+  filters: Pick<
+    EvidenceFilters,
+    "scenarioId" | "scenarioExecutionId" | "participantId" | "activityType"
+  > = {},
 ): Promise<RelationshipProjection> {
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(filters)) {
@@ -539,12 +631,19 @@ export function fetchActivity(
   params.set("limit", String(Math.min(filters.limit ?? 200, 200)));
   params.set("order", filters.order ?? "asc");
   for (const [key, value] of Object.entries(filters)) {
-    if (key !== "limit" && key !== "order" && value !== undefined && value !== "") {
+    if (
+      key !== "limit" &&
+      key !== "order" &&
+      value !== undefined &&
+      value !== ""
+    ) {
       params.set(key, String(value));
     }
   }
   const suffix = params.toString() ? `?${params.toString()}` : "";
-  return get<ActivityPage>(`/api/v1/runs/${encodeURIComponent(experimentId)}/activity${suffix}`);
+  return get<ActivityPage>(
+    `/api/v1/runs/${encodeURIComponent(experimentId)}/activity${suffix}`,
+  );
 }
 
 export function fetchAdversarialResearcherScenarios(
@@ -553,7 +652,9 @@ export function fetchAdversarialResearcherScenarios(
 ): Promise<AdversarialResearcherScenario[]> {
   const params = new URLSearchParams({ state });
   if (result) params.set("result", result);
-  return get<AdversarialResearcherScenario[]>(`/api/v1/scientist-scenarios?${params.toString()}`);
+  return get<AdversarialResearcherScenario[]>(
+    `/api/v1/scientist-scenarios?${params.toString()}`,
+  );
 }
 
 export const fetchScientistScenarios = fetchAdversarialResearcherScenarios;
@@ -589,7 +690,8 @@ export function adversarialResearcherScenarioExportUrl(
   return `${apiOrigin}/api/v1/scientist-scenarios/${encodeURIComponent(experimentId)}/${encodeURIComponent(artifactId)}/export`;
 }
 
-export const scientistScenarioExportUrl = adversarialResearcherScenarioExportUrl;
+export const scientistScenarioExportUrl =
+  adversarialResearcherScenarioExportUrl;
 
 async function mutate<T>(path: string, method: "PUT" | "DELETE"): Promise<T> {
   const response = await fetch(`${apiOrigin}${path}`, { method });

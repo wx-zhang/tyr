@@ -1,100 +1,36 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { cancelRun, deleteRun, fetchRuns, type Run, type RunState } from "../../api/client";
+import {
+  cancelRun,
+  deleteRun,
+  fetchRuns,
+  type Run,
+  type RunState,
+} from "../../api/client";
 import { PageHeader } from "../../components/PageHeader";
-import { StatusBadge } from "../../components/StatusBadge";
+import { DashboardRunCard } from "./DashboardRunCard";
+import { DashboardSelectionToolbar } from "./DashboardSelectionToolbar";
+import { compareRunsNewestFirst } from "./dashboardRunPresentation";
 
-const terminalStates = new Set<RunState>([
-  "completed",
-  "failed",
-  "cancelled",
-  "interrupted",
-]);
+const terminalStates: Partial<Record<RunState, true>> = {
+  completed: true,
+  failed: true,
+  cancelled: true,
+  interrupted: true,
+};
 
-const deletableLiveStates = new Set<RunState>(["queued"]);
+const deletableLiveStates: Partial<Record<RunState, true>> = { queued: true };
 
 function shortRunId(id: string): string {
   return id.replaceAll("-", "").slice(0, 8);
 }
 
-function runWhen(run: Run): string | null {
-  return run.createdAt ?? run.updatedAt ?? run.finishedAt ?? null;
-}
-
-function label(value: string | null | undefined): string {
-  if (!value) return "—";
-  if (value === "approval_required") return "Approval-gated";
-  return value
-    .replaceAll("_", " ")
-    .replace(/\b\w/g, (character) => character.toUpperCase());
-}
-
-function stateTone(
-  state: string | undefined,
-): "info" | "success" | "warning" | "danger" | "neutral" {
-  if (state === "completed") return "success";
-  if (state === "failed") return "danger";
-  if (state === "waiting_for_approval") return "warning";
-  if (state === "cancelled" || state === "interrupted") return "neutral";
-  return "info";
-}
-
-function formatAbsolute(value: string | null): string {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
-  return new Intl.DateTimeFormat(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
-}
-
-function formatRelative(value: string | null, now: number): string {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
-  const deltaSeconds = Math.round((date.getTime() - now) / 1000);
-  const absolute = Math.abs(deltaSeconds);
-  if (absolute < 5) return "just now";
-  const formatter = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
-  if (absolute < 60) return formatter.format(deltaSeconds, "second");
-  if (absolute < 3600) {
-    return formatter.format(Math.round(deltaSeconds / 60), "minute");
-  }
-  if (absolute < 86_400) {
-    return formatter.format(Math.round(deltaSeconds / 3600), "hour");
-  }
-  if (absolute < 86_400 * 30) {
-    return formatter.format(Math.round(deltaSeconds / 86_400), "day");
-  }
-  return formatAbsolute(value);
-}
-
-function compareRunsNewestFirst(left: Run, right: Run): number {
-  const leftTime = Date.parse(left.createdAt ?? left.updatedAt ?? "") || 0;
-  const rightTime = Date.parse(right.createdAt ?? right.updatedAt ?? "") || 0;
-  if (rightTime !== leftTime) return rightTime - leftTime;
-  return right.id.localeCompare(left.id);
-}
-
-function taskLabel(task: string): string {
-  const parts = task.split("/").filter(Boolean);
-  return parts[parts.length - 1] ?? task;
-}
-
-function sourceLabel(source: Run["source"] | undefined): string {
-  if (source === "cli") return "CLI";
-  if (source === "service") return "Service";
-  return "—";
-}
-
 async function deleteRuns(ids: string[]): Promise<void> {
   const results = await Promise.allSettled(ids.map((id) => deleteRun(id)));
-  const failed = results.filter((result) => result.status === "rejected").length;
+  const failed = results.filter(
+    (result) => result.status === "rejected",
+  ).length;
   if (failed > 0) {
     throw new Error(
       failed === ids.length
@@ -150,7 +86,9 @@ export function DashboardPage() {
       void queryClient.invalidateQueries({ queryKey: ["runs"] });
     },
     onError: (error: unknown) => {
-      setStopError(error instanceof Error ? error.message : "Could not stop Experiment");
+      setStopError(
+        error instanceof Error ? error.message : "Could not stop Experiment",
+      );
     },
   });
 
@@ -163,8 +101,8 @@ export function DashboardPage() {
     () =>
       recentRuns.filter(
         (run) =>
-          terminalStates.has(run.state as RunState)
-          || deletableLiveStates.has(run.state as RunState),
+          terminalStates[run.state as RunState] ||
+          deletableLiveStates[run.state as RunState],
       ),
     [recentRuns],
   );
@@ -174,7 +112,8 @@ export function DashboardPage() {
   );
   const selectedCount = selectedIds.size;
   const allDeletableSelected =
-    deletableRuns.length > 0 && deletableRuns.every((run) => selectedIds.has(run.id));
+    deletableRuns.length > 0 &&
+    deletableRuns.every((run) => selectedIds.has(run.id));
 
   const enterSelecting = () => {
     setDeleteError(null);
@@ -246,8 +185,8 @@ export function DashboardPage() {
           </span>
         </h2>
         <p>
-          Red team for Tyr. Experiments run attack Scenarios against it and save the
-          evidence so you can see what held and what failed.
+          Red team for Tyr. Experiments run attack Scenarios against it and save
+          the evidence so you can see what held and what failed.
         </p>
       </section>
 
@@ -255,9 +194,20 @@ export function DashboardPage() {
         title="Recent Experiments"
         description="Red-team Experiments against Tyr, newest first. Open an Experiment to review its state and evidence."
         actions={
-          <Link className="button button-primary" to="/experiments/new">
-            Run Experiment
-          </Link>
+          <div className="button-row">
+            {deletableRuns.length > 0 && !selecting ? (
+              <button
+                type="button"
+                className="button button-ghost"
+                onClick={enterSelecting}
+              >
+                Select
+              </button>
+            ) : null}
+            <Link className="button button-primary" to="/experiments/new">
+              Run Experiment
+            </Link>
+          </div>
         }
       />
 
@@ -295,7 +245,10 @@ export function DashboardPage() {
         <div className="card empty-state">
           <div>
             <h3>No Experiments yet</h3>
-            <p>When an Experiment is queued, it will appear here with its current state and evidence links.</p>
+            <p>
+              When an Experiment is queued, it will appear here with its current
+              state and evidence links.
+            </p>
             <Link className="button button-secondary" to="/experiments/new">
               Run Experiment
             </Link>
@@ -304,197 +257,45 @@ export function DashboardPage() {
       ) : null}
 
       {recentRuns.length > 0 ? (
-        <div className="card table-wrap">
-          {deletableRuns.length > 0 || selecting ? (
-            <div className="session-table-toolbar" aria-label="Experiment selection">
-              {selecting ? (
-                <>
-                  <p className="session-table-toolbar-status muted">
-                    {selectedCount === 0
-                      ? "Select Experiments to delete"
-                      : `${selectedCount} selected`}
-                  </p>
-                  <div className="button-row">
-                    <button
-                      type="button"
-                      className="button button-ghost run-action"
-                      disabled={deleteMutation.isPending}
-                      onClick={exitSelecting}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      className="button button-danger run-action"
-                      disabled={selectedCount === 0 || deleteMutation.isPending}
-                      onClick={requestBulkDelete}
-                    >
-                      {deleteMutation.isPending
-                        ? "Deleting…"
-                        : selectedCount === 0
-                          ? "Delete selected"
-                          : `Delete ${selectedCount} selected`}
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <button
-                  type="button"
-                  className="button button-ghost run-action"
-                  onClick={enterSelecting}
-                >
-                  Select
-                </button>
-              )}
-            </div>
+        <div className="experiment-card-collection">
+          {selecting ? (
+            <DashboardSelectionToolbar
+              selectedCount={selectedCount}
+              allDeletableSelected={allDeletableSelected}
+              deletableCount={deletableRuns.length}
+              deletePending={deleteMutation.isPending}
+              onSelectAll={toggleSelectAll}
+              onCancel={exitSelecting}
+              onDelete={requestBulkDelete}
+            />
           ) : null}
-          <table
-            className={`data-table session-table${selecting ? " is-selecting" : ""}`}
-          >
-            <thead>
-              <tr>
-                {selecting ? (
-                  <th scope="col" className="session-select-col">
-                    <input
-                      type="checkbox"
-                      className="session-checkbox"
-                      aria-label="Select all deletable Experiments"
-                      checked={allDeletableSelected}
-                      disabled={deletableRuns.length === 0 || deleteMutation.isPending}
-                      onChange={toggleSelectAll}
-                    />
-                  </th>
-                ) : null}
-                <th scope="col">Experiment</th>
-                <th scope="col">Status</th>
-                <th scope="col">Mode</th>
-                <th scope="col">When</th>
-                {!selecting ? <th scope="col">Actions</th> : null}
-              </tr>
-            </thead>
-            <tbody>
-              {recentRuns.map((run) => {
-                const when = runWhen(run);
-                const actionMode = run.configuration?.actionMode;
-                const isLive = !terminalStates.has(run.state as RunState);
-                const isDeletable = deletableIds.has(run.id);
-                const isSelected = selectedIds.has(run.id);
-                const isDeleting =
-                  deleteMutation.isPending
-                  && (deleteMutation.variables?.includes(run.id) ?? false);
-                const isStopping =
-                  stopMutation.isPending && stopMutation.variables === run.id;
-                return (
-                  <tr
-                    key={run.id}
-                    className={isSelected ? "is-selected" : undefined}
-                  >
-                    {selecting ? (
-                      <td className="session-select-col">
-                        <input
-                          type="checkbox"
-                          className="session-checkbox"
-                          aria-label={`Select Experiment ${shortRunId(run.id)}`}
-                          checked={isSelected}
-                          disabled={!isDeletable || deleteMutation.isPending}
-                          onChange={() => toggleSelected(run.id)}
-                        />
-                      </td>
-                    ) : null}
-                    <td>
-                      <div className="cell-stack">
-                        <Link
-                          to={`/runs/${run.id}`}
-                          className="table-primary session-title"
-                          title={run.id}
-                        >
-                          {run.name?.trim() || taskLabel(run.task)}
-                        </Link>
-                        <p className="session-meta muted">
-                          <span className="mono" title={run.id}>
-                            {shortRunId(run.id)}
-                          </span>
-                          <span aria-hidden="true">·</span>
-                          <span>{sourceLabel(run.source)}</span>
-                          {run.configuration?.model ? (
-                            <>
-                              <span aria-hidden="true">·</span>
-                              <span
-                                className="mono"
-                                title={run.configuration.model}
-                              >
-                                {run.configuration.model}
-                              </span>
-                            </>
-                          ) : null}
-                        </p>
-                      </div>
-                    </td>
-                    <td>
-                      <StatusBadge
-                        label={label(run.state)}
-                        tone={stateTone(run.state)}
-                        pulse={isLive}
-                      />
-                    </td>
-                    <td>
-                      <StatusBadge
-                        label={label(actionMode)}
-                        tone={
-                          actionMode === "approval_required"
-                            ? "warning"
-                            : "neutral"
-                        }
-                      />
-                    </td>
-                    <td>
-                      <div className="cell-stack">
-                        <time
-                          className="table-primary tabular"
-                          dateTime={when ?? undefined}
-                        >
-                          {formatRelative(when, now)}
-                        </time>
-                        <span className="muted mono tabular">
-                          {formatAbsolute(when)}
-                        </span>
-                      </div>
-                    </td>
-                    {!selecting ? (
-                      <td>
-                        <div className="button-row session-actions">
-                          {isLive ? (
-                            <button
-                              type="button"
-                              className="button button-ghost run-action"
-                              disabled={stopMutation.isPending}
-                              title="Stop this Experiment"
-                              onClick={() => requestStop(run)}
-                            >
-                              {isStopping ? "Stopping…" : "Stop"}
-                            </button>
-                          ) : null}
-                          <button
-                            type="button"
-                            className="button button-ghost run-action run-action-danger"
-                            disabled={!isDeletable || deleteMutation.isPending}
-                            title={
-                              isDeletable
-                                ? "Delete this Experiment"
-                                : "Stop the Experiment before deleting it"
-                            }
-                            onClick={() => requestDelete(run)}
-                          >
-                            {isDeleting ? "Deleting…" : "Delete"}
-                          </button>
-                        </div>
-                      </td>
-                    ) : null}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <ol className="experiment-card-list" aria-label="Recent Experiments">
+            {recentRuns.map((run) => {
+              const isDeletable = deletableIds.has(run.id);
+              const isDeleting =
+                deleteMutation.isPending &&
+                (deleteMutation.variables?.includes(run.id) ?? false);
+              const isStopping =
+                stopMutation.isPending && stopMutation.variables === run.id;
+              return (
+                <DashboardRunCard
+                  key={run.id}
+                  run={run}
+                  now={now}
+                  selecting={selecting}
+                  selected={selectedIds.has(run.id)}
+                  deletable={isDeletable}
+                  deletePending={deleteMutation.isPending}
+                  deleting={isDeleting}
+                  stopPending={stopMutation.isPending}
+                  stopping={isStopping}
+                  onSelect={() => toggleSelected(run.id)}
+                  onDelete={() => requestDelete(run)}
+                  onStop={() => requestStop(run)}
+                />
+              );
+            })}
+          </ol>
         </div>
       ) : null}
     </section>

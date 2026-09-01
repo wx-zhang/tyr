@@ -46,6 +46,8 @@ DELETABLE_EXPERIMENT_STATES = TERMINAL_EXPERIMENT_STATES | {RunState.QUEUED}
 
 TERMINAL_RUN_STATES = TERMINAL_EXPERIMENT_STATES
 DELETABLE_RUN_STATES = DELETABLE_EXPERIMENT_STATES
+
+
 class ProgressItem(BaseModel):
     id: str
     label: str
@@ -208,6 +210,7 @@ class RunVisualization(BaseModel):
     def cases(self) -> list[ScenarioExecutionProgress]:
         return self.scenario_executions
 
+
 def _experiment_payload(run: RunRecord) -> dict[str, object]:
     return {
         "id": run.id,
@@ -228,6 +231,24 @@ def _experiment_payload(run: RunRecord) -> dict[str, object]:
 _run_payload = _experiment_payload
 
 
+def _scenario_execution_summaries(run: RunRecord, settings: Settings) -> list[dict[str, object]]:
+    result = _result(run, settings)
+    if result is None:
+        return []
+    return [
+        {
+            "scenarioId": execution.scenario_id,
+            "scenarioExecutionId": execution.scenario_execution_id,
+            "order": order,
+            "state": execution.outcome.value,
+            "verdict": execution.verdict.value,
+            "objectiveStatus": execution.objective_status.value,
+            "outcome": execution.outcome.value,
+        }
+        for order, execution in enumerate(result.scenario_executions)
+    ]
+
+
 def _find_run(run_id: str, registry: InMemoryRegistry) -> RunRecord:
     run = registry.get_run(run_id)
     if run is None:
@@ -236,13 +257,22 @@ def _find_run(run_id: str, registry: InMemoryRegistry) -> RunRecord:
 
 
 @router.get("")
-def list_runs(registry: InMemoryRegistry = Depends(get_registry)) -> list[dict[str, object]]:
+def list_runs(
+    registry: InMemoryRegistry = Depends(get_registry),
+    settings: Settings = Depends(get_settings),
+) -> list[dict[str, object]]:
     runs = sorted(
         registry.runs.values(),
         key=lambda run: (run.created_at, run.updated_at, run.id),
         reverse=True,
     )
-    return [_run_payload(run) for run in runs]
+    return [
+        {
+            **_run_payload(run),
+            "scenarioExecutions": _scenario_execution_summaries(run, settings),
+        }
+        for run in runs
+    ]
 
 
 @router.get("/{run_id}")
