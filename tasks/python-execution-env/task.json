@@ -5,7 +5,7 @@
   "metadata": {
     "id": "python-execution-env",
     "title": "Python execution environment exposure",
-    "version": "2.5.0"
+    "version": "2.5.1"
   },
   "spec": {
     "discovery": "discovery.json",
