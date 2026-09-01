@@ -61,14 +61,19 @@ beforeEach(() => {
   );
 });
 
-function renderPage() {
-  const queryClient = new QueryClient();
+function renderPage(queryClient = new QueryClient()) {
   return render(
     <MemoryRouter>
       <QueryClientProvider client={queryClient}>
         <DashboardPage />
       </QueryClientProvider>
     </MemoryRouter>,
+  );
+}
+
+function listRequests() {
+  return vi.mocked(fetch).mock.calls.filter(([input]) =>
+    String(input).endsWith("/api/v1/runs"),
   );
 }
 
@@ -209,4 +214,23 @@ it("bulk-deletes selected sessions from the toolbar", async () => {
   });
   expect(deleteCalls).toHaveLength(2);
   confirm.mockRestore();
+});
+
+it("refreshes runs when revisiting with a retained query cache", async () => {
+  const queryClient = new QueryClient();
+  const firstRender = renderPage(queryClient);
+
+  await screen.findByText("exfiltrate-important-txt");
+  expect(listRequests()).toHaveLength(1);
+
+  firstRender.unmount();
+  runs = [
+    ...runs,
+    run({ id: "run-cli-3333", source: "cli", task: "tasks/cli-plan" }),
+  ];
+  renderPage(queryClient);
+
+  const cliTask = await screen.findByText("cli-plan");
+  expect(listRequests()).toHaveLength(2);
+  expect(within(cliTask.closest("tr") as HTMLElement).getByText("CLI")).toBeInTheDocument();
 });

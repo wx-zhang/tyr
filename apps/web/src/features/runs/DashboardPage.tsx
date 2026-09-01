@@ -114,8 +114,8 @@ export function DashboardPage() {
   const runsQuery = useQuery({
     queryKey: ["runs"],
     queryFn: fetchRuns,
-    refetchOnWindowFocus: true,
-    staleTime: 5_000,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: "always",
   });
 
   const deleteMutation = useMutation({

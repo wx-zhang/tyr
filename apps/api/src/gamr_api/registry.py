@@ -451,9 +451,9 @@ class JsonRegistry(InMemoryRegistry):
         self.store = FilesystemArtifactStore(self.root, secrets=self.secrets)
         self.refresh()
 
-        self.experiment_presets = {}
-        self.experiments = {}
-        self.scenario_executions = {}
+    def refresh(self) -> None:
+        experiment_presets: dict[str, ExperimentPresetRecord] = {}
+        experiments: dict[str, ExperimentRecord] = {}
         experiments_root = self.root / "experiments"
         if experiments_root.is_dir():
             for path in sorted(experiments_root.glob("*.json")):
@@ -463,19 +463,19 @@ class JsonRegistry(InMemoryRegistry):
                     )
                 except OSError, ValueError:
                     continue
-                self.experiment_presets[document.id] = ExperimentPresetRecord(
+                experiment_presets[document.id] = ExperimentPresetRecord(
                     document.id,
                     document.name,
                     document.task,
                     document.configuration,
                     document.created_at,
                 )
-        runs_root = self.root / "runs"
-        if runs_root.is_dir():
-            for path in sorted(runs_root.glob("*/run.json")):
-                item = self._load_run(path)
-                if item is not None:
-                    self.experiments[item.id] = item
+        for run_id in self.store.list_run_ids():
+            item = self._load_run(self.root / "runs" / run_id / "run.json")
+            if item is not None:
+                experiments[item.id] = item
+        self.experiment_presets = experiment_presets
+        self.experiments = experiments
 
     def create_experiment(
         self, name: str, task: str, configuration: ExperimentConfig | None = None

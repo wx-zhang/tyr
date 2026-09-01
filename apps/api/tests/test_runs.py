@@ -1,11 +1,15 @@
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import cast
 
+import pytest
 from fastapi.testclient import TestClient
+from gamr_adapters.artifacts.filesystem import FilesystemArtifactStore
+from gamr_api import dependencies
 from gamr_api.dependencies import get_registry
 from gamr_api.main import app
-from gamr_api.registry import InMemoryRegistry, RunRecord
-from gamr_core import ExperimentConfig, RunSource, RunState
+from gamr_api.registry import InMemoryRegistry, JsonRegistry, RunRecord
+from gamr_core import ExperimentConfig, ExperimentRecord, RunSource, RunState
 
 
 def _experiment(client: TestClient) -> str:
@@ -46,6 +50,35 @@ def test_list_runs_includes_timestamps_and_orders_newest_first() -> None:
     assert payload[0]["createdAt"].startswith("2026-08-09T12:00:00")
     assert payload[0]["updatedAt"].startswith("2026-08-09T12:00:00")
     assert payload[0]["finishedAt"] is None
+
+def test_list_runs_refreshes_process_global_json_registry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    registry = JsonRegistry(tmp_path)
+    monkeypatch.setattr(dependencies, "registry", registry)
+    client = TestClient(app)
+
+    first_response = client.get("/api/v1/runs")
+    assert first_response.status_code == 200
+    assert first_response.json() == []
+
+    store = FilesystemArtifactStore(tmp_path)
+    run_id = "cli-api-refresh"
+    document = ExperimentRecord(
+        id=run_id,
+        source=RunSource.CLI,
+        state=RunState.RUNNING,
+        task="tasks/exfiltrate-important-txt",
+    )
+    store.write_json(
+        f"runs/{run_id}/run.json", document.model_dump(by_alias=True, mode="json")
+    )
+
+    second_response = client.get("/api/v1/runs")
+
+    assert second_response.status_code == 200
+    assert second_response.json()[0]["id"] == run_id
+    assert second_response.json()[0]["source"] == "cli"
 
 
 def test_service_accepts_approval_required_experiment() -> None:

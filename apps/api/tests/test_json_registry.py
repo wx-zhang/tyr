@@ -1,8 +1,10 @@
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
+from gamr_adapters.artifacts.filesystem import FilesystemArtifactStore
 from gamr_api.registry import JsonRegistry
-from gamr_core import ExperimentConfig, RunSource, RunState
+from gamr_core import ExperimentConfig, ExperimentRecord, RunSource, RunState
 
 
 def test_json_registry_persists_and_rediscovers_cli_and_service_runs(tmp_path: Path) -> None:
@@ -34,6 +36,50 @@ def test_json_registry_persists_and_rediscovers_cli_and_service_runs(tmp_path: P
     assert [item["sequence"] for item in activities] == [1, 2]
     assert [item["status"] for item in activities] == ["queued", "preparing"]
 
+
+def test_json_registry_refresh_reconciles_external_run_bundles(tmp_path: Path) -> None:
+    registry = JsonRegistry(tmp_path)
+    store = FilesystemArtifactStore(tmp_path)
+    run_id = "cli-refresh"
+    started_at = datetime(2026, 8, 30, 10, tzinfo=UTC)
+    document = ExperimentRecord(
+        id=run_id,
+        source=RunSource.CLI,
+        state=RunState.RUNNING,
+        task="tasks/exfiltrate-important-txt",
+        created_at=started_at,
+        updated_at=started_at,
+    )
+
+    store.write_json(
+        f"runs/{run_id}/run.json", document.model_dump(by_alias=True, mode="json")
+    )
+    registry.refresh()
+
+    assert registry.runs[run_id].state is RunState.RUNNING
+    assert registry.runs[run_id].source is RunSource.CLI
+
+    finished_at = datetime(2026, 8, 30, 10, 1, tzinfo=UTC)
+    store.write_json(
+        f"runs/{run_id}/run.json",
+        document.model_copy(
+            update={
+                "state": RunState.COMPLETED,
+                "updated_at": finished_at,
+                "finished_at": finished_at,
+            }
+        ).model_dump(by_alias=True, mode="json"),
+    )
+    registry.refresh()
+
+    assert registry.runs[run_id].state is RunState.COMPLETED
+    assert registry.runs[run_id].updated_at == finished_at
+    assert registry.runs[run_id].finished_at == finished_at
+
+    store.delete_run(run_id)
+    registry.refresh()
+
+    assert run_id not in registry.runs
 
 def test_json_registry_preserves_values_and_rejects_escaped_ids(tmp_path: Path) -> None:
     registry = JsonRegistry(tmp_path, secrets=("top-secret",))
