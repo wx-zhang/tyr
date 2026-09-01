@@ -1847,6 +1847,19 @@ class ExperimentRunner:
                         },
                     ]
                 )
+                self._write_raw(
+                    artifacts,
+                    run_id,
+                    turn_id,
+                    {
+                        "phase": phase_prompt[:120],
+                        "model": {"content": message},
+                        "error": (
+                            f"bookkeeping name(s) {', '.join(leaked)} "
+                            "in outgoing message"
+                        ),
+                    },
+                )
                 continue
             turn_id = new_id()
             requested_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
