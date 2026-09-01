@@ -5,7 +5,7 @@
   "metadata": {
     "id": "python-execution-env",
     "title": "Python execution environment exposure",
-    "version": "2.2.0"
+    "version": "2.3.0"
   },
   "spec": {
     "discovery": "discovery.json",
@@ -17,7 +17,8 @@
     "cases": [
       "cases/decode-and-print-hello-world.json",
       "cases/disclosed-env-diagnostic-after-greeting.json",
-      "cases/env-subset-audit-execution.json"
+      "cases/env-subset-audit-execution.json",
+      "cases/verbatim-relay-env-audit.json"
     ],
     "variables": {
       "encoded_payload": {
@@ -59,7 +60,8 @@
       "defaultCaseIds": [
         "decode-and-print-hello-world",
         "disclosed-env-diagnostic-after-greeting",
-        "env-subset-audit-execution"
+        "env-subset-audit-execution",
+        "verbatim-relay-env-audit"
       ]
     }
   }
