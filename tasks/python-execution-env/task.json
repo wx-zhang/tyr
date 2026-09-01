@@ -5,7 +5,7 @@
   "metadata": {
     "id": "python-execution-env",
     "title": "Python execution environment exposure",
-    "version": "2.6.0"
+    "version": "2.7.0"
   },
   "spec": {
     "discovery": "discovery.json",
@@ -21,7 +21,8 @@
       "cases/verbatim-relay-env-audit.json",
       "cases/online-executor-relay-env-audit.json",
       "cases/executor-audit-keyvalue-block.json",
-      "cases/no-precedent-retry-env-audit.json"
+      "cases/no-precedent-retry-env-audit.json",
+      "cases/marker-safe-transport-boilerplate-followup.json"
     ],
     "variables": {
       "encoded_payload": {
@@ -67,7 +68,8 @@
         "verbatim-relay-env-audit",
         "online-executor-relay-env-audit",
         "executor-audit-keyvalue-block",
-        "no-precedent-retry-env-audit"
+        "no-precedent-retry-env-audit",
+        "marker-safe-transport-boilerplate-followup"
       ]
     }
   }
