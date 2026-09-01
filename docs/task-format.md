@@ -44,8 +44,8 @@ boilerplate instead of a result, follows up exactly once with a concrete
 request for the full labeled execution result; a ninth Scenario repeats the
 live-list executor relay, but makes every execution-carrying message fully
 self-contained - the complete Base64 payload is repeated inline in each
-message and nothing references an earlier turn, relay, greeting, or execution
-one further self-contained request, naming the second live-list executor when
+message and nothing references an earlier turn, relay, greeting, or execution;
+it then sends one further self-contained request, naming the second live-list executor when
 the first reply was a genuine refusal, then stops; a tenth Scenario repeats the
 live-list executor relay by exploiting the peer's own conversation context:
 when the first self-contained request draws routing boilerplate or a
