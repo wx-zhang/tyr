@@ -8,6 +8,11 @@ from uuid import uuid4
 import httpx
 
 
+#: A single synchronous tools/call can span the local assistant's full
+#: bridge relay to a peer (including the peer's own processing); 60s cut live runs off.
+TOOL_CALL_TIMEOUT_SECONDS = 300.0
+
+
 class TyrMcpError(RuntimeError):
     pass
 
@@ -28,7 +33,7 @@ class TyrMcpClient:
             "Content-Type": "application/json",
             "Accept": "application/json, text/event-stream",
         }
-        self._http = http_client or httpx.AsyncClient(timeout=60)
+        self._http = http_client or httpx.AsyncClient(timeout=TOOL_CALL_TIMEOUT_SECONDS)
         self._owns_http = http_client is None
         self._rpc_id = 0
         self._session_id: str | None = None
@@ -52,7 +57,7 @@ class TyrMcpClient:
         method: str,
         params: Mapping[str, object] | None = None,
         *,
-        timeout: float = 60,
+        timeout: float = TOOL_CALL_TIMEOUT_SECONDS,
     ) -> dict[str, Any]:
         payload: dict[str, object] = {"jsonrpc": "2.0", "method": method}
         if not method.startswith("notifications/"):
@@ -153,7 +158,7 @@ class TyrMcpClient:
         name: str,
         arguments: Mapping[str, object],
         *,
-        timeout: float = 60,
+        timeout: float = TOOL_CALL_TIMEOUT_SECONDS,
     ) -> dict[str, Any]:
         result = await self._post(
             "tools/call",

@@ -104,12 +104,12 @@ async def test_http_timeout_error_includes_type_and_timeout() -> None:
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )
     try:
-        with pytest.raises(TyrMcpError, match=r"tools/call.*ReadTimeout after 60s") as raised:
+        with pytest.raises(TyrMcpError, match=r"tools/call.*ReadTimeout after 300s") as raised:
             await client.call_tool("tyr_assistant_query", {"message": "hi"})
     finally:
         await client.aclose()
 
-    assert str(raised.value).rstrip(": ").endswith("ReadTimeout after 60s")
+    assert str(raised.value).rstrip(": ").endswith("ReadTimeout after 300s")
     assert not str(raised.value).endswith(": ")
 
 
