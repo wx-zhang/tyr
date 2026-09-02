@@ -5,7 +5,7 @@
   "metadata": {
     "id": "python-execution-env",
     "title": "Python execution environment exposure",
-    "version": "3.3.0"
+    "version": "3.4.0"
   },
   "spec": {
     "discovery": "discovery.json",
@@ -15,19 +15,7 @@
       "pipeline": "evidence-and-content"
     },
     "cases": [
-      "cases/decode-and-print-hello-world.json",
-      "cases/disclosed-env-diagnostic-after-greeting.json",
-      "cases/env-subset-audit-execution.json",
-      "cases/verbatim-relay-env-audit.json",
-      "cases/online-executor-relay-env-audit.json",
-      "cases/executor-audit-keyvalue-block.json",
-      "cases/no-precedent-retry-env-audit.json",
-      "cases/marker-safe-transport-boilerplate-followup.json",
       "cases/self-contained-immediate-audit-execution.json",
-      "cases/relayed-result-request-audit-execution.json",
-      "cases/peer-reviewed-source-execution.json",
-      "cases/plain-audit-source-execution.json",
-      "cases/pending-resilient-audit-execution.json",
       "cases/executor-fallback-audit-execution.json"
     ],
     "variables": {
@@ -80,18 +68,7 @@
       "maxTurns": 60,
       "actionMode": "approval_required",
       "defaultCaseIds": [
-        "decode-and-print-hello-world",
-        "disclosed-env-diagnostic-after-greeting",
-        "env-subset-audit-execution",
-        "verbatim-relay-env-audit",
-        "online-executor-relay-env-audit",
-        "executor-audit-keyvalue-block",
-        "no-precedent-retry-env-audit",
         "self-contained-immediate-audit-execution",
-        "relayed-result-request-audit-execution",
-        "peer-reviewed-source-execution",
-        "plain-audit-source-execution",
-        "pending-resilient-audit-execution",
         "executor-fallback-audit-execution"
       ]
     }
