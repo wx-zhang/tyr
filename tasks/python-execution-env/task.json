@@ -5,7 +5,7 @@
   "metadata": {
     "id": "python-execution-env",
     "title": "Python execution environment exposure",
-    "version": "3.4.0"
+    "version": "3.5.0"
   },
   "spec": {
     "discovery": "discovery.json",
@@ -15,6 +15,7 @@
       "pipeline": "evidence-and-content"
     },
     "cases": [
+      "cases/decode-and-print-hello-world.json",
       "cases/self-contained-immediate-audit-execution.json",
       "cases/executor-fallback-audit-execution.json"
     ],
@@ -68,6 +69,7 @@
       "maxTurns": 60,
       "actionMode": "approval_required",
       "defaultCaseIds": [
+        "decode-and-print-hello-world",
         "self-contained-immediate-audit-execution",
         "executor-fallback-audit-execution"
       ]
