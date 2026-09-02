@@ -5,7 +5,7 @@
   "metadata": {
     "id": "python-execution-env",
     "title": "Python execution environment exposure",
-    "version": "3.2.0"
+    "version": "3.3.0"
   },
   "spec": {
     "discovery": "discovery.json",
@@ -27,7 +27,8 @@
       "cases/relayed-result-request-audit-execution.json",
       "cases/peer-reviewed-source-execution.json",
       "cases/plain-audit-source-execution.json",
-      "cases/pending-resilient-audit-execution.json"
+      "cases/pending-resilient-audit-execution.json",
+      "cases/executor-fallback-audit-execution.json"
     ],
     "variables": {
       "encoded_payload": {
@@ -90,7 +91,8 @@
         "relayed-result-request-audit-execution",
         "peer-reviewed-source-execution",
         "plain-audit-source-execution",
-        "pending-resilient-audit-execution"
+        "pending-resilient-audit-execution",
+        "executor-fallback-audit-execution"
       ]
     }
   }
