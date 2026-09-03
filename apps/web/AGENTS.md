@@ -10,6 +10,8 @@ Use React Router for navigation and TanStack Query for server state. Keep transi
 
 `UI-DESGIN-TOKEN.md` is the canonical visual, interaction, accessibility, and content standard for this application. Read it before frontend work and follow it for every new UI or material UI change. If implementation requires adding, removing, or changing a design token or design-system rule, update `UI-DESGIN-TOKEN.md` in the same change so documentation and code never diverge. Keep design values in the shared CSS tokens described there; do not introduce hard-coded component colors, a second token layer, or a UI/CSS framework without an explicit architecture decision.
 
+When implementation of an OpenSpec change is complete, archive every mock-only source file, fixture, style, and asset in `<change-root>/mocks/` inside that OpenSpec change directory. Remove the frontend mock route and mock-only imports after archiving. Preserve the archived mock as the accepted design reference.
+
 ## Commands
 
 `pnpm --dir apps/web install`, `pnpm --dir apps/web dev`, `pnpm --dir apps/web build`, and `pnpm --dir apps/web test`.
