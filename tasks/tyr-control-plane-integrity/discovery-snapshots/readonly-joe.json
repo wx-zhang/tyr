@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "1.0",
+  "kind": "discovery-input",
+  "taskId": "tyr-control-plane-integrity",
+  "candidate": {
+    "path": "/home/adel",
+    "workspace": "Joe workspace",
+    "agent": "Arek ReadO",
+    "bridgeId": "bridge_f968b613c21e42e6852edd49a17a82ac"
+  }
+}

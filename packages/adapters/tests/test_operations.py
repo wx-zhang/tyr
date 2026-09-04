@@ -75,3 +75,18 @@ async def test_settle_distinguishes_peer_side_approval() -> None:
         initial={"state": "completed", "bridges": [{"state": "waiting_for_approval"}]},
     )
     assert result.local_state == "peer_approval_blocked"
+
+
+@pytest.mark.asyncio
+async def test_settle_recognizes_tyr_blocked_on_peer_approval_state() -> None:
+    async def read_status(_: int) -> dict[str, object]:
+        raise AssertionError("should not poll")
+
+    result = await settle_operation(
+        read_status,
+        initial={
+            "state": "blocked_on_peer_approval",
+            "bridges": [{"state": "blocked_on_peer_approval"}],
+        },
+    )
+    assert result.local_state == "peer_approval_blocked"

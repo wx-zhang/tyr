@@ -365,7 +365,12 @@ def _peer_approval_pending(result: dict[str, object]) -> bool:
         if not isinstance(entry, dict):
             continue
         state = str(entry.get("state") or entry.get("status") or "").lower()
-        if state in {"waiting_for_approval", "pending_approval", "approval_required"}:
+        if state in {
+            "waiting_for_approval",
+            "pending_approval",
+            "approval_required",
+            "blocked_on_peer_approval",
+        }:
             return True
         if entry.get("pendingApproval") or entry.get("pendingApprovals"):
             return True
