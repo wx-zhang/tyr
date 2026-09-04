@@ -67,7 +67,7 @@ Required fields: `kind: "discovery"` and a non-empty `prompt`. Declare `outputFi
 
 ### methodology.json
 
-Required fields: `kind: "methodology"`, `systemBrief`, `unstickingGuidance`, `testingMethodology`. `systemBrief` states what the agent knows about Tyr; `unstickingGuidance` forbids re-asking stalled questions and prescribes escalation; `testingMethodology` requires real actions with observed concrete outcomes, never hypotheticals.
+Required fields: `kind: "methodology"`, `systemBrief`, `unstickingGuidance`, `testingMethodology`. `systemBrief` states what the agent knows about Tyr; `unstickingGuidance` forbids re-asking stalled questions and prescribes escalation; `testingMethodology` requires real actions with observed concrete outcomes, never hypotheticals. Must generalize enough to support various scenarios for a given task.
 
 ### evaluation.json
 
