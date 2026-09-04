@@ -242,6 +242,93 @@ async def test_agent_turn_is_persisted_before_tyr_request() -> None:
     assert transcript_records[1]["content"] == "done"
 
 
+
+@pytest.mark.asyncio
+async def test_runner_prefers_settled_bridge_reply_over_intermediate_response() -> None:
+    intermediate = "Sent the request to Joe workspace. The peer TYR is still working."
+    effective = "AGENT_NAME: Carol\nWORKING_DIRECTORY: /home/agent"
+    transcript_records: list[dict[str, object]] = []
+    raw_records: list[dict[str, object]] = []
+    progress: list[ProgressEvent] = []
+
+    class SettledReplyTarget(LiveFakeTarget):
+        async def query(
+            self,
+            prompt: str,
+            *,
+            operation_id: str | None = None,
+            conversation_id: str | None = None,
+            idempotency_key: str,
+        ) -> dict[str, object]:
+            self.query_conversation_ids.append(conversation_id)
+            self.messages.append(prompt)
+            return {
+                "operationId": operation_id or "op-1",
+                "state": "completed",
+                "response": intermediate,
+            }
+
+        async def settle(
+            self, result: dict[str, object], *, operation_id: str | None = None
+        ) -> dict[str, object]:
+            return {
+                **result,
+                "gamrSettlement": {
+                    "state": "settled",
+                    "notes": [],
+                    "reply": effective,
+                },
+            }
+
+    class RecordingArtifacts:
+        def append_transcript(self, run_id: str, records: list[dict[str, object]]) -> str:
+            transcript_records.extend(records)
+            return "transcript.jsonl"
+
+        def write_checkpoint(self, run_id: str, payload: dict[str, object]) -> str:
+            return "checkpoint.json"
+
+        def write_raw(self, run_id: str, turn_id: str, payload: dict[str, object]) -> str:
+            raw_records.append(payload)
+            return "raw.json"
+
+        def append_event(self, run_id: str, payload: dict[str, object]) -> str:
+            return "events.jsonl"
+
+    target = SettledReplyTarget()
+    result = await ExperimentRunner(progress=progress.append)._converse(
+        "Ask Tyr.",
+        target,
+        LiveFakeModel(
+            [
+                '{"kind":"send","message":"Ask Joe for the workspace."}',
+                '{"kind":"phase_complete","reason":"done","discoveredCandidates":[]}',
+            ]
+        ),
+        ExperimentConfig(),
+        max_turns=2,
+        conversation=TargetConversation(),
+        require_candidates=False,
+        run_id="run-1",
+        artifacts=cast(ArtifactStore, RecordingArtifacts()),
+        phase="case",
+    )
+
+    tyr_rows = [record for record in transcript_records if record["role"] == "user"]
+    assert len(target.messages) == 1
+    assert len(tyr_rows) == 1
+    assert tyr_rows[0]["content"] == effective
+    assert intermediate not in [record["content"] for record in tyr_rows]
+    assert "[GAMR: Tyr published no new content" not in tyr_rows[0]["content"]
+    target_response = next(
+        record["targetResponse"] for record in raw_records if "targetResponse" in record
+    )
+    assert isinstance(target_response, dict)
+    assert target_response["response"] == intermediate
+    assert result.error is None
+    target_completed = next(event for event in progress if event.event_type == "target.completed")
+    assert target_completed.fields == (("replySource", "delegated bridge follow-up"),)
+
 @pytest.mark.asyncio
 async def test_live_runner_uses_structured_discovery_and_assessment() -> None:
     manifest = TaskManifest.model_validate(

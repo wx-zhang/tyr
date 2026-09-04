@@ -252,10 +252,13 @@ class TyrMcpClient:
             initial=result,
         )
         payload = dict(settled.payload)
-        payload["gamrSettlement"] = {
+        settlement: dict[str, object] = {
             "state": settled.local_state,
             "notes": list(settled.notes),
         }
+        if settled.reply is not None:
+            settlement["reply"] = settled.reply
+        payload["gamrSettlement"] = settlement
         return payload
 
     async def resolve_approval(

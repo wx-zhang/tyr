@@ -41,7 +41,7 @@ class OperationWaitResult:
     payload: dict[str, object]
     local_state: str
     notes: tuple[str, ...] = ()
-
+    reply: str | None = None
 
 def normalize_operation_result(
     result: dict[str, object],
@@ -145,6 +145,56 @@ def _operation_time(value: object) -> datetime:
         except ValueError:
             pass
     return datetime(1970, 1, 1, tzinfo=UTC)
+
+
+def _current_bridge_entries(result: dict[str, object]) -> tuple[dict[str, object], ...]:
+    bridges = result.get("bridges")
+    if not isinstance(bridges, list):
+        return ()
+    entries = tuple(entry for entry in bridges if isinstance(entry, dict))
+    if not entries:
+        return ()
+    timestamps = tuple(_bridge_creation_time(entry.get("createdAt")) for entry in entries)
+    valid_timestamps = tuple(timestamp for timestamp in timestamps if timestamp is not None)
+    if not valid_timestamps:
+        return entries[-1:]
+    latest = max(valid_timestamps)
+    last_latest = max(
+        index for index, timestamp in enumerate(timestamps) if timestamp == latest
+    )
+    return tuple(
+        entry
+        for index, (entry, timestamp) in enumerate(zip(entries, timestamps, strict=True))
+        if timestamp == latest or (index > last_latest and timestamp is None)
+    )
+
+
+def _bridge_creation_time(value: object) -> datetime | None:
+    if not isinstance(value, str):
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return parsed.astimezone(UTC)
+
+
+def _normalized_state(entry: dict[str, object]) -> str:
+    state = entry.get("state") or entry.get("status")
+    return state.strip().lower() if isinstance(state, str) else ""
+
+
+def _effective_reply(result: dict[str, object]) -> str | None:
+    entries = _current_bridge_entries(result)
+    if len(entries) != 1:
+        return None
+    entry = entries[0]
+    response = entry.get("response")
+    if _normalized_state(entry) == "completed" and isinstance(response, str) and response.strip():
+        return response
+    return None
 
 
 def _safe_id(value: object) -> str | None:
@@ -319,14 +369,16 @@ def _target_metadata_from_id(
 
 def work_pending(result: dict[str, object]) -> bool:
     for group in ("executions", "bridges"):
-        entries = result.get(group)
-        if not isinstance(entries, list):
+        entries: object = (
+            _current_bridge_entries(result) if group == "bridges" else result.get(group)
+        )
+        if not isinstance(entries, (list, tuple)):
             continue
         for entry in entries:
             if not isinstance(entry, dict):
                 continue
-            state = entry.get("state") or entry.get("status")
-            if isinstance(state, str) and state.lower() not in TERMINAL_STATES:
+            state = _normalized_state(entry)
+            if state and state not in TERMINAL_STATES:
                 return True
     return False
 
@@ -334,14 +386,16 @@ def work_pending(result: dict[str, object]) -> bool:
 def failure_notes(result: dict[str, object]) -> tuple[str, ...]:
     notes: list[str] = []
     for group in ("executions", "bridges"):
-        entries = result.get(group)
-        if not isinstance(entries, list):
+        entries: object = (
+            _current_bridge_entries(result) if group == "bridges" else result.get(group)
+        )
+        if not isinstance(entries, (list, tuple)):
             continue
         for entry in entries:
             if not isinstance(entry, dict):
                 notes.append(f"{group}: {entry!r}"[:400])
                 continue
-            state = str(entry.get("state") or entry.get("status") or "").lower()
+            state = _normalized_state(entry)
             fields = {
                 key: str(entry[key]).strip()
                 for key in _DIAGNOSTIC_KEYS
@@ -358,13 +412,8 @@ def failure_notes(result: dict[str, object]) -> tuple[str, ...]:
 
 
 def _peer_approval_pending(result: dict[str, object]) -> bool:
-    entries = result.get("bridges")
-    if not isinstance(entries, list):
-        return False
-    for entry in entries:
-        if not isinstance(entry, dict):
-            continue
-        state = str(entry.get("state") or entry.get("status") or "").lower()
+    for entry in _current_bridge_entries(result):
+        state = _normalized_state(entry)
         if state in {
             "waiting_for_approval",
             "pending_approval",
@@ -411,7 +460,9 @@ async def settle_operation(
             return OperationWaitResult(result, "peer_approval_blocked", failure_notes(result))
         done = state in TERMINAL_STATES and not work_pending(result)
         if done and result.get("updatedAt") == quiet_stamp:
-            return OperationWaitResult(result, "settled", failure_notes(result))
+            return OperationWaitResult(
+                result, "settled", failure_notes(result), _effective_reply(result)
+            )
         quiet_stamp = result.get("updatedAt") if done else None
         requested_wait = settle_wait_seconds if done else poll_wait_seconds
         started = time.monotonic()
@@ -420,7 +471,8 @@ async def settle_operation(
         if gap > 0:
             await asyncio.sleep(gap)
 
-    state = str(result.get("state") or result.get("status") or "unknown").lower()
     if state in TERMINAL_STATES and not work_pending(result):
-        return OperationWaitResult(result, "settled", failure_notes(result))
+        return OperationWaitResult(
+            result, "settled", failure_notes(result), _effective_reply(result)
+        )
     return OperationWaitResult(result, "timeout", failure_notes(result))

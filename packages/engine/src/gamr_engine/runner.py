@@ -2196,7 +2196,18 @@ class ExperimentRunner:
                     [],
                     f"target call failed: {exc}",
                 )
-            full_reply = str(result.get("response") or "").strip()
+            settlement_metadata = result.get("gamrSettlement")
+            settlement_reply = (
+                settlement_metadata.get("reply")
+                if isinstance(settlement_metadata, dict)
+                else None
+            )
+            reply_source: str | None = None
+            if isinstance(settlement_reply, str) and settlement_reply.strip():
+                full_reply = settlement_reply.strip()
+                reply_source = "delegated bridge follow-up"
+            else:
+                full_reply = str(result.get("response") or "").strip()
             if (
                 full_reply
                 and conversation.seen_reply
@@ -2221,6 +2232,7 @@ class ExperimentRunner:
                 turn=turn,
                 turn_id=turn_id,
                 detail=reply,
+                fields=(("replySource", reply_source),) if reply_source else None,
             )
             retryable = _RETRYABLE_REPLY.search(reply) is not None
             retry_streak = retry_streak + 1 if retryable else 0

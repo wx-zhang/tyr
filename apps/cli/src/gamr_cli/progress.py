@@ -77,6 +77,8 @@ def render_progress(console: Console, event: ProgressEvent) -> None:
         _print_message(console, event.detail, style="magenta")
     elif event.event_type == "target.completed":
         console.print(f"[green]↘[/] [dim]{context}[/] Tyr replied")
+        if event.fields and ("replySource", "delegated bridge follow-up") in event.fields:
+            console.print("  [dim]↳ Settled delegated bridge follow-up[/]")
         _print_message(console, event.detail, style="green")
     elif event.event_type == "target.failed":
         console.print(

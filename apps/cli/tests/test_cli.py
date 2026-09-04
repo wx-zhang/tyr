@@ -197,6 +197,28 @@ def test_progress_renderer_shows_tyr_message_bodies(monkeypatch: pytest.MonkeyPa
     assert "Alice and Bob are online." in rendered
 
 
+
+def test_progress_renderer_indicates_settled_bridge_follow_up(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output = StringIO()
+    monkeypatch.setattr(cli, "console", Console(file=output, force_terminal=False))
+
+    cli._render_progress(
+        ProgressEvent(
+            "target.completed",
+            "run-1",
+            phase="case",
+            turn=1,
+            detail="AGENT_NAME: Carol\nWORKING_DIRECTORY: /home/agent",
+            fields=(("replySource", "delegated bridge follow-up"),),
+        )
+    )
+
+    rendered = output.getvalue()
+    assert "Settled delegated bridge follow-up" in rendered
+    assert "AGENT_NAME: Carol" in rendered
+
 def test_progress_renderer_renders_markdown_preview(monkeypatch: pytest.MonkeyPatch) -> None:
     output = StringIO()
     monkeypatch.setattr(cli, "console", Console(file=output, force_terminal=False, width=80))
