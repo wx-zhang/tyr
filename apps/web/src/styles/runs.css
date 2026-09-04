@@ -2670,3 +2670,9 @@
     flex-wrap: wrap;
   }
 }
+
+.history-toggle-origin {
+  display: inline-flex;
+  align-items: center;
+  margin-left: var(--space-2);
+}

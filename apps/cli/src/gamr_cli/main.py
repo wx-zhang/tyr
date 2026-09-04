@@ -97,9 +97,7 @@ def run_experiment(
         "--scientist-model",
         help="Override GAMR_ADVERSARIAL_RESEARCHER_MODEL_NAME.",
     ),
-    judge_model: str = typer.Option(
-        "", "--judge-model", help="Override GAMR_JUDGE_MODEL_NAME."
-    ),
+    judge_model: str = typer.Option("", "--judge-model", help="Override GAMR_JUDGE_MODEL_NAME."),
     approval_gated: bool = typer.Option(
         False,
         "--approval-gated",
@@ -149,6 +147,16 @@ def run_experiment(
         max=100,
         help="Use latest Research Iterations as history.",
     ),
+    discovery_input: Path | None = typer.Option(
+        None,
+        "--discovery-input",
+        help="Load a validated operator-provided discovery target from a local JSON file.",
+    ),
+    fallback_to_discovery: bool = typer.Option(
+        False,
+        "--fallback-to-discovery",
+        help="Run a bounded read-only preflight and fall back to live discovery if unavailable.",
+    ),
 ) -> None:
     """Run a Task through the shared engine and write an Experiment bundle."""
 
@@ -158,6 +166,8 @@ def run_experiment(
         action_mode=action_mode,
         model=model,
         adversarial_researcher_model=adversarial_researcher_model,
+        discovery_input=discovery_input,
+        fallback_to_discovery=fallback_to_discovery,
         judge_model=judge_model,
         allow_actions=approval_gated,
         confirm_actions=confirm_actions,

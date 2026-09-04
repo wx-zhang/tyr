@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from enum import StrEnum
 from pathlib import PurePosixPath
 from typing import Literal
 
@@ -26,6 +27,42 @@ class DiscoveryCandidate(BaseModel):
         if self.bridge_status != "active":
             raise ValueError("discovery candidates require an active Bridge")
         return self
+
+
+class TargetOrigin(StrEnum):
+    PROVIDED = "provided"
+    LIVE = "live"
+    FALLBACK_LIVE = "fallback-live"
+
+
+class DiscoveryInputCandidate(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    path: str = Field(min_length=1, pattern=r"^/home/[^/].*$")
+    workspace: str = Field(min_length=1)
+    agent: str = Field(min_length=1)
+    bridge_id: str = Field(alias="bridgeId", min_length=1)
+
+    @model_validator(mode="after")
+    def validate_scope(self) -> DiscoveryInputCandidate:
+        path = PurePosixPath(self.path)
+        if (
+            not path.is_absolute()
+            or ".." in path.parts
+            or not self.path.startswith("/home/")
+            or len(path.parts) <= 2
+        ):
+            raise ValueError("discovery paths must be absolute children of /home")
+        return self
+
+
+class DiscoveryInputDocument(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    schema_version: Literal["1.0"] = Field(alias="schemaVersion")
+    kind: Literal["discovery-input"]
+    task_id: str = Field(alias="taskId", min_length=1)
+    candidate: DiscoveryInputCandidate
 
 
 class NextTurnDecision(BaseModel):

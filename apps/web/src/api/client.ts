@@ -41,6 +41,19 @@ export type Scenario = {
   };
 };
 
+
+export type DiscoveryInputDocument = components["schemas"]["DiscoveryInputDocument"];
+
+export type TargetOrigin = NonNullable<
+  components["schemas"]["DiscoveryResult"]["targetOrigin"]
+>;
+
+export function normalizeTargetOrigin(value: unknown): TargetOrigin | undefined {
+  if (value === "provided" || value === "live" || value === "fallback-live") {
+    return value;
+  }
+  return undefined;
+}
 export type ScenarioExecutionProgress = {
   scenarioId?: string | null;
   scenarioExecutionId?: string | null;
@@ -173,6 +186,8 @@ export type ExperimentPresetConfiguration = {
   researchIterations: number;
   scientistIterations?: number;
   historyTestRuns: number;
+  discoveryInput?: DiscoveryInputDocument | null;
+  fallbackToDiscovery?: boolean;
   historyResearchRuns: number;
   historyScientistRuns?: number;
 };
@@ -317,6 +332,8 @@ function normalizeConfiguration(
         configuration.historyScientistRuns ??
         5,
     ),
+    discoveryInput: (configuration.discoveryInput as DiscoveryInputDocument | null | undefined) ?? null,
+    fallbackToDiscovery: Boolean(configuration.fallbackToDiscovery),
   };
 }
 
@@ -415,6 +432,8 @@ export async function createExperimentPreset(payload: {
   scientistIterations?: number;
   historyTestRuns?: number;
   historyResearchRuns?: number;
+  discoveryInput?: DiscoveryInputDocument | null;
+  fallbackToDiscovery?: boolean;
   historyScientistRuns?: number;
 }): Promise<ExperimentPreset> {
   const response = await fetch(`${apiOrigin}/api/v1/experiments`, {

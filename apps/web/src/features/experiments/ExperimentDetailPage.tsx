@@ -27,6 +27,7 @@ export function ExperimentDetailPage() {
   const researchIterations = config?.researchIterations ?? 0;
   const historyTestRuns = config?.historyTestRuns ?? 10;
   const historyResearchRuns = config?.historyResearchRuns ?? 5;
+  const discoveryInput = config?.discoveryInput ?? null;
   const researcherOnly = configuredScenarioIds?.length === 0 && researchIterations > 0;
 
   return (
@@ -44,6 +45,7 @@ export function ExperimentDetailPage() {
             <StatusBadge label={modeLabel(actionMode)} tone={actionMode === "approval_required" ? "warning" : "neutral"} />
           </div>
           {experimentPreset.isLoading ? <p className="secondary" role="status">Loading Experiment Preset…</p> : experimentPreset.isError ? <p className="secondary" role="alert">Could not load this Experiment Preset.</p> : (
+            <>
             <dl className="detail-list">
               <div className="detail-row"><dt>Experiment Preset ID</dt><dd className="mono">{id ?? "—"}</dd></div>
               <div className="detail-row"><dt>Task</dt><dd className="mono">{experimentPreset.data?.task ?? "—"}</dd></div>
@@ -54,7 +56,23 @@ export function ExperimentDetailPage() {
               <div className="detail-row"><dt>Research Iterations</dt><dd className="mono tabular">{researchIterations > 0 ? researchIterations : "0 (off)"}</dd></div>
               <div className="detail-row"><dt>Base Scenario history</dt><dd className="mono tabular">{historyTestRuns}</dd></div>
               <div className="detail-row"><dt>Research Iteration history</dt><dd className="mono tabular">{historyResearchRuns}</dd></div>
+              <div className="detail-row"><dt>Discovery input</dt><dd>{discoveryInput ? "Provided target" : "None (live discovery)"}</dd></div>
+              {discoveryInput ? <div className="detail-row"><dt>Fallback to live discovery</dt><dd>{config?.fallbackToDiscovery ? "Enabled (bounded read-only preflight)" : "Disabled (an unavailable target fails the Experiment)"}</dd></div> : null}
             </dl>
+            {discoveryInput ? (
+              <div className="discovery-review">
+                <p className="eyebrow">Provided discovery input</p>
+                <dl className="detail-list">
+                  <div className="detail-row"><dt>Task ID in document</dt><dd className="mono">{discoveryInput.taskId}</dd></div>
+                  <div className="detail-row"><dt>path</dt><dd className="mono">{discoveryInput.candidate.path}</dd></div>
+                  <div className="detail-row"><dt>workspace</dt><dd className="mono">{discoveryInput.candidate.workspace}</dd></div>
+                  <div className="detail-row"><dt>agent</dt><dd className="mono">{discoveryInput.candidate.agent}</dd></div>
+                  <div className="detail-row"><dt>bridgeId</dt><dd className="mono">{discoveryInput.candidate.bridgeId}</dd></div>
+                </dl>
+                <p className="field-help">The document Task ID is informational and is not matched against the selected Task.</p>
+              </div>
+            ) : null}
+            </>
           )}
         </article>
         <aside className="card">

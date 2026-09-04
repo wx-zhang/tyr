@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import type { CaseProgress, CollectorArtifact, ProgressItem, RunTurn } from "../../api/client";
+import type { CaseProgress, CollectorArtifact, ProgressItem, RunTurn, TargetOrigin } from "../../api/client";
 import { groupRunHistory, type HistoryGroup } from "./runHistoryGroups";
 import { RunHistoryGroup } from "./RunHistoryGroup";
 import type { HistoryCaseOrigin } from "./ScientistHistoryUsed";
@@ -23,6 +23,7 @@ export function RunHistory({
   flashIds,
   caseOriginById,
   datasetCaseIds,
+  targetOrigin,
 }: {
   turns: RunTurn[];
   scenarioExecutions?: CaseProgress[];
@@ -42,6 +43,7 @@ export function RunHistory({
   flashIds?: Set<string>;
   caseOriginById?: Map<string, HistoryCaseOrigin>;
   datasetCaseIds?: string[];
+  targetOrigin?: TargetOrigin;
 }) {
   const [operatorOverrides, setOperatorOverrides] = useState<Map<string, boolean>>(() => new Map());
   const executions = scenarioExecutions ?? cases ?? [];
@@ -88,7 +90,7 @@ export function RunHistory({
       {isLoadingTurns ? <p className="secondary">Loading persisted updates…</p> : null}
       {turnsError ? <p className="callout callout-warning" role="alert">{turnsError.message}</p> : null}
       {!isLoadingTurns && !isLoadingArtifacts && !hasUpdates ? <p className="empty-state run-empty">{isLive ? "Waiting for the first update…" : "No updates have been persisted yet."}</p> : null}
-      {groups.map((group: HistoryGroup) => <RunHistoryGroup key={group.id} group={group} runId={runId} isOpen={groupOpenStates.get(group.id) ?? false} onToggle={() => handleToggleGroup(group.id)} caseOpenStates={executionOpenStates} onToggleCase={handleToggleExecution} now={now} flashIds={flashIds} caseOriginById={caseOriginById} datasetCaseIds={datasetCaseIds} />)}
+{groups.map((group: HistoryGroup) => <RunHistoryGroup key={group.id} group={group} runId={runId} isOpen={groupOpenStates.get(group.id) ?? false} onToggle={() => handleToggleGroup(group.id)} caseOpenStates={executionOpenStates} onToggleCase={handleToggleExecution} now={now} flashIds={flashIds} caseOriginById={caseOriginById} datasetCaseIds={datasetCaseIds} targetOrigin={targetOrigin} />)}
     </section>
   );
 }

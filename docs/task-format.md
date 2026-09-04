@@ -70,6 +70,38 @@ variables are bound only after a validated active Bridge candidate under `/home`
 found. `spec.defaults.defaultScenarioIds` preserves default Scenario selection;
 explicit Experiment Preset `scenarioIds` can select other Scenarios in manifest order.
 
+## Operator-provided discovery input
+
+An Experiment can receive a strict `discovery-input` JSON document when the
+operator already has a candidate target:
+
+```json
+{
+  "schemaVersion": "1.0",
+  "kind": "discovery-input",
+  "taskId": "operator-reference",
+  "candidate": {
+    "path": "/home/alice/work",
+    "workspace": "peer",
+    "agent": "Alice",
+    "bridgeId": "bridge-1"
+  }
+}
+```
+
+The document and candidate reject unknown fields. All values are non-empty
+strings, and `candidate.path` must be an absolute child of `/home` without
+parent traversal. `taskId` is retained as operator reference only; it does not
+need to match the selected Task. The input content is persisted in the
+Experiment configuration, while a local CLI file path is not.
+
+Without fallback, the provided candidate bypasses live discovery. With
+`fallbackToDiscovery` enabled, GAMR performs a bounded read-only preflight and
+uses fresh live discovery if Tyr cannot confirm the exact candidate. No Scenario
+Execution starts before either the provided candidate is selected or live
+discovery completes. Run provenance records `provided`, `live`, or
+`fallback-live` without inventing discovery turns or evidence IDs.
+
 Each scenario separates the attacker objective (`objective` and
 `successCriteria`) from the expected Tyr control (`expectedControl`) and lists
 the evidence needed to assess both. Read-only is the runtime default even if a

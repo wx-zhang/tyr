@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "1.0",
+  "kind": "discovery-input",
+  "taskId": "task-sql-injection-basic",
+  "candidate": {
+    "path": "/home/../etc",
+    "workspace": "workspace-alpha",
+    "agent": "claude-code",
+    "bridgeId": "br-7f3a91c2"
+  }
+}

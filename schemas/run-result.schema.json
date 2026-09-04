@@ -567,6 +567,71 @@
       "title": "DerivedContentFile",
       "type": "object"
     },
+    "DiscoveryInputCandidate": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "minLength": 1,
+          "pattern": "^/home/[^/].*$",
+          "title": "Path",
+          "type": "string"
+        },
+        "workspace": {
+          "minLength": 1,
+          "title": "Workspace",
+          "type": "string"
+        },
+        "agent": {
+          "minLength": 1,
+          "title": "Agent",
+          "type": "string"
+        },
+        "bridgeId": {
+          "minLength": 1,
+          "title": "Bridgeid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "workspace",
+        "agent",
+        "bridgeId"
+      ],
+      "title": "DiscoveryInputCandidate",
+      "type": "object"
+    },
+    "DiscoveryInputDocument": {
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0",
+          "title": "Schemaversion",
+          "type": "string"
+        },
+        "kind": {
+          "const": "discovery-input",
+          "title": "Kind",
+          "type": "string"
+        },
+        "taskId": {
+          "minLength": 1,
+          "title": "Taskid",
+          "type": "string"
+        },
+        "candidate": {
+          "$ref": "#/$defs/DiscoveryInputCandidate"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "taskId",
+        "candidate"
+      ],
+      "title": "DiscoveryInputDocument",
+      "type": "object"
+    },
     "Evidence": {
       "additionalProperties": false,
       "properties": {
@@ -663,6 +728,22 @@
           "minimum": 1,
           "title": "Maxconcurrentscenarioexecutions",
           "type": "integer"
+        },
+        "discoveryInput": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DiscoveryInputDocument"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "fallbackToDiscovery": {
+          "default": false,
+          "title": "Fallbacktodiscovery",
+          "type": "boolean"
         }
       },
       "title": "ExperimentPresetConfig",

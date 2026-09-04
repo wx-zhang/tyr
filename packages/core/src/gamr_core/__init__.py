@@ -92,8 +92,11 @@ from .tasks import (
 from .workflow import (
     CaseAssessment,
     DiscoveryCandidate,
+    DiscoveryInputCandidate,
+    DiscoveryInputDocument,
     NextTurnDecision,
     ScenarioExecutionAssessment,
+    TargetOrigin,
 )
 
 __all__ = [
@@ -119,6 +122,9 @@ __all__ = [
     "DecodingStream",
     "DerivedContentFile",
     "DiscoveryCandidate",
+    "DiscoveryInputCandidate",
+    "DiscoveryInputDocument",
+    "TargetOrigin",
     "DiscoveryPlan",
     "EvaluationPlan",
     "EvaluationReference",

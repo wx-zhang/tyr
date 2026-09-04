@@ -7,7 +7,6 @@ from uuid import uuid4
 
 import httpx
 
-
 #: A single synchronous tools/call can span the local assistant's full
 #: bridge relay to a peer (including the peer's own processing); 60s cut live runs off.
 TOOL_CALL_TIMEOUT_SECONDS = 300.0

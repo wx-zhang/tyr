@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -12,6 +13,7 @@ from gamr_adapters.config import Settings
 from gamr_adapters.tasks.filesystem import load_task, resolve_task_directory
 from gamr_adapters.tracing import create_trace_port
 from gamr_core import (
+    DiscoveryInputDocument,
     ExperimentPresetConfig,
     ExperimentRecord,
     ExperimentSource,
@@ -46,6 +48,8 @@ def run_experiment_command(
     research_iterations: int,
     history_test_runs: int,
     history_research_runs: int,
+    discovery_input: Path | None,
+    fallback_to_discovery: bool,
     render_progress_cb: Any,
 ) -> None:
     from . import main as main_cli
@@ -57,6 +61,22 @@ def run_experiment_command(
         "Enable action-capable experiment requests? Every Tyr action still requires approval",
     )
     load_fn = getattr(main_cli, "load_task", load_task)
+    provided_document: DiscoveryInputDocument | None = None
+    if discovery_input is not None:
+        try:
+            provided_document = DiscoveryInputDocument.model_validate(
+                json.loads(discovery_input.read_text(encoding="utf-8"))
+            )
+        except (OSError, ValueError) as error:
+            raise typer.BadParameter(
+                f"invalid discovery input: {error}",
+                param_hint="--discovery-input",
+            ) from error
+    if fallback_to_discovery and provided_document is None:
+        raise typer.BadParameter(
+            "--fallback-to-discovery requires --discovery-input",
+            param_hint="--fallback-to-discovery",
+        )
     task = load_fn(directory)
     if scenario_id and all_scenarios:
         raise typer.BadParameter("use --scenario-id or --all-scenarios, not both")
@@ -70,9 +90,7 @@ def run_experiment_command(
     settings = settings_cls()
     selected_model = model or settings.model_name
     selected_adversarial_researcher_model = (
-        adversarial_researcher_model
-        or settings.adversarial_researcher_model_name
-        or selected_model
+        adversarial_researcher_model or settings.adversarial_researcher_model_name or selected_model
     )
     selected_judge_model = (
         judge_model or getattr(settings, "judge_model_name", "") or selected_model
@@ -121,6 +139,8 @@ def run_experiment_command(
         maxTurns=task.manifest.spec.defaults.max_turns,
         discoveryTurns=20,
         scenarioIds=selected_scenario_ids,
+        discoveryInput=provided_document,
+        fallbackToDiscovery=fallback_to_discovery,
         maxConcurrentScenarioExecutions=max_concurrent_scenario_executions,
         researchIterations=research_iterations,
         historyTestRuns=history_test_runs,
@@ -217,9 +237,7 @@ def resume_research_command(
 
     selected_model = model or configuration.model or settings.model_name
     selected_adversarial_researcher_model = (
-        adversarial_researcher_model
-        or settings.adversarial_researcher_model_name
-        or selected_model
+        adversarial_researcher_model or settings.adversarial_researcher_model_name or selected_model
     )
     selected_judge_model = (
         judge_model or getattr(settings, "judge_model_name", "") or selected_model

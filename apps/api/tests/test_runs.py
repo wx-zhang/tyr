@@ -1,7 +1,7 @@
 import json
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 import pytest
 from fastapi.testclient import TestClient
@@ -12,6 +12,18 @@ from gamr_api.dependencies import get_registry, get_settings
 from gamr_api.main import app
 from gamr_api.registry import InMemoryRegistry, JsonRegistry, RunRecord
 from gamr_core import ExperimentConfig, ExperimentRecord, RunSource, RunState
+
+DISCOVERY_INPUT: dict[str, Any] = {
+    "schemaVersion": "1.0",
+    "kind": "discovery-input",
+    "taskId": "informational-task-id",
+    "candidate": {
+        "path": "/home/alice/work",
+        "workspace": "peer",
+        "agent": "Alice",
+        "bridgeId": "bridge-1",
+    },
+}
 
 
 def _experiment(client: TestClient) -> str:
@@ -308,6 +320,82 @@ def test_create_experiment_accepts_task_id_and_case_ids() -> None:
         assert body["task"] == "exfiltrate-important-txt"
         assert body["configuration"]["actionMode"] == "approval_required"
         assert body["configuration"]["scenarioIds"] == ["rename-relocate-fresh-agent-upload"]
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_create_and_start_experiment_persists_discovery_input() -> None:
+    registry = InMemoryRegistry()
+    app.dependency_overrides[get_registry] = lambda: registry
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/api/v1/experiments",
+            json={
+                "name": "provided target",
+                "task": "exfiltrate-important-txt",
+                "discoveryInput": DISCOVERY_INPUT,
+                "fallbackToDiscovery": True,
+            },
+        )
+        assert response.status_code == 201
+        body = response.json()
+        assert body["configuration"]["discoveryInput"] == DISCOVERY_INPUT
+        assert body["configuration"]["fallbackToDiscovery"] is True
+
+        started = client.post(f"/api/v1/experiments/{body['id']}/runs", json={})
+        assert started.status_code == 202
+        run = registry.runs[started.json()["id"]]
+        assert run.configuration.discovery_input is not None
+        assert run.configuration.discovery_input.candidate.bridge_id == "bridge-1"
+        assert run.configuration.fallback_to_discovery is True
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_create_experiment_rejects_invalid_discovery_input() -> None:
+    registry = InMemoryRegistry()
+    app.dependency_overrides[get_registry] = lambda: registry
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/api/v1/experiments",
+            json={
+                "name": "invalid provided target",
+                "task": "exfiltrate-important-txt",
+                "fallbackToDiscovery": True,
+            },
+        )
+        assert response.status_code == 400
+        assert response.json()["detail"]["code"] == "invalid_task"
+
+        response = client.post(
+            "/api/v1/experiments",
+            json={
+                "name": "unsafe provided target",
+                "task": "exfiltrate-important-txt",
+                "discoveryInput": {
+                    **DISCOVERY_INPUT,
+                    "candidate": {**DISCOVERY_INPUT["candidate"], "path": "/tmp/work"},
+                },
+            },
+        )
+        assert response.status_code == 422
+        response = client.post(
+            "/api/v1/experiments",
+            json={
+                "name": "server path target",
+                "task": "exfiltrate-important-txt",
+                "discoveryInput": {
+                    **DISCOVERY_INPUT,
+                    "candidate": {
+                        **DISCOVERY_INPUT["candidate"],
+                        "serverPath": "/srv/secret",
+                    },
+                },
+            },
+        )
+        assert response.status_code == 422
     finally:
         app.dependency_overrides.clear()
 

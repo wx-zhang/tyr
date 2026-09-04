@@ -16,6 +16,7 @@ from gamr_core import (
     RunEvent,
     RunResult,
     RunState,
+    TargetOrigin,
 )
 from pydantic import AliasChoices, BaseModel, Field, model_validator
 
@@ -176,6 +177,7 @@ class DiscoveryResult(BaseModel):
     candidate_count: int = Field(alias="candidateCount")
     fields: list[DiscoveryField]
     reason: str | None = None
+    target_origin: TargetOrigin | None = Field(default=None, alias="targetOrigin")
 
     model_config = {"populate_by_name": True}
 
