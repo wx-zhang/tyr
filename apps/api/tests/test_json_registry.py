@@ -6,6 +6,17 @@ from gamr_adapters.artifacts.filesystem import FilesystemArtifactStore
 from gamr_api.registry import JsonRegistry
 from gamr_core import ExperimentConfig, ExperimentRecord, RunSource, RunState
 
+DISCOVERY_INPUT = {
+    "schemaVersion": "1.0",
+    "kind": "discovery-input",
+    "taskId": "operator-reference",
+    "candidate": {
+        "path": "/home/alice/work",
+        "workspace": "peer",
+        "agent": "Alice",
+        "bridgeId": "bridge-1",
+    },
+}
 
 def test_json_registry_persists_and_rediscovers_cli_and_service_runs(tmp_path: Path) -> None:
     registry = JsonRegistry(tmp_path, secrets=("top-secret",))
@@ -35,6 +46,29 @@ def test_json_registry_persists_and_rediscovers_cli_and_service_runs(tmp_path: P
     activities = rediscovered.store.read_activity_records(service_run.id)
     assert [item["sequence"] for item in activities] == [1, 2]
     assert [item["status"] for item in activities] == ["queued", "preparing"]
+
+def test_json_registry_round_trips_discovery_input_for_presets_and_runs(
+    tmp_path: Path,
+) -> None:
+    configuration = ExperimentConfig(
+        scenarioIds=["rename-relocate-fresh-agent-upload"],
+        discoveryInput=DISCOVERY_INPUT,
+        fallbackToDiscovery=True,
+    )
+    registry = JsonRegistry(tmp_path)
+    preset = registry.create_experiment(
+        "Provided target", "tasks/exfiltrate-important-txt", configuration
+    )
+    run = registry.create_run(preset.id, preset.task, configuration, source=RunSource.SERVICE)
+
+    rediscovered = JsonRegistry(tmp_path)
+
+    stored_preset = rediscovered.experiment_presets[preset.id]
+    stored_run = rediscovered.runs[run.id]
+    assert stored_preset.configuration.discovery_input is not None
+    assert stored_preset.configuration.discovery_input.candidate.path == "/home/alice/work"
+    assert stored_preset.configuration.fallback_to_discovery is True
+    assert stored_run.configuration.discovery_input == stored_preset.configuration.discovery_input
 
 
 def test_json_registry_refresh_reconciles_external_run_bundles(tmp_path: Path) -> None:

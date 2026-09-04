@@ -103,6 +103,7 @@ class LiveFakeTarget:
         self.messages: list[str] = []
         self.started_conversations: list[str] = []
         self.query_conversation_ids: list[str | None] = []
+        self.request_conversation_ids: list[str | None] = []
 
     async def initialize(self) -> dict[str, object]:
         return {"ok": True}
@@ -149,6 +150,7 @@ class LiveFakeTarget:
         conversation_id: str | None = None,
         idempotency_key: str,
     ) -> dict[str, object]:
+        self.request_conversation_ids.append(conversation_id)
         return await self.query(
             prompt,
             operation_id=operation_id,
@@ -672,6 +674,7 @@ async def test_case_bookkeeping_leak_turn_is_persisted_as_raw_record() -> None:
 
         def read_transcript(self, run_id: str) -> list[dict[str, object]]:
             return []
+
     target = LiveFakeTarget()
     result = await ExperimentRunner().run(
         LoadedTask(
@@ -3439,4 +3442,387 @@ async def test_scenario_execution_identity_is_unique_and_consistent() -> None:
     assert any(
         item.get("scenarioExecutionId") == execution.scenario_execution_id
         for item in artifacts.checkpoints
+    )
+
+
+@pytest.mark.asyncio
+async def test_provided_target_bypasses_discovery_and_marks_prompt_provenance() -> None:
+    manifest = TaskManifest.model_validate(
+        {
+            "metadata": {"id": "provided", "title": "Provided", "version": "1.0.0"},
+            "spec": {
+                "variables": {
+                    "path": {"source": "discovery", "field": "path"},
+                    "workspace": {"source": "discovery", "field": "workspace"},
+                    "agent": {"source": "discovery", "field": "agent"},
+                },
+                "cases": ["case.json"],
+                "defaults": {"maxTurns": 1, "actionMode": "read_only"},
+            },
+        }
+    )
+    scenario = Scenario.model_validate(
+        {
+            "metadata": {"id": "case", "title": "Inspect {path}"},
+            "spec": {
+                "objective": "Use {workspace}.",
+                "steps": ["Act as {agent} on {path}."],
+                "expectedControl": "deny",
+                "evidenceRequirements": ["response"],
+            },
+        }
+    )
+    model = LiveFakeModel(['{"kind":"phase_complete","reason":"done"}'])
+    target = LiveFakeTarget()
+    progress: list[ProgressEvent] = []
+    result = await ExperimentRunner(progress=progress.append).run(
+        LoadedTask(manifest, [scenario], {}),
+        ExperimentConfig(
+            scenarioIds=["case"],
+            discoveryInput={
+                "schemaVersion": "1.0",
+                "kind": "discovery-input",
+                "taskId": "different-task",
+                "candidate": {
+                    "path": "/home/operator/file.txt",
+                    "workspace": "workspace",
+                    "agent": "agent",
+                    "bridgeId": "bridge",
+                },
+            },
+        ),
+        target=target,
+        model=model,
+    )
+
+    assert result.outcome == "completed"
+    assert target.started_conversations == []
+    assert len(model.prompts) == 1
+    assert "Operator-provided target facts" in model.prompts[0]
+    assert "already established by discovery" not in model.prompts[0]
+    discovery = next(event for event in progress if event.event_type == "discovery.completed")
+    assert discovery.fields == (
+        ("path", "/home/operator/file.txt"),
+        ("workspace", "workspace"),
+        ("agent", "agent"),
+        ("bridgeId", "bridge"),
+    )
+
+
+@pytest.mark.asyncio
+async def test_provided_target_selection_finishes_before_scenario_start() -> None:
+    manifest = TaskManifest.model_validate(
+        {
+            "metadata": {"id": "provided-order", "title": "Provided", "version": "1.0.0"},
+            "spec": {
+                "variables": {"path": {"source": "discovery", "field": "path"}},
+                "cases": ["case.json"],
+                "defaults": {"maxTurns": 1, "actionMode": "read_only"},
+            },
+        }
+    )
+    scenario = Scenario.model_validate(
+        {
+            "metadata": {"id": "case", "title": "Case {path}"},
+            "spec": {
+                "objective": "Observe.",
+                "steps": ["Observe {path}."],
+                "expectedControl": "deny",
+                "evidenceRequirements": ["response"],
+            },
+        }
+    )
+    progress: list[ProgressEvent] = []
+    result = await ExperimentRunner(progress=progress.append).run(
+        LoadedTask(manifest, [scenario], {}),
+        ExperimentConfig(
+            scenarioIds=["case"],
+            discoveryInput={
+                "schemaVersion": "1.0",
+                "kind": "discovery-input",
+                "taskId": "task-reference",
+                "candidate": {
+                    "path": "/home/operator/file.txt",
+                    "workspace": "workspace",
+                    "agent": "agent",
+                    "bridgeId": "bridge",
+                },
+            },
+        ),
+        target=LiveFakeTarget(),
+        model=LiveFakeModel(['{"kind":"phase_complete","reason":"done"}']),
+    )
+
+    assert result.cases
+    event_types = [event.event_type for event in progress]
+    assert event_types.index("discovery.completed") < event_types.index("case.started")
+
+
+def _provided_input() -> dict[str, object]:
+    return {
+        "schemaVersion": "1.0",
+        "kind": "discovery-input",
+        "taskId": "task-reference",
+        "candidate": {
+            "path": "/home/operator/file.txt",
+            "workspace": "workspace",
+            "agent": "agent",
+            "bridgeId": "bridge",
+        },
+    }
+
+
+def _fallback_task() -> LoadedTask:
+    manifest = TaskManifest.model_validate(
+        {
+            "metadata": {"id": "fallback", "title": "Fallback", "version": "1.0.0"},
+            "spec": {
+                "discovery": "discovery.json",
+                "variables": {"path": {"source": "discovery", "field": "path"}},
+                "cases": ["case.json"],
+                "defaults": {"maxTurns": 1, "actionMode": "read_only"},
+            },
+        }
+    )
+    discovery = DiscoveryPlan(prompt="Find a target.", outputFields=["path"])
+    scenario = Scenario.model_validate(
+        {
+            "metadata": {"id": "case", "title": "Case {path}"},
+            "spec": {
+                "objective": "Observe.",
+                "steps": ["Observe {path}."],
+                "expectedControl": "deny",
+                "evidenceRequirements": ["response"],
+            },
+        }
+    )
+    return LoadedTask(manifest, [scenario], {}, discovery=discovery)
+
+
+@pytest.mark.asyncio
+async def test_fallback_preflight_forces_read_only_target_query() -> None:
+    model = LiveFakeModel(
+        [
+            '{"kind":"send","message":"Check the supplied target."}',
+            '{"kind":"phase_complete","reason":"matching candidate","discoveredCandidates":'
+            '[{"path":"/home/operator/file.txt","workspace":"workspace",'
+            '"agent":"agent","bridgeId":"bridge"}]}',
+        ]
+    )
+    target = LiveFakeTarget()
+    result = await ExperimentRunner()._run_discovery(
+        "preflight-read-only",
+        _fallback_task(),
+        ExperimentConfig(
+            actionMode="approval_required",
+            scenarioIds=["case"],
+            discoveryInput=_provided_input(),
+            fallbackToDiscovery=True,
+        ),
+        target,
+        model,
+        None,
+        TargetConversation(),
+    )
+
+    assert result.target_origin.value == "provided"
+    assert target.query_conversation_ids == ["conversation-1"]
+    assert target.request_conversation_ids == []
+
+
+@pytest.mark.asyncio
+async def test_fallback_mismatch_uses_live_discovery_without_starting_a_scenario() -> None:
+    model = LiveFakeModel(
+        [
+            '{"kind":"send","message":"Check the supplied target."}',
+            '{"kind":"phase_complete","reason":"different target","discoveredCandidates":'
+            '[{"path":"/home/other/file.txt","workspace":"workspace",'
+            '"agent":"agent","bridgeId":"bridge"}]}',
+            '{"kind":"send","message":"Find the current target."}',
+            '{"kind":"phase_blocked","reason":"live discovery unavailable"}',
+        ]
+    )
+    progress: list[ProgressEvent] = []
+    await ExperimentRunner(progress=progress.append).run(
+        _fallback_task(),
+        ExperimentConfig(
+            scenarioIds=["case"],
+            discoveryInput=_provided_input(),
+            fallbackToDiscovery=True,
+        ),
+        target=(target := LiveFakeTarget()),
+        model=model,
+    )
+
+    assert target.started_conversations == ["conversation-1", "conversation-2"]
+    assert not any(event.event_type == "case.started" for event in progress)
+    assert any(event.event_type == "discovery.preflight.failed" for event in progress)
+
+
+@pytest.mark.asyncio
+async def test_fallback_malformed_output_uses_fresh_live_discovery() -> None:
+    model = LiveFakeModel(
+        [
+            "not-json",
+            '{"kind":"phase_complete","reason":"matching candidate","discoveredCandidates":'
+            '[{"path":"/home/operator/file.txt","workspace":"workspace",'
+            '"agent":"agent","bridgeId":"bridge"}]}',
+            '{"kind":"phase_blocked","reason":"live discovery unavailable"}',
+        ]
+    )
+    result = await ExperimentRunner().run(
+        _fallback_task(),
+        ExperimentConfig(
+            scenarioIds=["case"],
+            discoveryInput=_provided_input(),
+            fallbackToDiscovery=True,
+        ),
+        target=LiveFakeTarget(),
+        model=model,
+    )
+
+    assert result.outcome == "blocked"
+    assert len(model.prompts) == 3
+
+
+@pytest.mark.asyncio
+async def test_fallback_timeout_blocks_without_starting_scenarios(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class SlowModel(LiveFakeModel):
+        async def complete(self, prompt: str) -> dict[str, object]:
+            self.prompts.append(prompt)
+            await asyncio.sleep(0.01)
+            return {"content": '{"kind":"phase_complete","reason":"late"}'}
+
+    monkeypatch.setattr(runner_module, "_PREFLIGHT_TIMEOUT_SECONDS", 0.001)
+    target = LiveFakeTarget()
+    progress: list[ProgressEvent] = []
+    await ExperimentRunner(progress=progress.append).run(
+        _fallback_task(),
+        ExperimentConfig(
+            scenarioIds=["case"],
+            discoveryInput=_provided_input(),
+            fallbackToDiscovery=True,
+        ),
+        target=target,
+        model=SlowModel([]),
+    )
+
+    assert target.started_conversations == []
+    assert not any(event.event_type == "case.started" for event in progress)
+
+
+@pytest.mark.asyncio
+async def test_fallback_preflight_keeps_matching_provided_target() -> None:
+    manifest = TaskManifest.model_validate(
+        {
+            "metadata": {"id": "preflight", "title": "Preflight", "version": "1.0.0"},
+            "spec": {
+                "variables": {"path": {"source": "discovery", "field": "path"}},
+                "cases": ["case.json"],
+                "defaults": {"maxTurns": 1, "actionMode": "read_only"},
+            },
+        }
+    )
+    scenario = Scenario.model_validate(
+        {
+            "metadata": {"id": "case", "title": "Case {path}"},
+            "spec": {
+                "objective": "Observe.",
+                "steps": ["Observe {path}."],
+                "expectedControl": "deny",
+                "evidenceRequirements": ["response"],
+            },
+        }
+    )
+    model = LiveFakeModel(
+        [
+            '{"kind":"send","message":"Check the supplied target."}',
+            '{"kind":"phase_complete","reason":"available","discoveredCandidates":'
+            '[{"path":"/home/operator/file.txt","workspace":"workspace",'
+            '"agent":"agent","bridgeId":"bridge"}]}',
+            '{"kind":"phase_complete","reason":"done"}',
+        ]
+    )
+    target = LiveFakeTarget()
+    progress: list[ProgressEvent] = []
+    result = await ExperimentRunner(progress=progress.append).run(
+        LoadedTask(manifest, [scenario], {}),
+        ExperimentConfig(
+            scenarioIds=["case"],
+            discoveryInput=_provided_input(),
+            fallbackToDiscovery=True,
+        ),
+        target=target,
+        model=model,
+    )
+
+    assert result.outcome == "completed"
+    assert len(model.prompts) == 3
+    assert target.started_conversations == ["conversation-1"]
+    assert not any(event.event_type == "discovery.started" for event in progress)
+    assert any(event.event_type == "discovery.preflight.started" for event in progress)
+
+
+@pytest.mark.asyncio
+async def test_failed_preflight_uses_fresh_live_discovery_before_scenarios() -> None:
+    manifest = TaskManifest.model_validate(
+        {
+            "metadata": {"id": "fallback", "title": "Fallback", "version": "1.0.0"},
+            "spec": {
+                "discovery": "discovery.json",
+                "variables": {"path": {"source": "discovery", "field": "path"}},
+                "cases": ["case.json"],
+                "defaults": {"maxTurns": 1, "actionMode": "read_only"},
+            },
+        }
+    )
+    discovery = DiscoveryPlan(prompt="Find a target.", outputFields=["path"])
+    scenario = Scenario.model_validate(
+        {
+            "metadata": {"id": "case", "title": "Case {path}"},
+            "spec": {
+                "objective": "Observe.",
+                "steps": ["Observe {path}."],
+                "expectedControl": "deny",
+                "evidenceRequirements": ["response"],
+            },
+        }
+    )
+    model = LiveFakeModel(
+        [
+            '{"kind":"send","message":"Check the supplied target."}',
+            '{"kind":"phase_blocked","reason":"target unavailable"}',
+            '{"kind":"send","message":"Find the current target."}',
+            '{"kind":"phase_complete","reason":"found","discoveredCandidates":'
+            '[{"path":"/home/live/file.txt","workspace":"workspace",'
+            '"agent":"agent","bridgeId":"bridge-live"}]}',
+            '{"kind":"phase_complete","reason":"done"}',
+        ]
+    )
+    target = LiveFakeTarget()
+    progress: list[ProgressEvent] = []
+    result = await ExperimentRunner(progress=progress.append).run(
+        LoadedTask(manifest, [scenario], {}, discovery=discovery),
+        ExperimentConfig(
+            scenarioIds=["case"],
+            discoveryInput=_provided_input(),
+            fallbackToDiscovery=True,
+        ),
+        target=target,
+        model=model,
+    )
+
+    assert result.outcome == "completed"
+    assert target.started_conversations == ["conversation-1", "conversation-2"]
+    assert [event.event_type for event in progress].index("discovery.preflight.failed") < [
+        event.event_type for event in progress
+    ].index("case.started")
+    completed = [event for event in progress if event.event_type == "discovery.completed"]
+    assert completed[-1].fields == (
+        ("path", "/home/live/file.txt"),
+        ("workspace", "workspace"),
+        ("agent", "agent"),
+        ("bridgeId", "bridge-live"),
     )

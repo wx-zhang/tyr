@@ -283,3 +283,30 @@ describe("RunHistory", () => {
     ).toBeInTheDocument();
   });
 });
+
+it("shows target provenance on the Discovery history group", () => {
+  render(
+    <RunHistory
+      turns={[
+        makeTurn({
+          id: "discovery-result",
+          sequence: 1,
+          stage: "discovery",
+          updateType: "discovery",
+          status: "completed",
+        }),
+      ]}
+      artifacts={[]}
+      runId="run-1"
+      isLive={false}
+      now={Date.now()}
+      targetOrigin="fallback-live"
+    />,
+  );
+
+  expect(
+    screen.getByRole("button", {
+      name: /Provided target · fell back to discovery/,
+    }),
+  ).toBeInTheDocument();
+});

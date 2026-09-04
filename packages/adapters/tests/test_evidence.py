@@ -152,6 +152,51 @@ def test_turn_normalization_groups_messages_and_preserves_partial_turns(tmp_path
     assert turns[1].replied_at is None
 
 
+def test_discovery_result_preserves_target_origin_without_fabricated_conversation(
+    tmp_path: Path,
+) -> None:
+    bundle = tmp_path / "provided-discovery"
+    bundle.mkdir()
+    (bundle / "discovery-result.json").write_text(
+        json.dumps(
+            {
+                "runId": "run-1",
+                "status": "found",
+                "targetOrigin": "provided",
+                "fields": [
+                    {"name": "path", "value": "/home/alice/work"},
+                    {"name": "workspace", "value": "peer"},
+                    {"name": "agent", "value": "Alice"},
+                    {"name": "bridgeId", "value": "bridge-1"},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (bundle / "transcript.jsonl").write_text(
+        json.dumps(
+            {
+                "turnId": "preflight",
+                "turn": 1,
+                "role": "assistant",
+                "content": "Check the supplied target.",
+                "stage": "discovery-preflight",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    turns = normalize_turns(bundle, run_id="run-1")
+
+    assert [turn.stage for turn in turns] == ["discovery", "discovery"]
+    assert turns[0].target_origin is None
+    assert turns[1].target_origin == "provided"
+    assert turns[1].agent_message == (
+        "path: /home/alice/work\nworkspace: peer\nagent: Alice\nbridgeId: bridge-1"
+    )
+
+
 def test_turn_normalization_folds_sandbox_events_into_one_operation(tmp_path: Path) -> None:
     bundle = tmp_path / "sandbox-turns"
     bundle.mkdir()

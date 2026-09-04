@@ -1,4 +1,4 @@
-import type { CollectorArtifact } from "../../api/client";
+import type { CollectorArtifact, TargetOrigin } from "../../api/client";
 import { StatusBadge } from "../../components/StatusBadge";
 import { CollectorArtifactUpdate } from "./CollectorArtifacts";
 import { RunHistoryCase } from "./RunHistoryCase";
@@ -21,6 +21,11 @@ function groupStatus(state: string) {
     return { label: "Cancelled", tone: "neutral" as const };
   return { label: "Status unavailable", tone: "neutral" as const };
 }
+function targetOriginLabel(origin: TargetOrigin): string {
+  if (origin === "provided") return "Provided target";
+  if (origin === "fallback-live") return "Provided target · fell back to discovery";
+  return "Discovered live";
+}
 
 export function RunHistoryGroup({
   group,
@@ -33,6 +38,7 @@ export function RunHistoryGroup({
   flashIds,
   caseOriginById,
   datasetCaseIds,
+  targetOrigin,
 }: {
   group: HistoryGroup;
   runId: string;
@@ -44,8 +50,10 @@ export function RunHistoryGroup({
   flashIds?: Set<string>;
   caseOriginById?: Map<string, HistoryCaseOrigin>;
   datasetCaseIds?: string[];
+  targetOrigin?: TargetOrigin;
 }) {
   const controlId = `history-${group.id}`;
+  const showTargetOrigin = group.id === "discovery" && targetOrigin !== undefined;
   const status = groupStatus(group.state);
   const iterMatch = group.id.match(/^(?:iteration|research-iteration)-(\d+)$/);
   const researchIteration = iterMatch ? Number(iterMatch[1]) : undefined;
@@ -86,6 +94,11 @@ export function RunHistoryGroup({
               pulse={group.isBusy}
             />
           </span>
+          {showTargetOrigin ? (
+            <span className="history-toggle-origin">
+              <StatusBadge label={targetOriginLabel(targetOrigin!)} tone="neutral" />
+            </span>
+          ) : null}
           {countDisplay !== null ? (
             <span className="history-toggle-count">{countDisplay}</span>
           ) : null}

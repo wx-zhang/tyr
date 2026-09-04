@@ -11,9 +11,7 @@ from rich.padding import Padding
 def render_progress(console: Console, event: ProgressEvent) -> None:
     context = _context(event)
     scenario_id = escape(event.scenario_id or event.case_id or "")
-    scenario_execution_id = escape(
-        event.scenario_execution_id or event.case_id or ""
-    )
+    scenario_execution_id = escape(event.scenario_execution_id or event.case_id or "")
     if event.event_type == "run.started":
         console.print(
             f"[bold cyan]GAMR[/] [dim]· Tyr's final opponent ·[/] "
@@ -25,15 +23,21 @@ def render_progress(console: Console, event: ProgressEvent) -> None:
     elif event.event_type == "tyr.connected":
         console.print("[green]✓[/] Tyr connection ready")
     elif event.event_type == "tyr.failed":
+        console.print(f"[red]✗[/] Tyr connection failed [dim]({escape(event.detail or '')})[/]")
+    elif event.event_type == "discovery.preflight.started":
+        console.print("[bold blue]▸[/] Provided-target preflight [dim]· read-only[/]")
+    elif event.event_type == "discovery.preflight.completed":
         console.print(
-            f"[red]✗[/] Tyr connection failed [dim]({escape(event.detail or '')})[/]"
+            f"[green]✓[/] Provided-target preflight [dim]· {escape(event.detail or '')}[/]"
+        )
+    elif event.event_type == "discovery.preflight.failed":
+        console.print(
+            f"[yellow]↳[/] Falling back to live discovery [dim]· {escape(event.detail or '')}[/]"
         )
     elif event.event_type == "discovery.started":
         console.print("[bold blue]▸[/] Discovery")
     elif event.event_type == "discovery.completed":
-        console.print(
-            f"[green]✓[/] Discovery complete [dim]· {escape(event.detail or '')}[/]"
-        )
+        console.print(f"[green]✓[/] Discovery complete [dim]· {escape(event.detail or '')}[/]")
         if event.fields:
             width = max(len(name) for name, _ in event.fields)
             for name, value in event.fields:
@@ -41,18 +45,13 @@ def render_progress(console: Console, event: ProgressEvent) -> None:
                 console.print(f"  [cyan]{escape(label)}[/]  {escape(value)}")
     elif event.event_type == "scientist.started":
         console.print(
-            f"[bold blue]▸[/] Adversarial Researcher "
-            f"[dim]· {escape(event.detail or '')}[/]"
+            f"[bold blue]▸[/] Adversarial Researcher [dim]· {escape(event.detail or '')}[/]"
         )
     elif event.event_type == "scientist.history_used":
-        console.print(
-            f"[cyan]↳[/] Research history [dim]· {escape(event.detail or '')}[/]"
-        )
+        console.print(f"[cyan]↳[/] Research history [dim]· {escape(event.detail or '')}[/]")
         if event.history_case_ids:
             for history_scenario_id in event.history_case_ids:
-                console.print(
-                    f"  [cyan]•[/] Scenario {escape(history_scenario_id)}"
-                )
+                console.print(f"  [cyan]•[/] Scenario {escape(history_scenario_id)}")
     elif event.event_type == "scientist.scenario_ready":
         console.print(
             "[green]✓[/] Adversarial Researcher Scenario ready "
@@ -61,23 +60,16 @@ def render_progress(console: Console, event: ProgressEvent) -> None:
         )
     elif event.event_type == "scientist.failed":
         console.print(
-            f"[red]✗[/] Adversarial Researcher failed "
-            f"[dim]({escape(event.detail or '')})[/]"
+            f"[red]✗[/] Adversarial Researcher failed [dim]({escape(event.detail or '')})[/]"
         )
     elif event.event_type == "scientist.skipped":
         console.print(
-            f"[yellow]⊘[/] Adversarial Researcher skipped "
-            f"[dim]· {escape(event.detail or '')}[/]"
+            f"[yellow]⊘[/] Adversarial Researcher skipped [dim]· {escape(event.detail or '')}[/]"
         )
     elif event.event_type == "scientist.completed":
-        console.print(
-            f"[green]✓[/] Research complete [dim]· {escape(event.detail or '')}[/]"
-        )
+        console.print(f"[green]✓[/] Research complete [dim]· {escape(event.detail or '')}[/]")
     elif event.event_type == "case.started":
-        console.print(
-            "[bold blue]▸[/] Scenario Execution "
-            f"[cyan]{scenario_execution_id}[/]"
-        )
+        console.print(f"[bold blue]▸[/] Scenario Execution [cyan]{scenario_execution_id}[/]")
     elif event.event_type == "model.thinking":
         console.print(f"[yellow]✦[/] [dim]{context}[/] Thinking…")
     elif event.event_type == "target.requesting":
@@ -88,8 +80,7 @@ def render_progress(console: Console, event: ProgressEvent) -> None:
         _print_message(console, event.detail, style="green")
     elif event.event_type == "target.failed":
         console.print(
-            f"[red]✗[/] [dim]{context}[/] Tyr call failed "
-            f"[dim]({escape(event.detail or '')})[/]"
+            f"[red]✗[/] [dim]{context}[/] Tyr call failed [dim]({escape(event.detail or '')})[/]"
         )
     elif event.event_type == "model.failed":
         console.print(

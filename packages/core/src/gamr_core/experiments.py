@@ -19,6 +19,7 @@ from .states import (
     ObjectiveStatus,
     SecurityVerdict,
 )
+from .workflow import DiscoveryInputDocument
 
 
 class ExperimentSource(StrEnum):
@@ -36,6 +37,7 @@ class TaskReference(BaseModel):
 
 class ExperimentPresetConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
     def __init__(self, **data: Any) -> None:
         super().__init__(**data)
 
@@ -44,7 +46,8 @@ class ExperimentPresetConfig(BaseModel):
     )
     model: str = ""
     adversarial_researcher_model: str = Field(
-        default="", alias="adversarialResearcherModel",
+        default="",
+        alias="adversarialResearcherModel",
         validation_alias=AliasChoices("adversarialResearcherModel", "scientistModel"),
     )
     judge_model: str = Field(default="", alias="judgeModel")
@@ -76,6 +79,8 @@ class ExperimentPresetConfig(BaseModel):
         ge=1,
         le=5,
     )
+    discovery_input: DiscoveryInputDocument | None = Field(default=None, alias="discoveryInput")
+    fallback_to_discovery: bool = Field(default=False, alias="fallbackToDiscovery")
 
     @model_validator(mode="after")
     def require_execution_work(self) -> ExperimentPresetConfig:
@@ -84,6 +89,8 @@ class ExperimentPresetConfig(BaseModel):
                 "select at least one scenario or enable research iterations "
                 "(legacy: scientist iterations) for execution"
             )
+        if self.fallback_to_discovery and self.discovery_input is None:
+            raise ValueError("fallback to discovery requires discovery input")
         return self
 
     @property
@@ -120,6 +127,7 @@ class ExperimentPresetRecord(BaseModel):
 
 class ExperimentRecord(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
     def __init__(self, **data: Any) -> None:
         super().__init__(**data)
 
@@ -208,6 +216,7 @@ class ContentOverlapResult(BaseModel):
 
 class ScenarioExecutionResult(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
     def __init__(self, **data: Any) -> None:
         super().__init__(**data)
 
@@ -262,6 +271,7 @@ class ResultSummary(BaseModel):
 
 class ExperimentResult(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
     def __init__(self, **data: Any) -> None:
         super().__init__(**data)
 
@@ -308,6 +318,7 @@ class ExperimentResult(BaseModel):
 class ExperimentConfig(ExperimentPresetConfig):
     def __init__(self, **data: Any) -> None:
         super().__init__(**data)
+
     def model_dump(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         payload = super().model_dump(*args, **kwargs)
         if kwargs.get("by_alias"):
@@ -327,6 +338,7 @@ class ExperimentConfig(ExperimentPresetConfig):
 class RunRecord(ExperimentRecord):
     def __init__(self, **data: Any) -> None:
         super().__init__(**data)
+
     def model_dump(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         payload = super().model_dump(*args, **kwargs)
         if kwargs.get("by_alias") and "experimentPresetId" in payload:

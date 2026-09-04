@@ -2971,6 +2971,71 @@
         ],
         "title": "DiscoveryField"
       },
+      "DiscoveryInputCandidate": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^/home/[^/].*$",
+            "title": "Path"
+          },
+          "workspace": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Workspace"
+          },
+          "agent": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Agent"
+          },
+          "bridgeId": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Bridgeid"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "path",
+          "workspace",
+          "agent",
+          "bridgeId"
+        ],
+        "title": "DiscoveryInputCandidate"
+      },
+      "DiscoveryInputDocument": {
+        "properties": {
+          "schemaVersion": {
+            "type": "string",
+            "const": "1.0",
+            "title": "Schemaversion"
+          },
+          "kind": {
+            "type": "string",
+            "const": "discovery-input",
+            "title": "Kind"
+          },
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Taskid"
+          },
+          "candidate": {
+            "$ref": "#/components/schemas/DiscoveryInputCandidate"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "schemaVersion",
+          "kind",
+          "taskId",
+          "candidate"
+        ],
+        "title": "DiscoveryInputDocument"
+      },
       "DiscoveryResult": {
         "properties": {
           "status": {
@@ -2998,6 +3063,16 @@
               }
             ],
             "title": "Reason"
+          },
+          "targetOrigin": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TargetOrigin"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -3192,6 +3267,21 @@
             "minimum": 0.0,
             "title": "Historyresearchruns",
             "default": 5
+          },
+          "discoveryInput": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DiscoveryInputDocument"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fallbackToDiscovery": {
+            "type": "boolean",
+            "title": "Fallbacktodiscovery",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -3267,6 +3357,27 @@
               }
             ],
             "title": "Historyresearchruns"
+          },
+          "discoveryInput": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DiscoveryInputDocument"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fallbackToDiscovery": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fallbacktodiscovery"
           }
         },
         "additionalProperties": false,
@@ -4754,6 +4865,15 @@
           "not_applicable"
         ],
         "title": "SecurityVerdict"
+      },
+      "TargetOrigin": {
+        "type": "string",
+        "enum": [
+          "provided",
+          "live",
+          "fallback-live"
+        ],
+        "title": "TargetOrigin"
       },
       "ValidationError": {
         "properties": {

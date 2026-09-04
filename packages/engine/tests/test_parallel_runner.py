@@ -10,6 +10,7 @@ from gamr_core import (
     ObjectiveStatus,
     Scenario,
     SecurityVerdict,
+    TargetOrigin,
     TaskManifest,
 )
 from gamr_engine.ports.models import ModelGateway
@@ -62,6 +63,7 @@ class CoordinatorRunner(ExperimentRunner):
         conversation: TargetConversation,
         *,
         phase: str = "case",
+        target_origin: TargetOrigin = TargetOrigin.LIVE,
     ) -> tuple[CaseRecord, None]:
         self.conversations.append(conversation)
         self.active += 1

@@ -3,7 +3,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, status
 from gamr_adapters.config import Settings
 from gamr_adapters.tasks.filesystem import FilesystemTaskRepository, resolve_task_directory
-from gamr_core import ExperimentPresetConfig
+from gamr_core import DiscoveryInputDocument, ExperimentPresetConfig
 from pydantic import AliasChoices, BaseModel, Field
 
 from ..dependencies import get_registry, get_settings, get_task_manager
@@ -57,7 +57,8 @@ class ExperimentPresetCreate(BaseModel):
         ge=0,
         le=100,
     )
-
+    discovery_input: DiscoveryInputDocument | None = Field(default=None, alias="discoveryInput")
+    fallback_to_discovery: bool = Field(default=False, alias="fallbackToDiscovery")
     model_config = {"populate_by_name": True, "extra": "forbid"}
 
     def configuration(self) -> ExperimentPresetConfig:
@@ -73,6 +74,8 @@ class ExperimentPresetCreate(BaseModel):
             researchIterations=self.research_iterations,
             historyTestRuns=self.history_test_runs,
             historyResearchRuns=self.history_research_runs,
+            discoveryInput=self.discovery_input,
+            fallbackToDiscovery=self.fallback_to_discovery,
         )
 
 
@@ -164,6 +167,8 @@ class ExperimentStart(BaseModel):
         ge=0,
         le=100,
     )
+    discovery_input: DiscoveryInputDocument | None = Field(default=None, alias="discoveryInput")
+    fallback_to_discovery: bool | None = Field(default=None, alias="fallbackToDiscovery")
 
     model_config = {"populate_by_name": True, "extra": "forbid"}
 

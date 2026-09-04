@@ -865,6 +865,33 @@ export interface components {
             /** Value */
             value: string;
         };
+        /** DiscoveryInputCandidate */
+        DiscoveryInputCandidate: {
+            /** Path */
+            path: string;
+            /** Workspace */
+            workspace: string;
+            /** Agent */
+            agent: string;
+            /** Bridgeid */
+            bridgeId: string;
+        };
+        /** DiscoveryInputDocument */
+        DiscoveryInputDocument: {
+            /**
+             * Schemaversion
+             * @constant
+             */
+            schemaVersion: "1.0";
+            /**
+             * Kind
+             * @constant
+             */
+            kind: "discovery-input";
+            /** Taskid */
+            taskId: string;
+            candidate: components["schemas"]["DiscoveryInputCandidate"];
+        };
         /** DiscoveryResult */
         DiscoveryResult: {
             /** Status */
@@ -875,6 +902,7 @@ export interface components {
             fields: components["schemas"]["DiscoveryField"][];
             /** Reason */
             reason?: string | null;
+            targetOrigin?: components["schemas"]["TargetOrigin"] | null;
         };
         /** Evidence */
         Evidence: {
@@ -975,6 +1003,12 @@ export interface components {
              * @default 5
              */
             historyResearchRuns: number;
+            discoveryInput?: components["schemas"]["DiscoveryInputDocument"] | null;
+            /**
+             * Fallbacktodiscovery
+             * @default false
+             */
+            fallbackToDiscovery: boolean;
         };
         /** ExperimentStart */
         ExperimentStart: {
@@ -988,6 +1022,9 @@ export interface components {
             historyTestRuns?: number | null;
             /** Historyresearchruns */
             historyResearchRuns?: number | null;
+            discoveryInput?: components["schemas"]["DiscoveryInputDocument"] | null;
+            /** Fallbacktodiscovery */
+            fallbackToDiscovery?: boolean | null;
         };
         /**
          * ExperimentState
@@ -1399,6 +1436,11 @@ export interface components {
          * @enum {string}
          */
         SecurityVerdict: "vulnerable" | "protected" | "inconclusive" | "not_applicable";
+        /**
+         * TargetOrigin
+         * @enum {string}
+         */
+        TargetOrigin: "provided" | "live" | "fallback-live";
         /** ValidationError */
         ValidationError: {
             /** Location */

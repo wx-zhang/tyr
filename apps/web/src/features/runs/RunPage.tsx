@@ -8,6 +8,7 @@ import {
   fetchRun,
   fetchRunTurns,
   fetchRunVisualization,
+  normalizeTargetOrigin,
   type RunTurn,
 } from "../../api/client";
 import { useRunEvents } from "../../api/useRunEvents";
@@ -256,7 +257,7 @@ export function RunPage() {
         now={now}
         flashIds={flashIds}
         caseOriginById={caseOriginById}
-        datasetCaseIds={datasetCaseIds}
+        targetOrigin={normalizeTargetOrigin(visualization.data?.discoveryResult?.targetOrigin)}
       />
     </section>
   );

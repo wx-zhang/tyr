@@ -102,6 +102,7 @@ class ActivityItemResponse(BaseModel):
     sandbox_event: SandboxOperationEvent | None = Field(default=None, alias="sandboxEvent")
 
     model_config = ConfigDict(populate_by_name=True)
+
     @model_validator(mode="before")
     @classmethod
     def normalize_historical_identity(cls, value: Any) -> Any:
@@ -152,6 +153,8 @@ class RelationshipResponse(BaseModel):
 class RelationshipProjectionResponse(BaseModel):
     participants: list[ParticipantResponse]
     relationships: list[RelationshipResponse]
+
+
 class ActivityPageResponse(BaseModel):
     items: list[ActivityItemResponse]
     next_cursor: str | None = Field(alias="nextCursor")
@@ -179,6 +182,7 @@ class EvidenceContentResponse(BaseModel):
     availability: Availability
     redacted: bool = False
     content: object | None = None
+
 
 class RunTurnResponse(BaseModel):
     id: str
@@ -254,7 +258,6 @@ class RunTurnResponse(BaseModel):
     @property
     def history_case_origins(self) -> list[str]:
         return self.history_research_run_origins
-
 
 
 class RunTurnPageResponse(BaseModel):
@@ -431,9 +434,13 @@ def _load_discovery_result(root: Path, secrets: tuple[str, ...] = ()) -> dict[st
         "candidateCount": candidate_count,
         "fields": fields,
     }
+    target_origin = value.get("targetOrigin")
+    if target_origin in {"provided", "live", "fallback-live"}:
+        payload["targetOrigin"] = target_origin
     reason = value.get("reason")
     if isinstance(reason, str) and reason:
         payload["reason"] = reason
+
     redacted = redact_payload(payload, secrets)
     return redacted if isinstance(redacted, dict) else payload
 
@@ -791,10 +798,10 @@ def turns(
             status=("incomplete" if terminal and item.status == "waiting_for_tyr" else item.status),
             agentMessage=item.agent_message,
             tyrMessage=item.tyr_message,
+            verdict=item.verdict,
             occurredAt=item.occurred_at,
             repliedAt=item.replied_at,
             updateType=item.update_type,
-            verdict=item.verdict,
             objectiveStatus=item.objective_status,
             outcome=item.outcome,
             assessmentSummary=item.assessment_summary,

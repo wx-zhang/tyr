@@ -347,3 +347,63 @@ it("hides and shows the Task Scenario explorer", async () => {
   ).toBeInTheDocument();
   expect(screen.getByLabelText(/Case Alpha/)).toBeChecked();
 });
+it("uploads a validated discovery input and persists it in the preset request", async () => {
+  const createBodies: Record<string, unknown>[] = [];
+  installFetch((body) => {
+    createBodies.push(body);
+  });
+
+  renderPage();
+  expect(await screen.findByLabelText(/Case Alpha/)).toBeChecked();
+  fireEvent.click(screen.getByRole("button", { name: /^Advanced/ }));
+  const input = document.querySelector(
+    'input[name="discoveryInputFile"]',
+  ) as HTMLInputElement;
+  const file = new File(
+    [
+      JSON.stringify({
+        schemaVersion: "1.0",
+        kind: "discovery-input",
+        taskId: "operator-reference",
+        candidate: {
+          path: "/home/alice/work",
+          workspace: "peer",
+          agent: "Alice",
+          bridgeId: "bridge-1",
+        },
+      }),
+    ],
+    "target.json",
+    { type: "application/json" },
+  );
+  Object.defineProperty(file, "text", {
+    value: async () =>
+      JSON.stringify({
+        schemaVersion: "1.0",
+        kind: "discovery-input",
+        taskId: "operator-reference",
+        candidate: {
+          path: "/home/alice/work",
+          workspace: "peer",
+          agent: "Alice",
+          bridgeId: "bridge-1",
+        },
+      }),
+  });
+  fireEvent.change(input, { target: { files: [file] } });
+
+  expect(await screen.findByText("Valid discovery input")).toBeInTheDocument();
+  fireEvent.click(screen.getByLabelText("Fall back to live discovery"));
+  fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+  await waitFor(() => {
+    expect(navigate).toHaveBeenCalledWith("/experiments/exp-1");
+  });
+  expect(createBodies[0]).toMatchObject({
+    discoveryInput: {
+      taskId: "operator-reference",
+      candidate: { bridgeId: "bridge-1" },
+    },
+    fallbackToDiscovery: true,
+  });
+});

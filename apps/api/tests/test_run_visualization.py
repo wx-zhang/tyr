@@ -90,6 +90,7 @@ def test_visualization_returns_typed_progress_with_counts_and_current_work() -> 
     finally:
         app.dependency_overrides.clear()
 
+
 def test_visualization_preserves_distinct_scenario_and_execution_ids() -> None:
     registry, run_id = _registry_with_run()
     run = registry.runs[run_id]
@@ -327,8 +328,7 @@ def test_visualization_concurrent_case_states_and_redaction() -> None:
         # Nonterminal active cases include case-1 (assessing), case-3 (active)
         assert set(payload["run"]["currentScenarioExecutionIds"]) == {"case-1", "case-3"}
         execution_map = {
-            item["scenarioExecutionId"]: item
-            for item in payload["scenarioExecutions"]
+            item["scenarioExecutionId"]: item for item in payload["scenarioExecutions"]
         }
         assert execution_map["case-1"]["state"] == "assessing"
         assert execution_map["case-2"]["state"] == "completed"
@@ -386,8 +386,7 @@ def test_visualization_keeps_precise_case_lifecycle_through_intermediate_activit
     try:
         payload = _client(registry).get(f"/api/v1/runs/{run_id}/visualization").json()
         execution_states = {
-            item["scenarioExecutionId"]: item["state"]
-            for item in payload["scenarioExecutions"]
+            item["scenarioExecutionId"]: item["state"] for item in payload["scenarioExecutions"]
         }
         assert execution_states == {
             "case-1": "queued",
@@ -423,6 +422,7 @@ def test_visualization_includes_discovery_result_with_peer_paths(tmp_path: Path)
             {
                 "status": "found",
                 "candidateCount": 1,
+                "targetOrigin": "provided",
                 "fields": [
                     {"name": "path", "value": "/home/alice/important.txt"},
                     {"name": "workspace", "value": "peer"},
@@ -451,6 +451,7 @@ def test_visualization_includes_discovery_result_with_peer_paths(tmp_path: Path)
         discovery = response.json()["discoveryResult"]
         assert discovery["status"] == "found"
         assert discovery["candidateCount"] == 1
+        assert discovery["targetOrigin"] == "provided"
         assert discovery["fields"] == [
             {"name": "path", "value": "/home/alice/important.txt"},
             {"name": "workspace", "value": "peer"},

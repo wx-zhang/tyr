@@ -33,6 +33,18 @@ const experiment = {
     researchIterations: 3,
     historyTestRuns: 10,
     historyResearchRuns: 5,
+    discoveryInput: {
+      schemaVersion: "1.0" as const,
+      kind: "discovery-input" as const,
+      taskId: "operator-reference",
+      candidate: {
+        path: "/home/alice/work",
+        workspace: "peer",
+        agent: "Alice",
+        bridgeId: "bridge-1",
+      },
+    },
+    fallbackToDiscovery: true,
   },
 };
 
@@ -120,10 +132,20 @@ it("shows stored Research Iterations on the configuration snapshot", async () =>
 
 it("shows off when Research Iterations are zero", async () => {
   installFetch({ researchIterations: 0 });
+
   renderPage();
 
   expect(await screen.findByText("Research Iterations")).toBeInTheDocument();
   expect(screen.getByText("0 (off)")).toBeInTheDocument();
+});
+it("shows the stored discovery input and fallback policy", async () => {
+  renderPage();
+
+  expect(await screen.findByText("Provided target")).toBeInTheDocument();
+  expect(screen.getByText("Enabled (bounded read-only preflight)")).toBeInTheDocument();
+  expect(screen.getByText("operator-reference")).toBeInTheDocument();
+  expect(screen.getByText("/home/alice/work")).toBeInTheDocument();
+  expect(screen.getByText("The document Task ID is informational and is not matched against the selected Task.")).toBeInTheDocument();
 });
 
 it("shows no Scenarios for researcher-only Experiments", async () => {

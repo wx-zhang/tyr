@@ -114,6 +114,46 @@ Each discovery thread, base Scenario Execution, and Research Iteration starts a 
 Assistant conversation. GAMR passes its `conversationId` on every query or action request, so
 concurrent Scenario Executions do not share Tyr context.
 
+## Operator-provided discovery input
+
+An Experiment may start from a validated `discovery-input` document instead of live
+target discovery. The document contains `schemaVersion`, `kind`, an informational
+`taskId`, and one candidate with `path`, `workspace`, `agent`, and `bridgeId`:
+
+```json
+{
+  "schemaVersion": "1.0",
+  "kind": "discovery-input",
+  "taskId": "operator-reference",
+  "candidate": {
+    "path": "/home/alice/work",
+    "workspace": "peer",
+    "agent": "Alice",
+    "bridgeId": "bridge-1"
+  }
+}
+```
+
+The candidate path must be an absolute child of `/home`; unknown fields, missing
+fields, unsupported versions, and parent traversal are rejected. The CLI validates
+the local file before creating the Experiment and stores its content in the
+Experiment configuration, never the local file path:
+
+```bash
+uv run gamr experiment run tasks/exfiltrate-important-txt \
+  --discovery-input ./discovery-input.json
+```
+
+The web form accepts the same JSON through its Advanced file picker and shows the
+stored document again before starting the Experiment. The document `taskId` is
+informational and is not matched against the selected Task.
+
+Provided targets skip live discovery by default. Add
+`--fallback-to-discovery` (or enable the matching web option) to run a bounded,
+read-only preflight first. A preflight must confirm every supplied field; otherwise
+GAMR starts fresh live discovery before any Scenario Execution. If the provided
+target is unavailable and fallback is disabled, the Experiment is blocked.
+
 ## Interactive chat
 
 `gamr chat` opens a live chat session with Tyr through the same engine:

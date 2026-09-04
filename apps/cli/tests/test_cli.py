@@ -1,5 +1,6 @@
 import asyncio
 from io import StringIO
+from pathlib import Path
 from types import SimpleNamespace
 
 import gamr_cli.main as cli
@@ -14,6 +15,45 @@ from typer.testing import CliRunner
 def test_doctor() -> None:
     result = CliRunner().invoke(cli.app, ["doctor"])
     assert result.exit_code == 0
+
+
+def test_experiment_run_exposes_discovery_input_options() -> None:
+    result = CliRunner().invoke(cli.app, ["experiment", "run", "--help"])
+
+    assert "--fallback-to-discove" in result.output
+
+
+def test_experiment_run_rejects_invalid_discovery_input(tmp_path: Path) -> None:
+    invalid = tmp_path / "discovery.json"
+    invalid.write_text('{"schemaVersion":"1.0"}', encoding="utf-8")
+
+    result = CliRunner().invoke(
+        cli.app,
+        [
+            "experiment",
+            "run",
+            "tasks/exfiltrate-important-txt",
+            "--discovery-input",
+            str(invalid),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "invalid discovery input" in result.output
+
+
+def test_experiment_run_requires_input_for_fallback() -> None:
+    result = CliRunner().invoke(
+        cli.app,
+        [
+            "experiment",
+            "run",
+            "tasks/exfiltrate-important-txt",
+            "--fallback-to-discovery",
+        ],
+    )
+    assert "requires" in result.output
+    assert "--discovery-input" in result.output
 
 
 def test_experiment_run_has_no_fake_or_live_switch() -> None:
@@ -330,6 +370,7 @@ def test_experiment_run_prints_result_errors(monkeypatch: pytest.MonkeyPatch) ->
 
 def test_experiment_run_accepts_max_concurrent_cases_option(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     captured_config: list[object] = []
     captured_output_tokens: list[object] = []
@@ -415,6 +456,30 @@ def test_experiment_run_accepts_max_concurrent_cases_option(
         )
         assert result.exit_code == 0
         assert getattr(captured_config[-1], "max_concurrent_cases", None) == val
+    discovery_input = tmp_path / "discovery.json"
+    discovery_input.write_text(
+        '{"schemaVersion":"1.0","kind":"discovery-input","taskId":"other",'
+        '"candidate":{"path":"/home/alice/work","workspace":"peer",'
+        '"agent":"Alice","bridgeId":"bridge-1"}}',
+        encoding="utf-8",
+    )
+    result = CliRunner().invoke(
+        cli.app,
+        [
+            "experiment",
+            "run",
+            "tasks/exfiltrate-important-txt",
+            "--discovery-input",
+            str(discovery_input),
+            "--fallback-to-discovery",
+        ],
+    )
+    assert result.exit_code == 0
+    document = getattr(captured_config[-1], "discovery_input", None)
+    assert document is not None
+    assert document.candidate.path == "/home/alice/work"
+    assert getattr(captured_config[-1], "fallback_to_discovery", False) is True
+    assert document.task_id == "other"
 
     # Invalid values (<1 or >5) rejected
     for invalid in (0, 6, -1):

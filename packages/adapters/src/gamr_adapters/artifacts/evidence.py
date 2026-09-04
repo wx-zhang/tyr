@@ -77,6 +77,7 @@ class NormalizedTurn:
     occurred_at: datetime | None = None
     replied_at: datetime | None = None
     update_type: str = "conversation"
+    target_origin: str | None = None
     verdict: str | None = None
     objective_status: str | None = None
     outcome: str | None = None
@@ -91,6 +92,7 @@ class NormalizedTurn:
     history_case_origins: tuple[str, ...] = ()
     sandbox_operation: SandboxOperationPreview | None = None
     scenario: Scenario | None = None
+
 
 class _SandboxSession(TypedDict):
     owner: str
@@ -113,9 +115,8 @@ def _parse_occurred_at(value: object) -> datetime | None:
 
 
 def _related_case_ids(value: dict[str, object]) -> tuple[str, ...]:
-    return _stored_case_ids(
-        value.get("relatedScenarioExecutionIds", value.get("relatedCaseIds"))
-    )
+    return _stored_case_ids(value.get("relatedScenarioExecutionIds", value.get("relatedCaseIds")))
+
 
 def _stored_case_ids(value: object) -> tuple[str, ...]:
     if not isinstance(value, (list, tuple)):
@@ -239,9 +240,7 @@ def _scientist_turns_from_activity(
             scenario_value = value.get("scenarioId", value.get("caseId"))
             execution_value = value.get("scenarioExecutionId", value.get("caseId"))
             activity_case_id = (
-                str(scenario_value)
-                if isinstance(scenario_value, str) and scenario_value
-                else None
+                str(scenario_value) if isinstance(scenario_value, str) and scenario_value else None
             )
             activity_execution_id = (
                 str(execution_value)
@@ -473,6 +472,12 @@ def _discovery_turn_from_artifact(
     status = raw.get("status")
     if status not in {"found", "blocked"}:
         return []
+    target_origin_value = raw.get("targetOrigin")
+    target_origin = (
+        target_origin_value
+        if target_origin_value in {"provided", "live", "fallback-live"}
+        else None
+    )
     occurred_at = _parse_occurred_at(raw.get("occurredAt"))
     if status == "blocked":
         reason = raw.get("reason")
@@ -493,6 +498,7 @@ def _discovery_turn_from_artifact(
                 tyr_message=None,
                 occurred_at=occurred_at,
                 update_type="discovery",
+                target_origin=target_origin,
             )
         ]
     raw_fields = raw.get("fields")
@@ -519,6 +525,7 @@ def _discovery_turn_from_artifact(
             tyr_message=None,
             occurred_at=occurred_at,
             update_type="discovery",
+            target_origin=target_origin,
         )
     ]
 
@@ -789,9 +796,12 @@ def normalize_turns(
                     continue
                 if not isinstance(value, dict):
                     continue
-                turn_id = str(value.get("turnId") or f"{run_id}-turn-{line_number}")
                 stage_value = value.get("stage")
-                if not isinstance(stage_value, str) or stage_value not in _TURN_STAGES:
+                if not isinstance(stage_value, str):
+                    stage_value = ""
+                if stage_value.startswith("discovery"):
+                    stage_value = "discovery"
+                elif stage_value not in _TURN_STAGES:
                     legacy_phase = value.get("phase")
                     stage_value = (
                         legacy_phase
@@ -810,6 +820,7 @@ def normalize_turns(
                     if isinstance(execution_value, str) and execution_value
                     else scenario_id
                 )
+                turn_id = str(value.get("turnId") or f"{run_id}-turn-{line_number}")
                 item = grouped.get(turn_id)
                 occurred_at = _parse_occurred_at(value.get("occurredAt"))
                 if item is None:
@@ -913,6 +924,7 @@ def normalize_turns(
             occurred_at=turn.occurred_at,
             replied_at=turn.replied_at,
             update_type=turn.update_type,
+            target_origin=turn.target_origin,
             verdict=turn.verdict,
             objective_status=turn.objective_status,
             outcome=turn.outcome,
