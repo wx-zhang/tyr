@@ -11,6 +11,12 @@ Own architecture, data-format, development, and scaffold documentation under `do
 - Prefer concise Markdown and examples that can be copied directly.
 - Store deterministic judge graph topology assets under `docs/assets/judges/`, generated via `uv run poe judge-graph <judge-directory>`.
 
+## Nested instructions
+
+| Directory | Ownership |
+|---|---|
+| `deck-template/` | Reusable HTML presentation source; copy to `.gamr/decks/<topic>/` before authoring a talk. See its `AGENTS.md` and `README.md`. |
+
 ## Commands
 
 Run `uv run poe check` for repository checks. Documentation-only changes need no Python test beyond the relevant check.

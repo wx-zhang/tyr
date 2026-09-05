@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title id="title">GAMR</title>
+  <desc id="desc">GAMR mark: a red arrow crosses a shield</desc>
+  <rect width="64" height="64" rx="14" fill="#07131a"/>
+  <path
+    d="M32 10.5 48 16.5v14.2c0 10.4-6.6 19.2-16 23.3-9.4-4.1-16-12.9-16-23.3V16.5L32 10.5Z"
+    fill="#0d1a24"
+    stroke="#7d90a3"
+    stroke-width="2.5"
+    stroke-linejoin="round"
+  />
+  <g fill="none" stroke="#60a5fa" stroke-width="1.6" opacity="0.9">
+    <circle cx="24.5" cy="36.5" r="3.2"/>
+    <path d="M24.5 32.2v2.1M24.5 38.7v2.1M20.2 36.5h2.1M26.7 36.5h2.1" stroke-linecap="round"/>
+    <circle cx="40" cy="24" r="3.2"/>
+    <path d="M40 19.7v2.1M40 26.2v2.1M35.7 24h2.1M42.2 24h2.1" stroke-linecap="round"/>
+  </g>
+  <path
+    d="M13.5 48.5 48.2 16.8"
+    fill="none"
+    stroke="#e11d48"
+    stroke-width="3.2"
+    stroke-linecap="round"
+  />
+  <path
+    d="M41.2 14.2 52.6 12.4 47.6 22.4 44.8 17.1Z"
+    fill="#e11d48"
+  />
+  <circle cx="24.5" cy="36.5" r="1.5" fill="#edf2f7"/>
+  <circle cx="40" cy="24" r="1.5" fill="#edf2f7"/>
+</svg>

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b0f14">
+  <title>Tyr × GAMR: deck template</title>
+  <link rel="icon" href="assets/gamr.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" type="module"></script>
+</head>
+<body>
+  <main id="viewport" aria-label="Research presentation">
+    <div id="stage">
+      <header class="masthead">
+        <div class="brands"><img src="assets/tyr.svg" alt="" class="tyr-mark"><strong>TYR</strong><span class="brand-divider">/</span><img src="assets/gamr.svg" alt="" class="gamr-mark"><strong class="gamr-word">GAMR</strong></div>
+        <div class="masthead-meta"><span class="live-dot"></span>ADVERSARIAL RESEARCH <span class="edition">DECK TEMPLATE / EXAMPLES</span></div>
+      </header>
+      <div id="slide-content" aria-live="polite"></div>
+      <footer class="slide-footer"><span>TYR SECURITY RESEARCH <span class="footer-divider">/</span> EXAMPLE PRESENTATION</span><span id="section-label"></span><span id="slide-count">01 / 05</span></footer>
+      <div id="progress" aria-hidden="true"></div>
+    </div>
+  </main>
+  <nav class="controls" aria-label="Presentation controls">
+    <span class="key-hint">← → NAVIGATE</span>
+    <button id="previous" aria-label="Previous slide" title="Previous slide (←)">←</button>
+    <button id="overview-button" title="Slide index (G)" aria-expanded="false">Slides <span>G</span></button>
+    <button id="notes-button" title="Presenter notes (N)" aria-expanded="false">Notes <span>N</span></button>
+    <button id="fullscreen" title="Toggle fullscreen (F)">Fullscreen <span>F</span></button>
+    <button id="theme-button" title="Toggle light theme (T)" aria-label="Light theme" aria-pressed="false">Light theme <span>T</span></button>
+    <button id="next" aria-label="Next slide" title="Next slide (→)">→</button>
+  </nav>
+  <dialog id="overview" aria-labelledby="overview-title"><div class="dialog-heading"><div><span class="label">RESEARCH BRIEFING</span><h2 id="overview-title">Choose a slide</h2></div><button data-close="overview" aria-label="Close slide index">×</button></div><div id="slide-index"></div></dialog>
+  <dialog id="notes" aria-labelledby="notes-title"><div class="dialog-heading"><div><span class="label">PRESENTER VIEW</span><h2 id="notes-title">Speaker notes</h2></div><button data-close="notes" aria-label="Close notes">×</button></div><div id="notes-content"></div><p class="notes-footer">Example slides only. Replace these notes with sources and evidence limits for your presentation.</p></dialog>
+</body>
+</html>
