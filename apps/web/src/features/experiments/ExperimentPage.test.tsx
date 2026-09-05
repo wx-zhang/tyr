@@ -225,9 +225,6 @@ it("sends configured research history windows for researcher-only Experiments", 
   expect(
     screen.getByRole("heading", { name: "Research Iteration history" }),
   ).toBeInTheDocument();
-  expect(
-    screen.getByRole("heading", { name: "Scenarios" }),
-  ).toBeInTheDocument();
   fireEvent.change(screen.getByLabelText("Research Iterations", { selector: "#research-iterations" }), {
     target: { value: "1" },
   });
@@ -325,15 +322,9 @@ it("hides and shows the Task Scenario explorer", async () => {
   renderPage();
 
   expect(await screen.findByLabelText(/Case Alpha/)).toBeChecked();
-  expect(
-    screen.getByRole("heading", { name: "Scenarios" }),
-  ).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole("button", { name: "Hide" }));
 
-  expect(
-    screen.queryByRole("heading", { name: "Scenarios" }),
-  ).not.toBeInTheDocument();
   expect(screen.queryByLabelText(/Case Alpha/)).not.toBeInTheDocument();
   expect(
     screen.getByRole("button", { name: "Show Scenarios" }),
@@ -342,9 +333,6 @@ it("hides and shows the Task Scenario explorer", async () => {
 
   fireEvent.click(screen.getByRole("button", { name: "Show Scenarios" }));
 
-  expect(
-    screen.getByRole("heading", { name: "Scenarios" }),
-  ).toBeInTheDocument();
   expect(screen.getByLabelText(/Case Alpha/)).toBeChecked();
 });
 it("uploads a validated discovery input and persists it in the preset request", async () => {

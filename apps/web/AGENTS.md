@@ -12,6 +12,45 @@ Use React Router for navigation and TanStack Query for server state. Keep transi
 
 When implementation of an OpenSpec change is complete, archive every mock-only source file, fixture, style, and asset in `<change-root>/mocks/` inside that OpenSpec change directory. Remove the frontend mock route and mock-only imports after archiving. Preserve the archived mock as the accepted design reference.
 
+## UI styleguide
+
+Aim for a calm, compact operator workspace. Use the rules below as the working
+summary of `UI-DESGIN-TOKEN.md`, not a separate design system.
+
+### Hierarchy and density
+
+- Start with one page title and a quiet secondary action. Add an eyebrow or description only when it supplies information the title and controls don't already convey.
+- Put useful controls near the top. Avoid tall introductory panels, repeated headings, decorative step numbers, and empty vertical space.
+- Use visible field labels instead of another section heading when a short form row explains itself. Simple selectors and optional names can sit in a borderless row.
+- Group by the decisions the operator makes. Use headings and dividers first; add a card only for a distinct work area. Avoid nested cards.
+- Give the main content more width than supporting settings. Align columns at the top and stack them in reading order on narrow screens.
+- Keep spacing on the shared 4px token grid. Use compact gaps within a group and larger gaps between groups. Don't shrink text or pointer targets to make a page fit.
+
+### Controls and content
+
+- Keep one primary action. Use secondary or ghost styling for navigation, selection tools, and disclosures.
+- Make the next action's consequence clear beside the button, especially the difference between saving settings, reviewing, and starting an Experiment.
+- Keep common settings visible. Put infrequent configuration behind a labeled disclosure that reports meaningful configured or error state.
+- Keep permissions, approval warnings, and blocking errors visible. Compact layouts must never hide safety information.
+- Use short, concrete labels and mark optional fields. Helper text must explain a constraint or consequence, not repeat the label.
+- Size controls to their content: short numeric inputs stay short; Task selectors and names receive room to read.
+- Use readable list rows with quiet separators rather than a separate heavy card for every item. Show selection counts, preserve full titles, and use text alongside selection or status color.
+- Prefer page scrolling for short configuration lists. Use bounded scrolling or pagination for large datasets, with a clear indication that more items exist.
+
+### Visual consistency
+
+- Reuse the shell, shared components, and CSS tokens before adding page-specific rules. Scope page-specific CSS so neighboring screens don't change.
+- Use neutral surfaces and thin borders. Blue identifies interaction, amber approval or caution, and red failure or danger. Avoid decorative color, gradients, and shadows on static panels.
+- Use sans-serif for human-readable content and monospace for identifiers and numeric data. Let typography and spacing establish hierarchy.
+- Preserve visible focus, semantic labels, readable contrast, and reduced-motion support in both themes. Long identifiers must wrap without widening the page.
+
+### Design verification
+
+- Inspect the actual page before editing. Use `/experiments/new` as a reference for compact setup forms, not a template to copy onto unrelated workflows.
+- Check the finished page at desktop and narrow mobile widths in light and dark themes. Look for unnecessary height as well as overflow, clipping, and cramped controls.
+- Exercise pointer and keyboard interactions, disclosures, selection, disabled actions, and relevant empty/error states. Never start a live Experiment just to verify presentation.
+- Run the relevant frontend build and behavior tests. Keep tests about user-visible behavior, not exact headings or markup shape.
+
 ## Commands
 
 `pnpm --dir apps/web install`, `pnpm --dir apps/web dev`, `pnpm --dir apps/web build`, and `pnpm --dir apps/web test`.
@@ -32,6 +71,10 @@ Legacy `/tasks/:taskId/cases/:caseId` links normalize at the route boundary.
 The Experiment review screens consume API Experiment, Scenario Execution, activity, and artifact
 endpoints; Tyr and model calls remain server-side.
 New web Experiment Preset forms initialize max concurrent Scenario Executions to 1; operators may raise it through 5.
+`features/experiments/ExperimentPage.tsx` keeps Task and optional Preset name in a compact, borderless row.
+Execution settings and the full Scenario checklist sit below, followed by the review footer.
+`ExecutionLimits.tsx` owns the limit controls; `DiscoveryInputPanel.tsx` owns the Advanced file-input presentation.
+Page-scoped layout lives in `src/styles/experiment-setup.css` and stacks on narrow screens.
 `features/runs/RunHistory.tsx`, `RunHistoryGroup.tsx`, and `RunHistoryCase.tsx` render
 grouped Experiment history partitioned into discovery, Scenario Executions, Research Iterations, and other updates.
 `features/runs/runHistoryGroups.ts` performs the grouping, while `runHistoryTypes.ts` owns its

@@ -11,10 +11,8 @@ import {
 import { PageHeader } from "../../components/PageHeader";
 import { ScenarioChecklist } from "./CaseChecklist";
 import { ResearchHistoryPanel } from "./ScientistHistoryPanel";
-import { StatusBadge } from "../../components/StatusBadge";
-import {
-  readDiscoveryInputFile,
-} from "./discoveryInput";
+import { DiscoveryInputPanel } from "./DiscoveryInputPanel";
+import { ExecutionLimits } from "./ExecutionLimits";
 
 function defaultScenarioSelection(task: Task | undefined, scenarioIds: string[]): string[] {
   if (!task) return [];
@@ -70,13 +68,8 @@ export function ExperimentPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [scenariosOpen, setScenariosOpen] = useState(true);
-  const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [discoveryFileName, setDiscoveryFileName] = useState("");
   const [discoveryDocument, setDiscoveryDocument] = useState<DiscoveryInputDocument | null>(null);
-  const [discoveryError, setDiscoveryError] = useState<string | null>(null);
   const [fallbackToDiscovery, setFallbackToDiscovery] = useState(false);
-  const [discoveryInputKey, setDiscoveryInputKey] = useState(0);
-  const [fileDragOver, setFileDragOver] = useState(false);
 
   const tasks = useQuery({ queryKey: ["tasks"], queryFn: fetchTasks });
 
@@ -113,28 +106,6 @@ export function ExperimentPage() {
         ? current.filter((id) => id !== scenarioId)
         : [...current, scenarioId],
     );
-  };
-  const handleDiscoveryFile = async (file: File | undefined) => {
-    if (!file) return;
-    const result = await readDiscoveryInputFile(file);
-    if (result.ok) {
-      setDiscoveryDocument(result.document);
-      setDiscoveryFileName(file.name);
-      setDiscoveryError(null);
-    } else {
-      setDiscoveryDocument(null);
-      setDiscoveryFileName(file.name);
-      setDiscoveryError(result.error);
-      setFallbackToDiscovery(false);
-    }
-  };
-
-  const clearDiscoveryInput = () => {
-    setDiscoveryDocument(null);
-    setDiscoveryFileName("");
-    setDiscoveryError(null);
-    setFallbackToDiscovery(false);
-    setDiscoveryInputKey((key) => key + 1);
   };
 
   const submit = async (event: FormEvent) => {
@@ -182,29 +153,19 @@ export function ExperimentPage() {
     !scenarios.isLoading;
 
   return (
-    <section className="section-stack">
+    <section className="section-stack experiment-setup">
       <PageHeader
-        eyebrow="Experiment Preset"
         title="Run Experiment"
-        description="Choose a Task and execution settings, then start an Experiment against Tyr."
         actions={
           <Link className="button button-secondary" to="/tasks">
             Browse Tasks
           </Link>
         }
       />
-      <div className={`execute-layout${!scenariosOpen ? " execute-layout-collapsed" : ""}`}>
-        <form className="card form-card" onSubmit={submit}>
-          <div className="field-group">
-            <label htmlFor="experiment-name">Preset name</label>
-            <input
-              id="experiment-name"
-              name="name"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="Optional · defaults to Task and time"
-            />
-          </div>
+      <form className="experiment-setup-form" onSubmit={submit}>
+        <fieldset className="card setup-task">
+          <legend className="sr-only">Task and Preset</legend>
+          <div className="setup-task-fields">
           <div className="field-group">
             <label htmlFor="experiment-task">Task</label>
             <select
@@ -225,12 +186,27 @@ export function ExperimentPage() {
               </option>
               {(tasks.data ?? []).map((task) => (
                 <option key={task.metadata.id} value={task.metadata.id}>
-                  {task.metadata.title} ({task.metadata.id})
+                  {task.metadata.title}
                 </option>
               ))}
             </select>
             {tasks.isError ? <p className="field-help" role="alert">Could not load Tasks. Check the API connection.</p> : null}
           </div>
+          <div className="field-group setup-name">
+            <label htmlFor="experiment-name">Preset name <span className="secondary">(optional)</span></label>
+            <input
+              id="experiment-name"
+              name="name"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="Optional · defaults to Task and time"
+            />
+          </div>
+          </div>
+        </fieldset>
+      <div className={`execute-layout${!scenariosOpen ? " execute-layout-collapsed" : ""}`}>
+        <div className="card form-card setup-settings">
+          <div className="setup-section-heading"><div><h2>Execution settings</h2><p className="field-help">Set permissions and execution limits.</p></div></div>
           {!scenariosOpen ? (
             <div className="field-group">
               <span className="field-label">Scenarios</span>
@@ -242,7 +218,9 @@ export function ExperimentPage() {
               </div>
             </div>
           ) : null}
-          <label className="choice-card choice-card-compact choice-card-risk">
+          <fieldset className="fieldset">
+          <legend>Action mode</legend>
+          <label className="choice-card choice-card-risk">
             <input
               type="checkbox"
               checked={approvalGated}
@@ -250,177 +228,21 @@ export function ExperimentPage() {
               aria-label="Approval-gated"
             />
             <span className="choice-inline-content">
-              <span className="choice-title" aria-hidden="true">Approval-gated</span>
-              <span className="choice-description">GAMR requests actions; Tyr requires an explicit human decision for every action.</span>
+              <span className="choice-title" aria-hidden="true">{approvalGated ? "Approval-gated" : "Read-only"}</span>
+              <span className="choice-description">{approvalGated ? "Actions require an explicit human decision in Tyr. GAMR never approves them." : "Actions are disabled. Check to allow approval-gated actions."}</span>
             </span>
           </label>
-          <div className="field-group">
-            <label htmlFor="max-concurrent-scenarios">Max concurrent Scenario Executions</label>
-            <input
-              id="max-concurrent-scenarios"
-              name="maxConcurrentScenarioExecutions"
-              type="number"
-              min={1}
-              max={5}
-              step={1}
-              inputMode="numeric"
-              value={maxConcurrentScenarioExecutionsInput}
-              onChange={(event) => setMaxConcurrentScenarioExecutionsInput(event.target.value)}
-              onBlur={() => setMaxConcurrentScenarioExecutionsInput(String(maxConcurrentScenarioExecutions))}
-            />
-            <p className="field-help">Number of base Scenario Executions to run simultaneously (1 to 5, default 1).</p>
-          </div>
-          <div className="field-group">
-            <div className="field-label-row">
-              <label htmlFor="research-iterations">Research Iterations</label>
-              <button type="button" className="info-tip" aria-label="What Research Iterations means" aria-describedby="research-iterations-tip">
-                <span aria-hidden="true">i</span>
-                <span id="research-iterations-tip" role="tooltip" className="info-tip-bubble">The maximum number of new Task-specific Scenarios the Adversarial Researcher generates and runs after discovery.</span>
-              </button>
-            </div>
-            <input
-              id="research-iterations"
-              name="researchIterations"
-              type="number"
-              min={0}
-              step={1}
-              inputMode="numeric"
-              value={researchIterationsInput}
-              onChange={(event) => setResearchIterationsInput(event.target.value)}
-              onBlur={() => setResearchIterationsInput(String(researchIterations))}
-            />
-            <p className="field-help">
-              {researchIterations === 0
-                ? researcherOnly
-                  ? "Select Scenarios or set Research Iterations above 0."
-                  : "Off. Selected Scenarios run only."
-                : researcherOnly
-                  ? `Adversarial Researcher only: use recent history to generate and run up to ${researchIterations} Scenario${researchIterations === 1 ? "" : "s"}.`
-                  : `After selected Scenarios finish, generate and run up to ${researchIterations} Task-specific follow-up Scenario${researchIterations === 1 ? "" : "s"}.`}
-            </p>
-          </div>
-          <div className="advanced-panel">
-            <button
-              type="button"
-              className="form-disclosure-toggle"
-              aria-expanded={advancedOpen}
-              aria-controls="advanced-panel-body"
-              onClick={() => setAdvancedOpen((open) => !open)}
-            >
-              Advanced
-              <span className="form-disclosure-hint">
-                {discoveryError
-                  ? "Discovery input: invalid file"
-                  : discoveryDocument
-                    ? `Discovery input: ${discoveryFileName}`
-                    : "Discovery input: not provided"}
-              </span>
-            </button>
-            {advancedOpen ? (
-              <div id="advanced-panel-body" className="advanced-body">
-                <div className="advanced-item">
-                  <div className="field-label-row">
-                    <span className="field-label">Skip discovery · provide target</span>
-                    <button type="button" className="info-tip" aria-label="What providing a discovery target means" aria-describedby="discovery-input-tip">
-                      <span aria-hidden="true">i</span>
-                      <span id="discovery-input-tip" role="tooltip" className="info-tip-bubble">
-                        Provide a validated discovery-input JSON document to skip live discovery and start
-                        Scenarios with the supplied target. The document is stored with the Preset; the file
-                        path is not kept. Its Task ID is informational and is never matched against the
-                        selected Task.
-                      </span>
-                    </button>
-                  </div>
-                  <label
-                    className={`file-drop${fileDragOver ? " is-dragover" : ""}${discoveryError ? " has-error" : ""}`}
-                    onDragOver={(event) => {
-                      event.preventDefault();
-                      setFileDragOver(true);
-                    }}
-                    onDragLeave={() => setFileDragOver(false)}
-                    onDrop={(event) => {
-                      event.preventDefault();
-                      setFileDragOver(false);
-                      void handleDiscoveryFile(event.dataTransfer.files?.[0]);
-                    }}
-                  >
-                    <input
-                      className="file-drop-input"
-                      name="discoveryInputFile"
-                      key={discoveryInputKey}
-                      type="file"
-                      accept="application/json,.json"
-                      onChange={(event) => {
-                        void handleDiscoveryFile(event.target.files?.[0]);
-                      }}
-                    />
-                    <span className="file-drop-title">
-                      {discoveryFileName || "Choose a JSON file or drop it here"}
-                    </span>
-                    <span className="file-drop-hint">
-                      {discoveryFileName
-                        ? "Choose a different file or drop it here"
-                        : "Discovery-input JSON document · .json"}
-                    </span>
-                  </label>
-                  {discoveryError ? (
-                    <p className="form-status form-status-error" role="alert">{discoveryError}</p>
-                  ) : null}
-                  {discoveryDocument ? (
-                    <div className="discovery-preview">
-                      <div className="discovery-preview-status">
-                        <StatusBadge label="Valid discovery input" tone="success" />
-                        <button type="button" className="button button-ghost" onClick={clearDiscoveryInput}>
-                          Remove
-                        </button>
-                      </div>
-                      <dl className="detail-list">
-                        <div className="detail-row"><dt>Task ID in document</dt><dd className="mono">{discoveryDocument.taskId}</dd></div>
-                        <div className="detail-row"><dt>path</dt><dd className="mono">{discoveryDocument.candidate.path}</dd></div>
-                        <div className="detail-row"><dt>workspace</dt><dd className="mono">{discoveryDocument.candidate.workspace}</dd></div>
-                        <div className="detail-row"><dt>agent</dt><dd className="mono">{discoveryDocument.candidate.agent}</dd></div>
-                        <div className="detail-row"><dt>bridgeId</dt><dd className="mono">{discoveryDocument.candidate.bridgeId}</dd></div>
-                      </dl>
-                      {taskId && discoveryDocument.taskId !== taskId ? (
-                        <p className="field-help">
-                          The document Task ID ({discoveryDocument.taskId}) differs from the selected Task
-                          ({taskId}). It is kept for reference; the selected Task is unchanged.
-                        </p>
-                      ) : null}
-                      <label className="choice-card choice-card-compact">
-                        <input
-                          type="checkbox"
-                          checked={fallbackToDiscovery}
-                          onChange={(event) => setFallbackToDiscovery(event.target.checked)}
-                          aria-label="Fall back to live discovery"
-                        />
-                        <span className="choice-inline-content">
-                          <span className="choice-title" aria-hidden="true">Fall back to live discovery</span>
-                          <span className="choice-description">
-                            Runs a bounded read-only preflight before any Scenario Execution; if the
-                            provided target is unavailable, normal discovery runs. Off by default: an
-                            unavailable target fails the Experiment.
-                          </span>
-                        </span>
-                      </label>
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-            ) : null}
-          </div>
-          <div className="form-actions">
-            {error ? <p className="form-status form-status-error" role="alert">{error}</p> : null}
-            <button className="button button-primary" type="submit" disabled={!canSubmit}>{submitting ? "Creating…" : "Continue"}</button>
-          </div>
-        </form>
+          </fieldset>
+          <ExecutionLimits maxConcurrentScenarioExecutionsInput={maxConcurrentScenarioExecutionsInput} maxConcurrentScenarioExecutions={maxConcurrentScenarioExecutions} setMaxConcurrentScenarioExecutionsInput={setMaxConcurrentScenarioExecutionsInput} researchIterationsInput={researchIterationsInput} researchIterations={researchIterations} setResearchIterationsInput={setResearchIterationsInput} researcherOnly={researcherOnly} />
+          <DiscoveryInputPanel taskId={taskId} discoveryDocument={discoveryDocument} setDiscoveryDocument={setDiscoveryDocument} fallbackToDiscovery={fallbackToDiscovery} setFallbackToDiscovery={setFallbackToDiscovery} />
+        </div>
         <div className="execute-side-stack">
           {scenariosOpen ? (
             <aside id="scenarios-panel" className="card form-card" aria-labelledby="scenarios-title">
               <div className="card-header">
-                <div><p className="eyebrow">Task Scenarios</p><h2 id="scenarios-title">Scenarios</h2></div>
+                <div className="setup-section-heading"><div><h2 id="scenarios-title">Select Scenarios</h2><p className="field-help">Choose the approaches to test against Tyr.</p></div></div>
                 <div className="case-explorer-actions">
-                  {taskId && selectedScenarioIds.length > 0 ? <span className="secondary mono tabular">{selectedScenarioIds.length} selected</span> : null}
+                  <span className="setup-selection-count tabular" role="status">{selectedScenarioIds.length} / {scenarioList.length} selected</span>
                   <button type="button" className="button button-ghost" onClick={() => setScenariosOpen(false)} aria-expanded={true} aria-controls="scenarios-panel">Hide</button>
                 </div>
               </div>
@@ -439,6 +261,13 @@ export function ExperimentPage() {
           {researcherOnly ? <ResearchHistoryPanel testRunsInput={historyTestRunsInput} scientistRunsInput={historyResearchRunsInput} testRuns={historyTestRuns} scientistRuns={historyResearchRuns} onTestRunsChange={setHistoryTestRunsInput} onTestRunsBlur={() => setHistoryTestRunsInput(String(historyTestRuns))} onScientistRunsChange={setHistoryResearchRunsInput} onScientistRunsBlur={() => setHistoryResearchRunsInput(String(historyResearchRuns))} /> : null}
         </div>
       </div>
+        <div className="setup-footer">
+          <div><strong>Next: review your Preset</strong><p className="field-help">Continue saves these settings. No Experiment starts yet.</p></div>
+          <span className={`setup-mode${approvalGated ? " setup-mode-warning" : ""}`}>{approvalGated ? "Approval-gated" : "Read-only"}</span>
+          {error ? <p className="form-status form-status-error" role="alert">{error}</p> : null}
+          <button className="button button-primary" type="submit" disabled={!canSubmit}>{submitting ? "Creating…" : "Continue"}</button>
+        </div>
+      </form>
     </section>
   );
 }

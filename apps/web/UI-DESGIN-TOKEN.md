@@ -290,8 +290,9 @@ Finding severity uses label plus token: Critical/High use `--danger`, Medium use
 - Labels are visible and placed immediately above their controls. Placeholder text is an example, never the only label.
 - Inputs use `--surface`, `--border`, `--control-h`, and the shared focus ring. Errors appear near the field and in an error summary when submission fails.
 - Group related experiment settings with `fieldset` and `legend`, particularly target/model configuration, limits, and action mode.
-- Explain the read-only default in plain language. Selecting `approval_required` reveals a warning and requires explicit confirmation before starting a run.
+- The web Preset form defaults to approval-gated mode with a visible warning. Unchecking it shows Read-only. Starting an action-enabled Experiment requires confirmation on the review screen; Tyr still requires a human decision for each action.
 - Preserve user input after validation or server errors unless retaining it would expose a secret.
+- New Experiment setup uses a compact title row and borderless Task/name fields. Avoid repeated headings and step numbers above those fields. Keep execution settings beside the full Scenario list on wide screens and stack them on narrow screens. The footer states that Continue saves a Preset for review without starting an Experiment.
 
 ### Tables and lists
 
