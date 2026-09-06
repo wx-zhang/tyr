@@ -89,5 +89,10 @@ bundle.
 - Evidence is retained verbatim for trusted test operators, including secrets and authorization data.
 - Every Tyr request uses an idempotency key.
 - Outer Tyr completion never overrides delegated or unsettled work.
+- A bridge reply replaces the top-level answer only when its identity or state/response changed
+  since the conversation's previous observations. Unchanged historical replies stay in raw evidence.
+- Repeated approval-blocked answers retain their approval status. The CLI reports a recorded turn
+  with target work awaiting approval, rather than implying that the target action completed.
+- Target text parsed as HTML is displayed literally so angle-bracketed evidence is not hidden.
 - Task, Experiment Preset, Experiment, result, and OpenAPI schemas are generated from owning models.
 - Default tests require no live provider and follow risk-weighted TDD.

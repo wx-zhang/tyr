@@ -6,6 +6,7 @@ from rich.console import Console
 from rich.markdown import Markdown
 from rich.markup import escape
 from rich.padding import Padding
+from rich.text import Text
 
 
 def render_progress(console: Console, event: ProgressEvent) -> None:
@@ -76,7 +77,15 @@ def render_progress(console: Console, event: ProgressEvent) -> None:
         console.print(f"[magenta]↗[/] [dim]{context}[/] Sending to Tyr…")
         _print_message(console, event.detail, style="magenta")
     elif event.event_type == "target.completed":
-        console.print(f"[green]↘[/] [dim]{context}[/] Tyr replied")
+        settlement_state = dict(event.fields or ()).get("settlementState")
+        label = (
+            "Tyr is waiting for peer-owner approval"
+            if settlement_state == "peer_approval_blocked"
+            else "Tyr is waiting for approval"
+            if settlement_state == "waiting_for_approval"
+            else "Tyr replied"
+        )
+        console.print(f"[green]↘[/] [dim]{context}[/] {label}")
         if event.fields and ("replySource", "delegated bridge follow-up") in event.fields:
             console.print("  [dim]↳ Settled delegated bridge follow-up[/]")
         _print_message(console, event.detail, style="green")
@@ -90,7 +99,14 @@ def render_progress(console: Console, event: ProgressEvent) -> None:
             f"[dim]({escape(event.detail or '')})[/]"
         )
     elif event.event_type == "turn.completed":
-        console.print(f"[green]✓[/] [dim]{context}[/] Turn complete")
+        settlement_state = dict(event.fields or ()).get("settlementState")
+        if settlement_state in {"peer_approval_blocked", "waiting_for_approval", "timeout"}:
+            detail = (
+                "target timed out" if settlement_state == "timeout" else "target awaiting approval"
+            )
+            console.print(f"[yellow]◌[/] [dim]{context}[/] Turn recorded · {detail}")
+        else:
+            console.print(f"[green]✓[/] [dim]{context}[/] Turn complete")
     elif event.event_type == "assessment.started":
         console.print(f"[yellow]◌[/] [dim]{context}[/] Assessing evidence…")
     elif event.event_type == "assessment.completed":
@@ -138,7 +154,12 @@ class ConsoleActivitySink:
                 scenario_execution_id=activity.scenario_execution_id,
                 turn=metadata_turn if isinstance(metadata_turn, int) else None,
                 detail=activity.summary,
-                fields=None,
+                fields=tuple(
+                    (key, value)
+                    for key in ("replySource", "settlementState")
+                    if isinstance(value := activity.metadata.get(key), str)
+                )
+                or None,
                 history_case_ids=tuple(activity.related_case_ids),
             ),
         )
@@ -161,4 +182,11 @@ def _context(event: ProgressEvent) -> str:
 def _print_message(console: Console, detail: str | None, *, style: str) -> None:
     if not detail or not detail.strip():
         return
-    console.print(Padding(Markdown(detail.strip(), style=style), (0, 0, 0, 2)))
+    message = Markdown(detail.strip(), style=style)
+    has_html = any(
+        token.type in {"html_inline", "html_block"}
+        for block in message.parsed
+        for token in (block, *(block.children or []))
+    )
+    rendered = Text(detail.strip(), style=style) if has_html else message
+    console.print(Padding(rendered, (0, 0, 0, 2)))

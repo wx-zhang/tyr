@@ -35,6 +35,8 @@ _DIAGNOSTIC_KEYS = (
     "message",
 )
 
+type BridgeSnapshot = dict[str, tuple[str, str | None]]
+
 
 @dataclass(frozen=True)
 class OperationWaitResult:
@@ -42,6 +44,7 @@ class OperationWaitResult:
     local_state: str
     notes: tuple[str, ...] = ()
     reply: str | None = None
+
 
 def normalize_operation_result(
     result: dict[str, object],
@@ -159,9 +162,7 @@ def _current_bridge_entries(result: dict[str, object]) -> tuple[dict[str, object
     if not valid_timestamps:
         return entries[-1:]
     latest = max(valid_timestamps)
-    last_latest = max(
-        index for index, timestamp in enumerate(timestamps) if timestamp == latest
-    )
+    last_latest = max(index for index, timestamp in enumerate(timestamps) if timestamp == latest)
     return tuple(
         entry
         for index, (entry, timestamp) in enumerate(zip(entries, timestamps, strict=True))
@@ -186,13 +187,36 @@ def _normalized_state(entry: dict[str, object]) -> str:
     return state.strip().lower() if isinstance(state, str) else ""
 
 
-def _effective_reply(result: dict[str, object]) -> str | None:
+def bridge_snapshot(result: dict[str, object]) -> BridgeSnapshot:
+    bridges = result.get("bridges")
+    if not isinstance(bridges, list):
+        return {}
+    return {
+        child_item_key(entry, "bridges", index): (
+            _normalized_state(entry),
+            response if isinstance(response := entry.get("response"), str) else None,
+        )
+        for index, entry in enumerate(bridges)
+        if isinstance(entry, dict)
+    }
+
+
+def _effective_reply(
+    result: dict[str, object], previous_bridges: BridgeSnapshot | None = None
+) -> str | None:
     entries = _current_bridge_entries(result)
     if len(entries) != 1:
         return None
     entry = entries[0]
     response = entry.get("response")
     if _normalized_state(entry) == "completed" and isinstance(response, str) and response.strip():
+        if previous_bridges is not None:
+            bridges = result.get("bridges")
+            assert isinstance(bridges, list)
+            index = next(index for index, item in enumerate(bridges) if item is entry)
+            key = child_item_key(entry, "bridges", index)
+            if previous_bridges.get(key) == (_normalized_state(entry), response):
+                return None
         return response
     return None
 
@@ -435,12 +459,15 @@ async def settle_operation(
     settle_wait_seconds: int = 5,
     poll_budget_seconds: float = 300,
     poll_min_gap_seconds: float = 1,
+    previous_bridges: BridgeSnapshot | None = None,
 ) -> OperationWaitResult:
     """Poll until the outer operation and delegated work are genuinely quiet.
 
     The normal budget is wall-clock based so an immediately-returning long poll
     cannot consume a fixed number of attempts before a slow delegated action
     finishes. ``attempts`` remains a bounded test seam for deterministic tests.
+    ``previous_bridges`` captures observations before this request; it gates reply
+    promotion only, never pending-work detection or the quiet-window policy.
     """
 
     result = initial or await read_status(0)
@@ -461,7 +488,7 @@ async def settle_operation(
         done = state in TERMINAL_STATES and not work_pending(result)
         if done and result.get("updatedAt") == quiet_stamp:
             return OperationWaitResult(
-                result, "settled", failure_notes(result), _effective_reply(result)
+                result, "settled", failure_notes(result), _effective_reply(result, previous_bridges)
             )
         quiet_stamp = result.get("updatedAt") if done else None
         requested_wait = settle_wait_seconds if done else poll_wait_seconds
@@ -473,6 +500,6 @@ async def settle_operation(
 
     if state in TERMINAL_STATES and not work_pending(result):
         return OperationWaitResult(
-            result, "settled", failure_notes(result), _effective_reply(result)
+            result, "settled", failure_notes(result), _effective_reply(result, previous_bridges)
         )
     return OperationWaitResult(result, "timeout", failure_notes(result))

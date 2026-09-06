@@ -54,7 +54,20 @@ def _resolved_reply(
         reply_source = "delegated bridge follow-up"
     else:
         full_reply = str(result.get("response") or "").strip()
-    if full_reply and conversation.seen_reply and full_reply.startswith(conversation.seen_reply):
+    settlement_state = (
+        settlement_metadata.get("state") if isinstance(settlement_metadata, dict) else None
+    )
+    approval_pending = isinstance(settlement_state, str) and settlement_state in {
+        "peer_approval_blocked",
+        "waiting_for_approval",
+    }
+    if (
+        full_reply
+        and conversation.seen_reply
+        and full_reply.startswith(conversation.seen_reply)
+        and not approval_pending
+        and reply_source is None
+    ):
         reply = full_reply[len(conversation.seen_reply) :].strip()
         replayed_chars = len(full_reply) - len(reply)
     else:
@@ -78,6 +91,15 @@ def record_target_reply(
 ) -> str | None:
     result = exchange.result
     reply, reply_source, replayed_chars = _resolved_reply(result, conversation)
+    settlement = result.get("gamrSettlement")
+    settlement_state = settlement.get("state") if isinstance(settlement, dict) else None
+    fields: tuple[tuple[str, str], ...] = (("replySource", reply_source),) if reply_source else ()
+    if isinstance(settlement_state, str) and settlement_state in {
+        "peer_approval_blocked",
+        "waiting_for_approval",
+        "timeout",
+    }:
+        fields += (("settlementState", settlement_state),)
     events.emit(
         "target.completed",
         context.run_id,
@@ -86,7 +108,8 @@ def record_target_reply(
         turn=context.turn,
         turn_id=exchange.turn_id,
         detail=reply,
-        fields=(("replySource", reply_source),) if reply_source else None,
+        fields=fields or None,
+        metadata_extra=dict(fields),
     )
     reply = observe_reply(state, exchange.message, reply)
     replied_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
@@ -174,6 +197,8 @@ def record_target_reply(
         case_id=context.case_id,
         turn=context.turn,
         turn_id=exchange.turn_id,
+        fields=fields or None,
+        metadata_extra=dict(fields),
     )
     settlement = result.get("gamrSettlement")
     if isinstance(settlement, dict) and settlement.get("state") in {

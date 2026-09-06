@@ -7,6 +7,8 @@ from uuid import uuid4
 
 import httpx
 
+from .operations import BridgeSnapshot, bridge_snapshot, settle_operation
+
 #: A single synchronous tools/call can span the local assistant's full
 #: bridge relay to a peer (including the peer's own processing); 60s cut live runs off.
 TOOL_CALL_TIMEOUT_SECONDS = 300.0
@@ -36,6 +38,8 @@ class TyrMcpClient:
         self._owns_http = http_client is None
         self._rpc_id = 0
         self._session_id: str | None = None
+        self._bridge_observations: dict[tuple[str, str], BridgeSnapshot] = {}
+        self._bridge_requests: dict[str, tuple[tuple[str, str], BridgeSnapshot]] = {}
 
     async def __aenter__(self) -> TyrMcpClient:
         return self
@@ -210,7 +214,7 @@ class TyrMcpClient:
             arguments["operationId"] = operation_id
         if conversation_id:
             arguments["conversationId"] = conversation_id
-        return await self.call_tool("tyr_assistant_query", arguments)
+        return await self._call_assistant("tyr_assistant_query", arguments)
 
     async def request(
         self,
@@ -228,7 +232,29 @@ class TyrMcpClient:
             arguments["operationId"] = operation_id
         if conversation_id:
             arguments["conversationId"] = conversation_id
-        return await self.call_tool("tyr_assistant_request", arguments)
+        return await self._call_assistant("tyr_assistant_request", arguments)
+
+    async def _call_assistant(self, name: str, arguments: dict[str, object]) -> dict[str, Any]:
+        scope = self._bridge_scope(arguments)
+        previous = self._bridge_observations.get(scope, {}).copy()
+        result = await self.call_tool(name, arguments)
+        operation_id = result.get("operationId") or arguments.get("operationId")
+        if not scope[1]:
+            scope = self._bridge_scope(result)
+            previous = self._bridge_observations.get(scope, {}).copy()
+        if isinstance(operation_id, str):
+            self._bridge_requests[operation_id] = (scope, previous)
+        if scope[1]:
+            self._bridge_observations.setdefault(scope, {}).update(bridge_snapshot(result))
+        return result
+
+    @staticmethod
+    def _bridge_scope(payload: dict[str, object]) -> tuple[str, str]:
+        for key in ("conversationId", "operationId"):
+            value = payload.get(key)
+            if isinstance(value, str) and value:
+                return key, value
+        return "operationId", ""
 
     async def operation_status(self, operation_id: str, *, wait_seconds: int = 0) -> dict[str, Any]:
         return await self.call_tool(
@@ -240,16 +266,31 @@ class TyrMcpClient:
     async def settle(
         self, result: dict[str, object], *, operation_id: str | None = None
     ) -> dict[str, object]:
-        from .operations import settle_operation
+        """Settle work while promoting only bridge replies fresh for this request."""
 
         op_id = result.get("operationId")
         if not isinstance(op_id, str):
             op_id = operation_id
         if not isinstance(op_id, str):
             return result
+        context = self._bridge_requests.pop(op_id, None)
+        if context is None:
+            scope = ("operationId", op_id)
+            previous = self._bridge_observations.get(scope, {}).copy()
+        else:
+            scope, previous = context
+        observed = self._bridge_observations.setdefault(scope, {})
+        observed.update(bridge_snapshot(result))
+
+        async def read_status(wait: int) -> dict[str, object]:
+            status = await self.operation_status(op_id, wait_seconds=wait)
+            observed.update(bridge_snapshot(status))
+            return status
+
         settled = await settle_operation(
-            lambda wait: self.operation_status(op_id, wait_seconds=wait),
+            read_status,
             initial=result,
+            previous_bridges=previous,
         )
         payload = dict(settled.payload)
         settlement: dict[str, object] = {
