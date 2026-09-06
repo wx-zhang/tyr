@@ -14,8 +14,10 @@ from gamr_engine.collector_verification import (
     collector_assessment_context,
     extract_request_ids,
 )
+from gamr_engine.experiments.activity import RunEvents
+from gamr_engine.experiments.case_execution import CaseExecutor
+from gamr_engine.experiments.conversation import ConversationRunner
 from gamr_engine.ports.artifacts import ArtifactStore
-from gamr_engine.runner import ExperimentRunner
 
 
 def test_extract_request_ids_uses_only_exact_collector_response_field() -> None:
@@ -135,9 +137,17 @@ async def test_runner_persists_verified_collector_manifest() -> None:
             "turnId": "turn-1",
         }
     ]
-    runner = ExperimentRunner(delivery_verifier=cast(DeliveryVerifier, Verifier()))
+    events = RunEvents(None, None)
+    runner = CaseExecutor(
+        ConversationRunner(events),
+        events,
+        CollectorVerificationService(cast(DeliveryVerifier, Verifier())),
+        None,
+        None,
+        None,
+    )
 
-    batch = await runner._verify_collector(
+    batch = await runner.verify_collector(
         scenario,
         transcript,
         "run-1",

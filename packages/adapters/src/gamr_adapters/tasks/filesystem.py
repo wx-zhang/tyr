@@ -14,7 +14,7 @@ from gamr_core.tasks import (
     validate_template_placeholders,
 )
 from gamr_engine.content_evidence import AssessmentReference
-from gamr_engine.runner import LoadedTask
+from gamr_engine.experiments.records import LoadedTask
 
 MAX_ASSESSMENT_REFERENCE_BYTES = 256 * 1024
 

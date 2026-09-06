@@ -15,13 +15,14 @@ from gamr_core import (
 
 from .collector_verification import DeliveryVerifier
 from .content_evidence import ContentEvidenceProvider
+from .experiments.records import LoadedTask, ProgressCallback
 from .ports.artifacts import ActivitySink, ArtifactStore
 from .ports.models import ModelGateway
 from .ports.sandbox import Sandbox
 from .ports.targets import TargetGateway
 from .ports.tracing import TracePort
 from .reporting import render_markdown
-from .runner import ExperimentRunner, LoadedTask, ProgressCallback
+from .runner import ExperimentRunner
 
 
 @dataclass(frozen=True)
@@ -127,7 +128,6 @@ class ExperimentExecutionService:
             self._emit_terminal_activity(activity_sink, result)
         return ExecutionOutput(result, result_path)
 
-    resume_scientist = resume_research
 
     @staticmethod
     def _terminal_experiment_state(outcome: CompletionOutcome) -> ExperimentState:

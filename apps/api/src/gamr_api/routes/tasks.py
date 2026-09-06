@@ -7,7 +7,7 @@ from gamr_adapters.tasks.filesystem import (
     load_task,
     resolve_task_directory,
 )
-from gamr_engine.runner import LoadedTask
+from gamr_engine.experiments.records import LoadedTask
 
 from ..dependencies import get_settings
 from ..errors import not_found

@@ -11,9 +11,10 @@ from gamr_core import (
     SecurityVerdict,
     TaskManifest,
 )
+from gamr_engine.experiments.records import LoadedTask
 from gamr_engine.judges.contracts import JudgeResult
 from gamr_engine.judges.registry import get_judge_pipeline
-from gamr_engine.runner import ExperimentRunner, LoadedTask
+from gamr_engine.runner import ExperimentRunner
 
 
 class FakeModel:
@@ -142,7 +143,7 @@ async def test_runner_without_evaluation_skips_registry_and_judge() -> None:
         ]
     )
 
-    with patch("gamr_engine.runner.get_judge_pipeline") as mock_get_pipeline:
+    with patch("gamr_engine.experiments.case_assessment.get_judge_pipeline") as mock_get_pipeline:
         result = await runner.run(
             task_no_eval,
             ExperimentConfig(),
@@ -174,7 +175,7 @@ async def test_runner_invokes_pipeline_once_per_case() -> None:
         ]
     )
 
-    with patch("gamr_engine.runner.get_judge_pipeline") as mock_get_pipeline:
+    with patch("gamr_engine.experiments.case_assessment.get_judge_pipeline") as mock_get_pipeline:
         mock_pipeline = AsyncMock()
         mock_pipeline.id = "evidence-and-content"
         mock_pipeline.run.return_value = JudgeResult(

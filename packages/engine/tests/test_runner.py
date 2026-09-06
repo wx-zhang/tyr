@@ -2,30 +2,30 @@ import asyncio
 import json
 from typing import cast
 
-import gamr_engine.runner as runner_module
+import gamr_engine.experiments.discovery as discovery_module
+import gamr_engine.experiments.scientist_generation as generation_module
 import pytest
 from gamr_core import (
     ActivityType,
-    AssessmentStatus,
-    CaseResult,
     DiscoveryPlan,
     EvaluationPlan,
-    ExecutionOutcome,
     ExperimentConfig,
-    ObjectiveStatus,
     RunActivity,
     Scenario,
-    SecurityVerdict,
     TaskManifest,
 )
-from gamr_engine.ports.artifacts import ArtifactStore
-from gamr_engine.runner import (
-    CaseRecord,
-    ExperimentRunner,
+from gamr_engine.experiments.activity import RunEvents
+from gamr_engine.experiments.conversation import ConversationRunner
+from gamr_engine.experiments.decisions import decision as parse_decision
+from gamr_engine.experiments.discovery import DiscoveryRunner
+from gamr_engine.experiments.records import (
     LoadedTask,
     ProgressEvent,
     TargetConversation,
 )
+from gamr_engine.experiments.rendering import select_scenarios
+from gamr_engine.ports.artifacts import ArtifactStore
+from gamr_engine.runner import ExperimentRunner
 
 
 @pytest.mark.asyncio
@@ -81,10 +81,10 @@ async def test_runner_uses_task_default_case_selection() -> None:
         for case_id in ("one", "two")
     ]
     task = LoadedTask(manifest, scenarios, {})
-    selected = ExperimentRunner._select_scenarios(task, ExperimentConfig())
+    selected = select_scenarios(task, ExperimentConfig())
     assert [case.metadata.id for case in selected] == ["two"]
 
-    selected = ExperimentRunner._select_scenarios(task, ExperimentConfig(caseIds=["one"]))
+    selected = select_scenarios(task, ExperimentConfig(caseIds=["one"]))
     assert [case.metadata.id for case in selected] == ["one"]
 
 
@@ -217,8 +217,8 @@ async def test_agent_turn_is_persisted_before_tyr_request() -> None:
                 idempotency_key=idempotency_key,
             )
 
-    runner = ExperimentRunner()
-    await runner._converse(
+    runner = ConversationRunner(RunEvents(None, None))
+    await runner.run(
         "Discover.",
         ObservingTarget(),
         LiveFakeModel(
@@ -296,7 +296,7 @@ async def test_runner_prefers_settled_bridge_reply_over_intermediate_response() 
             return "events.jsonl"
 
     target = SettledReplyTarget()
-    result = await ExperimentRunner(progress=progress.append)._converse(
+    result = await ConversationRunner(RunEvents(progress.append, None)).run(
         "Ask Tyr.",
         target,
         LiveFakeModel(
@@ -788,7 +788,7 @@ async def test_case_bookkeeping_leak_turn_is_persisted_as_raw_record() -> None:
 
 
 def test_decision_maps_action_alias_to_kind() -> None:
-    decision = ExperimentRunner._decision(
+    decision = parse_decision(
         '{"action":"send","message":"Do the thing."}',
         strict=False,
     )
@@ -798,8 +798,8 @@ def test_decision_maps_action_alias_to_kind() -> None:
 
 
 def test_decision_returns_none_for_invalid_object_without_raising() -> None:
-    assert ExperimentRunner._decision('{"notADecision":true}', strict=False) is None
-    assert ExperimentRunner._decision('{"notADecision":true}', strict=True) is None
+    assert parse_decision('{"notADecision":true}', strict=False) is None
+    assert parse_decision('{"notADecision":true}', strict=True) is None
 
 
 def test_decision_rejects_multiple_json_objects() -> None:
@@ -808,14 +808,14 @@ def test_decision_rejects_multiple_json_objects() -> None:
         '{"kind":"send","message":"Step two."}\n'
         '{"kind":"phase_complete","reason":"done"}'
     )
-    assert ExperimentRunner._decision(multi, strict=False) is None
-    assert ExperimentRunner._decision(multi, strict=True) is None
+    assert parse_decision(multi, strict=False) is None
+    assert parse_decision(multi, strict=True) is None
 
 
 def test_decision_does_not_free_text_fallback_broken_json() -> None:
     broken = '{"kind":"send","message":"missing end quote}'
-    assert ExperimentRunner._decision(broken, strict=False) is None
-    decision = ExperimentRunner._decision("Just ask Tyr plainly.", strict=False)
+    assert parse_decision(broken, strict=False) is None
+    decision = parse_decision("Just ask Tyr plainly.", strict=False)
     assert decision is not None
     assert decision.kind == "send"
 
@@ -2979,7 +2979,7 @@ async def test_scientist_generation_timeout_does_not_retry(
     scientist_model = SlowModel([])
     artifacts = RawCapturingArtifacts()
     progress: list[ProgressEvent] = []
-    monkeypatch.setattr(runner_module, "_SCIENTIST_GENERATION_TIMEOUT_SECONDS", 0.001)
+    monkeypatch.setattr(generation_module, "SCIENTIST_GENERATION_TIMEOUT_SECONDS", 0.001)
 
     result = await ExperimentRunner(progress=progress.append).run(
         LoadedTask(
@@ -3365,9 +3365,7 @@ async def test_scientist_stops_after_a_scenario_succeeds() -> None:
 
 
 @pytest.mark.asyncio
-async def test_scientist_history_uses_configured_runs_with_base_cases_selected(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+async def test_scientist_history_uses_configured_runs_with_base_cases_selected() -> None:
     manifest, discovery, evaluation, scenario = _discovery_case_task()
     historical_scenario = Scenario.model_validate(
         {
@@ -3381,33 +3379,56 @@ async def test_scientist_history_uses_configured_runs_with_base_cases_selected(
             },
         }
     )
-    historical = CaseRecord(
-        scenario=historical_scenario,
-        rendered_title="Historical scientist",
-        rendered_objective="Try the previous approach.",
-        rendered_steps=["Probe the target."],
-        rendered_success="The target responds.",
-        case=CaseResult(
-            scenarioId="historical-scientist",
-            outcome=ExecutionOutcome.COMPLETED,
-            objectiveStatus=ObjectiveStatus.PARTIAL,
-            verdict=SecurityVerdict.INCONCLUSIVE,
-            summary="The previous approach was partial.",
-            evidence=[],
-            assessmentStatus=AssessmentStatus.VALID,
-        ),
-        transcript=[{"role": "assistant", "content": "Previous probe."}],
-        origin="scientist",
-        origin_run_id="old-run",
-        origin_artifact_id="historical-scientist",
+    historical_config = {
+        "actionMode": "read_only",
+        "caseIds": [],
+        "scientistIterations": 1,
+    }
+    historical_case = {
+        "scenarioId": "historical-scientist",
+        "outcome": "completed",
+        "objectiveStatus": "partial",
+        "verdict": "inconclusive",
+        "summary": "The previous approach was partial.",
+        "evidence": [],
+    }
+    artifacts = HistoryArtifacts(
+        {
+            "old-run": {
+                "schemaVersion": "1.0",
+                "id": "old-run",
+                "source": "service",
+                "task": "live",
+                "state": "completed",
+                "configuration": historical_config,
+                "createdAt": "2026-08-08T10:00:00Z",
+                "updatedAt": "2026-08-08T10:00:00Z",
+            },
+            "old-run:result": {
+                "schemaVersion": "1.0",
+                "runId": "old-run",
+                "task": {"id": "live", "version": "2.0.0", "digest": "sha256:live"},
+                "startedAt": "2026-08-08T10:00:00Z",
+                "finishedAt": "2026-08-08T10:00:00Z",
+                "outcome": "completed",
+                "configuration": historical_config,
+                "summary": {"vulnerable": 0, "protected": 0, "inconclusive": 1},
+                "cases": [historical_case],
+                "findings": [],
+                "errors": [],
+            },
+        },
+        {
+            "old-run": [
+                {
+                    "caseId": "historical-scientist",
+                    "role": "assistant",
+                    "content": "Previous probe.",
+                }
+            ]
+        },
+        {"historical-scientist.json": historical_scenario.model_dump(by_alias=True, mode="json")},
     )
-    calls: list[str] = []
-
-    def load_history(*args: object) -> list[CaseRecord]:
-        calls.append("called")
-        return [historical]
-
-    monkeypatch.setattr(ExperimentRunner, "_load_configured_history", staticmethod(load_history))
     generated = {
         "schemaVersion": "1.0",
         "kind": "scenario",
@@ -3456,9 +3477,10 @@ async def test_scientist_history_uses_configured_runs_with_base_cases_selected(
         run_id="current-run",
         target=LiveFakeTarget(),
         model=model,
+        artifacts=cast(ArtifactStore, artifacts),
     )
 
-    assert calls == ["called"], model.prompts
+    assert model.prompts
     history = next(event for event in progress if event.event_type == "scientist.history_used")
     assert history.history_case_ids == ("case", "historical-scientist")
     scientist_prompt = next(prompt for prompt in model.prompts if "Design one new" in prompt)
@@ -3697,7 +3719,8 @@ async def test_fallback_preflight_forces_read_only_target_query() -> None:
         ]
     )
     target = LiveFakeTarget()
-    result = await ExperimentRunner()._run_discovery(
+    events = RunEvents(None, None)
+    result = await DiscoveryRunner(ConversationRunner(events), events, None).run(
         "preflight-read-only",
         _fallback_task(),
         ExperimentConfig(
@@ -3782,7 +3805,7 @@ async def test_fallback_timeout_blocks_without_starting_scenarios(
             await asyncio.sleep(0.01)
             return {"content": '{"kind":"phase_complete","reason":"late"}'}
 
-    monkeypatch.setattr(runner_module, "_PREFLIGHT_TIMEOUT_SECONDS", 0.001)
+    monkeypatch.setattr(discovery_module, "_PREFLIGHT_TIMEOUT_SECONDS", 0.001)
     target = LiveFakeTarget()
     progress: list[ProgressEvent] = []
     await ExperimentRunner(progress=progress.append).run(

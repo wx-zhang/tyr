@@ -25,6 +25,7 @@ from gamr_engine.collector_verification import (
 from gamr_engine.content_evidence import AssessmentReference
 from gamr_engine.content_source import VerifiedContentSnapshot
 from gamr_engine.execution import ExperimentExecutionService
+from gamr_engine.experiments.records import LoadedTask
 from gamr_engine.ports.artifacts import ArtifactStore
 from gamr_engine.ports.sandbox import (
     ExecutionResult,
@@ -33,7 +34,6 @@ from gamr_engine.ports.sandbox import (
     SandboxId,
     SandboxIsolation,
 )
-from gamr_engine.runner import LoadedTask
 
 
 class FakeModel:

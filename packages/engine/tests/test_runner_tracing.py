@@ -13,9 +13,9 @@ from gamr_core import (
     TaskManifest,
 )
 from gamr_engine.execution import ExperimentExecutionService
+from gamr_engine.experiments.records import LoadedTask
 from gamr_engine.ports.artifacts import ArtifactStore
 from gamr_engine.ports.tracing import TraceObservation
-from gamr_engine.runner import LoadedTask
 
 
 class FakeObs:
@@ -413,7 +413,7 @@ async def test_scientist_resume_uses_source_session_lineage() -> None:
     service = ExperimentExecutionService()
     task = _make_task()
 
-    await service.resume_scientist(
+    await service.resume_research(
         task,
         ExperimentConfig(scientistIterations=1),
         source_run_id="source-run-abc",

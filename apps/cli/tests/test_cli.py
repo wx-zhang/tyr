@@ -7,7 +7,7 @@ import gamr_cli.main as cli
 import pytest
 from gamr_core import ExecutionOutcome, RunState
 from gamr_engine.execution import ExperimentExecutionService
-from gamr_engine.runner import ProgressEvent
+from gamr_engine.experiments.records import ProgressEvent
 from rich.console import Console
 from typer.testing import CliRunner
 

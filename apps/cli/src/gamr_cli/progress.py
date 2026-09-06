@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from gamr_core import ExperimentActivity
-from gamr_engine.runner import ProgressEvent
+from gamr_engine.experiments.records import ProgressEvent
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.markup import escape
