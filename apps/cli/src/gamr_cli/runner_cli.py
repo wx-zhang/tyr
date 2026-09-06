@@ -10,6 +10,7 @@ import typer
 from gamr_adapters.artifacts.filesystem import FilesystemArtifactStore
 from gamr_adapters.collector import CollectorClient
 from gamr_adapters.config import Settings
+from gamr_adapters.models import ModelStreamCallback
 from gamr_adapters.models.openai_compatible import OpenAICompatibleModel
 from gamr_adapters.tracing import create_trace_port
 from gamr_adapters.tyr.client import TyrMcpClient
@@ -68,6 +69,7 @@ def build_experiment_execution(
     selected_scientist_model: str,
     selected_judge_model: str,
     trace_port: TracePort | None = None,
+    stream_callback: ModelStreamCallback | None = None,
 ) -> tuple[
     FilesystemArtifactStore,
     TyrMcpClient,
@@ -104,6 +106,7 @@ def build_experiment_execution(
         settings.model_api_key,
         selected_model,
         trace_port=trace_port,
+        stream_callback=stream_callback,
     )
     researcher_base_url = settings.adversarial_researcher_base_url or settings.model_base_url
     researcher_api_key = (
@@ -122,6 +125,7 @@ def build_experiment_execution(
             researcher_api_key,
             selected_scientist_model,
             trace_port=trace_port,
+            stream_callback=stream_callback,
         )
     )
     judge_model_gateway = (
@@ -132,6 +136,7 @@ def build_experiment_execution(
             settings.model_api_key,
             selected_judge_model,
             trace_port=trace_port,
+            stream_callback=stream_callback,
         )
     )
     return (

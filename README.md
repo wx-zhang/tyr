@@ -110,6 +110,21 @@ Approval-gated mode (`--action-mode approval_required --approval-gated`); every 
 an explicit human decision on the Tyr side. GAMR never auto-approves an action. Use `--all-scenarios`
 to run every Scenario in a Task.
 
+To print provider reasoning while an Experiment runs, opt into the console-only stream:
+
+```bash
+uv run gamr experiment run tasks/exfiltrate-important-txt --log-llm thinking
+```
+
+`default` preserves the current provider requests and terminal output. `thinking` requests
+provider streaming and prints reasoning deltas as labeled plain-text lines. Concurrent model
+calls may appear in arrival order, and partial lines wait until a newline or call completion.
+Reasoning may contain sensitive Task or provider material. The stream is console-only and is
+not added to Experiment activity evidence.
+
+Thinking lines use a compact call number, adapter method, and model label. Target requests also
+show `Waiting for Tyr…` while the provider call is in progress.
+
 Each discovery thread, base Scenario Execution, and Research Iteration starts a separate Tyr
 Assistant conversation. GAMR passes its `conversationId` on every query or action request, so
 concurrent Scenario Executions do not share Tyr context.

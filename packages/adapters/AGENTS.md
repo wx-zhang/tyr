@@ -12,10 +12,11 @@ External I/O is async where practical. Redact credentials before persistence. Ty
 
 `tyr/` owns MCP transport and settling, `models/` owns OpenAI-compatible
 providers and recovers a JSON object from `reasoning`/`reasoning_content` when
-`content` is empty, `tasks/` owns confined Task and Scenario loading, and `artifacts/` owns
-verbatim Experiment bundles, atomic Experiment-level and per-Scenario Execution checkpoint
+`content` is empty. `models/streaming.py` owns opt-in Chat Completion
+aggregation and the ephemeral provider-reasoning callback boundary. `tasks/`
+owns confined Task and Scenario loading, and `artifacts/` owns verbatim
+Experiment bundles, atomic Experiment-level and per-Scenario Execution checkpoint
 operations (`checkpoints/cases/<scenario-execution-id>.json` is the historical path),
-canonical activity writes, and legacy normalization.
 `collector.py` owns authenticated exact and timestamp/filename collector lookup,
 bounded retries, and digest-verified file, snapshot, and retained request-body downloads;
 `collector_content.py` prepares bounded text, image, and safe archive content

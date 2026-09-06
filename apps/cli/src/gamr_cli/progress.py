@@ -76,6 +76,7 @@ def render_progress(console: Console, event: ProgressEvent) -> None:
     elif event.event_type == "target.requesting":
         console.print(f"[magenta]↗[/] [dim]{context}[/] Sending to Tyr…")
         _print_message(console, event.detail, style="magenta")
+        console.print("  [dim]Waiting for Tyr…[/]")
     elif event.event_type == "target.completed":
         settlement_state = dict(event.fields or ()).get("settlementState")
         label = (

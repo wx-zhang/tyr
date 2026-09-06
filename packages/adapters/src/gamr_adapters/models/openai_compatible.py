@@ -8,6 +8,8 @@ from gamr_engine.ports.models import ModelImage
 from gamr_engine.ports.tracing import TracePort, trace_generation
 from openai import AsyncOpenAI, BadRequestError
 
+from .streaming import ModelStreamCallback, stream_chat_completion
+
 
 def _reasoning_text(message: Any) -> str:
     if message is None:
@@ -54,7 +56,12 @@ def _completion_payload(response: Any) -> dict[str, object]:
     choice = response.choices[0] if response.choices else None
     message = choice.message if choice else None
     content = message.content if message and message.content else ""
-    reasoning = _reasoning_text(message)
+    stream_reasoning = getattr(response, "_gamr_reasoning", None)
+    reasoning = (
+        stream_reasoning
+        if isinstance(stream_reasoning, str)
+        else _reasoning_text(message)
+    )
     if not isinstance(content, str) or not content.strip():
         extracted = _json_object_text(reasoning) if reasoning else None
         if extracted:
@@ -79,10 +86,24 @@ class OpenAICompatibleModel:
         model: str,
         *,
         trace_port: TracePort | None = None,
+        stream_callback: ModelStreamCallback | None = None,
     ) -> None:
         self.client = AsyncOpenAI(base_url=base_url, api_key=api_key)
         self.model = model
         self.trace_port = trace_port
+        self.stream_callback = stream_callback
+
+    async def _response(self, request: dict[str, Any], method: str) -> Any:
+        if self.stream_callback is None:
+            return await self.client.chat.completions.create(**cast(Any, request))
+        return await stream_chat_completion(
+            self.client.chat.completions.create,
+            request,
+            model=self.model,
+            method=method,
+            callback=self.stream_callback,
+        )
+
 
     async def complete(self, prompt: str) -> dict[str, object]:
         with trace_generation(
@@ -91,10 +112,13 @@ class OpenAICompatibleModel:
             model=self.model,
             input={"prompt": prompt},
         ) as gen_obs:
-            response = await self.client.chat.completions.create(
-                model=self.model,
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=8192,
+            response = await self._response(
+                {
+                    "model": self.model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "max_tokens": 8192,
+                },
+                "complete",
             )
             payload = _completion_payload(response)
             if gen_obs is not None:
@@ -142,7 +166,7 @@ class OpenAICompatibleModel:
             input=request,
             metadata={"schema_name": schema_name},
         ) as gen_obs:
-            payload = await self._structured_response(request)
+            payload = await self._structured_response(request, "complete_structured")
             if gen_obs is not None:
                 gen_obs.end(
                     output=payload,
@@ -206,7 +230,9 @@ class OpenAICompatibleModel:
             input=request,
             metadata={"schema_name": schema_name},
         ) as gen_obs:
-            payload = await self._structured_response(request)
+            payload = await self._structured_response(
+                request, "complete_multimodal_structured"
+            )
             if gen_obs is not None:
                 gen_obs.end(
                     output=payload,
@@ -219,12 +245,14 @@ class OpenAICompatibleModel:
                 )
             return payload
 
-    async def _structured_response(self, request: dict[str, object]) -> dict[str, object]:
+    async def _structured_response(
+        self, request: dict[str, object], method: str
+    ) -> dict[str, object]:
         try:
-            response = await self.client.chat.completions.create(**cast(Any, request))
+            response = await self._response(request, method)
         except BadRequestError:
             request["response_format"] = {"type": "json_object"}
-            response = await self.client.chat.completions.create(**cast(Any, request))
+            response = await self._response(request, method)
         return _completion_payload(response)
 
     async def chat(
@@ -248,7 +276,7 @@ class OpenAICompatibleModel:
             model=self.model,
             input=request,
         ) as gen_obs:
-            response = await self.client.chat.completions.create(**request)
+            response = await self._response(request, "chat")
             if not response.choices:
                 payload: dict[str, Any] = {
                     "message": {"role": "assistant", "content": ""},

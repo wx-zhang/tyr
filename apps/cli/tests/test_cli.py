@@ -127,7 +127,9 @@ def test_experiment_run_ctrl_c_cancels_run(monkeypatch: pytest.MonkeyPatch) -> N
 
     store = FakeStore()
 
-    def fake_build(*_args: object) -> tuple[object, object, None, object, object, object, object]:
+    def fake_build(
+        *_args: object, **_kwargs: object
+    ) -> tuple[object, object, None, object, object, object, object]:
         model = FakeModel()
         return store, FakeTarget(), None, FakeStore(), model, model, model
 
@@ -191,6 +193,7 @@ def test_progress_renderer_shows_tyr_message_bodies(monkeypatch: pytest.MonkeyPa
     )
 
     rendered = output.getvalue()
+    assert "Waiting for Tyr" in rendered
     assert "Sending to Tyr" in rendered
     assert "What agents are available in the peer workspace?" in rendered
     assert "Tyr replied" in rendered
@@ -372,7 +375,9 @@ def test_experiment_run_prints_result_errors(monkeypatch: pytest.MonkeyPatch) ->
             result_path=".gamr/runs/run-err/result.json",
         )
 
-    def fake_build(*_args: object) -> tuple[object, object, None, object, object, object, object]:
+    def fake_build(
+        *_args: object, **_kwargs: object
+    ) -> tuple[object, object, None, object, object, object, object]:
         model = FakeModel()
         return FakeStore(), FakeTarget(), None, FakeStore(), model, model, model
 
@@ -448,7 +453,9 @@ def test_experiment_run_accepts_max_concurrent_cases_option(
             result_path=".gamr/runs/run-concurrency/result.json",
         )
 
-    def fake_build(*_args: object) -> tuple[object, object, None, object, object, object, object]:
+    def fake_build(
+        *_args: object, **_kwargs: object
+    ) -> tuple[object, object, None, object, object, object, object]:
         model = FakeModel()
         return FakeStore(), FakeTarget(), None, FakeStore(), model, model, model
 
@@ -516,3 +523,63 @@ def test_experiment_run_accepts_max_concurrent_cases_option(
             ],
         )
         assert result.exit_code != 0
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        ["experiment", "run", "tasks/exfiltrate-important-txt"],
+        ["experiment", "resume-research", "run-1"],
+        ["experiment", "resume-scientist", "run-1"],
+    ],
+)
+def test_experiment_commands_expose_typed_llm_log_option(command: list[str]) -> None:
+    result = CliRunner().invoke(cli.app, [*command, "--help"])
+
+    assert result.exit_code == 0
+    assert "--log-llm" in result.output
+    assert "default" in result.output
+    assert "thinking" in result.output
+
+
+@pytest.mark.parametrize(
+    ("command", "helper_name"),
+    [
+        (["experiment", "run", "tasks/exfiltrate-important-txt"], "run_experiment_command"),
+        (["experiment", "resume-research", "run-1"], "resume_research_command"),
+        (["experiment", "resume-scientist", "run-1"], "resume_research_command"),
+    ],
+)
+def test_experiment_commands_forward_llm_log_mode(
+    monkeypatch: pytest.MonkeyPatch,
+    command: list[str],
+    helper_name: str,
+) -> None:
+    from gamr_cli import experiment_commands
+    from gamr_cli.llm_logging import LlmLogMode
+
+    captured: list[dict[str, object]] = []
+
+    def fake_helper(**kwargs: object) -> None:
+        captured.append(kwargs)
+
+    monkeypatch.setattr(experiment_commands, helper_name, fake_helper)
+    runner = CliRunner()
+    assert runner.invoke(cli.app, command).exit_code == 0
+    assert captured[-1].get("log_llm") is LlmLogMode.DEFAULT
+    assert runner.invoke(cli.app, [*command, "--log-llm", "thinking"]).exit_code == 0
+    assert captured[-1].get("log_llm") is LlmLogMode.THINKING
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        ["experiment", "run", "tasks/exfiltrate-important-txt"],
+        ["experiment", "resume-research", "run-1"],
+        ["experiment", "resume-scientist", "run-1"],
+    ],
+)
+def test_experiment_commands_reject_invalid_llm_log_mode(command: list[str]) -> None:
+    result = CliRunner().invoke(cli.app, [*command, "--log-llm", "invalid"])
+
+    assert result.exit_code == 2

@@ -24,6 +24,7 @@ from gamr_engine import ExecutionOutput, ExperimentExecutionService
 from rich.console import Console
 
 from .composition import configured_secrets
+from .llm_logging import LlmLogMode, model_stream_callback
 from .runner_cli import (
     build_experiment_execution,
     execute_cli_run,
@@ -50,6 +51,7 @@ def run_experiment_command(
     history_research_runs: int,
     discovery_input: Path | None,
     fallback_to_discovery: bool,
+    log_llm: LlmLogMode,
     render_progress_cb: Any,
 ) -> None:
     from . import main as main_cli
@@ -85,7 +87,6 @@ def run_experiment_command(
         if all_scenarios
         else scenario_id or None
     )
-
     settings_cls = getattr(main_cli, "Settings", Settings)
     settings = settings_cls()
     selected_model = model or settings.model_name
@@ -98,38 +99,24 @@ def run_experiment_command(
     trace_port = getattr(settings, "trace_port", None) or getattr(
         main_cli, "create_trace_port", create_trace_port
     )(settings)
+    stream_callback = model_stream_callback(console, log_llm)
     build_fn = getattr(main_cli, "build_experiment_execution", build_experiment_execution)
-    try:
-        (
-            artifact_store,
-            target,
-            collector,
-            sandbox,
-            model_gateway,
-            scientist_model_gateway,
-            judge_model_gateway,
-        ) = build_fn(
-            settings,
-            selected_model,
-            selected_adversarial_researcher_model,
-            selected_judge_model,
-            trace_port=trace_port,
-        )
-    except TypeError:
-        (
-            artifact_store,
-            target,
-            collector,
-            sandbox,
-            model_gateway,
-            scientist_model_gateway,
-            judge_model_gateway,
-        ) = build_fn(
-            settings,
-            selected_model,
-            selected_adversarial_researcher_model,
-            selected_judge_model,
-        )
+    (
+        artifact_store,
+        target,
+        collector,
+        sandbox,
+        model_gateway,
+        scientist_model_gateway,
+        judge_model_gateway,
+    ) = build_fn(
+        settings,
+        selected_model,
+        selected_adversarial_researcher_model,
+        selected_judge_model,
+        trace_port=trace_port,
+        stream_callback=stream_callback,
+    )
 
     configuration = ExperimentPresetConfig(
         actionMode=action_mode,
@@ -194,6 +181,7 @@ def resume_research_command(
     adversarial_researcher_model: str,
     judge_model: str,
     confirm_actions: bool,
+    log_llm: LlmLogMode,
     render_progress_cb: Any,
 ) -> None:
     from . import main as main_cli
@@ -245,37 +233,23 @@ def resume_research_command(
     trace_port = getattr(settings, "trace_port", None) or getattr(
         main_cli, "create_trace_port", create_trace_port
     )(settings)
-    try:
-        (
-            artifact_store,
-            target,
-            collector,
-            sandbox,
-            model_gateway,
-            scientist_model_gateway,
-            judge_model_gateway,
-        ) = build_experiment_execution(
-            settings,
-            selected_model,
-            selected_adversarial_researcher_model,
-            selected_judge_model,
-            trace_port=trace_port,
-        )
-    except TypeError:
-        (
-            artifact_store,
-            target,
-            collector,
-            sandbox,
-            model_gateway,
-            scientist_model_gateway,
-            judge_model_gateway,
-        ) = build_experiment_execution(
-            settings,
-            selected_model,
-            selected_adversarial_researcher_model,
-            selected_judge_model,
-        )
+    stream_callback = model_stream_callback(console, log_llm)
+    (
+        artifact_store,
+        target,
+        collector,
+        sandbox,
+        model_gateway,
+        scientist_model_gateway,
+        judge_model_gateway,
+    ) = build_experiment_execution(
+        settings,
+        selected_model,
+        selected_adversarial_researcher_model,
+        selected_judge_model,
+        trace_port=trace_port,
+        stream_callback=stream_callback,
+    )
 
     configuration = configuration.model_copy(
         update={
