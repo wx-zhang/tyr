@@ -10,8 +10,14 @@ from gamr_core import (
     Scenario,
     SecurityVerdict,
 )
+from gamr_engine.experiments.history import (
+    cap_history_records,
+    effective_scientist_history,
+    scientist_history,
+    truncate_scientist_history_transcript,
+)
+from gamr_engine.experiments.records import ScenarioExecutionRecord
 from gamr_engine.ports.artifacts import ArtifactStore
-from gamr_engine.runner import CaseRecord, ExperimentRunner
 
 
 def _at(hour: int) -> datetime:
@@ -31,7 +37,7 @@ def test_scientist_history_includes_execution_contract_and_result_fields() -> No
             },
         }
     )
-    record = CaseRecord(
+    record = ScenarioExecutionRecord(
         scenario=scenario,
         rendered_title="Failed case",
         rendered_objective="Read the protected value.",
@@ -55,7 +61,7 @@ def test_scientist_history_includes_execution_contract_and_result_fields() -> No
         ],
     )
 
-    history = ExperimentRunner._scientist_history([record])
+    history = scientist_history([record])
 
     assert (
         "=== failed-case (outcome=failed, verdict=inconclusive, "
@@ -73,7 +79,7 @@ def test_scientist_history_includes_execution_contract_and_result_fields() -> No
 def test_scientist_history_truncates_long_transcripts_without_losing_latest_turn() -> None:
     transcript = "PREFIX " + ("middle-only " * 600) + " SUFFIX"
 
-    rendered = ExperimentRunner._truncate_scientist_history_transcript(transcript)
+    rendered = truncate_scientist_history_transcript(transcript)
 
     assert len(rendered) <= 4000
     assert rendered.startswith("PREFIX")
@@ -85,7 +91,7 @@ def test_scientist_history_truncates_long_transcripts_without_losing_latest_turn
 def test_scientist_history_budget_preserves_latest_scenario_spread() -> None:
     records = [make_record(f"spread-{index}") for index in range(3)]
 
-    history = ExperimentRunner._scientist_history(records, max_bytes=900)
+    history = scientist_history(records, max_bytes=900)
 
     assert len(history.encode("utf-8")) <= 900
     for index in range(3):
@@ -99,7 +105,7 @@ def make_record(
     origin_run_id: str | None = None,
     origin_artifact_id: str | None = None,
     source_created_at: datetime | None = None,
-) -> CaseRecord:
+) -> ScenarioExecutionRecord:
     scenario = Scenario.model_validate(
         {
             "metadata": {"id": scenario_id, "title": scenario_id},
@@ -118,7 +124,7 @@ def make_record(
         summary="Observed.",
         evidence=[],
     )
-    return CaseRecord(
+    return ScenarioExecutionRecord(
         scenario=scenario,
         rendered_title=scenario_id,
         rendered_objective="Observe.",
@@ -149,9 +155,7 @@ def test_archived_history_is_excluded_but_authored_base_cases_remain() -> None:
     ]
     artifacts = ArchiveAwareArtifacts({("run-1", "generated")})
 
-    effective = ExperimentRunner._effective_scientist_history(
-        records, cast(ArtifactStore, artifacts)
-    )
+    effective = effective_scientist_history(records, cast(ArtifactStore, artifacts))
 
     assert [record.case.scenario_id for record in effective] == ["base", "active"]
 
@@ -160,14 +164,10 @@ def test_restoring_a_scenario_makes_it_eligible_again() -> None:
     record = make_record("generated", origin_run_id="run-1", origin_artifact_id="generated")
     artifacts = ArchiveAwareArtifacts({("run-1", "generated")})
 
-    assert not ExperimentRunner._effective_scientist_history(
-        [record], cast(ArtifactStore, artifacts)
-    )
+    assert not effective_scientist_history([record], cast(ArtifactStore, artifacts))
 
     artifacts.archived.clear()
-    effective = ExperimentRunner._effective_scientist_history(
-        [record], cast(ArtifactStore, artifacts)
-    )
+    effective = effective_scientist_history([record], cast(ArtifactStore, artifacts))
 
     assert [item.case.scenario_id for item in effective] == ["generated"]
 
@@ -176,9 +176,7 @@ def test_archived_ids_are_still_available_to_duplicate_prevention() -> None:
     record = make_record("generated", origin_run_id="run-1", origin_artifact_id="generated")
     artifacts = ArchiveAwareArtifacts({("run-1", "generated")})
 
-    effective = ExperimentRunner._effective_scientist_history(
-        [record], cast(ArtifactStore, artifacts)
-    )
+    effective = effective_scientist_history([record], cast(ArtifactStore, artifacts))
     used_ids = {item.case.scenario_id for item in [record]}
 
     assert effective == []
@@ -192,7 +190,7 @@ def test_history_cap_keeps_latest_unique_scientist_scenarios() -> None:
         make_record("sci-c", origin_run_id="run-3", source_created_at=_at(12)),
         make_record("sci-d", origin_run_id="run-4", source_created_at=_at(13)),
     ]
-    capped = ExperimentRunner._cap_history_records(records, test_limit=0, scientist_limit=2)
+    capped = cap_history_records(records, test_limit=0, scientist_limit=2)
     assert [record.case.scenario_id for record in capped] == ["sci-c", "sci-d"]
 
 
@@ -202,7 +200,7 @@ def test_history_cap_uses_latest_run_of_the_same_scenario() -> None:
         make_record("sci-b", origin_run_id="run-2", source_created_at=_at(11)),
         make_record("sci-a", origin_run_id="run-3", source_created_at=_at(12)),
     ]
-    capped = ExperimentRunner._cap_history_records(records, test_limit=0, scientist_limit=2)
+    capped = cap_history_records(records, test_limit=0, scientist_limit=2)
     assert [record.case.scenario_id for record in capped] == ["sci-b", "sci-a"]
     assert capped[1].origin_run_id == "run-3"
 
@@ -214,5 +212,5 @@ def test_history_cap_applies_base_and_scientist_limits_separately() -> None:
         make_record("sci-old", origin_run_id="run-1", source_created_at=_at(11)),
         make_record("sci-new", origin_run_id="run-2", source_created_at=_at(13)),
     ]
-    capped = ExperimentRunner._cap_history_records(records, test_limit=1, scientist_limit=1)
+    capped = cap_history_records(records, test_limit=1, scientist_limit=1)
     assert [record.case.scenario_id for record in capped] == ["base-new", "sci-new"]

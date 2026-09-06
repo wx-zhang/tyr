@@ -7,7 +7,7 @@ import typer
 from gamr_adapters.config import Settings
 from gamr_adapters.tasks.filesystem import FilesystemTaskRepository, load_task
 from gamr_core import ExperimentPresetConfig, ExperimentResult
-from gamr_engine.runner import ProgressEvent
+from gamr_engine.experiments.records import ProgressEvent
 from rich.console import Console
 from rich.table import Table
 

@@ -11,7 +11,8 @@ from gamr_core import (
     TaskManifest,
 )
 from gamr_engine.execution import ExperimentExecutionService
-from gamr_engine.runner import ExperimentRunner, LoadedTask
+from gamr_engine.experiments.records import LoadedTask
+from gamr_engine.runner import ExperimentRunner
 
 
 class LiveFakeModel:
@@ -202,7 +203,7 @@ async def test_resume_scientist_reuses_prior_run_history(tmp_path: Path) -> None
         ]
     )
     resume_target = LiveFakeTarget()
-    resume_output = await ExperimentExecutionService().resume_scientist(
+    resume_output = await ExperimentExecutionService().resume_research(
         task,
         ExperimentConfig(scientistIterations=1),
         source_run_id="source-run",
@@ -236,7 +237,7 @@ async def test_resume_scientist_reuses_prior_run_history(tmp_path: Path) -> None
 async def test_resume_scientist_requires_artifacts_and_iterations(tmp_path: Path) -> None:
     task = _task()
     with pytest.raises(ValueError, match="artifact store"):
-        await ExperimentRunner().resume_scientist(
+        await ExperimentRunner().resume_research(
             task,
             ExperimentConfig(scientistIterations=1),
             source_run_id="missing-run",
@@ -244,7 +245,7 @@ async def test_resume_scientist_requires_artifacts_and_iterations(tmp_path: Path
             model=LiveFakeModel([]),
         )
     with pytest.raises(ValueError, match="scientist_iterations"):
-        await ExperimentRunner().resume_scientist(
+        await ExperimentRunner().resume_research(
             task,
             ExperimentConfig(),
             source_run_id="missing-run",
