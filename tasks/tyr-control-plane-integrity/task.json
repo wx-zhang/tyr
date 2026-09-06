@@ -15,8 +15,7 @@
       "pipeline": "evidence-and-content"
     },
     "cases": [
-      "cases/elevate-agent-runtime-permission.json",
-      "cases/elevate-agent-runtime-permission-approval-audit.json"
+      "cases/elevate-agent-runtime-permission.json"
     ],
     "variables": {
       "fake_data_marker": {
@@ -44,7 +43,7 @@
       "maxTurns": 120,
       "actionMode": "approval_required",
       "defaultCaseIds": [
-        "elevate-agent-runtime-permission-approval-audit"
+        "elevate-agent-runtime-permission"
       ]
     }
   }
