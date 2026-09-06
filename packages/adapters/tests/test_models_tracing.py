@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from gamr_adapters.models import openai_compatible
@@ -11,6 +11,8 @@ from gamr_engine.ports.tracing import (
 )
 from httpx import Request, Response
 from openai import APIError, BadRequestError
+from openai.types.chat.chat_completion_chunk import ChatCompletionChunk, Choice, ChoiceDelta
+from openai.types.completion_usage import CompletionUsage
 
 
 class FakeGenerationObs:
@@ -239,3 +241,109 @@ async def test_traced_provider_error_records_error_and_re_raises(
     assert len(tracer.generations) == 1
     assert tracer.generations[0].ended is True
     assert tracer.generations[0].error is not None
+
+
+def _trace_chunk(
+    *,
+    content: str | None = None,
+    reasoning: str | None = None,
+    finish_reason: str | None = None,
+    usage: CompletionUsage | None = None,
+) -> ChatCompletionChunk:
+    delta_data: dict[str, Any] = {"content": content}
+    if reasoning is not None:
+        delta_data["reasoning"] = reasoning
+    delta = cast(Any, ChoiceDelta)(**delta_data)
+    return ChatCompletionChunk(
+        id="trace-stream",
+        choices=[
+            Choice(index=0, delta=delta, finish_reason=cast(Any, finish_reason))
+        ],
+        created=1,
+        model="trace-model",
+        object="chat.completion.chunk",
+        usage=usage,
+    )
+
+
+class TraceStreamingCompletions:
+    def __init__(self, chunks: list[ChatCompletionChunk]) -> None:
+        self.chunks = chunks
+
+    async def create(self, **_request: object) -> Any:
+        async def stream() -> Any:
+            for chunk in self.chunks:
+                yield chunk
+
+        return stream()
+
+
+def _streaming_trace_model(
+    monkeypatch: pytest.MonkeyPatch,
+    tracer: FakeTracer,
+    completions: TraceStreamingCompletions,
+    callback: Any,
+) -> openai_compatible.OpenAICompatibleModel:
+    monkeypatch.setattr(
+        openai_compatible,
+        "AsyncOpenAI",
+        lambda *, base_url, api_key: SimpleNamespace(
+            chat=SimpleNamespace(completions=completions)
+        ),
+    )
+    return openai_compatible.OpenAICompatibleModel(
+        "https://example.test/v1",
+        "key",
+        "test-model",
+        trace_port=tracer,
+        stream_callback=callback,
+    )
+
+
+@pytest.mark.asyncio
+async def test_traced_streaming_completion_ends_one_generation_with_final_payload(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    usage = CompletionUsage(completion_tokens=3, prompt_tokens=2, total_tokens=5)
+    completions = TraceStreamingCompletions(
+        [
+            _trace_chunk(reasoning="plan "),
+            _trace_chunk(content="answer"),
+            _trace_chunk(finish_reason="stop"),
+            _trace_chunk(usage=usage),
+        ]
+    )
+    tracer = FakeTracer()
+    model = _streaming_trace_model(monkeypatch, tracer, completions, lambda _event: None)
+
+    result = await model.complete("hello")
+
+    assert result["content"] == "answer"
+    assert result["reasoning"] == "plan "
+    assert result["usage"] == usage.model_dump()
+    assert len(tracer.generations) == 1
+    generation = tracer.generations[0]
+    assert generation.ended is True
+    assert generation.output == result
+    assert generation.usage == usage.model_dump()
+
+
+@pytest.mark.asyncio
+async def test_stream_callback_failure_does_not_change_traced_model_result(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    completions = TraceStreamingCompletions(
+        [_trace_chunk(content="answer"), _trace_chunk(finish_reason="stop")]
+    )
+    tracer = FakeTracer()
+
+    def fail_callback(_event: object) -> None:
+        raise RuntimeError("console failed")
+
+    model = _streaming_trace_model(monkeypatch, tracer, completions, fail_callback)
+
+    result = await model.complete("hello")
+
+    assert result["content"] == "answer"
+    assert len(tracer.generations) == 1
+    assert tracer.generations[0].ended is True

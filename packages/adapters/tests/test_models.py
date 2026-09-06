@@ -9,6 +9,14 @@ from gamr_adapters.models import openai_compatible
 from gamr_engine.ports.models import ModelImage
 from httpx import Request, Response
 from openai import BadRequestError
+from openai.types.chat.chat_completion_chunk import (
+    ChatCompletionChunk,
+    Choice,
+    ChoiceDelta,
+    ChoiceDeltaToolCall,
+    ChoiceDeltaToolCallFunction,
+)
+from openai.types.completion_usage import CompletionUsage
 
 
 class FakeCompletions:
@@ -31,7 +39,7 @@ class FakeCompletions:
 
 
 class FakeClient:
-    def __init__(self, completions: FakeCompletions) -> None:
+    def __init__(self, completions: Any) -> None:
         self.chat = SimpleNamespace(completions=completions)
 
 
@@ -63,7 +71,8 @@ async def test_complete_sets_a_large_enough_json_completion_budget(
     await model.complete("Return JSON.")
 
     assert completions.request is not None
-    assert completions.request["max_tokens"] == 8192
+    assert "stream" not in completions.request
+    assert "stream_options" not in completions.request
 
 
 @pytest.mark.asyncio
@@ -239,3 +248,259 @@ async def test_complete_keeps_empty_content_when_reasoning_is_not_json(
 
     assert result["content"] == ""
     assert result["reasoning"] == "Need a genuinely new approach using {path}."
+
+
+
+def _stream_chunk(
+    *,
+    content: str | None = None,
+    reasoning: str | None = None,
+    reasoning_content: str | None = None,
+    refusal: str | None = None,
+    tool_calls: list[ChoiceDeltaToolCall] | None = None,
+    finish_reason: str | None = None,
+    usage: CompletionUsage | None = None,
+) -> ChatCompletionChunk:
+    delta_data: dict[str, Any] = {
+        "content": content,
+        "refusal": refusal,
+        "tool_calls": tool_calls,
+    }
+    for key, value in (
+        ("reasoning", reasoning),
+        ("reasoning_content", reasoning_content),
+    ):
+        if value is not None:
+            delta_data[key] = value
+    delta = cast(Any, ChoiceDelta)(**delta_data)
+    return ChatCompletionChunk(
+        id="stream-1",
+        choices=[
+            Choice(index=0, delta=delta, finish_reason=cast(Any, finish_reason))
+        ],
+        created=1,
+        model="stream-model",
+        object="chat.completion.chunk",
+        usage=usage,
+    )
+
+
+def _usage() -> CompletionUsage:
+    return CompletionUsage(completion_tokens=3, prompt_tokens=2, total_tokens=5)
+
+
+class StreamingCompletions:
+    def __init__(self, chunks: list[ChatCompletionChunk]) -> None:
+        self.requests: list[dict[str, object]] = []
+        self.chunks = chunks
+
+    async def create(self, **request: object) -> Any:
+        self.requests.append(request)
+
+        async def stream() -> Any:
+            for chunk in self.chunks:
+                yield chunk
+
+        return stream()
+
+
+class StreamingSchemaRejectingCompletions(StreamingCompletions):
+    def __init__(self, chunks: list[ChatCompletionChunk]) -> None:
+        super().__init__(chunks)
+
+    async def create(self, **request: object) -> Any:
+        self.requests.append(request)
+        if len(self.requests) == 1:
+            response = Response(400, request=Request("POST", "https://example.test/v1"))
+            raise BadRequestError("streaming schema unsupported", response=response, body={})
+
+        async def stream() -> Any:
+            for chunk in self.chunks:
+                yield chunk
+
+        return stream()
+
+
+@pytest.mark.asyncio
+async def test_callback_enabled_completion_streams_and_reconstructs_response(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    usage = _usage()
+    completions = StreamingCompletions(
+        [
+            _stream_chunk(reasoning="plan"),
+            _stream_chunk(reasoning_content=" "),
+            _stream_chunk(content="answer", refusal="blocked"),
+            _stream_chunk(finish_reason="stop"),
+            _stream_chunk(usage=usage),
+        ]
+    )
+    monkeypatch.setattr(
+        openai_compatible,
+        "AsyncOpenAI",
+        lambda *, base_url, api_key: FakeClient(completions),
+    )
+    events: list[tuple[str, str]] = []
+    model = openai_compatible.OpenAICompatibleModel(
+        "https://example.test/v1",
+        "key",
+        "test-model",
+        stream_callback=lambda event: events.append((event.kind, event.delta)),
+    )
+
+    result = await model.complete("Return an answer.")
+
+    assert completions.requests[0]["stream"] is True
+    assert completions.requests[0]["stream_options"] == {"include_usage": True}
+    assert result == {
+        "content": "answer",
+        "reasoning": "plan ",
+        "usage": usage.model_dump(),
+        "model": "stream-model",
+        "finishReason": "stop",
+        "refusal": "blocked",
+    }
+    assert events[0][0] == "started"
+    assert events[1:3] == [("thinking", "plan"), ("thinking", " ")]
+    assert events[-1][0] == "completed"
+
+
+@pytest.mark.asyncio
+async def test_streamed_reasoning_only_response_recovers_json(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scenario = '{"kind":"scenario"}'
+    completions = StreamingCompletions(
+        [
+            _stream_chunk(reasoning="Plan first.\n"),
+            _stream_chunk(reasoning_content=scenario),
+            _stream_chunk(finish_reason="stop"),
+            _stream_chunk(usage=_usage()),
+        ]
+    )
+    monkeypatch.setattr(
+        openai_compatible,
+        "AsyncOpenAI",
+        lambda *, base_url, api_key: FakeClient(completions),
+    )
+    model = openai_compatible.OpenAICompatibleModel(
+        "https://example.test/v1",
+        "key",
+        "test-model",
+        stream_callback=lambda _event: None,
+    )
+
+    result = await model.complete("Design one scenario.")
+
+    assert result["content"] == scenario
+    assert result["reasoning"] == f"Plan first.\n{scenario}"
+
+
+@pytest.mark.asyncio
+async def test_streamed_chat_reconstructs_fragmented_function_tool_call(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    completions = StreamingCompletions(
+        [
+            _stream_chunk(
+                tool_calls=[
+                    ChoiceDeltaToolCall(
+                        index=0,
+                        id="call_",
+                        type="function",
+                        function=ChoiceDeltaToolCallFunction(name="get_", arguments=""),
+                    )
+                ]
+            ),
+            _stream_chunk(
+                tool_calls=[
+                    ChoiceDeltaToolCall(
+                        index=0,
+                        id="42",
+                        type="function",
+                        function=ChoiceDeltaToolCallFunction(name="user", arguments='{"id":'),
+                    )
+                ]
+            ),
+            _stream_chunk(
+                tool_calls=[
+                    ChoiceDeltaToolCall(
+                        index=0,
+                        type="function",
+                        function=ChoiceDeltaToolCallFunction(arguments="7}"),
+                    )
+                ],
+                finish_reason="tool_calls",
+            ),
+            _stream_chunk(usage=_usage()),
+        ]
+    )
+    monkeypatch.setattr(
+        openai_compatible,
+        "AsyncOpenAI",
+        lambda *, base_url, api_key: FakeClient(completions),
+    )
+    model = openai_compatible.OpenAICompatibleModel(
+        "https://example.test/v1",
+        "key",
+        "test-model",
+        stream_callback=lambda _event: None,
+    )
+
+    result = await model.chat(
+        [{"role": "user", "content": "Find user 7."}],
+        tools=[{"type": "function"}],
+    )
+
+    assert result["message"]["tool_calls"] == [
+        {
+            "index": 0,
+            "id": "call_42",
+            "type": "function",
+            "function": {"name": "get_user", "arguments": '{"id":7}'},
+        }
+    ]
+    assert result["usage"] == _usage().model_dump()
+    assert result["finishReason"] == "tool_calls"
+
+
+@pytest.mark.asyncio
+async def test_streamed_structured_schema_retry_has_separate_failed_request(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    completions = StreamingSchemaRejectingCompletions(
+        [
+            _stream_chunk(reasoning="Assessing evidence.\n"),
+            _stream_chunk(content='{"ok":true}'),
+            _stream_chunk(finish_reason="stop"),
+        ]
+    )
+    monkeypatch.setattr(
+        openai_compatible,
+        "AsyncOpenAI",
+        lambda *, base_url, api_key: FakeClient(completions),
+    )
+    events: list[tuple[str, str, str]] = []
+    model = openai_compatible.OpenAICompatibleModel(
+        "https://example.test/v1",
+        "key",
+        "test-model",
+        stream_callback=lambda event: events.append((event.kind, event.request_id, event.delta)),
+    )
+
+    result = await model.complete_structured(
+        "Evidence", system="Judge safely", json_schema={"type": "object"}
+    )
+
+    assert result["content"] == '{"ok":true}'
+    assert result["reasoning"] == "Assessing evidence.\n"
+    assert completions.requests[0]["stream"] is True
+    assert completions.requests[0]["response_format"]["type"] == "json_schema"  # type: ignore[index]
+    assert completions.requests[1]["response_format"] == {"type": "json_object"}
+    assert events[0][0] == "started"
+    assert events[1][0] == "failed"
+    assert events[2][0] == "started"
+    assert events[-1][0] == "completed"
+    assert events[-2][0] == "thinking"
+    assert events[-2][2] == "Assessing evidence.\n"
+    assert events[0][1] != events[2][1]

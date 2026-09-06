@@ -2,6 +2,7 @@ from typing import cast
 
 import pytest
 from gamr_adapters.config import Settings
+from gamr_adapters.models import ModelStreamEvent
 from gamr_adapters.models.openai_compatible import OpenAICompatibleModel
 from gamr_cli.composition import build_chat_session
 from gamr_cli.runner_cli import build_experiment_execution
@@ -48,6 +49,7 @@ def test_experiment_builder_uses_researcher_endpoint_only_for_researcher(
             model: str,
             *,
             trace_port: object = None,
+            stream_callback: object = None,
         ) -> None:
             captures.append((base_url, api_key, model))
 
@@ -85,6 +87,7 @@ def test_experiment_builder_falls_back_and_separates_same_model_researcher(
             _model: str,
             *,
             trace_port: object = None,
+            stream_callback: object = None,
         ) -> None:
             captures.append((base_url, api_key))
 
@@ -124,3 +127,80 @@ def test_experiment_builder_falls_back_and_separates_same_model_researcher(
         ("http://ollama.example/v1", ""),
     ]
     assert no_auth_result[4] is not no_auth_result[5]
+
+
+def test_experiment_builder_propagates_stream_callback_to_distinct_gateways(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = _settings(monkeypatch)
+    settings.adversarial_researcher_base_url = "http://ollama.example/v1"
+    settings.adversarial_researcher_api_key = "research-key"
+    callbacks: list[object] = []
+
+    class CapturingModel:
+        def __init__(
+            self,
+            _base_url: str,
+            _api_key: str,
+            _model: str,
+            *,
+            trace_port: object = None,
+            stream_callback: object = None,
+        ) -> None:
+            callbacks.append(stream_callback)
+
+    from gamr_cli import main as main_cli
+
+    monkeypatch.setattr(main_cli, "OpenAICompatibleModel", CapturingModel, raising=False)
+    monkeypatch.setattr(main_cli, "build_sandbox", lambda _settings: object(), raising=False)
+    def callback(_event: ModelStreamEvent) -> None:
+        pass
+
+    result = build_experiment_execution(
+        settings,
+        "loop-model",
+        "research-model",
+        "judge-model",
+        stream_callback=callback,
+    )
+
+    assert callbacks == [callback, callback, callback]
+    assert result[4] is not result[5]
+    assert result[4] is not result[6]
+
+
+def test_experiment_builder_reuses_callback_enabled_main_gateway_for_aliases(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = _settings(monkeypatch)
+    callbacks: list[object] = []
+
+    class CapturingModel:
+        def __init__(
+            self,
+            _base_url: str,
+            _api_key: str,
+            _model: str,
+            *,
+            trace_port: object = None,
+            stream_callback: object = None,
+        ) -> None:
+            callbacks.append(stream_callback)
+
+    from gamr_cli import main as main_cli
+
+    monkeypatch.setattr(main_cli, "OpenAICompatibleModel", CapturingModel, raising=False)
+    monkeypatch.setattr(main_cli, "build_sandbox", lambda _settings: object(), raising=False)
+    def callback(_event: ModelStreamEvent) -> None:
+        pass
+
+    result = build_experiment_execution(
+        settings,
+        "same-model",
+        "same-model",
+        "same-model",
+        stream_callback=callback,
+    )
+
+    assert callbacks == [callback]
+    assert result[4] is result[5] is result[6]
