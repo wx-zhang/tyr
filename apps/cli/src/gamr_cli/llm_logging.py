@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import timedelta
 from enum import StrEnum
+from time import monotonic
 
 from gamr_adapters.models import ModelStreamCallback, ModelStreamEvent
 from rich.console import Console
@@ -18,6 +20,7 @@ class _CallState:
     number: int
     model: str
     method: str
+    started_at: float
     buffer: str = ""
 
 
@@ -30,7 +33,7 @@ class ThinkingStreamRenderer:
     def __call__(self, event: ModelStreamEvent) -> None:
         if event.kind == "started":
             self._calls[event.request_id] = _CallState(
-                self._next_call_number, event.model, event.method
+                self._next_call_number, event.model, event.method, monotonic()
             )
             self._next_call_number += 1
             return
@@ -44,6 +47,9 @@ class ThinkingStreamRenderer:
             return
         if event.kind in {"completed", "failed"}:
             self._render_line(state, state.buffer)
+            elapsed = timedelta(seconds=int(monotonic() - state.started_at))
+            label = "Thinking complete" if event.kind == "completed" else "Thinking failed"
+            self._render_line(state, f"{label} · {elapsed}")
             del self._calls[event.request_id]
 
     def _render_complete_lines(self, state: _CallState) -> None:

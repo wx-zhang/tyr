@@ -6,10 +6,46 @@ from rich.console import Console
 from rich.markdown import Markdown
 from rich.markup import escape
 from rich.padding import Padding
+from rich.progress import Progress, TaskID, TextColumn, TimeElapsedColumn
 from rich.text import Text
+
+_waits: dict[Console, tuple[Progress, dict[tuple[str, str | None, int | None], TaskID]]] = {}
+
+
+def _update_wait(console: Console, event: ProgressEvent) -> None:
+    key = (event.run_id, event.scenario_execution_id or event.case_id or event.phase, event.turn)
+    if event.event_type == "target.requesting":
+        if console not in _waits:
+            progress = Progress(
+                TextColumn("{task.description}", markup=False),
+                TimeElapsedColumn(),
+                console=console,
+                refresh_per_second=4,
+            )
+            _waits[console] = (progress, {})
+            progress.start()
+        progress, tasks = _waits[console]
+        tasks[key] = progress.add_task(f"  Waiting for Tyr… · {_context(event)} ·", total=None)
+    elif console in _waits:
+        progress, tasks = _waits[console]
+        for pending in list(tasks):
+            if pending == key and event.event_type in {"target.completed", "target.failed"}:
+                progress.stop_task(tasks.pop(pending))
+            elif pending[0] == event.run_id and event.event_type in {
+                "run.completed",
+                "run.failed",
+                "run.interrupted",
+                "run.cancelled",
+            }:
+                progress.stop_task(tasks.pop(pending))
+        if not tasks:
+            progress.stop()
+            del _waits[console]
 
 
 def render_progress(console: Console, event: ProgressEvent) -> None:
+    if event.event_type != "target.requesting":
+        _update_wait(console, event)
     context = _context(event)
     scenario_id = escape(event.scenario_id or event.case_id or "")
     scenario_execution_id = escape(event.scenario_execution_id or event.case_id or "")
@@ -76,7 +112,7 @@ def render_progress(console: Console, event: ProgressEvent) -> None:
     elif event.event_type == "target.requesting":
         console.print(f"[magenta]↗[/] [dim]{context}[/] Sending to Tyr…")
         _print_message(console, event.detail, style="magenta")
-        console.print("  [dim]Waiting for Tyr…[/]")
+        _update_wait(console, event)
     elif event.event_type == "target.completed":
         settlement_state = dict(event.fields or ()).get("settlementState")
         label = (
