@@ -5,12 +5,14 @@
 Own the installed `gamr` Typer command and Rich terminal presentation.
 
 The source entrypoint is `src/gamr_cli/main.py`; `src/gamr_cli/progress.py`
-renders live Experiment progress, including Tyr request and reply message bodies
-as terminal Markdown. `src/gamr_cli/experiment_commands.py` owns the three
+renders live Experiment progress, including a live Tyr wait timer and request/reply
+message bodies as terminal Markdown. Durations use `H:MM:SS`.
+`src/gamr_cli/experiment_commands.py` owns the three
 Experiment Typer declarations and their `--log-llm [default|thinking]` option.
 `src/gamr_cli/experiment_cli.py` handles Experiment execution and Adversarial
 Researcher resume commands. `src/gamr_cli/llm_logging.py` owns the console-only
-provider reasoning renderer. `src/gamr_cli/runner_cli.py` and
+provider reasoning renderer, including elapsed time after completion or failure.
+`src/gamr_cli/runner_cli.py` and
 `src/gamr_cli/composition.py` own execution composition, global decoder capacity
 gating (`GAMR_MAX_CONCURRENT_DECODERS`), Adversarial Researcher completion limits
 (`GAMR_ADVERSARIAL_RESEARCHER_OUTPUT_TOKENS`), and Scenario Execution concurrency.
