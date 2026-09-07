@@ -8,6 +8,8 @@ from gamr_engine.ports.models import ModelImage
 from gamr_engine.ports.tracing import TracePort, trace_generation
 from openai import AsyncOpenAI, BadRequestError
 
+from gamr_adapters.config import ReasoningEffort
+
 from .streaming import ModelStreamCallback, stream_chat_completion
 
 
@@ -57,11 +59,7 @@ def _completion_payload(response: Any) -> dict[str, object]:
     message = choice.message if choice else None
     content = message.content if message and message.content else ""
     stream_reasoning = getattr(response, "_gamr_reasoning", None)
-    reasoning = (
-        stream_reasoning
-        if isinstance(stream_reasoning, str)
-        else _reasoning_text(message)
-    )
+    reasoning = stream_reasoning if isinstance(stream_reasoning, str) else _reasoning_text(message)
     if not isinstance(content, str) or not content.strip():
         extracted = _json_object_text(reasoning) if reasoning else None
         if extracted:
@@ -85,6 +83,7 @@ class OpenAICompatibleModel:
         api_key: str,
         model: str,
         *,
+        reasoning_effort: ReasoningEffort | None = None,
         trace_port: TracePort | None = None,
         stream_callback: ModelStreamCallback | None = None,
     ) -> None:
@@ -92,34 +91,35 @@ class OpenAICompatibleModel:
         self.model = model
         self.trace_port = trace_port
         self.stream_callback = stream_callback
+        self.reasoning_effort = reasoning_effort
+        self._model_parameters: dict[str, object] | None = (
+            None if reasoning_effort is None else {"reasoning_effort": reasoning_effort}
+        )
 
     async def _response(self, request: dict[str, Any], method: str) -> Any:
+        if self.reasoning_effort is not None:
+            request["reasoning_effort"] = self.reasoning_effort
         if self.stream_callback is None:
             return await self.client.chat.completions.create(**cast(Any, request))
         return await stream_chat_completion(
-            self.client.chat.completions.create,
-            request,
+            self.client.chat.completions.create, request,
             model=self.model,
             method=method,
             callback=self.stream_callback,
         )
-
-
     async def complete(self, prompt: str) -> dict[str, object]:
         with trace_generation(
             self.trace_port,
             "complete",
             model=self.model,
             input={"prompt": prompt},
+            model_parameters=self._model_parameters,
         ) as gen_obs:
-            response = await self._response(
-                {
-                    "model": self.model,
-                    "messages": [{"role": "user", "content": prompt}],
-                    "max_tokens": 8192,
-                },
-                "complete",
-            )
+            request = {
+                "model": self.model, "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 8192,
+            }
+            response = await self._response(request, "complete")
             payload = _completion_payload(response)
             if gen_obs is not None:
                 gen_obs.end(
@@ -165,6 +165,7 @@ class OpenAICompatibleModel:
             model=self.model,
             input=request,
             metadata={"schema_name": schema_name},
+            model_parameters=self._model_parameters,
         ) as gen_obs:
             payload = await self._structured_response(request, "complete_structured")
             if gen_obs is not None:
@@ -229,10 +230,9 @@ class OpenAICompatibleModel:
             model=self.model,
             input=request,
             metadata={"schema_name": schema_name},
+            model_parameters=self._model_parameters,
         ) as gen_obs:
-            payload = await self._structured_response(
-                request, "complete_multimodal_structured"
-            )
+            payload = await self._structured_response(request, "complete_multimodal_structured")
             if gen_obs is not None:
                 gen_obs.end(
                     output=payload,
@@ -268,13 +268,13 @@ class OpenAICompatibleModel:
             "max_tokens": max_tokens,
         }
         if tools:
-            request["tools"] = tools
-            request["tool_choice"] = "auto"
+            request.update(tools=tools, tool_choice="auto")
         with trace_generation(
             self.trace_port,
             "chat",
             model=self.model,
             input=request,
+            model_parameters=self._model_parameters,
         ) as gen_obs:
             response = await self._response(request, "chat")
             if not response.choices:

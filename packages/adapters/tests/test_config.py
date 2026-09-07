@@ -338,3 +338,98 @@ def test_invalid_canonical_researcher_tokens_do_not_fallback(
     monkeypatch.setenv("GAMR_SCIENTIST_OUTPUT_TOKENS", "12288")
     with pytest.raises(ValidationError):
         Settings()
+
+REASONING_EFFORT_ENVIRONMENTS = (
+    ("GAMR_MODEL_REASONING_EFFORT", "model_reasoning_effort"),
+    (
+        "GAMR_ADVERSARIAL_RESEARCHER_REASONING_EFFORT",
+        "adversarial_researcher_reasoning_effort",
+    ),
+)
+REASONING_EFFORT_VALUES = ("none", "minimal", "low", "medium", "high", "xhigh")
+
+
+def _clear_reasoning_effort_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    for env_name, _field in REASONING_EFFORT_ENVIRONMENTS:
+        monkeypatch.delenv(env_name, raising=False)
+
+
+def test_reasoning_effort_settings_load_independently(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    _clear_reasoning_effort_env(monkeypatch)
+
+    monkeypatch.setenv("GAMR_MODEL_REASONING_EFFORT", "high")
+    settings = Settings()
+    assert settings.model_reasoning_effort == "high"
+    assert settings.adversarial_researcher_reasoning_effort is None
+
+    monkeypatch.setenv("GAMR_ADVERSARIAL_RESEARCHER_REASONING_EFFORT", "low")
+    settings = Settings()
+    assert settings.model_reasoning_effort == "high"
+    assert settings.adversarial_researcher_reasoning_effort == "low"
+
+
+@pytest.mark.parametrize("env_name,_field", REASONING_EFFORT_ENVIRONMENTS)
+def test_reasoning_effort_strips_surrounding_whitespace(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    env_name: str,
+    _field: str,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    _clear_reasoning_effort_env(monkeypatch)
+    monkeypatch.setenv(env_name, "  high  ")
+
+    assert getattr(Settings(), _field) == "high"
+
+@pytest.mark.parametrize("env_name,_field", REASONING_EFFORT_ENVIRONMENTS)
+@pytest.mark.parametrize("value", ["", "   "])
+def test_blank_reasoning_effort_is_omitted(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    env_name: str,
+    _field: str,
+    value: str,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    _clear_reasoning_effort_env(monkeypatch)
+    monkeypatch.setenv(env_name, value)
+
+    settings = Settings()
+
+    assert getattr(settings, _field) is None
+
+
+@pytest.mark.parametrize("env_name,_field", REASONING_EFFORT_ENVIRONMENTS)
+@pytest.mark.parametrize("value", REASONING_EFFORT_VALUES)
+def test_reasoning_effort_accepts_supported_values(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    env_name: str,
+    _field: str,
+    value: str,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    _clear_reasoning_effort_env(monkeypatch)
+    monkeypatch.setenv(env_name, value)
+
+    assert getattr(Settings(), _field) == value
+
+
+@pytest.mark.parametrize("env_name,_field", REASONING_EFFORT_ENVIRONMENTS)
+@pytest.mark.parametrize("invalid_value", ["MAX", "invalid", "max"])
+def test_reasoning_effort_rejects_invalid_values(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    env_name: str,
+    _field: str,
+    invalid_value: str,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    _clear_reasoning_effort_env(monkeypatch)
+    monkeypatch.setenv(env_name, invalid_value)
+
+    with pytest.raises(ValidationError):
+        Settings()

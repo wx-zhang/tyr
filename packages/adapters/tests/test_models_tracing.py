@@ -113,7 +113,8 @@ async def test_traced_plain_completion(monkeypatch: pytest.MonkeyPatch) -> None:
         lambda *, base_url, api_key: SimpleNamespace(chat=SimpleNamespace(completions=completions)),
     )
     model = openai_compatible.OpenAICompatibleModel(
-        "https://example.test/v1", "key", "test-model", trace_port=tracer
+        "https://example.test/v1", "key", "test-model", trace_port=tracer,
+        reasoning_effort="high",
     )
 
     result = await model.complete("hello")
@@ -124,6 +125,7 @@ async def test_traced_plain_completion(monkeypatch: pytest.MonkeyPatch) -> None:
     assert gen.model == "test-model"
     assert gen.output == result
     assert gen.usage == {"total_tokens": 50}
+    assert gen.kwargs["model_parameters"] == {"reasoning_effort": "high"}
 
 
 @pytest.mark.asyncio
@@ -147,6 +149,7 @@ async def test_traced_structured_completion(monkeypatch: pytest.MonkeyPatch) -> 
     gen = tracer.generations[0]
     assert gen.ended is True
     assert gen.output == result
+    assert gen.kwargs.get("model_parameters") is None
 
 
 @pytest.mark.asyncio
@@ -232,7 +235,8 @@ async def test_traced_provider_error_records_error_and_re_raises(
         lambda *, base_url, api_key: SimpleNamespace(chat=SimpleNamespace(completions=completions)),
     )
     model = openai_compatible.OpenAICompatibleModel(
-        "https://example.test/v1", "key", "test-model", trace_port=tracer
+        "https://example.test/v1", "key", "test-model", trace_port=tracer,
+        reasoning_effort="high",
     )
 
     with pytest.raises(APIError, match="provider timeout"):
@@ -241,6 +245,7 @@ async def test_traced_provider_error_records_error_and_re_raises(
     assert len(tracer.generations) == 1
     assert tracer.generations[0].ended is True
     assert tracer.generations[0].error is not None
+    assert tracer.generations[0].kwargs["model_parameters"] == {"reasoning_effort": "high"}
 
 
 def _trace_chunk(
