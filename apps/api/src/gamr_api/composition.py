@@ -113,11 +113,16 @@ def build_run_executor(
             settings.model_api_key,
             selected_model,
             trace_port=trace_port,
+            reasoning_effort=settings.model_reasoning_effort,
         )
         scientist_model = (
             model
             if (
                 selected_adversarial_researcher_model == selected_model
+                and (
+                    settings.adversarial_researcher_reasoning_effort
+                    == settings.model_reasoning_effort
+                )
                 and researcher_base_url == settings.model_base_url
             )
             else OpenAICompatibleModel(
@@ -125,11 +130,15 @@ def build_run_executor(
                 researcher_api_key,
                 selected_adversarial_researcher_model,
                 trace_port=trace_port,
+                reasoning_effort=settings.adversarial_researcher_reasoning_effort,
             )
         )
         judge_model = (
             model
-            if selected_judge_model == selected_model
+            if (
+                selected_judge_model == selected_model
+                and settings.model_reasoning_effort is None
+            )
             else OpenAICompatibleModel(
                 settings.model_base_url,
                 settings.model_api_key,

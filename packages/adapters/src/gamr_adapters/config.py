@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import AliasChoices, Field
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+type ReasoningEffort = Literal["none", "minimal", "low", "medium", "high", "xhigh"]
 
 
 class Settings(BaseSettings):
@@ -45,11 +47,18 @@ class Settings(BaseSettings):
     model_name: str = Field(
         default="", validation_alias=AliasChoices("GAMR_MODEL_NAME", "TYR_LOOP_MODEL")
     )
+    model_reasoning_effort: ReasoningEffort | None = Field(
+        default=None, validation_alias="GAMR_MODEL_REASONING_EFFORT"
+    )
     adversarial_researcher_model_name: str = Field(
         default="",
         validation_alias=AliasChoices(
             "GAMR_ADVERSARIAL_RESEARCHER_MODEL_NAME", "TYR_LOOP_SCIENTIST_MODEL"
         ),
+    )
+    adversarial_researcher_reasoning_effort: ReasoningEffort | None = Field(
+        default=None,
+        validation_alias="GAMR_ADVERSARIAL_RESEARCHER_REASONING_EFFORT",
     )
     judge_model_name: str = Field(
         default="", validation_alias=AliasChoices("GAMR_JUDGE_MODEL_NAME", "TYR_LOOP_JUDGE_MODEL")
@@ -105,6 +114,18 @@ class Settings(BaseSettings):
         default="",
         validation_alias=AliasChoices("GAMR_LANGFUSE_ENVIRONMENT", "LANGFUSE_ENVIRONMENT"),
     )
+
+    @field_validator(
+        "model_reasoning_effort",
+        "adversarial_researcher_reasoning_effort",
+        mode="before",
+    )
+    @classmethod
+    def normalize_reasoning_effort(cls, value: object) -> object:
+        if isinstance(value, str):
+            stripped = value.strip()
+            return stripped or None
+        return value
 
     @property
     def scientist_model_name(self) -> str:

@@ -107,6 +107,7 @@ def build_experiment_execution(
         selected_model,
         trace_port=trace_port,
         stream_callback=stream_callback,
+        reasoning_effort=settings.model_reasoning_effort,
     )
     researcher_base_url = settings.adversarial_researcher_base_url or settings.model_base_url
     researcher_api_key = (
@@ -119,6 +120,10 @@ def build_experiment_execution(
         if (
             selected_scientist_model == selected_model
             and researcher_base_url == settings.model_base_url
+            and (
+                settings.adversarial_researcher_reasoning_effort
+                == settings.model_reasoning_effort
+            )
         )
         else model_cls(
             researcher_base_url,
@@ -126,11 +131,15 @@ def build_experiment_execution(
             selected_scientist_model,
             trace_port=trace_port,
             stream_callback=stream_callback,
+            reasoning_effort=settings.adversarial_researcher_reasoning_effort,
         )
     )
     judge_model_gateway = (
         model_gateway
-        if selected_judge_model == selected_model
+        if (
+            selected_judge_model == selected_model
+            and settings.model_reasoning_effort is None
+        )
         else model_cls(
             settings.model_base_url,
             settings.model_api_key,

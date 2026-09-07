@@ -43,6 +43,12 @@ Adversarial Researcher generation defaults to an 8,192-token Completion budget. 
 `GAMR_ADVERSARIAL_RESEARCHER_OUTPUT_TOKENS`; `GAMR_SCIENTIST_OUTPUT_TOKENS` is fallback-only.
 `GAMR_ADVERSARIAL_RESEARCHER_MODEL_NAME` and `GAMR_CHAT_MODEL_NAME` follow the same precedence
 rules over their legacy `TYR_LOOP_*` names.
+
+`GAMR_MODEL_REASONING_EFFORT` optionally sets the main loop's top-level
+`reasoning_effort` request field. `GAMR_ADVERSARIAL_RESEARCHER_REASONING_EFFORT`
+sets the Researcher's value independently. Both accept `none`, `minimal`, `low`,
+`medium`, `high`, and `xhigh`. Blank or unset values omit the field. The loop
+setting does not configure judge or interactive chat requests.
 Tasks configure judge execution via `spec.judge.pipeline` in `task.json` (defaulting to
 `evidence-and-content`).
 

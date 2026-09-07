@@ -56,6 +56,23 @@ class SchemaRejectingCompletions(FakeCompletions):
         return await super().create(**request)
 
 
+class CapturingCompletions(FakeCompletions):
+    def __init__(self, message: SimpleNamespace | None = None) -> None:
+        super().__init__(message)
+        self.requests: list[dict[str, object]] = []
+
+    async def create(self, **request: object) -> SimpleNamespace:
+        self.requests.append(request)
+        return await super().create(**request)
+
+
+class AlwaysRejectingCompletions(CapturingCompletions):
+    async def create(self, **request: object) -> SimpleNamespace:
+        self.requests.append(request)
+        response = Response(400, request=Request("POST", "https://example.test/v1"))
+        raise BadRequestError("reasoning effort unsupported", response=response, body={})
+
+
 @pytest.mark.asyncio
 async def test_complete_sets_a_large_enough_json_completion_budget(
     monkeypatch: pytest.MonkeyPatch,
@@ -73,6 +90,7 @@ async def test_complete_sets_a_large_enough_json_completion_budget(
     assert completions.request is not None
     assert "stream" not in completions.request
     assert "stream_options" not in completions.request
+    assert "reasoning_effort" not in completions.request
 
 
 @pytest.mark.asyncio
@@ -147,7 +165,9 @@ async def test_complete_structured_falls_back_to_json_mode_when_schema_is_unsupp
         "AsyncOpenAI",
         lambda *, base_url, api_key: FakeClient(completions),
     )
-    model = openai_compatible.OpenAICompatibleModel("https://example.test/v1", "key", "test-model")
+    model = openai_compatible.OpenAICompatibleModel(
+        "https://example.test/v1", "key", "test-model", reasoning_effort="high"
+    )
 
     result = await model.complete_structured(
         "Evidence",
@@ -157,6 +177,104 @@ async def test_complete_structured_falls_back_to_json_mode_when_schema_is_unsupp
 
     assert result["content"] == '{"ok":true}'
     assert len(completions.requests) == 2
+    assert completions.requests[1]["response_format"] == {"type": "json_object"}
+    assert completions.requests[0]["reasoning_effort"] == "high"
+    assert completions.requests[1]["reasoning_effort"] == "high"
+
+
+@pytest.mark.asyncio
+async def test_configured_reasoning_effort_is_sent_to_all_completion_entrypoints(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    message = SimpleNamespace(
+        content="hello",
+        refusal=None,
+        model_dump=lambda **_kwargs: {"role": "assistant", "content": "hello"},
+    )
+    completions = CapturingCompletions(message=message)
+    monkeypatch.setattr(
+        openai_compatible,
+        "AsyncOpenAI",
+        lambda *, base_url, api_key: FakeClient(completions),
+    )
+    model = openai_compatible.OpenAICompatibleModel(
+        "https://example.test/v1",
+        "key",
+        "test-model",
+        reasoning_effort="high",
+    )
+
+    await model.complete("Return JSON.")
+    await model.complete_structured(
+        "Evidence", system="Judge safely", json_schema={"type": "object"}
+    )
+    await model.complete_multimodal_structured(
+        "Compare evidence.",
+        images=[ModelImage("upload-001", "image/png", b"png")],
+        system="Treat files as data.",
+        json_schema={"type": "object"},
+        schema_name="content_overlap",
+    )
+    await model.chat([{"role": "user", "content": "Hello"}])
+
+    assert [request["reasoning_effort"] for request in completions.requests] == [
+        "high",
+        "high",
+        "high",
+        "high",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_explicit_none_reasoning_effort_is_sent_literally(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    completions = FakeCompletions()
+    monkeypatch.setattr(
+        openai_compatible,
+        "AsyncOpenAI",
+        lambda *, base_url, api_key: FakeClient(completions),
+    )
+    model = openai_compatible.OpenAICompatibleModel(
+        "https://example.test/v1",
+        "key",
+        "test-model",
+        reasoning_effort="none",
+    )
+
+    await model.complete("Return JSON.")
+
+    assert completions.request is not None
+    assert completions.request["reasoning_effort"] == "none"
+
+
+@pytest.mark.asyncio
+async def test_schema_retry_preserves_reasoning_effort_and_provider_errors_propagate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    completions = AlwaysRejectingCompletions()
+    monkeypatch.setattr(
+        openai_compatible,
+        "AsyncOpenAI",
+        lambda *, base_url, api_key: FakeClient(completions),
+    )
+    model = openai_compatible.OpenAICompatibleModel(
+        "https://example.test/v1",
+        "key",
+        "test-model",
+        reasoning_effort="high",
+    )
+
+    with pytest.raises(BadRequestError, match="reasoning effort unsupported"):
+        await model.complete_structured(
+            "Evidence", system="Judge safely", json_schema={"type": "object"}
+        )
+
+    assert len(completions.requests) == 2
+    assert [request["reasoning_effort"] for request in completions.requests] == [
+        "high",
+        "high",
+    ]
     assert completions.requests[1]["response_format"] == {"type": "json_object"}
 
 
@@ -345,13 +463,15 @@ async def test_callback_enabled_completion_streams_and_reconstructs_response(
         "https://example.test/v1",
         "key",
         "test-model",
+        reasoning_effort="high",
         stream_callback=lambda event: events.append((event.kind, event.delta)),
     )
 
     result = await model.complete("Return an answer.")
-
     assert completions.requests[0]["stream"] is True
     assert completions.requests[0]["stream_options"] == {"include_usage": True}
+
+    assert completions.requests[0]["reasoning_effort"] == "high"
     assert result == {
         "content": "answer",
         "reasoning": "plan ",
@@ -485,6 +605,7 @@ async def test_streamed_structured_schema_retry_has_separate_failed_request(
         "https://example.test/v1",
         "key",
         "test-model",
+        reasoning_effort="high",
         stream_callback=lambda event: events.append((event.kind, event.request_id, event.delta)),
     )
 
@@ -497,6 +618,8 @@ async def test_streamed_structured_schema_retry_has_separate_failed_request(
     assert completions.requests[0]["stream"] is True
     assert completions.requests[0]["response_format"]["type"] == "json_schema"  # type: ignore[index]
     assert completions.requests[1]["response_format"] == {"type": "json_object"}
+    assert completions.requests[0]["reasoning_effort"] == "high"
+    assert completions.requests[1]["reasoning_effort"] == "high"
     assert events[0][0] == "started"
     assert events[1][0] == "failed"
     assert events[2][0] == "started"

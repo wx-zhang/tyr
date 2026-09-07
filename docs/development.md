@@ -27,6 +27,13 @@ When both names are set, the canonical value wins. A present empty or invalid
 canonical value does not revive a legacy value. Browser and API origins remain
 separate (`VITE_API_ORIGIN` is browser build configuration).
 
+`GAMR_MODEL_REASONING_EFFORT` and
+`GAMR_ADVERSARIAL_RESEARCHER_REASONING_EFFORT` are optional and independent.
+Each accepts `none`, `minimal`, `low`, `medium`, `high`, or `xhigh`. Blank or
+unset values omit the top-level `reasoning_effort` request field. A missing
+Researcher value does not inherit the loop value. Judge and interactive chat
+adapters remain unconfigured.
+
 `OPENROUTER_BASE_URL` is the global OpenAI-compatible endpoint for the main loop, judge, chat,
 and judge evaluation. `GAMR_ADVERSARIAL_RESEARCHER_BASE_URL` is an optional deployment setting
 for routing only Adversarial Researcher calls to another OpenAI-compatible service; empty or unset
