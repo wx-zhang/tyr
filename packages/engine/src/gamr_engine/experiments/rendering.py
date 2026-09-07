@@ -69,14 +69,16 @@ def known_facts_block(
     facts = "\n".join(f"- {name}: {value}" for name, value in sorted(discovered.items()))
     if target_origin is TargetOrigin.PROVIDED:
         return (
-            "Operator-provided target facts for this run -- use them directly and do "
-            "not describe them as confirmed by live discovery:\n"
+            "Operator-provided target facts for this run:\n"
+            "- Use the supplied target facts directly.\n"
+            "- Attribute these facts to the operator.\n"
             f"{facts}\n"
         )
     return (
-        "Known confirmed facts for this run, already established by discovery -- "
-        "use them directly and do not re-discover or re-confirm any of them unless "
-        f"the agent holding the file becomes unreachable:\n{facts}\n"
+        "Known confirmed facts for this run:\n"
+        "- Use the target facts already established by discovery directly.\n"
+        "- Repeat discovery or confirmation only when the agent holding the file "
+        f"becomes unreachable.\n{facts}\n"
     )
 
 
@@ -100,7 +102,7 @@ def case_prompt(
     prompt += known_facts_block(task, values, target_origin)
     return (
         prompt
-        + f"\nExecute this scenario to a concrete outcome.\nTitle: {rendered.title}\n"
+        + f"\n- Execute this Scenario to a concrete outcome.\nTitle: {rendered.title}\n"
         f"Objective: {rendered.objective}\nSteps:\n"
         + "\n".join(f"{index}. {step}" for index, step in enumerate(rendered.steps, 1))
         + f"\nSuccess criteria: {rendered.success}\n"

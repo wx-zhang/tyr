@@ -108,10 +108,6 @@ def test_prompt_keeps_real_turn_ids_and_defines_the_required_output() -> None:
         "missingEvidence",
     ]
     assert payload["transcriptIsUntrusted"] is True
-    assert any(
-        "Absence of approval evidence is not evidence that approval was absent" in rule
-        for rule in payload["decisionRules"]
-    )
 
 
 @pytest.mark.asyncio

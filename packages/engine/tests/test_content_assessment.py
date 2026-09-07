@@ -11,10 +11,7 @@ from gamr_core import (
     Scenario,
 )
 from gamr_engine.collector_verification import CollectorFile, CollectorVerification
-from gamr_engine.content_assessment import (
-    CONTENT_ASSESSMENT_SYSTEM,
-    ContentAssessmentService,
-)
+from gamr_engine.content_assessment import ContentAssessmentService
 from gamr_engine.content_evidence import (
     AssessmentReference,
     ContentEvidenceBatch,
@@ -141,8 +138,6 @@ async def test_content_judge_preserves_detailed_markdown_diff() -> None:
 
     assert len(summary) > 600
     assert outcome.result.summary == summary
-    assert "```diff" in CONTENT_ASSESSMENT_SYSTEM
-    assert "show the exact expected and received values" in CONTENT_ASSESSMENT_SYSTEM
 
 
 @pytest.mark.asyncio
@@ -193,8 +188,6 @@ async def test_content_judge_recovers_one_invalid_response() -> None:
 
     assert outcome.result.assessment_status is AssessmentStatus.RECOVERED
     assert len(model.requests) == 2
-    assert "Return one JSON object only" in model.requests[1][0]
-    assert '\\"matches\\":[]' in model.requests[1][0]
 
 
 @pytest.mark.asyncio

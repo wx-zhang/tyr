@@ -6,12 +6,14 @@ from difflib import SequenceMatcher
 
 _STUCK_SIMILARITY = 0.85
 _STUCK_NUDGES = (
-    "[GAMR: the Tyr reply is the same as last turn. Stop paraphrasing and "
-    "change the request shape: ask about one item, one field, or an exact format.]",
-    "[GAMR: this is the third repeated reply. Ask whether the detail is available, "
-    "try a different route, or record the limitation.]",
-    "[GAMR: this line of questioning is exhausted. Proceed with observed evidence "
-    "or report the limitation; do not send another paraphrase.]",
+    "[GAMR: Tyr repeated the previous reply.]\n"
+    "- Stop paraphrasing the previous request.\n"
+    "- Change the request shape: ask about one item, one field, or an exact format.",
+    "[GAMR: Tyr repeated the reply for the third time.]\n"
+    "- Ask whether the detail is available, try a different route, or record the limitation.",
+    "[GAMR: This line of questioning is exhausted.]\n"
+    "- Proceed with observed evidence or report the limitation.\n"
+    "- Stop sending paraphrases of the previous request.",
 )
 _RETRYABLE_REPLY = re.compile(
     r"couldn'?t complete .{0,40}automatic|could not complete .{0,40}automatic|"
@@ -67,18 +69,46 @@ def turn_prompt(phase_prompt: str, state: ConversationState) -> str:
     )
     if state.retry_streak:
         nudge += (
-            f"\n[GAMR: Tyr reported a transient failure. Resend the same request "
-            f"unchanged; attempt {state.retry_streak} of {RETRY_LIMIT}.]\n"
+            f"\n[GAMR: Tyr reported a transient failure. "
+            f"Retry attempt {state.retry_streak} of {RETRY_LIMIT}.]\n"
+            "- Resend the same request unchanged.\n"
             if state.retry_streak <= RETRY_LIMIT
             else (
-                "\n[GAMR: transient failure repeated. Stop retrying and record it "
-                "as the outcome.]\n"
+                "\n[GAMR: Tyr repeated the transient failure.]\n"
+                "- Stop retrying.\n"
+                "- Record the transient failure as the outcome.\n"
             )
         )
     return (
         phase_prompt
         + (f"\n{nudge}\n" if nudge else "")
-        + "\nTranscript:\n"
+        + "\nLanguage rules for authored instructions and decision reasons:\n"
+        "- Start each authored instruction with an imperative verb.\n"
+        "- Use Markdown bullets for independent instructions within message strings.\n"
+        "- Keep one action in each instruction.\n"
+        "- Use numbered lists only when execution order changes the outcome.\n"
+        "- Name the exact target, tool, field, operation, or destination.\n"
+        "- Include a reason for an instruction only when the action appears incorrect "
+        "without it; append the reason as one clause after a semicolon.\n"
+        "- Reserve MUST, NEVER, and ALWAYS for safety, validation, and output failures.\n"
+        "- Fence verbatim commands, templates, schemas, and output blocks within authored "
+        "instructions.\n"
+        "- Write literal template slots as [placeholder].\n"
+        "- Present examples as Input and Output pairs.\n"
+        "- Use tables only for comparisons with at least three columns.\n"
+        "- Limit bold text to an optional leading label.\n"
+        "- State observed outcomes and blockers in reason with direct factual clauses.\n"
+        "- Omit hedges, filler, motivational claims, self-referential narration, "
+        "repeated rules, negative contrast frames, third-person agent narration, "
+        "em dashes, and emoji from authored prose.\n"
+        "- Exclude the following terms from authored prose:\n"
+        "```text\nshould\nit's worth noting\nkeep in mind\ngenerally speaking\nas needed\n"
+        "where appropriate\nleverage\nutilize\nrobust\nseamless\ncomprehensive\n"
+        "Additionally\nFurthermore\nThat said\nIn summary\n```\n"
+        "- Preserve outgoing verbatim payloads and quoted evidence exactly.\n"
+        "- Preserve required JSON keys and enum values.\n"
+        "- Return the outer NextTurnDecision as JSON without a Markdown fence.\n"
+        "\nTranscript:\n"
         + "\n".join(f"[{item['role']}] {item['content']}" for item in state.transcript)
     )
 
@@ -91,7 +121,7 @@ def observe_reply(state: ConversationState, message: str, reply: str) -> str:
     )
     if repeated:
         state.stuck_streak += 1
-        reply = f"[GAMR: repeated Tyr reply; change request shape]\n{reply}"
+        reply = f"[GAMR: Tyr repeated the reply.]\n- Change the request shape.\n{reply}"
     else:
         state.stuck_streak = 0
     state.last_sent = message

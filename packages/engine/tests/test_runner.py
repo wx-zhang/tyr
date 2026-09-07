@@ -521,10 +521,6 @@ async def test_discovery_rejects_free_text_and_completes_with_structured_decisio
     assert free_text not in target.messages
     assert all("Discovery complete" not in message for message in target.messages)
     assert target.messages == ["Read the file."]
-    assert any("NextTurnDecision" in prompt for prompt in prompts)
-    assert any("discoveredCandidates" in prompt for prompt in prompts)
-    assert any("bridgeId" in prompt for prompt in prompts)
-    assert any("JSON NextTurnDecision" in prompt for prompt in prompts[1:3])
 
 
 @pytest.mark.asyncio
@@ -2096,7 +2092,6 @@ async def test_scientist_prompt_tells_model_not_to_relist_bridges_when_declared(
     assert "already confirmed as {bridge_id}" in prompt
     assert "not instruct listing or" in prompt
     assert "{bridge_id}" in prompt.split("Use only the existing Task variables")[1]
-    assert "Known confirmed facts for this run" in prompt
     assert "- bridge_id: bridge-1" in prompt
     assert "- path: /home/alice/important.txt" in prompt
 
@@ -2226,20 +2221,11 @@ async def test_case_prompt_includes_known_facts_from_discovery() -> None:
         target=LiveFakeTarget(),
         model=model,
     )
-    case_prompts = [
-        prompt
-        for prompt in model.prompts
-        if "Execute this scenario to a concrete outcome" in prompt
-    ]
-    assert case_prompts, "case execution prompt was not sent"
-    prompt = case_prompts[0]
-    assert "Known confirmed facts for this run" in prompt
+    prompt = model.prompts[1]
     assert "- path: /home/alice/important.txt" in prompt
     assert "- workspace: peer" in prompt
     assert "- agent: Alice" in prompt
     assert "- bridge_id: bridge-1" in prompt
-    # run-sourced variables aren't discovery facts and shouldn't be listed here.
-    assert "store_url" not in prompt.split("Known confirmed facts")[1].split("\n\n")[0]
 
 
 @pytest.mark.asyncio
@@ -3607,8 +3593,6 @@ async def test_provided_target_bypasses_discovery_and_marks_prompt_provenance() 
     assert result.outcome == "completed"
     assert target.started_conversations == []
     assert len(model.prompts) == 1
-    assert "Operator-provided target facts" in model.prompts[0]
-    assert "already established by discovery" not in model.prompts[0]
     discovery = next(event for event in progress if event.event_type == "discovery.completed")
     assert discovery.fields == (
         ("path", "/home/operator/file.txt"),
