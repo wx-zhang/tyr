@@ -8,6 +8,8 @@ Own experiment/chat orchestration, approval coordination, reporting, and ports.
 
 Keep all provider and persistence access behind protocols. CLI and API use the same execution service and runner. Model output is data and cannot control workflow transitions.
 
+Loop prompts preserve evidence-based uncertainty. Missing, unreported, unavailable, or conflicting evidence leaves a prerequisite or control unknown. Claim absence only when supplied evidence establishes it. When eligibility cannot be confirmed, blocked explanations name the unverified prerequisite and missing evidence. Direct-language rules remove rhetorical hedges without removing evidence-based uncertainty.
+
 ## Source map
 
 `runner.py` is the shared discovery and Scenario Execution engine and emits typed activities,
