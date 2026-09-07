@@ -3725,6 +3725,68 @@ async def test_fallback_preflight_forces_read_only_target_query() -> None:
 
 
 @pytest.mark.asyncio
+async def test_preflight_prompt_includes_decision_contract() -> None:
+    model = LiveFakeModel(
+        [
+            '{"kind":"phase_blocked","reason":"stop after inspecting prompt"}',
+            '{"kind":"phase_blocked","reason":"live discovery unavailable"}',
+        ]
+    )
+
+    await DiscoveryRunner(
+        ConversationRunner(RunEvents(None, None)), RunEvents(None, None), None
+    ).run(
+        "preflight-prompt",
+        _fallback_task(),
+        ExperimentConfig(
+            scenarioIds=["case"],
+            discoveryInput=_provided_input(),
+            fallbackToDiscovery=True,
+        ),
+        LiveFakeTarget(),
+        model,
+        None,
+        TargetConversation(),
+    )
+
+    assert '{"kind":"send","message":"[direct instruction]"}' in model.prompts[0]
+    assert '"discoveredCandidates"' in model.prompts[0]
+
+
+@pytest.mark.asyncio
+async def test_preflight_recovers_from_one_invalid_decision_and_reuses_target() -> None:
+    model = LiveFakeModel(
+        [
+            '{"phase":"preflight","instructions":["Check the supplied target."]}',
+            '{"kind":"send","message":"Check the supplied target."}',
+            '{"kind":"phase_complete","reason":"available","discoveredCandidates":'
+            '[{"path":"/home/operator/file.txt","workspace":"workspace",'
+            '"agent":"agent","bridgeId":"bridge"}]}',
+        ]
+    )
+    target = LiveFakeTarget()
+    events = RunEvents(None, None)
+
+    result = await DiscoveryRunner(ConversationRunner(events), events, None).run(
+        "preflight-recovery",
+        _fallback_task(),
+        ExperimentConfig(
+            scenarioIds=["case"],
+            discoveryInput=_provided_input(),
+            fallbackToDiscovery=True,
+        ),
+        target,
+        model,
+        None,
+        TargetConversation(),
+    )
+
+    assert result.target_origin.value == "provided"
+    assert result.candidates[0].path == "/home/operator/file.txt"
+    assert target.started_conversations == ["conversation-1"]
+
+
+@pytest.mark.asyncio
 async def test_fallback_mismatch_uses_live_discovery_without_starting_a_scenario() -> None:
     model = LiveFakeModel(
         [
@@ -3777,6 +3839,34 @@ async def test_fallback_malformed_output_uses_fresh_live_discovery() -> None:
 
     assert result.outcome == "blocked"
     assert len(model.prompts) == 3
+
+
+@pytest.mark.asyncio
+async def test_malformed_preflight_reports_inconclusive_diagnostic() -> None:
+    model = LiveFakeModel(
+        [
+            "not-json",
+            '{"kind":"phase_blocked","reason":"invalid response prevented target check"}',
+            '{"kind":"phase_blocked","reason":"live discovery unavailable"}',
+        ]
+    )
+    progress: list[ProgressEvent] = []
+
+    await ExperimentRunner(progress=progress.append).run(
+        _fallback_task(),
+        ExperimentConfig(
+            scenarioIds=["case"],
+            discoveryInput=_provided_input(),
+            fallbackToDiscovery=True,
+        ),
+        target=LiveFakeTarget(),
+        model=model,
+    )
+
+    completed = next(
+        event for event in progress if event.event_type == "discovery.preflight.completed"
+    )
+    assert completed.detail == "provided target preflight inconclusive"
 
 
 @pytest.mark.asyncio

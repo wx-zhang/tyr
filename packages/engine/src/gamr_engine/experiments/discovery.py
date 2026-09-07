@@ -53,14 +53,17 @@ class DiscoveryRunner:
         )
 
     @staticmethod
-    def preflight_confirmed(result: PhaseResult, candidate: DiscoveryCandidate) -> bool:
+    def preflight_reached_target(result: PhaseResult) -> bool:
+        return any(
+            item.get("role") == "user" and "observedFacts" in item for item in result.transcript
+        )
+
+    @classmethod
+    def preflight_confirmed(cls, result: PhaseResult, candidate: DiscoveryCandidate) -> bool:
         return (
             result.error is None
             and bool(result.candidates)
-            and any(
-                item.get("role") == "user" and "observedFacts" in item
-                for item in result.transcript
-            )
+            and cls.preflight_reached_target(result)
             and discovery_fields(result.candidates[0]) == discovery_fields(candidate)
         )
 
@@ -103,15 +106,20 @@ class DiscoveryRunner:
                 return result
             preflight = await self.preflight(run_id, config, target, model, artifacts, candidate)
             preflight_confirmed = self.preflight_confirmed(preflight, candidate)
+            preflight_detail = (
+                "provided target confirmed"
+                if preflight_confirmed
+                else (
+                    "provided target unavailable"
+                    if self.preflight_reached_target(preflight)
+                    else "provided target preflight inconclusive"
+                )
+            )
             self._events.emit(
                 "discovery.preflight.completed",
                 run_id,
                 phase="discovery",
-                detail=(
-                    "provided target confirmed"
-                    if preflight_confirmed
-                    else "provided target unavailable"
-                ),
+                detail=preflight_detail,
                 fields=discovery_fields(candidate),
                 metadata_extra={
                     "targetOrigin": (
@@ -184,6 +192,7 @@ class DiscoveryRunner:
         )
         prompt = (
             _DISCOVERY_PREFLIGHT_PROMPT
+            + DISCOVERY_DECISION_PROMPT
             + "\nSupplied candidate:\n```json\n"
             + json.dumps(dict(discovery_fields(candidate)), sort_keys=True)
             + "\n```\n"
@@ -196,7 +205,7 @@ class DiscoveryRunner:
                     target,
                     model,
                     preflight_config,
-                    max_turns=min(2, config.discovery_turns),
+                    max_turns=min(3, config.discovery_turns),
                     conversation=TargetConversation(),
                     require_candidates=True,
                     run_id=run_id,
