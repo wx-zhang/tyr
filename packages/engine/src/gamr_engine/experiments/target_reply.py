@@ -32,6 +32,7 @@ def _settled_bridge_facts(result: dict[str, object]) -> dict[str, object]:
         "bridgeId": "bridgeId",
         "conversationId": "bridgeConversationId",
         "peerWorkspaceName": "bridgePeerWorkspace",
+        "acknowledgement": "bridgeAcknowledgement",
     }
     facts: dict[str, object] = {
         output_key: value
