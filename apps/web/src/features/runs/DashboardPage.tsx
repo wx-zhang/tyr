@@ -12,6 +12,8 @@ import { PageHeader } from "../../components/PageHeader";
 import { DashboardRunCard } from "./DashboardRunCard";
 import { DashboardSelectionToolbar } from "./DashboardSelectionToolbar";
 import { compareRunsNewestFirst } from "./dashboardRunPresentation";
+import { DashboardFilters, useDashboardFilters } from "./DashboardFilters";
+import { useDashboardSelection } from "./useDashboardSelection";
 
 const terminalStates: Partial<Record<RunState, true>> = {
   completed: true,
@@ -44,8 +46,6 @@ export function DashboardPage() {
   const [now] = useState(() => Date.now());
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [stopError, setStopError] = useState<string | null>(null);
-  const [selecting, setSelecting] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
   const runsQuery = useQuery({
     queryKey: ["runs"],
@@ -96,33 +96,37 @@ export function DashboardPage() {
     () => [...(runsQuery.data ?? [])].sort(compareRunsNewestFirst),
     [runsQuery.data],
   );
+  const { filters, changeFilters, visibleRuns, matchingCount, showMore } =
+    useDashboardFilters(recentRuns);
 
   const deletableRuns = useMemo(
     () =>
-      recentRuns.filter(
+      visibleRuns.filter(
         (run) =>
           terminalStates[run.state as RunState] ||
           deletableLiveStates[run.state as RunState],
       ),
-    [recentRuns],
+    [visibleRuns],
   );
   const deletableIds = useMemo(
     () => new Set(deletableRuns.map((run) => run.id)),
     [deletableRuns],
   );
+  const {
+    selecting,
+    setSelecting,
+    selectedIds,
+    setSelectedIds,
+    allDeletableSelected,
+    exitSelecting,
+    toggleSelected,
+    toggleSelectAll,
+  } = useDashboardSelection(deletableRuns);
   const selectedCount = selectedIds.size;
-  const allDeletableSelected =
-    deletableRuns.length > 0 &&
-    deletableRuns.every((run) => selectedIds.has(run.id));
 
   const enterSelecting = () => {
     setDeleteError(null);
     setSelecting(true);
-  };
-
-  const exitSelecting = () => {
-    setSelecting(false);
-    setSelectedIds(new Set());
   };
 
   const requestDelete = (run: Run) => {
@@ -153,46 +157,11 @@ export function DashboardPage() {
     stopMutation.mutate(run.id);
   };
 
-  const toggleSelected = (runId: string) => {
-    setSelectedIds((current) => {
-      const next = new Set(current);
-      if (next.has(runId)) next.delete(runId);
-      else next.add(runId);
-      return next;
-    });
-  };
-
-  const toggleSelectAll = () => {
-    setSelectedIds((current) => {
-      if (allDeletableSelected) {
-        const next = new Set(current);
-        for (const run of deletableRuns) next.delete(run.id);
-        return next;
-      }
-      const next = new Set(current);
-      for (const run of deletableRuns) next.add(run.id);
-      return next;
-    });
-  };
-
   return (
-    <section className="section-stack">
-      <section className="product-overview" aria-label="About GAMR">
-        <h2 className="product-overview-name">
-          GAMR{" "}
-          <span className="product-overview-acronym">
-            Generative Adversarial Risk Mapper
-          </span>
-        </h2>
-        <p>
-          Red team for Tyr. Experiments run attack Scenarios against it and save
-          the evidence so you can see what held and what failed.
-        </p>
-      </section>
-
+    <section className="section-stack experiments-dashboard">
       <PageHeader
-        title="Recent Experiments"
-        description="Red-team Experiments against Tyr, newest first. Open an Experiment to review its state and evidence."
+        title="Experiments"
+        description="Review results, follow active work, and inspect the evidence."
         actions={
           <div className="button-row">
             {deletableRuns.length > 0 && !selecting ? (
@@ -216,7 +185,13 @@ export function DashboardPage() {
           {runsQuery.error instanceof Error
             ? runsQuery.error.message
             : "Could not load Experiments"}
-          . Check that the API is running, then refresh.
+          <button
+            className="button button-secondary"
+            disabled={runsQuery.isFetching}
+            onClick={() => void runsQuery.refetch()}
+          >
+            Retry
+          </button>
         </div>
       ) : null}
 
@@ -258,6 +233,17 @@ export function DashboardPage() {
 
       {recentRuns.length > 0 ? (
         <div className="experiment-card-collection">
+          <DashboardFilters
+            filters={filters}
+            visibleCount={visibleRuns.length}
+            matchingCount={matchingCount}
+            totalCount={recentRuns.length}
+            disabled={deleteMutation.isPending}
+            onChange={(next) => {
+              exitSelecting();
+              changeFilters(next);
+            }}
+          />
           {selecting ? (
             <DashboardSelectionToolbar
               selectedCount={selectedCount}
@@ -270,7 +256,7 @@ export function DashboardPage() {
             />
           ) : null}
           <ol className="experiment-card-list" aria-label="Recent Experiments">
-            {recentRuns.map((run) => {
+            {visibleRuns.map((run) => {
               const isDeletable = deletableIds.has(run.id);
               const isDeleting =
                 deleteMutation.isPending &&
@@ -296,6 +282,15 @@ export function DashboardPage() {
               );
             })}
           </ol>
+          {visibleRuns.length < matchingCount ? (
+            <button
+              className="button button-secondary"
+              onClick={showMore}
+              disabled={deleteMutation.isPending}
+            >
+              Show more Experiments
+            </button>
+          ) : null}
         </div>
       ) : null}
     </section>

@@ -134,7 +134,9 @@ export function RunPage() {
     setCancelError(null);
     try {
       await cancelExperiment(runId);
-      await queryClient.invalidateQueries({ queryKey: ["run-visualization", runId] });
+      await queryClient.invalidateQueries({
+        queryKey: ["run-visualization", runId],
+      });
       await queryClient.invalidateQueries({ queryKey: ["run-turns", runId] });
     } catch (error) {
       setCancelError(
@@ -201,10 +203,11 @@ export function RunPage() {
 
   return (
     <section
-      className={`section-stack run-details${isLive ? " run-live" : ""}`}
+      className={`section-stack run-details run-review${isLive ? " run-live" : ""}`}
     >
       <RunHeader
         runId={runId}
+        name={runRecord.data?.name}
         run={run}
         now={now}
         isLive={isLive}
@@ -226,39 +229,57 @@ export function RunPage() {
           {visualization.error.message}
         </p>
       ) : null}
+      <nav className="run-review-nav" aria-label="Experiment sections">
+        <a href="#review-results">Results &amp; activity</a>
+        <a href="#review-lifecycle">Lifecycle</a>
+        <a href="#review-network">Tyr network</a>
+      </nav>
 
-      <RunStagesPanel
-        phases={visualization.data?.phases}
-        run={run}
-        isLive={isLive}
-        waitingForTyr={waitingForTyr}
-        agentWorking={agentWorking}
-        isLoading={visualization.isLoading}
-      />
+      <div id="review-results" className="run-review-section">
+        <RunHistory
+          turns={allTurns}
+          scenarioExecutions={
+            visualization.data?.scenarioExecutions ??
+            visualization.data?.cases ??
+            []
+          }
+          phases={visualization.data?.phases}
+          artifacts={
+            Array.isArray(collectorArtifacts.data)
+              ? collectorArtifacts.data
+              : []
+          }
+          runId={runId}
+          isLive={isLive}
+          persistedTurnsCount={turns.data?.latestSequence}
+          hasMoreTurns={Boolean(turns.data?.nextCursor)}
+          isLoadingTurns={turns.isLoading}
+          isLoadingMore={loadingOlder}
+          isLoadingArtifacts={collectorArtifacts.isLoading}
+          turnsError={turns.error}
+          onLoadMore={loadOlder}
+          now={now}
+          flashIds={flashIds}
+          caseOriginById={caseOriginById}
+          targetOrigin={normalizeTargetOrigin(
+            visualization.data?.discoveryResult?.targetOrigin,
+          )}
+        />
+      </div>
+      <div id="review-lifecycle" className="run-review-section">
+        <RunStagesPanel
+          phases={visualization.data?.phases}
+          run={run}
+          isLive={isLive}
+          waitingForTyr={waitingForTyr}
+          agentWorking={agentWorking}
+          isLoading={visualization.isLoading}
+        />
+      </div>
 
-      <TyrNetworkMap runId={runId} isLive={isLive} refreshMs={refreshMs} />
-
-      <RunHistory
-        turns={allTurns}
-        scenarioExecutions={visualization.data?.scenarioExecutions ?? visualization.data?.cases ?? []}
-        phases={visualization.data?.phases}
-        artifacts={
-          Array.isArray(collectorArtifacts.data) ? collectorArtifacts.data : []
-        }
-        runId={runId}
-        isLive={isLive}
-        persistedTurnsCount={turns.data?.latestSequence}
-        hasMoreTurns={Boolean(turns.data?.nextCursor)}
-        isLoadingTurns={turns.isLoading}
-        isLoadingMore={loadingOlder}
-        isLoadingArtifacts={collectorArtifacts.isLoading}
-        turnsError={turns.error}
-        onLoadMore={loadOlder}
-        now={now}
-        flashIds={flashIds}
-        caseOriginById={caseOriginById}
-        targetOrigin={normalizeTargetOrigin(visualization.data?.discoveryResult?.targetOrigin)}
-      />
+      <div id="review-network" className="run-review-section">
+        <TyrNetworkMap runId={runId} isLive={isLive} refreshMs={refreshMs} />
+      </div>
     </section>
   );
 }

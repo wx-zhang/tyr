@@ -37,7 +37,7 @@ export function App() {
     ? "Task catalog"
     : location.pathname.startsWith("/experiments")
       ? "Experiment Preset"
-      : location.pathname.startsWith("/runs")
+      : location.pathname.startsWith("/runs/") && location.pathname !== "/runs/"
         ? "Experiment review"
         : "Experiment operations";
 
@@ -95,15 +95,18 @@ export function App() {
           <p className="sidebar-label">Workspace</p>
           <nav className="primary-nav" aria-label="Primary navigation">
             <NavLink
-              to="/"
+              to="/runs"
               end
-              aria-label="Dashboard"
+              aria-label="Experiments"
+              aria-current={location.pathname === "/" ? "page" : undefined}
               data-short="⌂"
               className={({ isActive }) =>
-                isActive ? "nav-link active" : "nav-link"
+                isActive || location.pathname === "/"
+                  ? "nav-link active"
+                  : "nav-link"
               }
             >
-              <span className="nav-label">Dashboard</span>
+              <span className="nav-label">Experiments</span>
             </NavLink>
             <NavLink
               to="/tasks"
