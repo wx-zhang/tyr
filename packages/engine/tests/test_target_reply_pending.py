@@ -1,3 +1,5 @@
+import json
+
 from gamr_engine.experiments.activity import RunEvents
 from gamr_engine.experiments.conversation_state import ConversationState, TurnContext
 from gamr_engine.experiments.records import ProgressEvent, TargetConversation
@@ -46,7 +48,22 @@ def test_fresh_bridge_reply_is_not_treated_as_cumulative_text() -> None:
             None,
             None,
             {
+                "operationId": "operation-current",
                 "response": "Working",
+                "bridges": [
+                    {
+                        "bridgeRequestId": "bridge-previous",
+                        "conversationId": "conversation-previous",
+                        "state": "completed",
+                        "response": "Earlier result",
+                    },
+                    {
+                        "bridgeRequestId": "bridge-current",
+                        "conversationId": "conversation-current",
+                        "state": "completed",
+                        "response": reply,
+                    },
+                ],
                 "gamrSettlement": {"state": "settled", "reply": reply},
             },
         ),
@@ -57,3 +74,11 @@ def test_fresh_bridge_reply_is_not_treated_as_cumulative_text() -> None:
         artifacts=None,
     )
     assert state.transcript[-1]["content"] == reply
+    assert json.loads(state.transcript[-1]["observedFacts"]) == {
+        "operationId": "operation-current",
+        "settlementState": "settled",
+        "bridgeRequestId": "bridge-current",
+        "bridgeConversationId": "conversation-current",
+        "bridgeState": "completed",
+        "bridgeResponseRecorded": True,
+    }
