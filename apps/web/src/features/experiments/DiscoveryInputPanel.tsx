@@ -138,9 +138,9 @@ export function DiscoveryInputPanel({ taskId, discoveryDocument, setDiscoveryDoc
                         <span className="choice-inline-content">
                           <span className="choice-title" aria-hidden="true">Fall back to live discovery</span>
                           <span className="choice-description">
-                            Runs a bounded read-only preflight before any Scenario Execution; if the
-                            provided target is unavailable, normal discovery runs. Off by default: an
-                            unavailable target fails the Experiment.
+                            Runs a bounded preflight in the selected execution mode before any
+                            Scenario Execution; if the provided target is unavailable, normal
+                            discovery runs. Off by default: an unavailable target fails the Experiment.
                           </span>
                         </span>
                       </label>

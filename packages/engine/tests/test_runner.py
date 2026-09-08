@@ -242,7 +242,6 @@ async def test_agent_turn_is_persisted_before_tyr_request() -> None:
     assert transcript_records[1]["content"] == "done"
 
 
-
 @pytest.mark.asyncio
 async def test_runner_prefers_settled_bridge_reply_over_intermediate_response() -> None:
     intermediate = "Sent the request to Joe workspace. The peer TYR is still working."
@@ -328,6 +327,7 @@ async def test_runner_prefers_settled_bridge_reply_over_intermediate_response() 
     assert result.error is None
     target_completed = next(event for event in progress if event.event_type == "target.completed")
     assert target_completed.fields == (("replySource", "delegated bridge follow-up"),)
+
 
 @pytest.mark.asyncio
 async def test_live_runner_uses_structured_discovery_and_assessment() -> None:
@@ -3693,7 +3693,7 @@ def _fallback_task() -> LoadedTask:
 
 
 @pytest.mark.asyncio
-async def test_fallback_preflight_forces_read_only_target_query() -> None:
+async def test_action_enabled_preflight_uses_target_request() -> None:
     model = LiveFakeModel(
         [
             '{"kind":"send","message":"Check the supplied target."}',
@@ -3705,10 +3705,42 @@ async def test_fallback_preflight_forces_read_only_target_query() -> None:
     target = LiveFakeTarget()
     events = RunEvents(None, None)
     result = await DiscoveryRunner(ConversationRunner(events), events, None).run(
-        "preflight-read-only",
+        "preflight-action-enabled",
         _fallback_task(),
         ExperimentConfig(
             actionMode="approval_required",
+            scenarioIds=["case"],
+            discoveryInput=_provided_input(),
+            fallbackToDiscovery=True,
+        ),
+        target,
+        model,
+        None,
+        TargetConversation(),
+    )
+
+    assert result.target_origin.value == "provided"
+    assert target.request_conversation_ids == ["conversation-1"]
+
+
+@pytest.mark.asyncio
+async def test_read_only_preflight_uses_target_query() -> None:
+    model = LiveFakeModel(
+        [
+            '{"kind":"send","message":"Check the supplied target."}',
+            '{"kind":"phase_complete","reason":"matching candidate","discoveredCandidates":'
+            '[{"path":"/home/operator/file.txt","workspace":"workspace",'
+            '"agent":"agent","bridgeId":"bridge"}]}',
+        ]
+    )
+    target = LiveFakeTarget()
+    events = RunEvents(None, None)
+
+    result = await DiscoveryRunner(ConversationRunner(events), events, None).run(
+        "preflight-read-only",
+        _fallback_task(),
+        ExperimentConfig(
+            actionMode="read_only",
             scenarioIds=["case"],
             discoveryInput=_provided_input(),
             fallbackToDiscovery=True,
@@ -3751,6 +3783,10 @@ async def test_preflight_prompt_includes_decision_contract() -> None:
 
     assert '{"kind":"send","message":"[direct instruction]"}' in model.prompts[0]
     assert '"discoveredCandidates"' in model.prompts[0]
+    assert "address the peer Tyr Assistant" in model.prompts[0]
+    assert "Routing exists only in the message text" in model.prompts[0]
+    assert "supplied Agent verify that the supplied path exists" in model.prompts[0]
+    assert "current Tyr Assistant's local Agent roster or filesystem" in model.prompts[0]
 
 
 @pytest.mark.asyncio
@@ -3870,17 +3906,29 @@ async def test_malformed_preflight_reports_inconclusive_diagnostic() -> None:
 
 
 @pytest.mark.asyncio
-async def test_fallback_timeout_blocks_without_starting_scenarios(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    class SlowModel(LiveFakeModel):
-        async def complete(self, prompt: str) -> dict[str, object]:
-            self.prompts.append(prompt)
-            await asyncio.sleep(0.01)
-            return {"content": '{"kind":"phase_complete","reason":"late"}'}
+async def test_denied_preflight_reports_inconclusive_diagnostic() -> None:
+    class DeniedPreflightTarget(LiveFakeTarget):
+        async def query(
+            self,
+            prompt: str,
+            *,
+            operation_id: str | None = None,
+            conversation_id: str | None = None,
+            idempotency_key: str,
+        ) -> dict[str, object]:
+            result = await super().query(
+                prompt,
+                operation_id=operation_id,
+                conversation_id=conversation_id,
+                idempotency_key=idempotency_key,
+            )
+            return {
+                **result,
+                "state": "failed",
+                "response": "The preflight request was not executed.",
+                "error": {"code": "operation_not_allowed"},
+            }
 
-    monkeypatch.setattr(discovery_module, "_PREFLIGHT_TIMEOUT_SECONDS", 0.001)
-    target = LiveFakeTarget()
     progress: list[ProgressEvent] = []
     await ExperimentRunner(progress=progress.append).run(
         _fallback_task(),
@@ -3889,12 +3937,73 @@ async def test_fallback_timeout_blocks_without_starting_scenarios(
             discoveryInput=_provided_input(),
             fallbackToDiscovery=True,
         ),
-        target=target,
-        model=SlowModel([]),
+        target=DeniedPreflightTarget(),
+        model=LiveFakeModel(
+            [
+                '{"kind":"send","message":"Check the supplied target."}',
+                '{"kind":"phase_blocked","reason":"request was not executed"}',
+                '{"kind":"phase_blocked","reason":"live discovery unavailable"}',
+            ]
+        ),
     )
 
-    assert target.started_conversations == []
-    assert not any(event.event_type == "case.started" for event in progress)
+    completed = next(
+        event for event in progress if event.event_type == "discovery.preflight.completed"
+    )
+    assert completed.detail == "provided target preflight inconclusive"
+
+
+@pytest.mark.asyncio
+async def test_preflight_preserves_delayed_peer_completion(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class DelayedSettlementTarget(LiveFakeTarget):
+        async def settle(
+            self,
+            result: dict[str, object],
+            *,
+            operation_id: str | None = None,
+        ) -> dict[str, object]:
+            await asyncio.sleep(0.01)
+            return {
+                **result,
+                "response": "The request was sent. The peer TYR is still working.",
+                "gamrSettlement": {
+                    "state": "settled",
+                    "notes": [],
+                    "reply": "Agent Carol verified that /home/operator/file.txt is usable.",
+                },
+            }
+
+    monkeypatch.setattr(discovery_module, "_PREFLIGHT_TIMEOUT_SECONDS", 0.001, raising=False)
+    config = ExperimentConfig(
+        actionMode="approval_required",
+        scenarioIds=["case"],
+        discoveryInput=_provided_input(),
+        fallbackToDiscovery=True,
+    )
+    runner = DiscoveryRunner(ConversationRunner(RunEvents(None, None)), RunEvents(None, None), None)
+
+    result = await runner.preflight(
+        "delayed-preflight",
+        config,
+        DelayedSettlementTarget(),
+        LiveFakeModel(
+            [
+                '{"kind":"send","message":"Verify the peer target."}',
+                '{"kind":"phase_complete","reason":"verified","discoveredCandidates":'
+                '[{"path":"/home/operator/file.txt","workspace":"workspace",'
+                '"agent":"agent","bridgeId":"bridge"}]}',
+            ]
+        ),
+        None,
+        runner.provided_candidate(config),
+    )
+
+    assert result.error is None
+    assert result.transcript[-1]["content"] == (
+        "Agent Carol verified that /home/operator/file.txt is usable."
+    )
 
 
 @pytest.mark.asyncio

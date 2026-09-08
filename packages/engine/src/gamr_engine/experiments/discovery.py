@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import json
 
 from gamr_core import DiscoveryCandidate, ExperimentPresetConfig, TargetOrigin
@@ -16,12 +15,21 @@ from .decisions import DISCOVERY_DECISION_PROMPT
 from .records import LoadedTask, PhaseResult, TargetConversation
 from .rendering import methodology_prefix
 
-_PREFLIGHT_TIMEOUT_SECONDS = 60
 _DISCOVERY_PREFLIGHT_PROMPT = (
-    "- Perform a bounded read-only availability preflight for the exact supplied target.\n"
+    "- Perform a bounded availability preflight for the exact supplied target.\n"
     "- NEVER execute a Scenario step during preflight.\n"
-    "- NEVER request action approval during preflight.\n"
-    "- Ask Tyr whether the supplied Bridge ID, workspace, agent, and path are reachable.\n"
+    "- The supplied workspace, Agent, and path are in the peer workspace behind "
+    "the supplied Bridge ID.\n"
+    "- In the first send decision, address the peer Tyr Assistant in the supplied "
+    "workspace over the supplied Bridge ID. Routing exists only in the message text, "
+    "so explicitly name both.\n"
+    "- Ask the peer Tyr Assistant to confirm the supplied Agent exists in that peer "
+    "workspace and have the supplied Agent verify that the supplied path exists and "
+    "is usable.\n"
+    "- NEVER ask the current Tyr Assistant's local Agent roster or filesystem to "
+    "verify the supplied Agent or path.\n"
+    "- Do not accept Bridge or workspace metadata alone as confirmation of the Agent "
+    "or path.\n"
     "- Return only a JSON NextTurnDecision.\n"
     "- Complete with discoveredCandidates containing the exact candidate only when "
     "Tyr's reply confirms every supplied field.\n"
@@ -54,9 +62,14 @@ class DiscoveryRunner:
 
     @staticmethod
     def preflight_reached_target(result: PhaseResult) -> bool:
-        return any(
-            item.get("role") == "user" and "observedFacts" in item for item in result.transcript
-        )
+        for item in result.transcript:
+            observed_facts = item.get("observedFacts")
+            if not isinstance(observed_facts, str):
+                continue
+            facts = json.loads(observed_facts)
+            if isinstance(facts, dict) and facts.get("targetState") == "completed":
+                return True
+        return False
 
     @classmethod
     def preflight_confirmed(cls, result: PhaseResult, candidate: DiscoveryCandidate) -> bool:
@@ -197,25 +210,18 @@ class DiscoveryRunner:
             + json.dumps(dict(discovery_fields(candidate)), sort_keys=True)
             + "\n```\n"
         )
-        preflight_config = config.model_copy(update={"action_mode": "read_only"})
-        try:
-            return await asyncio.wait_for(
-                self._conversation.run(
-                    prompt,
-                    target,
-                    model,
-                    preflight_config,
-                    max_turns=min(3, config.discovery_turns),
-                    conversation=TargetConversation(),
-                    require_candidates=True,
-                    run_id=run_id,
-                    artifacts=artifacts,
-                    phase="discovery-preflight",
-                ),
-                timeout=_PREFLIGHT_TIMEOUT_SECONDS,
-            )
-        except TimeoutError:
-            return PhaseResult([], None, None, [], "preflight timed out")
+        return await self._conversation.run(
+            prompt,
+            target,
+            model,
+            config,
+            max_turns=min(3, config.discovery_turns),
+            conversation=TargetConversation(),
+            require_candidates=True,
+            run_id=run_id,
+            artifacts=artifacts,
+            phase="discovery-preflight",
+        )
 
     async def live(
         self,

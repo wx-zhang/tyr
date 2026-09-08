@@ -142,7 +142,7 @@ it("shows the stored discovery input and fallback policy", async () => {
   renderPage();
 
   expect(await screen.findByText("Provided target")).toBeInTheDocument();
-  expect(screen.getByText("Enabled (bounded read-only preflight)")).toBeInTheDocument();
+  expect(screen.getByText("Enabled (bounded preflight)")).toBeInTheDocument();
   expect(screen.getByText("operator-reference")).toBeInTheDocument();
   expect(screen.getByText("/home/alice/work")).toBeInTheDocument();
   expect(screen.getByText("The document Task ID is informational and is not matched against the selected Task.")).toBeInTheDocument();
