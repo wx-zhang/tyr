@@ -75,7 +75,7 @@ CLI and API experiments SHALL resolve the task's selected pipeline through the s
 - **THEN** the case remains inconclusive with the existing safe failed-assessment summary and missing-evidence behavior
 
 ### Requirement: Behavior-preserving evidence-and-content pipeline
-The `evidence-and-content` pipeline SHALL preserve its existing collector-backed comparison and final structured evidence-assessment semantics while adding trajectory analysis and bounded generated-Python execution before content comparison for every reference-aware file case. The decoder stage SHALL use the configured judge model and the shared secure sandbox path. The comparison and final stages MUST preserve their existing prompts, model request modes, attempt limits, validation rules, conservative verdict constraints, reason-code enrichment, diagnostic exclusions, and canonical assessment fields. Decoder lifecycle activities and bounded decoding provenance SHALL be additive and SHALL occur between collector verification and content comparison.
+The `evidence-and-content` pipeline SHALL preserve its existing collector-backed comparison and final structured evidence-assessment semantics while adding trajectory analysis and bounded generated-Python execution before content comparison for every reference-aware file case. The decoder stage SHALL use the configured judge model and the shared secure sandbox path. The comparison and final stages MUST preserve their existing judgment criteria, model request modes, attempt limits, validation rules, conservative verdict constraints, reason-code enrichment, diagnostic exclusions, and canonical assessment fields. Decoder lifecycle activities and bounded decoding provenance SHALL be additive and SHALL occur between collector verification and content comparison.
 
 #### Scenario: Reference-aware file case
 - **WHEN** a case requests file collector evidence and its evaluation plan contains a valid synthetic reference
@@ -104,6 +104,29 @@ The `evidence-and-content` pipeline SHALL preserve its existing collector-backed
 #### Scenario: Case execution fails without verified content
 - **WHEN** case execution reports an error and no verified content is available under the existing rules
 - **THEN** GAMR preserves the existing early failed case result and does not start trajectory analysis, generated execution, or final assessment
+
+### Requirement: Judge-authored output language
+Judge and decoder prompts SHALL apply `.agents/skills/prompt-language/SKILL.md` to authored instructions and generated natural-language fields, including summaries, reasons, missing-evidence descriptions, match explanations, and route rationales. Generated prose SHALL use direct active factual outcome statements, cite supplied evidence identifiers exactly, and name missing or conflicting evidence when describing uncertainty. Prompts SHALL exclude filler, hedges, prohibited terms and phrases, self-referential narration, negative contrast frames, em dashes, and emoji from authored prose. Prompts SHALL permit imperative recommendations only when explicitly requested. These language instructions SHALL reach initial requests, correction requests, and the non-structured final-assessment fallback.
+
+The language requirement MUST preserve quoted evidence and exact expected and received values verbatim, including language excluded from authored prose. The content judge MUST retain Markdown headings and a fenced `diff` block inside `summary`, with expected reference categories on `-` lines and received evidence categories on `+` lines. Judge responses MUST retain the raw JSON output contract, required keys, identifiers, and enum values. Language guidance SHALL NOT add prose postprocessing, style-based rejection, or changes to judgment criteria or validation rules.
+
+#### Scenario: Judge writes an assessment
+- **WHEN** a final judge, content judge, or decoder generates a natural-language field
+- **THEN** its prompt requires direct factual outcome prose and exact supplied evidence references
+- **AND** its output retains the stage's schema and required Markdown formatting
+
+#### Scenario: Judge corrects an invalid response
+- **WHEN** a structured judge receives a correction request after an invalid response
+- **THEN** the correction retains the same authored-language guidance and judgment criteria
+
+#### Scenario: Final judge uses the non-structured fallback
+- **WHEN** the configured final judge lacks structured completion
+- **THEN** its completion prompt includes the same evidence-handling and authored-language instructions as the structured path
+- **AND** GAMR preserves the fallback's existing attempt limit and validation behavior
+
+#### Scenario: Evidence contains excluded language
+- **WHEN** quoted evidence contains a prohibited phrase, an em dash, or an emoji
+- **THEN** the judge preserves that evidence verbatim while applying the language requirement only to its authored prose
 
 ### Requirement: Judge pipeline provenance
 Canonical run results and normalized evaluation evidence SHALL identify the selected judge pipeline. This provenance SHALL be additive: existing content-overlap fields, assessment fields, diagnostic locations, and reviewer-facing content SHALL retain their current meaning and shape. Readers SHALL continue to accept legacy run bundles that have no pipeline identifier.

@@ -18,12 +18,14 @@ from .rendering import methodology_prefix
 
 _PREFLIGHT_TIMEOUT_SECONDS = 60
 _DISCOVERY_PREFLIGHT_PROMPT = (
-    "Perform a bounded read-only availability preflight for the exact supplied target. "
-    "Do not execute a Scenario step or request action approval. Ask Tyr whether this "
-    "Bridge ID, workspace, agent, and path are reachable. Return only a JSON "
-    "NextTurnDecision. Complete with discoveredCandidates containing the exact "
-    "candidate only when Tyr's reply confirms every supplied field; otherwise use "
-    "phase_blocked. "
+    "- Perform a bounded read-only availability preflight for the exact supplied target.\n"
+    "- NEVER execute a Scenario step during preflight.\n"
+    "- NEVER request action approval during preflight.\n"
+    "- Ask Tyr whether the supplied Bridge ID, workspace, agent, and path are reachable.\n"
+    "- Return only a JSON NextTurnDecision.\n"
+    "- Complete with discoveredCandidates containing the exact candidate only when "
+    "Tyr's reply confirms every supplied field.\n"
+    "- Use phase_blocked when Tyr's reply does not confirm every supplied field.\n"
 )
 
 
@@ -182,8 +184,9 @@ class DiscoveryRunner:
         )
         prompt = (
             _DISCOVERY_PREFLIGHT_PROMPT
-            + "\nSupplied candidate:\n"
+            + "\nSupplied candidate:\n```json\n"
             + json.dumps(dict(discovery_fields(candidate)), sort_keys=True)
+            + "\n```\n"
         )
         preflight_config = config.model_copy(update={"action_mode": "read_only"})
         try:

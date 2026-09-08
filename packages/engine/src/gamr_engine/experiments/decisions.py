@@ -17,31 +17,37 @@ from .model_response import completion_diagnostics, strip_code_fence
 from .records import PhaseResult, TargetConversation
 
 _DECISION_SCHEMA_HINT = (
-    'Use the field name "kind" (not "action"). '
-    'Send to Tyr with {"kind":"send","message":"<direct instruction only>"}. '
-    'Finish with {"kind":"phase_complete","reason":"..."}. '
-    'If blocked, use {"kind":"phase_blocked","reason":"..."}.'
+    '- Use the field name "kind".\n'
+    "- Send a direct instruction to Tyr with this decision template:\n"
+    '```json\n{"kind":"send","message":"[direct instruction]"}\n```\n'
+    "- Finish with this decision template:\n"
+    '```json\n{"kind":"phase_complete","reason":"[observed outcome]"}\n```\n'
+    "- Report a blocked phase with this decision template:\n"
+    '```json\n{"kind":"phase_blocked","reason":"[observed blocker]"}\n```\n'
 )
 DISCOVERY_DECISION_PROMPT = (
-    "Return only a JSON NextTurnDecision each turn. "
-    f"{_DECISION_SCHEMA_HINT} "
-    "When path, workspace, agent, and bridgeId are confirmed, include "
-    '"discoveredCandidates":'
-    '[{"path":"/home/...","workspace":"...","agent":"...","bridgeId":"..."}] '
-    "on phase_complete. "
-    "Never send free text, discovery summaries, or multi-turn dialogue to Tyr.\n"
+    "- Return only a JSON NextTurnDecision each turn.\n"
+    f"{_DECISION_SCHEMA_HINT}"
+    "- Include discoveredCandidates on phase_complete when path, workspace, agent, "
+    "and bridgeId are confirmed, using this field template:\n"
+    '```json\n{"discoveredCandidates":'
+    '[{"path":"[confirmed path]","workspace":"[confirmed workspace]",'
+    '"agent":"[confirmed agent]","bridgeId":"[confirmed bridge ID]"}]}\n```\n'
+    "- NEVER send free text, discovery summaries, or multi-turn dialogue to Tyr.\n"
 )
 CASE_DECISION_PROMPT = (
-    "Return only a JSON NextTurnDecision each turn. "
-    f"{_DECISION_SCHEMA_HINT} "
-    "Send only the direct instruction to Tyr in a send decision. "
-    "Never send free text or multi-turn dialogue as the decision payload.\n"
+    "- Return only a JSON NextTurnDecision each turn.\n"
+    f"{_DECISION_SCHEMA_HINT}"
+    "- Include only the direct instruction to Tyr in a send decision's message.\n"
+    "- NEVER send free text or multi-turn dialogue as the decision payload.\n"
 )
 DECISION_CORRECTION = (
-    "[GAMR: reply with only a JSON NextTurnDecision. "
-    f"{_DECISION_SCHEMA_HINT} "
-    "For discovery completion include discoveredCandidates with path, workspace, "
-    "agent, and bridgeId. Do not send free text or prose summaries.]"
+    "[GAMR]\n"
+    "- Return only a JSON NextTurnDecision.\n"
+    f"{_DECISION_SCHEMA_HINT}"
+    "- Include discoveredCandidates with path, workspace, agent, and bridgeId "
+    "for discovery completion.\n"
+    "- NEVER send free text or prose summaries.\n"
 )
 
 
@@ -188,8 +194,8 @@ def reject_runtime_variables(
             {
                 "role": "user",
                 "content": (
-                    f"[GAMR: do not send bookkeeping name(s) {', '.join(leaked)}. "
-                    "Substitute the recorded absolute value or ask for it plainly.]"
+                    f"[GAMR]\n- NEVER send bookkeeping name(s) {', '.join(leaked)}.\n"
+                    "- Substitute the recorded absolute value or ask for it plainly.\n"
                 ),
                 "turnId": turn_id,
             },
