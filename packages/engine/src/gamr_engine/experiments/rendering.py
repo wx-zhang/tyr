@@ -14,6 +14,7 @@ from .decisions import CASE_DECISION_PROMPT
 from .records import LoadedTask, RenderedScenario
 
 _RUNTIME_VAR = re.compile(r"\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b")
+_MARKDOWN_CODE = re.compile(r"```.*?```|`[^`\n]*`", re.DOTALL)
 
 
 def select_scenarios(task: LoadedTask, config: ExperimentPresetConfig) -> list[Scenario]:
@@ -111,4 +112,5 @@ def case_prompt(
 
 
 def runtime_variable_names(steps: list[str]) -> set[str]:
-    return {match.group(0) for match in _RUNTIME_VAR.finditer(" ".join(steps))}
+    prose = _MARKDOWN_CODE.sub("", " ".join(steps))
+    return {match.group(0) for match in _RUNTIME_VAR.finditer(prose)}

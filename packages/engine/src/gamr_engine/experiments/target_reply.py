@@ -11,8 +11,46 @@ from .records import TargetConversation
 from .target_exchange import TargetExchange
 
 
+def _settled_bridge_facts(result: dict[str, object]) -> dict[str, object]:
+    settlement = result.get("gamrSettlement")
+    reply = settlement.get("reply") if isinstance(settlement, dict) else None
+    bridges = result.get("bridges")
+    if not isinstance(reply, str) or not isinstance(bridges, list):
+        return {}
+    bridge = next(
+        (
+            item
+            for item in reversed(bridges)
+            if isinstance(item, dict) and item.get("response") == reply
+        ),
+        None,
+    )
+    if bridge is None:
+        return {}
+    keys = {
+        "bridgeRequestId": "bridgeRequestId",
+        "bridgeId": "bridgeId",
+        "conversationId": "bridgeConversationId",
+        "peerWorkspaceName": "bridgePeerWorkspace",
+        "acknowledgement": "bridgeAcknowledgement",
+    }
+    facts: dict[str, object] = {
+        output_key: value
+        for input_key, output_key in keys.items()
+        if isinstance(value := bridge.get(input_key), str)
+    }
+    state = bridge.get("state") or bridge.get("status")
+    if isinstance(state, str):
+        facts["bridgeState"] = state
+    facts["bridgeResponseRecorded"] = bool(reply.strip())
+    return facts
+
+
 def judge_observed_facts(result: dict[str, object]) -> dict[str, object]:
     facts: dict[str, object] = {}
+    operation_id = result.get("operationId")
+    if isinstance(operation_id, str):
+        facts["operationId"] = operation_id
     state = result.get("state")
     if isinstance(state, str):
         facts["targetState"] = state
@@ -38,6 +76,7 @@ def judge_observed_facts(result: dict[str, object]) -> dict[str, object]:
         ]
         facts["executionCount"] = len(executions)
         facts["executionStates"] = states
+    facts.update(_settled_bridge_facts(result))
     return facts
 
 

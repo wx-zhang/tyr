@@ -1,5 +1,11 @@
+import json
+
 from gamr_engine.experiments.activity import RunEvents
-from gamr_engine.experiments.conversation_state import ConversationState, TurnContext
+from gamr_engine.experiments.conversation_state import (
+    ConversationState,
+    TurnContext,
+    turn_prompt,
+)
 from gamr_engine.experiments.records import ProgressEvent, TargetConversation
 from gamr_engine.experiments.target_exchange import TargetExchange
 from gamr_engine.experiments.target_reply import record_target_reply
@@ -46,7 +52,22 @@ def test_fresh_bridge_reply_is_not_treated_as_cumulative_text() -> None:
             None,
             None,
             {
+                "operationId": "operation-current",
                 "response": "Working",
+                "bridges": [
+                    {
+                        "bridgeRequestId": "bridge-previous",
+                        "conversationId": "conversation-previous",
+                        "state": "completed",
+                        "response": "Earlier result",
+                    },
+                    {
+                        "bridgeRequestId": "bridge-current",
+                        "conversationId": "conversation-current",
+                        "state": "completed",
+                        "response": reply,
+                    },
+                ],
                 "gamrSettlement": {"state": "settled", "reply": reply},
             },
         ),
@@ -57,3 +78,53 @@ def test_fresh_bridge_reply_is_not_treated_as_cumulative_text() -> None:
         artifacts=None,
     )
     assert state.transcript[-1]["content"] == reply
+    assert json.loads(state.transcript[-1]["observedFacts"]) == {
+        "operationId": "operation-current",
+        "settlementState": "settled",
+        "bridgeRequestId": "bridge-current",
+        "bridgeConversationId": "conversation-current",
+        "bridgeState": "completed",
+        "bridgeResponseRecorded": True,
+    }
+
+
+def test_next_model_turn_receives_settled_bridge_evidence() -> None:
+    reply = "/home/workspace exists and is usable."
+    state = ConversationState()
+    record_target_reply(
+        TargetExchange(
+            "turn",
+            "Verify Carol in Joe workspace.",
+            "decision",
+            "key",
+            None,
+            None,
+            {
+                "state": "completed",
+                "response": reply,
+                "bridges": [
+                    {
+                        "bridgeRequestId": "request",
+                        "bridgeId": "bridge-joe",
+                        "conversationId": "conversation",
+                        "state": "completed",
+                        "peerWorkspaceName": "Joe workspace",
+                        "acknowledgement": "Routed to Carol.",
+                        "response": reply,
+                    }
+                ],
+                "gamrSettlement": {"state": "settled", "reply": reply},
+            },
+        ),
+        TargetConversation(),
+        state,
+        TurnContext("run", "discovery-preflight", None, None, 1, "Verify target."),
+        events=RunEvents(None, None),
+        artifacts=None,
+    )
+
+    prompt = turn_prompt("Verify target.", state)
+
+    assert '"bridgeId":"bridge-joe"' in prompt
+    assert '"bridgePeerWorkspace":"Joe workspace"' in prompt
+    assert '"bridgeAcknowledgement":"Routed to Carol."' in prompt

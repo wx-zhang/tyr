@@ -57,7 +57,7 @@ export function ExperimentDetailPage() {
               <div className="detail-row"><dt>Base Scenario history</dt><dd className="mono tabular">{historyTestRuns}</dd></div>
               <div className="detail-row"><dt>Research Iteration history</dt><dd className="mono tabular">{historyResearchRuns}</dd></div>
               <div className="detail-row"><dt>Discovery input</dt><dd>{discoveryInput ? "Provided target" : "None (live discovery)"}</dd></div>
-              {discoveryInput ? <div className="detail-row"><dt>Fallback to live discovery</dt><dd>{config?.fallbackToDiscovery ? "Enabled (bounded read-only preflight)" : "Disabled (an unavailable target fails the Experiment)"}</dd></div> : null}
+              {discoveryInput ? <div className="detail-row"><dt>Fallback to live discovery</dt><dd>{config?.fallbackToDiscovery ? "Enabled (bounded preflight)" : "Disabled (an unavailable target fails the Experiment)"}</dd></div> : null}
             </dl>
             {discoveryInput ? (
               <div className="discovery-review">

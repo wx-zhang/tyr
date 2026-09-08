@@ -62,7 +62,7 @@ def render_progress(console: Console, event: ProgressEvent) -> None:
     elif event.event_type == "tyr.failed":
         console.print(f"[red]✗[/] Tyr connection failed [dim]({escape(event.detail or '')})[/]")
     elif event.event_type == "discovery.preflight.started":
-        console.print("[bold blue]▸[/] Provided-target preflight [dim]· read-only[/]")
+        console.print("[bold blue]▸[/] Provided-target preflight")
     elif event.event_type == "discovery.preflight.completed":
         console.print(
             f"[green]✓[/] Provided-target preflight [dim]· {escape(event.detail or '')}[/]"

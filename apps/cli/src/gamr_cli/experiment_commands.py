@@ -79,7 +79,7 @@ def run_experiment(
     fallback_to_discovery: bool = typer.Option(
         False,
         "--fallback-to-discovery",
-        help="Run a bounded read-only preflight and fall back to live discovery if unavailable.",
+        help="Run a bounded preflight in the selected action mode and fall back if unavailable.",
     ),
     log_llm: LlmLogMode = typer.Option(
         LlmLogMode.DEFAULT,

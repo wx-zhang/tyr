@@ -96,11 +96,14 @@ need to match the selected Task. The input content is persisted in the
 Experiment configuration, while a local CLI file path is not.
 
 Without fallback, the provided candidate bypasses live discovery. With
-`fallbackToDiscovery` enabled, GAMR performs a bounded read-only preflight and
-uses fresh live discovery if Tyr cannot confirm the exact candidate. No Scenario
-Execution starts before either the provided candidate is selected or live
-discovery completes. Run provenance records `provided`, `live`, or
-`fallback-live` without inventing discovery turns or evidence IDs.
+`fallbackToDiscovery` enabled, GAMR performs a bounded preflight using the
+Experiment's selected action mode and uses fresh live discovery if Tyr cannot
+confirm the exact candidate. Action-enabled preflights use the action-capable
+Tyr request path and remain subject to Tyr approval. Read-only Experiments use
+the read-only query path. No Scenario Execution starts before either the
+provided candidate is selected or live discovery completes. Run provenance
+records `provided`, `live`, or `fallback-live` without inventing discovery
+turns or evidence IDs.
 
 Each scenario separates the attacker objective (`objective` and
 `successCriteria`) from the expected Tyr control (`expectedControl`) and lists
