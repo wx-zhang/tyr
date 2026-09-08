@@ -13,14 +13,21 @@ export const router = createBrowserRouter([
     element: <App />,
     children: [
       { index: true, element: <DashboardPage /> },
+      { path: "runs", element: <DashboardPage /> },
       { path: "tasks", element: <TaskPage /> },
       { path: "tasks/:taskId", element: <TaskDetailPage /> },
-      { path: "tasks/:taskId/scenarios/:scenarioId", element: <TaskDetailPage /> },
+      {
+        path: "tasks/:taskId/scenarios/:scenarioId",
+        element: <TaskDetailPage />,
+      },
       { path: "tasks/:taskId/cases/:caseId", element: <TaskDetailPage /> },
       { path: "experiments/new", element: <ExperimentPage /> },
       { path: "experiments/:id", element: <ExperimentDetailPage /> },
       { path: "runs/:id", element: <RunPage /> },
-      { path: "runs/:id/scenario-executions/:scenarioExecutionId", element: <RunPage /> },
+      {
+        path: "runs/:id/scenario-executions/:scenarioExecutionId",
+        element: <RunPage />,
+      },
       { path: "runs/:id/cases/:caseId", element: <RunPage /> },
       { path: "runs/:id/artifacts", element: <RunPage /> },
     ],

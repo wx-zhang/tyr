@@ -8,3 +8,7 @@
 @import "./styles/scientist-scenarios.css";
 @import "./styles/responsive.css";
 @import "./styles/experiment-setup.css";
+@import "./styles/experiment-browser.css";
+@import "./styles/run-review.css";
+@import "./styles/run-review-header.css";
+@import "./styles/run-review-history.css";

@@ -58,11 +58,10 @@ export function DashboardRunCard({
         className={`experiment-card ${resultClass}${selected ? " is-selected" : ""}`}
         aria-labelledby={titleId}
       >
-
         <header className="experiment-card-header">
           <div className="experiment-card-heading">
             {selecting ? (
-              <div className="experiment-card-selection">
+              <label className="experiment-card-selection">
                 <input
                   type="checkbox"
                   className="session-checkbox"
@@ -71,7 +70,7 @@ export function DashboardRunCard({
                   disabled={!deletable || deletePending}
                   onChange={onSelect}
                 />
-              </div>
+              </label>
             ) : null}
             <div className="experiment-card-identity">
               <Link
@@ -96,16 +95,20 @@ export function DashboardRunCard({
                     </span>
                   </>
                 ) : null}
+                <span aria-hidden="true">·</span>
+                <time
+                  className="tabular"
+                  dateTime={when ?? undefined}
+                  title={when ?? undefined}
+                >
+                  {relativeWhen} <span className="mono">{absoluteWhen}</span>
+                </time>
               </p>
             </div>
           </div>
           <div className="experiment-card-facts">
             <StatusBadge label={stateLabel} tone={stateTone} pulse={live} />
             <StatusBadge label={actionModeLabel} tone={actionModeTone} />
-            <time className="tabular" dateTime={when ?? undefined}>
-              {relativeWhen}
-              <span className="muted mono tabular">{absoluteWhen}</span>
-            </time>
           </div>
         </header>
 
@@ -123,20 +126,17 @@ export function DashboardRunCard({
               >
                 Scenario results
               </span>
-              <div className="experiment-result-metrics">
-                <div>
-                  <span>Breach</span>
-                  <strong>{counts.breach}</strong>
-                </div>
-                <div>
-                  <span>No breach</span>
-                  <strong>{counts.protected}</strong>
-                </div>
-                <div>
-                  <span>Inconclusive</span>
-                  <strong>{counts.inconclusive}</strong>
-                </div>
-              </div>
+              <span className="experiment-result-metrics">
+                <span>
+                  Breach <strong>{counts.breach}</strong>
+                </span>
+                <span>
+                  No breach <strong>{counts.protected}</strong>
+                </span>
+                <span>
+                  Inconclusive <strong>{counts.inconclusive}</strong>
+                </span>
+              </span>
               <span className="experiment-results-toggle experiment-results-toggle-closed">
                 View details
               </span>
@@ -182,6 +182,12 @@ export function DashboardRunCard({
 
         {!selecting ? (
           <div className="button-row experiment-card-actions">
+            <Link
+              className="button button-secondary run-action"
+              to={`/runs/${run.id}`}
+            >
+              Review
+            </Link>
             {live ? (
               <button
                 type="button"

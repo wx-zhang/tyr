@@ -95,286 +95,286 @@
   margin: 0;
 }
 
-.experiment-card-collection,
-.experiment-card-list {
+.experiments-dashboard .experiment-card-collection {
   display: grid;
   gap: var(--space-3);
   min-width: 0;
 }
 
-.experiment-card-list,
-.experiment-result-list {
+.experiments-dashboard .experiment-card-list,
+.experiments-dashboard .experiment-result-list {
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.experiment-card {
-  position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--space-2) var(--space-4);
+.experiments-dashboard .experiment-card-list {
   min-width: 0;
   border: var(--border-w) solid var(--border);
   border-radius: var(--radius-md);
   background: var(--surface);
-  padding: var(--space-3) var(--space-4);
 }
 
-.experiment-card.has-breach {
-  border-color: var(--danger);
+.experiments-dashboard .experiment-card-list > li + li {
+  border-top: var(--border-w) solid var(--border);
 }
 
-.experiment-card.has-no-breach {
-  border-color: var(--success);
+.experiments-dashboard .experiment-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2) var(--space-4);
+  min-width: 0;
+  padding: var(--space-4);
 }
 
-.experiment-card.is-selected {
-  background: var(--info-tint);
+.experiments-dashboard .experiment-card-list > li:first-child .experiment-card {
+  border-start-start-radius: var(--radius-md);
+  border-start-end-radius: var(--radius-md);
 }
 
-.experiment-card-selection {
+.experiments-dashboard .experiment-card-list > li:last-child .experiment-card {
+  border-end-start-radius: var(--radius-md);
+  border-end-end-radius: var(--radius-md);
+}
+
+.experiments-dashboard .experiment-card.is-selected {
+  background: var(--accent-tint);
+}
+
+.experiments-dashboard .experiment-card-selection {
+  display: flex;
   flex: 0 0 auto;
-  padding-top: var(--space-0-5);
+  align-items: center;
+  justify-content: center;
+  min-width: var(--space-6);
+  min-height: var(--space-6);
+  cursor: pointer;
 }
 
-.experiment-card-header {
+.experiments-dashboard .experiment-card-selection .session-checkbox {
+  width: var(--space-4);
+  height: var(--space-4);
+}
+
+.experiments-dashboard .experiment-card-header {
   grid-column: 1 / -1;
-}
-
-.experiment-card-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: var(--space-4);
+  gap: var(--space-2) var(--space-4);
   min-width: 0;
 }
 
-.experiment-card-heading {
+.experiments-dashboard .experiment-card-heading {
   display: flex;
+  flex: 1;
   align-items: flex-start;
   gap: var(--space-2);
   min-width: 0;
 }
 
-.experiment-card-identity {
+.experiments-dashboard .experiment-card-identity {
   min-width: 0;
 }
 
-.experiment-card-title {
+.experiments-dashboard .experiment-card-title {
   color: var(--text);
   font-size: var(--text-md);
-  font-weight: 700;
+  line-height: var(--leading-md);
+  font-weight: 600;
   overflow-wrap: anywhere;
   text-decoration: none;
 }
 
-.experiment-card-title:hover {
+.experiments-dashboard .experiment-card-title:hover {
   text-decoration: underline;
 }
 
-.experiment-card-meta {
+.experiments-dashboard .experiment-card-meta {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: baseline;
   gap: var(--space-1) var(--space-2);
   margin: var(--space-1) 0 0;
   font-size: var(--text-xs);
   line-height: var(--leading-xs);
+  overflow-wrap: anywhere;
 }
 
-.experiment-card-facts {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  align-items: flex-start;
-  gap: var(--space-2);
-}
-
-.experiment-card-facts time {
-  display: grid;
-  gap: var(--space-0-5);
-  text-align: right;
-}
-
-.experiment-card-facts time span {
-  font-size: var(--text-xs);
-}
-
-.experiment-results {
+.experiments-dashboard .experiment-card-meta > span,
+.experiments-dashboard .experiment-card-meta time {
   min-width: 0;
 }
 
-.experiment-results summary {
-  display: grid;
-  grid-template-columns: auto minmax(18rem, 28rem) auto;
+.experiments-dashboard .experiment-card-meta time {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+}
+
+.experiments-dashboard .experiment-card-facts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-1);
+}
+
+.experiments-dashboard .experiment-results {
+  min-width: 0;
+  align-self: center;
+}
+
+.experiments-dashboard .experiment-results summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  min-height: var(--space-6);
+  border-radius: var(--radius-xs);
   cursor: pointer;
   list-style: none;
 }
 
-.experiment-results summary::-webkit-details-marker {
+.experiments-dashboard .experiment-results summary::-webkit-details-marker {
   display: none;
 }
 
-.experiment-results-heading,
-.experiment-results h3 {
-  margin: 0;
-  font-size: var(--text-sm);
-  font-weight: 600;
+.experiments-dashboard .experiment-results summary:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
-.experiment-results-toggle {
+.experiments-dashboard .experiment-results-heading,
+.experiments-dashboard .experiment-results h3 {
+  margin: 0;
   color: var(--text-secondary);
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
+  font-weight: 500;
+}
+
+.experiments-dashboard .experiment-results-toggle {
+  color: var(--accent);
   font-size: var(--text-xs);
   font-weight: 500;
 }
 
-.experiment-results-toggle-open,
-.experiment-results[open] .experiment-results-toggle-closed {
+.experiments-dashboard
+  .experiment-results
+  summary:hover
+  .experiment-results-toggle {
+  text-decoration: underline;
+}
+
+.experiments-dashboard .experiment-results-toggle-open,
+.experiments-dashboard
+  .experiment-results[open]
+  .experiment-results-toggle-closed {
   display: none;
 }
 
-.experiment-results[open] .experiment-results-toggle-open {
+.experiments-dashboard
+  .experiment-results[open]
+  .experiment-results-toggle-open {
   display: inline;
 }
 
-.experiment-result-metrics {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  border: var(--border-w) solid var(--border);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-}
-
-.experiment-result-metrics div {
-  display: flex;
-  align-items: baseline;
-  justify-content: center;
-  gap: var(--space-1);
-  min-width: 0;
-  padding: var(--space-1) var(--space-2);
-  text-align: center;
-}
-
-.experiment-result-metrics div + div {
-  border-inline-start: var(--border-w) solid var(--border);
-}
-
-.experiment-result-metrics span {
+.experiments-dashboard .experiment-result-metrics {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
   color: var(--text-secondary);
   font-size: var(--text-xs);
+  line-height: var(--leading-xs);
 }
 
-.experiment-result-metrics strong {
-  font-size: var(--text-sm);
+.experiments-dashboard .experiment-result-metrics > span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-1);
+}
+
+.experiments-dashboard .experiment-result-metrics strong {
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 
-.has-breach .experiment-result-metrics div:first-child {
-  background: var(--danger-tint);
+.experiments-dashboard
+  .has-breach
+  .experiment-result-metrics
+  > span:first-child
+  strong {
   color: var(--danger);
 }
 
-.has-no-breach .experiment-result-metrics div:nth-child(2) {
-  background: var(--success-tint);
-  color: var(--success);
+.experiments-dashboard .experiment-result-list {
+  display: grid;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+  border-top: var(--border-w) solid var(--border);
+  padding-top: var(--space-2);
 }
 
-.experiment-result-list {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-2);
-  margin-top: var(--space-3);
-}
-
-.experiment-result-chip {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+.experiments-dashboard .experiment-result-chip {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-2);
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-3);
   min-width: 0;
-  border-radius: var(--radius-sm);
-  background: var(--surface-hover);
-  padding: var(--space-2) var(--space-3);
+  padding-block: var(--space-1);
 }
 
-.experiment-result-chip.result-vulnerable .experiment-result-scenario {
-  color: var(--danger);
-  font-weight: 600;
-}
-
-.experiment-result-scenario {
+.experiments-dashboard .experiment-result-scenario {
   min-width: 0;
   overflow-wrap: anywhere;
 }
 
-.experiment-result-chip .status-badge {
-  grid-column: 2;
-  grid-row: 1 / span 2;
-}
-
-.experiment-results-empty {
+.experiments-dashboard .experiment-results-empty {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-2);
   margin: 0;
-  border: var(--border-w) dashed var(--border);
-  border-radius: var(--radius-sm);
-  padding: var(--space-2) var(--space-3);
 }
 
-.experiment-results-empty p {
-  margin: var(--space-1) 0 0;
+.experiments-dashboard .experiment-results-empty p {
+  margin: 0;
   font-size: var(--text-xs);
+  line-height: var(--leading-xs);
 }
 
-.experiment-card-actions {
-  align-self: center;
+.experiments-dashboard .experiment-card-actions {
+  align-self: start;
   justify-content: flex-end;
+  gap: var(--space-1);
+}
+
+.experiments-dashboard .experiment-card-actions .button {
+  min-height: var(--row-h);
 }
 
 @media (max-width: 720px) {
-  .experiment-card {
+  .experiments-dashboard .experiment-card {
     grid-template-columns: minmax(0, 1fr);
     padding: var(--space-3);
   }
 
-  .experiment-card-header {
-    display: grid;
+  .experiments-dashboard .experiment-card-header {
+    flex-wrap: wrap;
   }
 
-  .experiment-card-facts {
+  .experiments-dashboard .experiment-card-heading {
+    flex-basis: 100%;
+  }
+
+  .experiments-dashboard .experiment-card-facts,
+  .experiments-dashboard .experiment-card-actions {
     justify-content: flex-start;
-  }
-
-  .experiment-card-facts time {
-    text-align: left;
-  }
-
-  .experiment-results summary {
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: var(--space-2);
-  }
-
-  .experiment-result-metrics {
-    grid-column: 1 / -1;
-    grid-row: 2;
-  }
-
-  .experiment-result-list {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .experiment-result-metrics div {
-    padding-inline: var(--space-1);
-  }
-
-  .experiment-card-actions {
-    grid-column: 1;
-    justify-content: stretch;
-  }
-
-  .experiment-card-actions .button {
-    flex: 1;
   }
 }
 

@@ -1,4 +1,5 @@
 import { currentPhaseLabel, stageStatusLabel } from "./runHelpers";
+import { label } from "./runTurnHelpers";
 
 export function RunStagesPanel({
   phases,
@@ -28,16 +29,20 @@ export function RunStagesPanel({
       aria-labelledby="stages-title"
     >
       <div className="section-heading">
-        <h2 id="stages-title">Experiment State</h2>
+        <h2 id="stages-title">Lifecycle</h2>
         <span className="muted" role="status" aria-live="polite">
-          {waitingForTyr
-            ? "Waiting for Tyr"
-            : agentWorking
-              ? "Agent working"
-              : currentPhaseLabel(run, phases)}
+          {!isLive && run?.state
+            ? label(run.state)
+            : waitingForTyr
+              ? "Waiting for Tyr"
+              : agentWorking
+                ? "Agent working"
+                : currentPhaseLabel(run, phases)}
         </span>
       </div>
-      {isLoading ? <p className="secondary">Loading Experiment stages…</p> : null}
+      {isLoading ? (
+        <p className="secondary">Loading Experiment stages…</p>
+      ) : null}
       <ol className="run-stages" aria-label="Experiment State stages">
         {(phases ?? []).map((phase) => {
           const active = phase.state === "active";

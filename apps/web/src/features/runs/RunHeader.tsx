@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { StatusBadge } from "../../components/StatusBadge";
 import type { RunConnectionState } from "../../api/useRunEvents";
 import { label, tone, formatTimestamp } from "./RunTurnCard";
@@ -6,12 +7,14 @@ import {
   connectionLabel,
   formatRefreshRate,
   formatRelative,
+  isRefreshRateMs,
   REFRESH_RATES_MS,
   type RefreshRateMs,
 } from "./runHelpers";
 
 export function RunHeader({
   runId,
+  name,
   run,
   now,
   isLive,
@@ -23,6 +26,7 @@ export function RunHeader({
   onRequestCancel,
 }: {
   runId: string;
+  name?: string | null;
   run?: {
     state?: string;
     actionMode?: string;
@@ -41,34 +45,104 @@ export function RunHeader({
   onRequestCancel: () => void;
 }) {
   const effectiveResearchIterations = researchIterations ?? 0;
+  const taskParts = run?.task?.split("/").filter(Boolean) ?? [];
+  const title = name?.trim() || taskParts[taskParts.length - 1] || "Experiment";
+  const updatesLabel =
+    connectionState === "connected"
+      ? "Updates connected"
+      : `Updates ${connectionLabel(connectionState).toLowerCase()}`;
   return (
     <header className="run-header">
       <div className="run-header-main">
-        <p className="eyebrow">Experiment details</p>
+        <Link className="run-review-back" to="/runs">
+          Back to Experiments
+        </Link>
         <div className="run-title">
-          <h1>Experiment <span className="mono">{runId}</span></h1>
-          <StatusBadge label={label(run?.state)} tone={tone(run?.state)} pulse={isLive} />
-          <span className={`run-mode${run?.actionMode === "approval_required" ? " run-mode-actions" : ""}`}>
-            {label(run?.actionMode ?? "read_only")}
+          <h1>{title}</h1>
+          <StatusBadge
+            label={label(run?.state)}
+            tone={tone(run?.state)}
+            pulse={isLive}
+          />
+          <span
+            className={`run-mode${run?.actionMode === "approval_required" ? " run-mode-actions" : ""}`}
+          >
+            {run?.actionMode ? label(run.actionMode) : "Mode unavailable"}
           </span>
-          {run?.executionMode ? <span className="run-mode run-execution-mode">{label(run.executionMode)}</span> : null}
+          {run?.executionMode ? (
+            <span className="run-mode run-execution-mode">
+              {label(run.executionMode)}
+            </span>
+          ) : null}
         </div>
+        <p className="run-review-id">
+          <span>Experiment ID</span> <span className="mono">{runId}</span>
+        </p>
         <dl className="run-facts">
-          <div><dt>Task</dt><dd className="mono">{run?.task ?? "Pending"}</dd></div>
-          <div><dt>Started</dt><dd title={run?.startedAt ?? undefined}>{formatTimestamp(run?.startedAt)}</dd></div>
-          <div><dt>Latest update</dt><dd title={run?.latestUpdateAt ?? undefined}>{isLive ? formatRelative(run?.latestUpdateAt, now) : formatTimestamp(run?.latestUpdateAt)}</dd></div>
-          {effectiveResearchIterations > 0 ? <div><dt>Research Iterations</dt><dd className="mono tabular">{effectiveResearchIterations}</dd></div> : null}
+          <div>
+            <dt>Task</dt>
+            <dd className="mono">{run?.task ?? "Pending"}</dd>
+          </div>
+          <div>
+            <dt>Started</dt>
+            <dd className="mono" title={run?.startedAt ?? undefined}>
+              {formatTimestamp(run?.startedAt)}
+            </dd>
+          </div>
+          <div>
+            <dt>Latest update</dt>
+            <dd className="mono" title={run?.latestUpdateAt ?? undefined}>
+              {isLive
+                ? formatRelative(run?.latestUpdateAt, now)
+                : formatTimestamp(run?.latestUpdateAt)}
+            </dd>
+          </div>
+          {effectiveResearchIterations > 0 ? (
+            <div>
+              <dt>Research Iterations</dt>
+              <dd className="mono tabular">{effectiveResearchIterations}</dd>
+            </div>
+          ) : null}
         </dl>
       </div>
       <div className="run-header-tools">
-        <div className="refresh-rate" role="radiogroup" aria-label="Refresh rate" title="How often to refresh Experiment data">
-          {REFRESH_RATES_MS.map((ms) => <button key={ms} type="button" role="radio" className={refreshMs === ms ? "is-selected" : undefined} aria-checked={refreshMs === ms} onClick={() => onSelectRefreshMs(ms)}>{formatRefreshRate(ms)}</button>)}
-        </div>
+        <label className="field-group run-review-refresh">
+          <span className="field-label">Refresh rate</span>
+          <select
+            value={refreshMs}
+            title="How often to refresh Experiment data"
+            onChange={(event) => {
+              const ms = Number(event.currentTarget.value);
+              if (isRefreshRateMs(ms)) onSelectRefreshMs(ms);
+            }}
+          >
+            {REFRESH_RATES_MS.map((ms) => (
+              <option key={ms} value={ms}>
+                {formatRefreshRate(ms)}
+              </option>
+            ))}
+          </select>
+        </label>
         <div className="run-header-meta">
-          <p className={`run-connection connection-${connectionState}`} role="status" aria-live="polite" title={connectionDetail(connectionState)}>
-            <span className="connection-dot" aria-hidden="true" /><span className="connection-label">{connectionLabel(connectionState)}</span>
+          <p
+            className={`run-connection connection-${connectionState}`}
+            role="status"
+            aria-live="polite"
+            title={connectionDetail(connectionState)}
+          >
+            <span className="connection-dot" aria-hidden="true" />
+            <span className="connection-label">{updatesLabel}</span>
           </p>
-          {isLive ? <button type="button" className="run-cancel" disabled={cancelling} onClick={onRequestCancel}>{cancelling ? "Cancelling…" : "Cancel Experiment"}</button> : null}
+          {isLive ? (
+            <button
+              type="button"
+              className="run-cancel"
+              disabled={cancelling}
+              onClick={onRequestCancel}
+            >
+              {cancelling ? "Cancelling…" : "Cancel Experiment"}
+            </button>
+          ) : null}
         </div>
       </div>
     </header>

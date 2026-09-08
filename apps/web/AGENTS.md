@@ -70,6 +70,14 @@ Legacy `/tasks/:taskId/cases/:caseId` links normalize at the route boundary.
 
 The Experiment review screens consume API Experiment, Scenario Execution, activity, and artifact
 endpoints; Tyr and model calls remain server-side.
+`/runs` lists Experiments newest first with search, state filters, and 25-row progressive loading;
+`/` remains an entry point to that list. Bulk selection applies only to visible, deletable rows
+and clears when filters change. Outcome accents distinguish breach and no-breach results.
+`/runs/:id` leads with the Experiment name, full ID, permissions, and a labeled refresh selector.
+Results and activity appear before lifecycle and Tyr network details, with section links for navigation.
+Scenario rows use red, green, or amber outcome accents while retaining separate lifecycle badges.
+Review layout styles live in `run-review.css`, `run-review-header.css`, and `run-review-history.css`;
+list controls and layout live in `experiment-browser.css` and the scoped dashboard rules in `data.css`.
 New web Experiment Preset forms initialize max concurrent Scenario Executions to 1; operators may raise it through 5.
 `features/experiments/ExperimentPage.tsx` keeps Task and optional Preset name in a compact, borderless row.
 Execution settings and the full Scenario checklist sit below, followed by the review footer.

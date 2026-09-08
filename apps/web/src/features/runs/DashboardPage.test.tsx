@@ -97,6 +97,50 @@ function renderPage(queryClient = new QueryClient()) {
   );
 }
 
+it("combines search and state filters and restores all Experiments", async () => {
+  renderPage();
+  await screen.findByText("second-plan");
+  fireEvent.change(screen.getByLabelText("Search Experiments"), {
+    target: { value: "RUN-2222" },
+  });
+  expect(
+    screen.queryByText("exfiltrate-important-txt"),
+  ).not.toBeInTheDocument();
+  expect(screen.getByText("second-plan")).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("Experiment state"), {
+    target: { value: "completed" },
+  });
+  expect(screen.queryByText("second-plan")).not.toBeInTheDocument();
+  expect(screen.getByText("No matching Experiments")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+  expect(screen.getByText("second-plan")).toBeInTheDocument();
+  expect(screen.getByText("exfiltrate-important-txt")).toBeInTheDocument();
+});
+
+it("selects only visible Experiments and clears selection when filters change", async () => {
+  runs.push(run({ id: "run-3333", task: "tasks/third-plan" }));
+  renderPage();
+  await screen.findByText("third-plan");
+  fireEvent.change(screen.getByLabelText("Search Experiments"), {
+    target: { value: "third-plan" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Select" }));
+  fireEvent.click(
+    screen.getByRole("checkbox", { name: "Select all deletable Experiments" }),
+  );
+  expect(
+    screen.getByRole("button", { name: "Delete 1 selected" }),
+  ).toBeEnabled();
+  fireEvent.change(screen.getByLabelText("Search Experiments"), {
+    target: { value: "" },
+  });
+  expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Select" }));
+  expect(
+    screen.getByRole("button", { name: "Delete selected" }),
+  ).toBeDisabled();
+});
+
 function listRequests() {
   return vi
     .mocked(fetch)
@@ -132,25 +176,6 @@ it("falls back to the task label when the run has no name", async () => {
   renderPage();
 
   await screen.findByText("exfiltrate-important-txt");
-});
-
-it("keeps lifecycle and action-mode badges neutral beside verdicts", async () => {
-  runs = [
-    run({
-      id: "run-neutral-badges",
-      configuration: {
-        actionMode: "approval_required",
-        model: "test",
-        maxTurns: 10,
-        discoveryTurns: 1,
-        scientistIterations: 0,
-      },
-    }),
-  ];
-  renderPage();
-
-  expect(await screen.findByText("Completed")).toHaveClass("status-neutral");
-  expect(screen.getByText("Approval-gated")).toHaveClass("status-neutral");
 });
 
 it("deletes a single finished session after confirmation", async () => {
@@ -376,15 +401,9 @@ it("shows every Scenario result and breach classification", async () => {
   expect(
     within(card).queryByText("execution-partial-repeat"),
   ).not.toBeInTheDocument();
-  expect(within(card).getByText("Breach").nextElementSibling).toHaveTextContent(
-    "2",
-  );
-  expect(
-    within(card).getAllByText("No breach")[0].nextElementSibling,
-  ).toHaveTextContent("1");
-  expect(
-    within(card).getAllByText("Inconclusive")[0].nextElementSibling,
-  ).toHaveTextContent("1");
+  expect(details?.querySelector("summary")).toHaveTextContent("Breach 2");
+  expect(details?.querySelector("summary")).toHaveTextContent("No breach 1");
+  expect(details?.querySelector("summary")).toHaveTextContent("Inconclusive 1");
   expect(within(card).getByText("Vulnerability Exposed")).toBeInTheDocument();
   expect(
     within(card).getByText("Vulnerability Exposed (partial)"),
