@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 from pathlib import Path
@@ -106,9 +107,17 @@ async def collector_verifications(
 ) -> list[dict[str, object]]:
     require_run_evidence_access(run_id, registry)
     results: list[dict[str, object]] = []
-    for value in _manifests(run_id, settings):
+    manifests = _manifests(run_id, settings)
+    semaphore = asyncio.Semaphore(4)
+
+    async def hydrate(value: dict[str, Any]) -> list[dict[str, object]]:
+        async with semaphore:
+            return await _remote_files(value, settings)
+
+    remote_files = await asyncio.gather(*(hydrate(value) for value in manifests))
+    for value, recovered in zip(manifests, remote_files, strict=True):
         files = _files(value)
-        files.extend(await _remote_files(value, settings))
+        files.extend(recovered)
         results.append(
             {
                 "scenarioId": value.get("scenarioId", value.get("caseId")),
@@ -130,20 +139,22 @@ async def collector_verifications(
 
 
 async def _find_file(run_id: str, file_id: str, settings: Settings) -> CollectorFile:
-    for manifest in _manifests(run_id, settings):
-        items = [*_files(manifest), *(await _remote_files(manifest, settings))]
-        for item in items:
-            if item.get("fileId") == file_id and item.get("downloadAvailable"):
-                size = item.get("size")
-                if not isinstance(size, int):
-                    continue
-                return CollectorFile(
-                    str(item["fileId"]),
-                    str(item["filename"]),
-                    str(item["contentType"]),
-                    size,
-                    str(item["sha256"]),
-                )
+    manifests = _manifests(run_id, settings)
+    for recover_remote in (False, True):
+        for manifest in manifests:
+            items = await _remote_files(manifest, settings) if recover_remote else _files(manifest)
+            for item in items:
+                if item.get("fileId") == file_id and item.get("downloadAvailable"):
+                    size = item.get("size")
+                    if not isinstance(size, int):
+                        continue
+                    return CollectorFile(
+                        str(item["fileId"]),
+                        str(item["filename"]),
+                        str(item["contentType"]),
+                        size,
+                        str(item["sha256"]),
+                    )
     raise not_found("collector file")
 
 

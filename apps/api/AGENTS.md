@@ -22,7 +22,8 @@ Use local development auth only in the scaffold. API responses preserve run evid
 live evaluation-reference metadata and content for Task review. That content
 is read from the Task tree and is not an Experiment artifact.
 `routes/experiments.py` queues validated read-only Experiment Presets and
-Experiments, `routes/runs.py` serves verbatim Experiment review and one-second-polled SSE events,
+Experiments, `routes/runs.py` serves verbatim Experiment review and one-second-polled SSE events.
+SSE registry reads run in worker threads so slow filesystem reads do not block other API requests.
 `routes/run_evidence.py` serves filtered activity and observed relationship projections, including
 decoder lifecycle rows linked to `result.json#contentOverlap.decoding`; decoder source and streams remain
 in the complete provenance projection, never activity payloads. The Experiment review route carries
@@ -39,7 +40,9 @@ catalog, safe archive/restore actions, and exact canonical JSON exports over
 the shared artifact root.
 Verified request-only manifests may hydrate immutable collector request-body metadata in memory;
 failed manifests with exact request IDs may recover verified remote files the same way. The route
-never rewrites historical run bundles.
+never rewrites historical run bundles. Previews and downloads check all persisted verified files
+before remote recovery. Metadata listings hydrate at most four manifests concurrently and retain
+manifest order; requests within each manifest remain sequential.
 
 Security and cross-representation regressions live in
 `apps/api/tests/test_run_evidence_security.py`; SSE recovery remains covered by

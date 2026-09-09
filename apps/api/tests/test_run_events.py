@@ -1,9 +1,13 @@
+import asyncio
 import json
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
+from threading import Event
 
+import httpx
+import pytest
 from fastapi.testclient import TestClient
 from gamr_adapters.config import Settings
 from gamr_api.dependencies import get_registry, get_settings
@@ -13,6 +17,7 @@ from gamr_core import (
     ActivityType,
     EvidenceType,
     RunActivity,
+    RunEvent,
     RunState,
     SandboxOperationEvent,
     SandboxOperationState,
@@ -164,3 +169,35 @@ def test_events_require_a_run_authorized_for_the_current_request() -> None:
     with registry_client() as (client, _registry):
         response = client.get("/api/v1/runs/not-authorized/events")
         assert response.status_code == 404
+
+
+async def test_slow_event_reads_do_not_block_other_requests(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with registry_client() as (_, registry):
+        run = make_run(registry)
+        started = Event()
+        release = Event()
+        responsive: list[bool] = []
+        stream_events = registry.stream_events
+
+        def slow_events(run_id: str, after_sequence: int = 0) -> list[RunActivity | RunEvent]:
+            started.set()
+            responsive.append(release.wait(timeout=2))
+            return stream_events(run_id, after_sequence)
+
+        monkeypatch.setattr(registry, "stream_events", slow_events)
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            pending = asyncio.create_task(client.get(f"/api/v1/runs/{run.id}/events"))
+            try:
+                assert await asyncio.to_thread(started.wait, 2)
+                response = await client.get(f"/api/v1/runs/{run.id}")
+                assert response.status_code == 200
+            finally:
+                release.set()
+                events_response = await pending
+
+        assert responsive == [True]
+        assert "event: run-activity" in events_response.text

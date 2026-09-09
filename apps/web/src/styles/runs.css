@@ -1870,12 +1870,19 @@
 }
 
 .tyr-waiting-spinner {
-  width: 12px;
-  height: 12px;
-  border: 1.5px solid var(--border-strong);
+  flex: none;
+  width: var(--space-3);
+  height: var(--space-3);
+  border: var(--border-w) solid var(--border-strong);
   border-top-color: var(--accent);
   border-radius: var(--radius-full);
-  animation: tyr-spin 0.8s linear infinite;
+  animation: tyr-spin calc(var(--duration-base) * 5) linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tyr-waiting-spinner {
+    animation: none;
+  }
 }
 
 .tyr-waiting-ellipsis {

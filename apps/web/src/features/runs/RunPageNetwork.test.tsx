@@ -1,7 +1,8 @@
-import { fireEvent, screen } from "@testing-library/react";
+import { act, fireEvent, screen } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import {
   renderRunPage,
+  relationshipsFixture,
   setupRunMocks,
   turnsFixture,
   visualizationFixture,
@@ -15,7 +16,9 @@ it("removes the previous evidence navigation and controls", async () => {
   renderRunPage();
   await screen.findByRole("heading", { name: "Experiment history" });
 
-  expect(screen.queryByRole("link", { name: "Scenarios" })).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("link", { name: "Scenarios" }),
+  ).not.toBeInTheDocument();
   expect(
     screen.queryByRole("link", { name: "Artifacts" }),
   ).not.toBeInTheDocument();
@@ -42,6 +45,16 @@ it("shows the Tyr network map with observed participants and connections", async
 
 it("keeps the Tyr network panel closed by default and expands on demand", async () => {
   window.localStorage.removeItem("gamr-tyr-network-open");
+  const originalFetch = vi.mocked(fetch).getMockImplementation()!;
+  let finishRelationships!: (response: Response) => void;
+  const pendingRelationships = new Promise<Response>((resolve) => {
+    finishRelationships = resolve;
+  });
+  vi.mocked(fetch).mockImplementation((input, init) =>
+    String(input).endsWith("/relationships")
+      ? pendingRelationships
+      : originalFetch(input, init),
+  );
   const { container } = renderRunPage();
 
   expect(
@@ -51,12 +64,26 @@ it("keeps the Tyr network panel closed by default and expands on demand", async 
   expect(panel).not.toBeNull();
   expect(panel).not.toHaveAttribute("open");
   expect(screen.queryByText("Joe workspace")).not.toBeInTheDocument();
+  expect(
+    vi
+      .mocked(fetch)
+      .mock.calls.some(([input]) => String(input).endsWith("/relationships")),
+  ).toBe(false);
 
   const summary = panel!.querySelector("summary");
   expect(summary).not.toBeNull();
   fireEvent.click(summary!);
   expect(panel).toHaveAttribute("open");
+  expect(
+    screen.getByRole("status", { name: "Loading Tyr network…" }),
+  ).toBeVisible();
+  await act(async () => {
+    finishRelationships(new Response(JSON.stringify(relationshipsFixture)));
+  });
   expect(await screen.findByText("Joe workspace")).toBeInTheDocument();
+  expect(
+    screen.queryByRole("status", { name: "Loading Tyr network…" }),
+  ).not.toBeInTheDocument();
   expect(window.localStorage.getItem("gamr-tyr-network-open")).toBe("1");
 
   fireEvent.click(summary!);
@@ -94,7 +121,10 @@ it("hides Cancel Experiment after the Experiment ends", async () => {
       } as Response);
     }
     if (url.includes("/turns")) {
-      return Promise.resolve({ ok: true, json: async () => turnsFixture } as Response);
+      return Promise.resolve({
+        ok: true,
+        json: async () => turnsFixture,
+      } as Response);
     }
     return Promise.resolve({
       ok: true,
@@ -104,5 +134,7 @@ it("hides Cancel Experiment after the Experiment ends", async () => {
 
   renderRunPage();
   await screen.findByRole("heading", { name: "Experiment history" });
-  expect(screen.queryByRole("button", { name: "Cancel Experiment" })).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: "Cancel Experiment" }),
+  ).not.toBeInTheDocument();
 });

@@ -324,6 +324,9 @@ Finding severity uses label plus token: Critical/High use `--danger`, Medium use
   a button with `aria-expanded` and `aria-controls`; an operator's choice survives incoming updates.
 - SSE reconnecting or stale data is explicit: use text such as “Reconnecting to live updates” or “Last update …”. Do not replace known persisted state with a spinner.
 - Announce important asynchronous changes through a restrained `aria-live` region. Do not announce every streamed token or polling tick.
+- Load Experiment summary, activity, and collector evidence independently. Use the shared labeled
+  spinner (`LoadingStatus`) for initial requests, naming the resource; retain loaded content during
+  refresh without announcing every polling tick. Collector failures stay visible with a scoped retry.
 - Cancellation is a destructive action with confirmation and clear scope. A cancelled run remains reviewable evidence.
 
 ### Transcript, tool calls, and evidence
@@ -364,6 +367,8 @@ polite status announcement and become static under `prefers-reduced-motion`.
   aggregate appears in both representations with the same participant labels, count, status text,
   sequence bounds, keyboard activation, visible focus, and selected state. The SVG is explanatory;
   the list is the authoritative accessible interaction surface.
+- Request Tyr relationships only while the persisted network disclosure is open. A collapsed
+  network must not trigger the initial relationship projection or poll for hidden content.
 - Evidence search is literal, exact, run-scoped, and reflected in the URL. Filter changes reset the
   cursor and selection to the bounded result window. Do not imply that omitted history was loaded;
   state the omitted count and provide older/newer navigation.
@@ -383,6 +388,10 @@ polite status announcement and become static under `prefers-reduced-motion`.
 - Inline feedback is preferred when it belongs to a form or run state.
 - Toasts are for brief, non-critical confirmation and never contain the only copy of an error or approval request.
 - Dialogs require a visible heading, clear scope, initial focus, focus containment, Escape handling when safe, and focus restoration.
+- Collector preview opens immediately with the filename in its loading status. Keep Close, Escape,
+  focus containment, and original download available during slow requests. Restore opener focus on
+  close, abort pending work, ignore late responses, and release image object URLs. Reduced motion
+  leaves a static outlined indicator with the same loading text.
 
 ### Icons and data visualization
 

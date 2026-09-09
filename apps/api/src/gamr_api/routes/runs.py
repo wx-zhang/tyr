@@ -19,6 +19,7 @@ from gamr_core import (
     TargetOrigin,
 )
 from pydantic import AliasChoices, BaseModel, Field, model_validator
+from starlette.concurrency import run_in_threadpool
 
 from ..dependencies import (
     browser_safe_activity,
@@ -350,7 +351,7 @@ async def events(
     registry: InMemoryRegistry = Depends(get_registry),
     settings: Settings = Depends(get_settings),
 ) -> StreamingResponse:
-    run = _find_run(run_id, registry)
+    run = await run_in_threadpool(_find_run, run_id, registry)
     follows_stream = "text/event-stream" in request.headers.get("accept", "")
     secrets = redaction_secrets(settings)
 
@@ -422,7 +423,10 @@ async def events(
         cursor = last_event_id
         last_heartbeat = time.monotonic()
         while True:
-            events = sorted(registry.stream_events(run.id), key=lambda item: item.sequence)
+            events = sorted(
+                await run_in_threadpool(registry.stream_events, run.id),
+                key=lambda item: item.sequence,
+            )
             latest_sequence = events[-1].sequence if events else 0
             pending = [event for event in events if event.sequence > cursor]
             if cursor > latest_sequence or len(pending) > MAX_REPLAY_NOTIFICATIONS:

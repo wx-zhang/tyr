@@ -1,3 +1,4 @@
+import { LoadingStatus } from "../../components/LoadingStatus";
 import { currentPhaseLabel, stageStatusLabel } from "./runHelpers";
 import { label } from "./runTurnHelpers";
 
@@ -40,9 +41,7 @@ export function RunStagesPanel({
                 : currentPhaseLabel(run, phases)}
         </span>
       </div>
-      {isLoading ? (
-        <p className="secondary">Loading Experiment stages…</p>
-      ) : null}
+      {isLoading ? <LoadingStatus label="Loading Experiment stages…" /> : null}
       <ol className="run-stages" aria-label="Experiment State stages">
         {(phases ?? []).map((phase) => {
           const active = phase.state === "active";

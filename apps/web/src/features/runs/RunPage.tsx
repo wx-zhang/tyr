@@ -12,6 +12,7 @@ import {
   type RunTurn,
 } from "../../api/client";
 import { useRunEvents } from "../../api/useRunEvents";
+import { LoadingStatus } from "../../components/LoadingStatus";
 import { RunHeader } from "./RunHeader";
 import { RunHistory } from "./RunHistory";
 import { RunStagesPanel } from "./RunStagesPanel";
@@ -219,6 +220,9 @@ export function RunPage() {
         onRequestCancel={() => void requestCancel()}
       />
 
+      {visualization.isLoading || runRecord.isLoading ? (
+        <LoadingStatus label="Loading Experiment summary…" />
+      ) : null}
       {cancelError ? (
         <p className="callout callout-warning" role="alert">
           {cancelError}
@@ -257,6 +261,8 @@ export function RunPage() {
           isLoadingMore={loadingOlder}
           isLoadingArtifacts={collectorArtifacts.isLoading}
           turnsError={turns.error}
+          artifactsError={collectorArtifacts.error}
+          onRetryArtifacts={() => void collectorArtifacts.refetch()}
           onLoadMore={loadOlder}
           now={now}
           flashIds={flashIds}

@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { CollectorArtifactUpdate } from "./CollectorArtifacts";
 
@@ -56,33 +62,64 @@ it("shows verified remote-backed files with a Scenario Execution-scoped download
 
   expect(screen.getByText("evidence.md")).toBeInTheDocument();
   expect(
-    screen.getByRole("heading", { name: "File received - Scenario Execution execution-1" }),
+    screen.getByRole("heading", {
+      name: "File received - Scenario Execution execution-1",
+    }),
   ).toBeInTheDocument();
-  const identity = screen.getByRole("heading", { name: "File received - Scenario Execution execution-1" }).parentElement;
+  const identity = screen.getByRole("heading", {
+    name: "File received - Scenario Execution execution-1",
+  }).parentElement;
   expect(identity).toHaveTextContent("Scenario scenario-1");
   expect(identity).toHaveTextContent("Execution execution-1");
-  expect(screen.queryByRole("heading", { name: "Collector artifacts" })).toBeNull();
+  expect(
+    screen.queryByRole("heading", { name: "Collector artifacts" }),
+  ).toBeNull();
   expect(screen.getByText("Verified")).toBeInTheDocument();
-  expect(screen.getByRole("link", { name: "Download evidence.md" })).toHaveAttribute(
+  expect(
+    screen.getByRole("link", { name: "Download evidence.md" }),
+  ).toHaveAttribute(
     "href",
     "http://127.0.0.1:6687/api/v1/runs/run-1/collector-files/file-1/download",
   );
 });
 
 it("previews markdown in an accessible modal and closes with Escape", async () => {
+  let finishPreview!: (response: Response) => void;
+  vi.mocked(fetch).mockImplementation(
+    () =>
+      new Promise<Response>((resolve) => {
+        finishPreview = resolve;
+      }),
+  );
   render(
     <ol aria-label="Run updates">
       <CollectorArtifactUpdate runId="run-1" artifact={artifacts[0]} />
     </ol>,
   );
 
-  fireEvent.click(await screen.findByRole("button", { name: "Preview evidence.md" }));
-  expect(await screen.findByRole("dialog", { name: "Preview evidence.md" })).toBeVisible();
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Preview evidence.md" }),
+  );
+  expect(
+    await screen.findByRole("dialog", { name: "Preview evidence.md" }),
+  ).toBeVisible();
+  expect(
+    screen.getByRole("status", { name: "Loading preview for evidence.md…" }),
+  ).toBeVisible();
+  expect(screen.getByRole("button", { name: "Close preview" })).toHaveFocus();
+  await act(async () => {
+    finishPreview(new Response("# Evidence\n\nPreview body"));
+  });
   expect(screen.getByRole("heading", { name: "Evidence" })).toBeVisible();
   expect(screen.getByText("Preview body")).toBeVisible();
+  expect(screen.queryByRole("status")).toBeNull();
   fireEvent.keyDown(document, { key: "Escape" });
-  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-  expect(screen.getByRole("button", { name: "Preview evidence.md" })).toHaveFocus();
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+  );
+  expect(
+    screen.getByRole("button", { name: "Preview evidence.md" }),
+  ).toHaveFocus();
 });
 
 it("shows image previews without rendering unsupported file types", async () => {
@@ -116,14 +153,23 @@ it("shows image previews without rendering unsupported file types", async () => 
       ],
     },
   ];
-  render(<ol><CollectorArtifactUpdate runId="run-1" artifact={imageArtifacts[0]} /></ol>);
-
-  fireEvent.click(await screen.findByRole("button", { name: "Preview evidence.png" }));
-  expect(await screen.findByRole("img", { name: "Preview of evidence.png" })).toHaveAttribute(
-    "src",
-    "blob:preview",
+  render(
+    <ol>
+      <CollectorArtifactUpdate runId="run-1" artifact={imageArtifacts[0]} />
+    </ol>,
   );
-  expect(screen.queryByRole("button", { name: "Preview evidence.zip" })).toBeNull();
+
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Preview evidence.png" }),
+  );
+  expect(
+    await screen.findByRole("img", { name: "Preview of evidence.png" }),
+  ).toHaveAttribute("src", "blob:preview");
+  expect(
+    screen.queryByRole("button", { name: "Preview evidence.zip" }),
+  ).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Close preview" }));
+  expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:preview");
 });
 
 it("offers a text preview for an XML request body", async () => {
@@ -139,10 +185,16 @@ it("offers a text preview for an XML request body", async () => {
       },
     ],
   };
-  render(<ol><CollectorArtifactUpdate runId="run-1" artifact={bodyArtifact} /></ol>);
+  render(
+    <ol>
+      <CollectorArtifactUpdate runId="run-1" artifact={bodyArtifact} />
+    </ol>,
+  );
 
   expect(
     await screen.findByRole("button", { name: "Preview request-body.xml" }),
   ).toBeVisible();
-  expect(screen.getByRole("link", { name: "Download request-body.xml" })).toBeVisible();
+  expect(
+    screen.getByRole("link", { name: "Download request-body.xml" }),
+  ).toBeVisible();
 });

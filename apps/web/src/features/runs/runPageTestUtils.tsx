@@ -71,7 +71,11 @@ export const visualizationFixture = {
     },
   ],
   attention: { pendingApprovalCount: 0, blockers: [], unsettledTyrWork: false },
-  counts: { totalKnown: true, totalScenarioExecutions: 2, completedScenarioExecutions: 0 },
+  counts: {
+    totalKnown: true,
+    totalScenarioExecutions: 2,
+    completedScenarioExecutions: 0,
+  },
   latestSequence: 5,
   latestActivity: null,
 };
@@ -203,10 +207,11 @@ export function setupRunMocks() {
   );
 }
 
-export function renderRunPage() {
-  const queryClient = new QueryClient({
+export function renderRunPage(
+  queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
-  });
+  }),
+) {
   return render(
     <MemoryRouter initialEntries={["/runs/run-1"]}>
       <QueryClientProvider client={queryClient}>
