@@ -75,6 +75,10 @@ endpoints; Tyr and model calls remain server-side.
 and clears when filters change. Outcome accents distinguish breach and no-breach results.
 `/runs/:id` leads with the Experiment name, full ID, permissions, and a labeled refresh selector.
 Results and activity appear before lifecycle and Tyr network details, with section links for navigation.
+Summary, activity, and collector evidence load independently with shared, labeled `LoadingStatus`
+indicators. Completed content remains visible during refresh; collector list failures show an
+inline error and a collector-only retry. Tyr relationships are requested only while their
+persisted disclosure is open, so the default collapsed network does not delay review.
 Scenario rows use red, green, or amber outcome accents while retaining separate lifecycle badges.
 Review layout styles live in `run-review.css`, `run-review-header.css`, and `run-review-history.css`;
 list controls and layout live in `experiment-browser.css` and the scoped dashboard rules in `data.css`.
@@ -110,12 +114,19 @@ without exposing secrets, decoded bytes, sandbox identity, or unsafe streams. De
 rows remain compact and reference the canonical provenance instead of duplicating source or process output.
 `features/runs/CollectorArtifacts.tsx` renders verified collector files as
 Updates entries with bounded text, Markdown, XML, and image previews plus run-scoped downloads,
-without receiving collector credentials.
+without receiving collector credentials. `CollectorPreview.tsx` owns the focus-contained preview
+dialog: its labeled spinner identifies the pending file; Close, Escape, and download remain
+available while loading. Closing aborts the request, ignores late bodies, releases image URLs,
+and restores focus to the invoking Preview button.
+
+`features/runs/NetworkGraph.tsx` renders network nodes and edges; `TyrNetworkMap.tsx`
+owns the disclosure, deferred query, selection state, and relationship list.
 
 Run-evidence behavior tests are split across `RunPage.test.tsx`,
 `RunPageScientist.test.tsx`, `RunPageUpdates.test.tsx`, `RunPageCancel.test.tsx`,
 `RunPageNetwork.test.tsx`, `RunPageSettings.test.tsx`, `RunHistory.test.tsx`,
-`RunHistoryInteraction.test.tsx`, `RunHistoryActivity.test.tsx`, `SandboxOperationSession.test.tsx`, `DecodingProvenance.test.tsx`, and `useRunEvents.test.ts`. Run
+`RunHistoryInteraction.test.tsx`, `RunHistoryActivity.test.tsx`, `RunPageLoading.test.tsx`,
+`CollectorArtifacts.test.tsx`, `CollectorPreviewLoading.test.tsx`, `SandboxOperationSession.test.tsx`, `DecodingProvenance.test.tsx`, and `useRunEvents.test.ts`. Run
 `pnpm --dir apps/web test -- --run` for the complete deterministic web suite and
 regenerate `src/api/generated.ts` with
 `pnpm --dir apps/web generate:api`.

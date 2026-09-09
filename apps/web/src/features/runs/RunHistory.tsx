@@ -6,6 +6,7 @@ import type {
   RunTurn,
   TargetOrigin,
 } from "../../api/client";
+import { LoadingStatus } from "../../components/LoadingStatus";
 import { groupRunHistory, type HistoryGroup } from "./runHistoryGroups";
 import { RunHistoryGroup } from "./RunHistoryGroup";
 import type { HistoryCaseOrigin } from "./ScientistHistoryUsed";
@@ -24,6 +25,8 @@ export function RunHistory({
   isLoadingMore,
   isLoadingArtifacts,
   turnsError,
+  artifactsError,
+  onRetryArtifacts,
   onLoadMore,
   now,
   flashIds,
@@ -44,6 +47,8 @@ export function RunHistory({
   isLoadingMore?: boolean;
   isLoadingArtifacts?: boolean;
   turnsError?: Error | null;
+  artifactsError?: Error | null;
+  onRetryArtifacts?: () => void;
   onLoadMore?: () => Promise<void>;
   now: number;
   flashIds?: Set<string>;
@@ -121,18 +126,41 @@ export function RunHistory({
           onClick={onLoadMore}
           disabled={isLoadingMore}
         >
-          {isLoadingMore ? "Loading earlier updates…" : "Load earlier updates"}
+          {isLoadingMore ? (
+            <LoadingStatus label="Loading earlier activity…" />
+          ) : (
+            "Load earlier updates"
+          )}
         </button>
       ) : null}
-      {isLoadingTurns ? (
-        <p className="secondary">Loading persisted updates…</p>
+      {isLoadingTurns ? <LoadingStatus label="Loading activity…" /> : null}
+      {isLoadingArtifacts ? (
+        <LoadingStatus label="Loading collector evidence…" />
+      ) : null}
+      {artifactsError ? (
+        <div className="callout callout-warning" role="alert">
+          <p>Could not load collector evidence: {artifactsError.message}</p>
+          {onRetryArtifacts ? (
+            <button
+              className="button button-secondary"
+              type="button"
+              onClick={onRetryArtifacts}
+            >
+              Retry collector evidence
+            </button>
+          ) : null}
+        </div>
       ) : null}
       {turnsError ? (
         <p className="callout callout-warning" role="alert">
           {turnsError.message}
         </p>
       ) : null}
-      {!isLoadingTurns && !isLoadingArtifacts && !hasUpdates ? (
+      {!isLoadingTurns &&
+      !isLoadingArtifacts &&
+      !turnsError &&
+      !artifactsError &&
+      !hasUpdates ? (
         <p className="empty-state run-empty">
           {isLive
             ? "Waiting for the first update…"
