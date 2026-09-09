@@ -39,3 +39,4 @@ Judge evaluation loader, scoring, trace, and CLI regressions live in
 `apps/cli/tests/test_judge_evaluation.py`. The real model-and-Docker evaluation is an explicit
 developer job and is never part of default pytest.
 Skill helper regressions live in `tests/skills/`.
+Installer credential handling, backup protection, and dry-run regressions live in `tests/test_install_omp.py`. Run `uv run pytest tests/test_install_omp.py`; these tests use temporary homes and fake installer/provider commands, with no live requests.
