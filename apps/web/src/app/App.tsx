@@ -94,6 +94,10 @@ export function App() {
           </div>
           <p className="sidebar-label">Workspace</p>
           <nav className="primary-nav" aria-label="Primary navigation">
+            <NavLink to="/benign" aria-label="Benign tests" data-short="B"
+              className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
+              <span className="nav-label">Benign tests</span>
+            </NavLink>
             <NavLink
               to="/runs"
               end

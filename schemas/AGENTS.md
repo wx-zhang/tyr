@@ -9,6 +9,7 @@ Own generated JSON Schema and OpenAPI artifacts.
 - `task.schema.json` is exported from `gamr-core`.
 - `run-result.schema.json` is exported from `gamr-core`.
 - `experiment.schema.json` and `run.schema.json` validate filesystem operational records.
+- `benign-scenario.schema.json` and `benign-run.schema.json` validate functional test records.
 - `openapi.json` is exported from `gamr-api`.
 - Regenerate with `uv run poe schemas`; do not hand-edit generated files.
 

@@ -6,9 +6,19 @@ Own Tyr MCP, model, task JSON, run-bundle, query, and artifact implementations.
 
 ## Standards
 
-External I/O is async where practical. Redact credentials before persistence. Tyr operation settling remains distinct from outer terminal status, and artifact paths stay below the configured root.
+External I/O is async where practical. Preserve evidence verbatim in trusted-operator storage. Keep configured credentials out of browser configuration. Tyr operation settling remains distinct from outer terminal status, and artifact paths stay below the configured root.
 
 ## Source map
+
+`benign_config.py`, `benign_store.py`, `benign_model.py`, `benign_tyr.py`, and
+`benign_worker.py` implement the independent functional scenario workflow. The worker
+owns a process lock and participant locks, persists checkpoints before delivery, and
+polls existing operations on explicit resume. API reloads do not own its lifetime.
+Focused offline regressions live in `tests/test_benign_*.py`.
+`benign_model.py` bounds model calls to 60 seconds and accepts only completed final answers.
+Drafting disables optional OpenRouter reasoning. Raw reasoning remains evidence, not an answer.
+`test_benign_draft_live.py` is generation-only, marker-gated and requires
+`BENIGN_LIVE_DRAFT_TEST=1`; it never invokes Tyr.
 
 `tyr/` owns MCP transport and settling, `models/` owns OpenAI-compatible
 providers and recovers a JSON object from `reasoning`/`reasoning_content` when

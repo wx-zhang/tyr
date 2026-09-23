@@ -14,6 +14,11 @@ the shared `.gamr` root, including Experiments started from the CLI.
 
 ## Quick start
 
+For benign functional tests, use the independent **Benign tests** page at `/benign`
+or `uv run scenario-test`. Start API, UI and its durable worker with
+`uv run poe dev:watch`. See [configuration, examples and pipeline](docs/benign-scenarios.md).
+This path does not run GAMR attacks.
+
 ```bash
 uv sync --all-packages --dev
 uv run gamr doctor
@@ -295,4 +300,3 @@ The Langfuse UI is published on `http://127.0.0.1:3000`. Storage is persisted in
 
 See [the scaffold contract](docs/SCAFFOLD_SPEC.md), [architecture](docs/architecture.md), and
 [development guide](docs/development.md).
-

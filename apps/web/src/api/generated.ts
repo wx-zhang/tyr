@@ -38,6 +38,92 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/benign/workspaces": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Workspaces */
+        get: operations["workspaces_api_v1_benign_workspaces_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/benign/drafts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Draft */
+        post: operations["draft_api_v1_benign_drafts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/benign/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Runs */
+        get: operations["list_runs_api_v1_benign_runs_get"];
+        put?: never;
+        /** Submit */
+        post: operations["submit_api_v1_benign_runs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/benign/runs/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Run */
+        get: operations["read_run_api_v1_benign_runs__run_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/benign/runs/{run_id}/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resume */
+        post: operations["resume_api_v1_benign_runs__run_id__resume_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tasks": {
         parameters: {
             query?: never;
@@ -652,6 +738,18 @@ export interface components {
             resultState: "vulnerable" | "protected" | "inconclusive" | "not_applicable" | "pending" | "unavailable";
             result?: components["schemas"]["ScenarioExecutionResult"] | null;
         };
+        /** Assessment */
+        Assessment: {
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "passed" | "failed" | "pending" | "inconclusive";
+            /** Summary */
+            summary: string;
+            /** Findings */
+            findings: components["schemas"]["Finding"][];
+        };
         /**
          * AssessmentReasonCode
          * @enum {string}
@@ -667,6 +765,115 @@ export interface components {
          * @enum {string}
          */
         Availability: "available" | "redacted" | "omitted" | "missing" | "malformed";
+        /** BenignRun */
+        BenignRun: {
+            /** Id */
+            id?: string;
+            /** Batch Id */
+            batch_id?: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at?: string;
+            scenario: components["schemas"]["BenignScenario"];
+            /**
+             * Action Mode
+             * @default read_only
+             * @enum {string}
+             */
+            action_mode: "read_only" | "approval_required";
+            /**
+             * Confirmed
+             * @default false
+             */
+            confirmed: boolean;
+            /**
+             * Concurrency
+             * @default 1
+             */
+            concurrency: number;
+            /**
+             * State
+             * @default queued
+             * @enum {string}
+             */
+            state: "queued" | "running" | "passed" | "failed" | "pending" | "inconclusive" | "error";
+            /**
+             * Phase
+             * @default queued
+             */
+            phase: string;
+            /**
+             * Summary
+             * @default
+             */
+            summary: string;
+            assessment?: components["schemas"]["Assessment"] | null;
+            /** Observations */
+            observations?: {
+                [key: string]: {
+                    [key: string]: unknown;
+                };
+            };
+            /** Checkpoints */
+            checkpoints?: {
+                [key: string]: {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        /** BenignScenario */
+        BenignScenario: {
+            /**
+             * Schema Version
+             * @default 1
+             * @constant
+             */
+            schema_version: "1";
+            /** Id */
+            id?: string;
+            /** Title */
+            title: string;
+            /** Original Input */
+            original_input: string;
+            /** Workspace */
+            workspace: string;
+            /** Participants */
+            participants: string[];
+            /** Timezone */
+            timezone: string;
+            /**
+             * Reference Time
+             * Format: date-time
+             */
+            reference_time: string;
+            /** Stimulus */
+            stimulus: string;
+            /**
+             * Require Bridge
+             * @default false
+             */
+            require_bridge: boolean;
+            /** Checks */
+            checks?: components["schemas"]["Check"][];
+            /** Questions */
+            questions?: string[];
+            /**
+             * Timeout Seconds
+             * @default 360
+             */
+            timeout_seconds: number;
+        };
+        /** Check */
+        Check: {
+            /** Id */
+            id: string;
+            /** Query */
+            query: string;
+            /** Expectation */
+            expectation: string;
+        };
         /** CheckedContentFile */
         CheckedContentFile: {
             /** Fileid */
@@ -904,6 +1111,15 @@ export interface components {
             reason?: string | null;
             targetOrigin?: components["schemas"]["TargetOrigin"] | null;
         };
+        /** DraftRequest */
+        DraftRequest: {
+            /** Text */
+            text: string;
+            /** Workspace */
+            workspace: string;
+            /** Timezone */
+            timezone: string;
+        };
         /** Evidence */
         Evidence: {
             /** Turnid */
@@ -1061,6 +1277,29 @@ export interface components {
             currentScenarioExecutionIds?: string[];
             /** Executionmode */
             executionMode: string;
+        };
+        /** Finding */
+        Finding: {
+            /** Stage */
+            stage: string;
+            /** Actor */
+            actor: string;
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "passed" | "failed" | "pending" | "inconclusive";
+            /** Observation */
+            observation: string;
+            /** Evidence */
+            evidence: string;
+            /** Quote */
+            quote: string;
+            /**
+             * Hypothesis
+             * @default
+             */
+            hypothesis: string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -1436,6 +1675,32 @@ export interface components {
          * @enum {string}
          */
         SecurityVerdict: "vulnerable" | "protected" | "inconclusive" | "not_applicable";
+        /** Submission */
+        Submission: {
+            /** Scenarios */
+            scenarios: components["schemas"]["BenignScenario"][];
+            /**
+             * Repeat
+             * @default 1
+             */
+            repeat: number;
+            /**
+             * Concurrency
+             * @default 1
+             */
+            concurrency: number;
+            /**
+             * Action Mode
+             * @default read_only
+             * @enum {string}
+             */
+            action_mode: "read_only" | "approval_required";
+            /**
+             * Confirmed
+             * @default false
+             */
+            confirmed: boolean;
+        };
         /**
          * TargetOrigin
          * @enum {string}
@@ -1453,6 +1718,13 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** WorkspaceOption */
+        WorkspaceOption: {
+            /** Alias */
+            alias: string;
+            /** Configured */
+            configured: boolean;
         };
     };
     responses: never;
@@ -1503,6 +1775,188 @@ export interface operations {
                     "application/json": {
                         [key: string]: string;
                     };
+                };
+            };
+        };
+    };
+    workspaces_api_v1_benign_workspaces_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceOption"][];
+                };
+            };
+        };
+    };
+    draft_api_v1_benign_drafts_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DraftRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BenignScenario"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_runs_api_v1_benign_runs_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                batch_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BenignRun"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    submit_api_v1_benign_runs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Submission"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BenignRun"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_run_api_v1_benign_runs__run_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BenignRun"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resume_api_v1_benign_runs__run_id__resume_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

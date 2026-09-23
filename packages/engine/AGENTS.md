@@ -12,6 +12,10 @@ Loop prompts preserve evidence-based uncertainty. Missing, unreported, unavailab
 
 ## Source map
 
+`benign.py` owns the separate fixed baseline/stimulus/verification/assessment pipeline.
+`benign_prompts.py` defines drafting and evidence-assessment contracts. Model assessments
+cannot issue actions; resume polls saved operations. Tests live in `tests/test_benign.py`.
+
 `runner.py` is the shared discovery and Scenario Execution engine and emits typed activities,
 `experiments/` owns the runner's records, activity, conversation, discovery, Scenario Execution, and research collaborators,
 `sandbox_preview.py` decorates sandbox ports with append-only, verbatim

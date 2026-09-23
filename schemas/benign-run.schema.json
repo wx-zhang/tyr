@@ -1,0 +1,310 @@
+{
+  "$defs": {
+    "Assessment": {
+      "additionalProperties": false,
+      "properties": {
+        "outcome": {
+          "enum": [
+            "passed",
+            "failed",
+            "pending",
+            "inconclusive"
+          ],
+          "title": "Outcome",
+          "type": "string"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "findings": {
+          "items": {
+            "$ref": "#/$defs/Finding"
+          },
+          "title": "Findings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "outcome",
+        "summary",
+        "findings"
+      ],
+      "title": "Assessment",
+      "type": "object"
+    },
+    "BenignScenario": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1",
+          "default": "1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "original_input": {
+          "maxLength": 20000,
+          "minLength": 1,
+          "title": "Original Input",
+          "type": "string"
+        },
+        "workspace": {
+          "pattern": "^[a-z][a-z0-9_-]{0,63}$",
+          "title": "Workspace",
+          "type": "string"
+        },
+        "participants": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "minItems": 1,
+          "title": "Participants",
+          "type": "array"
+        },
+        "timezone": {
+          "title": "Timezone",
+          "type": "string"
+        },
+        "reference_time": {
+          "format": "date-time",
+          "title": "Reference Time",
+          "type": "string"
+        },
+        "stimulus": {
+          "maxLength": 10000,
+          "minLength": 1,
+          "title": "Stimulus",
+          "type": "string"
+        },
+        "require_bridge": {
+          "default": false,
+          "title": "Require Bridge",
+          "type": "boolean"
+        },
+        "checks": {
+          "items": {
+            "$ref": "#/$defs/Check"
+          },
+          "maxItems": 10,
+          "title": "Checks",
+          "type": "array"
+        },
+        "questions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Questions",
+          "type": "array"
+        },
+        "timeout_seconds": {
+          "default": 360,
+          "maximum": 1800,
+          "minimum": 10,
+          "title": "Timeout Seconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "title",
+        "original_input",
+        "workspace",
+        "participants",
+        "timezone",
+        "reference_time",
+        "stimulus"
+      ],
+      "title": "BenignScenario",
+      "type": "object"
+    },
+    "Check": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[a-z][a-z0-9_-]{0,63}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "query": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Query",
+          "type": "string"
+        },
+        "expectation": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Expectation",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "query",
+        "expectation"
+      ],
+      "title": "Check",
+      "type": "object"
+    },
+    "Finding": {
+      "additionalProperties": false,
+      "properties": {
+        "stage": {
+          "title": "Stage",
+          "type": "string"
+        },
+        "actor": {
+          "title": "Actor",
+          "type": "string"
+        },
+        "outcome": {
+          "enum": [
+            "passed",
+            "failed",
+            "pending",
+            "inconclusive"
+          ],
+          "title": "Outcome",
+          "type": "string"
+        },
+        "observation": {
+          "title": "Observation",
+          "type": "string"
+        },
+        "evidence": {
+          "title": "Evidence",
+          "type": "string"
+        },
+        "quote": {
+          "minLength": 1,
+          "title": "Quote",
+          "type": "string"
+        },
+        "hypothesis": {
+          "default": "",
+          "title": "Hypothesis",
+          "type": "string"
+        }
+      },
+      "required": [
+        "stage",
+        "actor",
+        "outcome",
+        "observation",
+        "evidence",
+        "quote"
+      ],
+      "title": "Finding",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+      "title": "Id",
+      "type": "string"
+    },
+    "batch_id": {
+      "title": "Batch Id",
+      "type": "string"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "scenario": {
+      "$ref": "#/$defs/BenignScenario"
+    },
+    "action_mode": {
+      "default": "read_only",
+      "enum": [
+        "read_only",
+        "approval_required"
+      ],
+      "title": "Action Mode",
+      "type": "string"
+    },
+    "confirmed": {
+      "default": false,
+      "title": "Confirmed",
+      "type": "boolean"
+    },
+    "concurrency": {
+      "default": 1,
+      "maximum": 8,
+      "minimum": 1,
+      "title": "Concurrency",
+      "type": "integer"
+    },
+    "state": {
+      "default": "queued",
+      "enum": [
+        "queued",
+        "running",
+        "passed",
+        "failed",
+        "pending",
+        "inconclusive",
+        "error"
+      ],
+      "title": "State",
+      "type": "string"
+    },
+    "phase": {
+      "default": "queued",
+      "title": "Phase",
+      "type": "string"
+    },
+    "summary": {
+      "default": "",
+      "title": "Summary",
+      "type": "string"
+    },
+    "assessment": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Assessment"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "observations": {
+      "additionalProperties": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Observations",
+      "type": "object"
+    },
+    "checkpoints": {
+      "additionalProperties": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Checkpoints",
+      "type": "object"
+    }
+  },
+  "required": [
+    "scenario"
+  ],
+  "title": "BenignRun",
+  "type": "object",
+  "$id": "https://gamr.local/schemas/benign-run.schema.json"
+}

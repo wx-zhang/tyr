@@ -12,6 +12,7 @@ from .dependencies import get_registry, get_settings
 from .execution import RunTaskManager
 from .registry import JsonRegistry
 from .routes import (
+    benign,
     collector_artifacts,
     experiments,
     health,
@@ -71,6 +72,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     application.include_router(health.router)
+    application.include_router(benign.router)
     application.include_router(tasks.router)
     application.include_router(experiments.router)
     application.include_router(runs.router)

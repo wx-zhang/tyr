@@ -1,5 +1,6 @@
 import { createBrowserRouter } from "react-router-dom";
 import { App } from "../app/App";
+import { BenignPage } from "../components/BenignPage";
 import { TaskDetailPage } from "../features/tasks/TaskDetailPage";
 import { TaskPage } from "../features/tasks/TaskPage";
 import { ExperimentDetailPage } from "../features/experiments/ExperimentDetailPage";
@@ -14,6 +15,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <DashboardPage /> },
       { path: "runs", element: <DashboardPage /> },
+      { path: "benign", element: <BenignPage /> },
       { path: "tasks", element: <TaskPage /> },
       { path: "tasks/:taskId", element: <TaskDetailPage /> },
       {

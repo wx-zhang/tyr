@@ -28,6 +28,10 @@ Commands compose shared engine services and must not implement experiment algori
 
 ## Commands
 
+`uv run scenario-test --help` exposes the independent benign functional workflow.
+`src/gamr_cli/benign.py` owns draft, validate, run (enqueue), show, resume and worker commands.
+See `docs/benign-scenarios.md` for profiles and action confirmation.
+
 `uv run gamr --help`, `uv run gamr doctor`, `uv run poe evaluate:judges`, and
 `pytest apps/cli/tests`.
 

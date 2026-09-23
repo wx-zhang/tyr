@@ -15,7 +15,9 @@ reviewable Scenario Execution evidence.
 - Apps depend on packages; packages never depend on apps.
 - The API calls Python services directly and never invokes CLI subprocesses.
 - JSON files are the only persistence layer.
-- One API process owns a bounded in-process queue. Distributed coordination is out of scope.
+- One API process owns the adversarial bounded in-process queue. Distributed coordination
+  is out of scope. Independent benign functional tests use a separate single-worker process
+  and JSON queue so API hot reload does not interrupt them. See `benign-scenarios.md`.
 - Read-only remains available. Approval-gated (`approval_required`) runs require explicit operator
   opt-in; GAMR requests actions and Tyr records the human decision for every action.
 

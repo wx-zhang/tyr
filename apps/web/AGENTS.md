@@ -53,6 +53,13 @@ summary of `UI-DESGIN-TOKEN.md`, not a separate design system.
 
 ## Commands
 
+`/benign` uses `components/BenignPage.tsx`, `api/benign.ts`, and `styles/benign.css`.
+It separates drafting/review from action-confirmed batch submission and displays real
+observations, diagnosis and pending-input resume. Behavior tests are in
+`components/BenignPage.test.tsx`.
+Generation displays elapsed time and errors beside its button. `api/benign.test.ts`
+covers the 75-second draft deadline and non-JSON server failures.
+
 `pnpm --dir apps/web install`, `pnpm --dir apps/web dev`, `pnpm --dir apps/web build`, and `pnpm --dir apps/web test`.
 Use `pnpm --dir apps/web generate:api` to regenerate `src/api/generated.ts` from
 `schemas/openapi.json`; `uv run poe schemas` runs this after exporting the server schemas.

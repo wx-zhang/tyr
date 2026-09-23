@@ -18,6 +18,11 @@ Use local development auth only in the scaffold. API responses preserve run evid
 
 ## Source map
 
+`routes/benign.py` exposes `/api/v1/benign` workspace aliases, drafting, batch enqueue,
+results and explicit resume. Its durable worker is separate from the API lifecycle.
+It omits configured credential values from browser results and never resolves approvals.
+Draft provider failures return JSON 502 errors; bounded generation timeouts return JSON 504.
+
 `routes/tasks.py` lists Task manifests and serves Scenarios plus `/plans`, including
 live evaluation-reference metadata and content for Task review. That content
 is read from the Task tree and is not an Experiment artifact.

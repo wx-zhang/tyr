@@ -10,6 +10,9 @@ No FastAPI, Typer, filesystem, network, terminal, or vendor SDK imports. Model w
 
 ## Source map
 
+`benign.py` owns independent functional scenario, batch submission, run and assessment
+contracts. It does not reuse adversarial outcomes.
+
 `tasks.py` owns task documents and template binding; `experiments.py`
 owns run/result contracts; `decoding.py` owns bounded route, attempt, execution-stream, and lineage provenance
 models; `sandbox.py` owns pipeline-neutral sandbox operation states, bounded

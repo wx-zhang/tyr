@@ -56,6 +56,268 @@
         }
       }
     },
+    "/api/v1/benign/workspaces": {
+      "get": {
+        "tags": [
+          "benign"
+        ],
+        "summary": "Workspaces",
+        "operationId": "workspaces_api_v1_benign_workspaces_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/WorkspaceOption"
+                  },
+                  "type": "array",
+                  "title": "Response Workspaces Api V1 Benign Workspaces Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/benign/drafts": {
+      "post": {
+        "tags": [
+          "benign"
+        ],
+        "summary": "Draft",
+        "operationId": "draft_api_v1_benign_drafts_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DraftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BenignScenario"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/benign/runs": {
+      "post": {
+        "tags": [
+          "benign"
+        ],
+        "summary": "Submit",
+        "operationId": "submit_api_v1_benign_runs_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Submission"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BenignRun"
+                  },
+                  "title": "Response Submit Api V1 Benign Runs Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "benign"
+        ],
+        "summary": "List Runs",
+        "operationId": "list_runs_api_v1_benign_runs_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "batch_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Batch Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BenignRun"
+                  },
+                  "title": "Response List Runs Api V1 Benign Runs Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/benign/runs/{run_id}": {
+      "get": {
+        "tags": [
+          "benign"
+        ],
+        "summary": "Read Run",
+        "operationId": "read_run_api_v1_benign_runs__run_id__get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BenignRun"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/benign/runs/{run_id}/resume": {
+      "post": {
+        "tags": [
+          "benign"
+        ],
+        "summary": "Resume",
+        "operationId": "resume_api_v1_benign_runs__run_id__resume_post",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Resume Api V1 Benign Runs  Run Id  Resume Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/tasks": {
       "get": {
         "tags": [
@@ -2285,6 +2547,39 @@
         ],
         "title": "AdversarialResearcherScenarioResponse"
       },
+      "Assessment": {
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "passed",
+              "failed",
+              "pending",
+              "inconclusive"
+            ],
+            "title": "Outcome"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/Finding"
+            },
+            "type": "array",
+            "title": "Findings"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "outcome",
+          "summary",
+          "findings"
+        ],
+        "title": "Assessment"
+      },
       "AssessmentReasonCode": {
         "type": "string",
         "enum": [
@@ -2326,6 +2621,228 @@
           "malformed"
         ],
         "title": "Availability"
+      },
+      "BenignRun": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+            "title": "Id"
+          },
+          "batch_id": {
+            "type": "string",
+            "title": "Batch Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "scenario": {
+            "$ref": "#/components/schemas/BenignScenario"
+          },
+          "action_mode": {
+            "type": "string",
+            "enum": [
+              "read_only",
+              "approval_required"
+            ],
+            "title": "Action Mode",
+            "default": "read_only"
+          },
+          "confirmed": {
+            "type": "boolean",
+            "title": "Confirmed",
+            "default": false
+          },
+          "concurrency": {
+            "type": "integer",
+            "maximum": 8.0,
+            "minimum": 1.0,
+            "title": "Concurrency",
+            "default": 1
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "passed",
+              "failed",
+              "pending",
+              "inconclusive",
+              "error"
+            ],
+            "title": "State",
+            "default": "queued"
+          },
+          "phase": {
+            "type": "string",
+            "title": "Phase",
+            "default": "queued"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary",
+            "default": ""
+          },
+          "assessment": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Assessment"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "observations": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Observations"
+          },
+          "checkpoints": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Checkpoints"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "scenario"
+        ],
+        "title": "BenignRun"
+      },
+      "BenignScenario": {
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "1",
+            "title": "Schema Version",
+            "default": "1"
+          },
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "original_input": {
+            "type": "string",
+            "maxLength": 20000,
+            "minLength": 1,
+            "title": "Original Input"
+          },
+          "workspace": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_-]{0,63}$",
+            "title": "Workspace"
+          },
+          "participants": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "minItems": 1,
+            "title": "Participants"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone"
+          },
+          "reference_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Reference Time"
+          },
+          "stimulus": {
+            "type": "string",
+            "maxLength": 10000,
+            "minLength": 1,
+            "title": "Stimulus"
+          },
+          "require_bridge": {
+            "type": "boolean",
+            "title": "Require Bridge",
+            "default": false
+          },
+          "checks": {
+            "items": {
+              "$ref": "#/components/schemas/Check"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "title": "Checks"
+          },
+          "questions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Questions"
+          },
+          "timeout_seconds": {
+            "type": "integer",
+            "maximum": 1800.0,
+            "minimum": 10.0,
+            "title": "Timeout Seconds",
+            "default": 360
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "title",
+          "original_input",
+          "workspace",
+          "participants",
+          "timezone",
+          "reference_time",
+          "stimulus"
+        ],
+        "title": "BenignScenario"
+      },
+      "Check": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_-]{0,63}$",
+            "title": "Id"
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Query"
+          },
+          "expectation": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Expectation"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "query",
+          "expectation"
+        ],
+        "title": "Check"
       },
       "CheckedContentFile": {
         "properties": {
@@ -3083,6 +3600,32 @@
         ],
         "title": "DiscoveryResult"
       },
+      "DraftRequest": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "maxLength": 20000,
+            "minLength": 1,
+            "title": "Text"
+          },
+          "workspace": {
+            "type": "string",
+            "title": "Workspace"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "text",
+          "workspace",
+          "timezone"
+        ],
+        "title": "DraftRequest"
+      },
       "Evidence": {
         "properties": {
           "turnId": {
@@ -3486,6 +4029,57 @@
           "executionMode"
         ],
         "title": "ExperimentVisualizationSummary"
+      },
+      "Finding": {
+        "properties": {
+          "stage": {
+            "type": "string",
+            "title": "Stage"
+          },
+          "actor": {
+            "type": "string",
+            "title": "Actor"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "passed",
+              "failed",
+              "pending",
+              "inconclusive"
+            ],
+            "title": "Outcome"
+          },
+          "observation": {
+            "type": "string",
+            "title": "Observation"
+          },
+          "evidence": {
+            "type": "string",
+            "title": "Evidence"
+          },
+          "quote": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Quote"
+          },
+          "hypothesis": {
+            "type": "string",
+            "title": "Hypothesis",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "stage",
+          "actor",
+          "outcome",
+          "observation",
+          "evidence",
+          "quote"
+        ],
+        "title": "Finding"
       },
       "HTTPValidationError": {
         "properties": {
@@ -4866,6 +5460,53 @@
         ],
         "title": "SecurityVerdict"
       },
+      "Submission": {
+        "properties": {
+          "scenarios": {
+            "items": {
+              "$ref": "#/components/schemas/BenignScenario"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Scenarios"
+          },
+          "repeat": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Repeat",
+            "default": 1
+          },
+          "concurrency": {
+            "type": "integer",
+            "maximum": 8.0,
+            "minimum": 1.0,
+            "title": "Concurrency",
+            "default": 1
+          },
+          "action_mode": {
+            "type": "string",
+            "enum": [
+              "read_only",
+              "approval_required"
+            ],
+            "title": "Action Mode",
+            "default": "read_only"
+          },
+          "confirmed": {
+            "type": "boolean",
+            "title": "Confirmed",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "scenarios"
+        ],
+        "title": "Submission"
+      },
       "TargetOrigin": {
         "type": "string",
         "enum": [
@@ -4914,6 +5555,25 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "WorkspaceOption": {
+        "properties": {
+          "alias": {
+            "type": "string",
+            "title": "Alias"
+          },
+          "configured": {
+            "type": "boolean",
+            "title": "Configured"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "alias",
+          "configured"
+        ],
+        "title": "WorkspaceOption"
       }
     }
   }

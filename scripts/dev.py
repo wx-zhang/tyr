@@ -26,7 +26,9 @@ def _commands(watch: bool) -> Sequence[Sequence[str]]:
             "packages",
         )
     )
-    return api, ("pnpm", "--dir", "apps/web", "dev")
+    return api, ("pnpm", "--dir", "apps/web", "dev"), (
+        "python", "-m", "gamr_cli.benign", "worker",
+    )
 
 
 def main() -> None:

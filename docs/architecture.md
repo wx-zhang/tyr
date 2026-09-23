@@ -1,5 +1,10 @@
 # Architecture
 
+Benign functional scenarios use a separate `scenario-test` entry point and fixed engine
+pipeline. CLI and `/api/v1/benign` enqueue the same JSON records; a separately running
+worker consumes them with participant locks. The architecture below describes GAMR's
+adversarial path. See [Benign scenario tests](benign-scenarios.md).
+
 The CLI is GAMR's primary entry point. The web app and API are optional interfaces for creating
 Experiment Presets, starting Experiments, and visualizing shared bundles.
 

@@ -1,0 +1,127 @@
+{
+  "$defs": {
+    "Check": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[a-z][a-z0-9_-]{0,63}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "query": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Query",
+          "type": "string"
+        },
+        "expectation": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Expectation",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "query",
+        "expectation"
+      ],
+      "title": "Check",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1",
+      "default": "1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "id": {
+      "pattern": "^[a-zA-Z0-9_-]{1,80}$",
+      "title": "Id",
+      "type": "string"
+    },
+    "title": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+    },
+    "original_input": {
+      "maxLength": 20000,
+      "minLength": 1,
+      "title": "Original Input",
+      "type": "string"
+    },
+    "workspace": {
+      "pattern": "^[a-z][a-z0-9_-]{0,63}$",
+      "title": "Workspace",
+      "type": "string"
+    },
+    "participants": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 20,
+      "minItems": 1,
+      "title": "Participants",
+      "type": "array"
+    },
+    "timezone": {
+      "title": "Timezone",
+      "type": "string"
+    },
+    "reference_time": {
+      "format": "date-time",
+      "title": "Reference Time",
+      "type": "string"
+    },
+    "stimulus": {
+      "maxLength": 10000,
+      "minLength": 1,
+      "title": "Stimulus",
+      "type": "string"
+    },
+    "require_bridge": {
+      "default": false,
+      "title": "Require Bridge",
+      "type": "boolean"
+    },
+    "checks": {
+      "items": {
+        "$ref": "#/$defs/Check"
+      },
+      "maxItems": 10,
+      "title": "Checks",
+      "type": "array"
+    },
+    "questions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Questions",
+      "type": "array"
+    },
+    "timeout_seconds": {
+      "default": 360,
+      "maximum": 1800,
+      "minimum": 10,
+      "title": "Timeout Seconds",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "title",
+    "original_input",
+    "workspace",
+    "participants",
+    "timezone",
+    "reference_time",
+    "stimulus"
+  ],
+  "title": "BenignScenario",
+  "type": "object",
+  "$id": "https://gamr.local/schemas/benign-scenario.schema.json"
+}

@@ -6,6 +6,11 @@ Own cross-package fixtures, integration tests, and smoke tests.
 
 ## Standards
 
+Benign functional pipeline tests live in `packages/engine/tests/test_benign.py`,
+`packages/adapters/tests/test_benign_*.py`, `apps/api/tests/test_benign.py`, and
+`apps/web/src/components/BenignPage.test.tsx`. Use fake peers; no simulated reply
+is available in the live runner.
+
 Use fake ports by default. Live Tyr/OpenRouter tests are opt-in markers and never run in default CI. Keep fixtures small and deterministic.
 
 ## Run-evidence fixtures

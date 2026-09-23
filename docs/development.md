@@ -1,5 +1,9 @@
 # Development
 
+`uv run poe dev:watch` also starts the independent benign worker. API reload does not
+restart that worker; restart it explicitly after worker-code changes. The `/benign`
+screen uses server-side workspace bindings. See [setup and pipeline](benign-scenarios.md).
+
 ```bash
 uv sync --all-packages --dev
 corepack enable
