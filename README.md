@@ -144,7 +144,8 @@ concurrent Scenario Executions do not share Tyr context.
 
 An Experiment may start from a validated `discovery-input` document instead of live
 target discovery. The document contains `schemaVersion`, `kind`, an informational
-`taskId`, and one candidate with `path`, `workspace`, `agent`, and `bridgeId`:
+`taskId`, and one candidate with `workspace`, `bridgeId`, and any `path` or `agent`
+required by the Task:
 
 ```json
 {
@@ -160,8 +161,11 @@ target discovery. The document contains `schemaVersion`, `kind`, an informationa
 }
 ```
 
-The candidate path must be an absolute child of `/home`; unknown fields, missing
-fields, unsupported versions, and parent traversal are rejected. The CLI validates
+Path constraints belong to the Task. The shared contract allows `path` and `agent`
+to be omitted or null. Supplied values must be non-empty strings; unknown fields,
+missing routing fields, and unsupported versions are rejected. GAMR checks the
+Task's discovery output fields and variable bindings before Scenario Execution.
+The CLI validates
 the local file before creating the Experiment and stores its content in the
 Experiment configuration, never the local file path:
 
@@ -176,7 +180,7 @@ informational and is not matched against the selected Task.
 
 Provided targets skip live discovery by default. Add
 `--fallback-to-discovery` (or enable the matching web option) to run a bounded,
-read-only preflight first. A preflight must confirm every supplied field; otherwise
+preflight first using the selected action mode. A preflight must confirm every supplied field; otherwise
 GAMR starts fresh live discovery before any Scenario Execution. If the provided
 target is unavailable and fallback is disabled, the Experiment is blocked.
 

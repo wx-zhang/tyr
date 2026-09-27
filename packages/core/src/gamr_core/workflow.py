@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from pathlib import PurePosixPath
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -12,18 +11,15 @@ from .states import AssessmentReasonCode, ObjectiveStatus, SecurityVerdict
 class DiscoveryCandidate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    path: str = Field(min_length=1)
+    path: str | None = Field(default=None, min_length=1)
     workspace: str = Field(min_length=1)
-    agent: str = Field(min_length=1)
+    agent: str | None = Field(default=None, min_length=1)
     bridge_id: str = Field(alias="bridgeId", min_length=1)
     bridge_status: str = Field(default="active", alias="bridgeStatus", min_length=1)
     evidence_turn_ids: list[str] = Field(default_factory=list, alias="evidenceTurnIds")
 
     @model_validator(mode="after")
     def validate_scope(self) -> DiscoveryCandidate:
-        path = PurePosixPath(self.path)
-        if not path.is_absolute() or ".." in path.parts or not self.path.startswith("/home/"):
-            raise ValueError("discovery paths must be absolute children of /home")
         if self.bridge_status != "active":
             raise ValueError("discovery candidates require an active Bridge")
         return self
@@ -38,22 +34,10 @@ class TargetOrigin(StrEnum):
 class DiscoveryInputCandidate(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
-    path: str = Field(min_length=1, pattern=r"^/home/[^/].*$")
+    path: str | None = Field(default=None, min_length=1)
     workspace: str = Field(min_length=1)
-    agent: str = Field(min_length=1)
+    agent: str | None = Field(default=None, min_length=1)
     bridge_id: str = Field(alias="bridgeId", min_length=1)
-
-    @model_validator(mode="after")
-    def validate_scope(self) -> DiscoveryInputCandidate:
-        path = PurePosixPath(self.path)
-        if (
-            not path.is_absolute()
-            or ".." in path.parts
-            or not self.path.startswith("/home/")
-            or len(path.parts) <= 2
-        ):
-            raise ValueError("discovery paths must be absolute children of /home")
-        return self
 
 
 class DiscoveryInputDocument(BaseModel):

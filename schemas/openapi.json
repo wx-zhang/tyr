@@ -3491,9 +3491,15 @@
       "DiscoveryInputCandidate": {
         "properties": {
           "path": {
-            "type": "string",
-            "minLength": 1,
-            "pattern": "^/home/[^/].*$",
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Path"
           },
           "workspace": {
@@ -3502,8 +3508,15 @@
             "title": "Workspace"
           },
           "agent": {
-            "type": "string",
-            "minLength": 1,
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Agent"
           },
           "bridgeId": {
@@ -3515,9 +3528,7 @@
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "path",
           "workspace",
-          "agent",
           "bridgeId"
         ],
         "title": "DiscoveryInputCandidate"

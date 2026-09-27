@@ -10,14 +10,24 @@ from gamr_core import (
 )
 
 
-def test_discovery_candidate_rejects_paths_outside_home() -> None:
-    with pytest.raises(ValueError, match="children of /home"):
-        DiscoveryCandidate(
-            path="/home2/important.txt",
-            workspace="peer",
-            agent="Alice",
-            bridgeId="bridge-1",
-        )
+@pytest.mark.parametrize("candidate_type", [DiscoveryCandidate, DiscoveryInputCandidate])
+@pytest.mark.parametrize("path", ["/srv/data", "/tmp/work", "relative/path", "Dorian -> Mira"])
+def test_discovery_path_is_task_data(
+    candidate_type: type[DiscoveryCandidate] | type[DiscoveryInputCandidate], path: str
+) -> None:
+    candidate = candidate_type(path=path, workspace="peer", agent="Alice", bridgeId="bridge-1")
+
+    assert candidate.path == path
+
+
+@pytest.mark.parametrize("candidate_type", [DiscoveryCandidate, DiscoveryInputCandidate])
+def test_discovery_accepts_workspace_and_bridge_without_path_or_agent(
+    candidate_type: type[DiscoveryCandidate] | type[DiscoveryInputCandidate],
+) -> None:
+    candidate = candidate_type.model_validate({"workspace": "Dorian", "bridgeId": "bridge-1"})
+
+    assert candidate.path is None
+    assert candidate.agent is None
 
 
 def test_discovery_candidate_requires_active_bridge() -> None:
@@ -62,7 +72,7 @@ def test_discovery_input_accepts_complete_document() -> None:
 @pytest.mark.parametrize(
     ("field", "value"),
     [
-        ("candidate.path", None),
+        ("candidate.path", ""),
         ("candidate.workspace", ""),
         ("candidate.agent", ""),
         ("candidate.bridgeId", None),
@@ -113,20 +123,6 @@ def test_discovery_input_rejects_undeclared_fields(field: str, value: object) ->
 )
 def test_discovery_input_rejects_unsupported_document_identity(field: str, value: str) -> None:
     payload = {**VALID_DISCOVERY_INPUT, field: value}
-
-    with pytest.raises(ValueError):
-        DiscoveryInputDocument.model_validate(payload)
-
-
-@pytest.mark.parametrize(
-    "path",
-    ["relative/path", "/tmp/file", "/home2/file", "/home/alice/../secret"],
-)
-def test_discovery_input_rejects_unsafe_candidate_paths(path: str) -> None:
-    payload = {
-        **VALID_DISCOVERY_INPUT,
-        "candidate": {**VALID_DISCOVERY_INPUT["candidate"], "path": path},
-    }
 
     with pytest.raises(ValueError):
         DiscoveryInputDocument.model_validate(payload)

@@ -1075,11 +1075,11 @@ export interface components {
         /** DiscoveryInputCandidate */
         DiscoveryInputCandidate: {
             /** Path */
-            path: string;
+            path?: string | null;
             /** Workspace */
             workspace: string;
             /** Agent */
-            agent: string;
+            agent?: string | null;
             /** Bridgeid */
             bridgeId: string;
         };

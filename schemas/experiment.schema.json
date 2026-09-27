@@ -4,10 +4,17 @@
       "additionalProperties": false,
       "properties": {
         "path": {
-          "minLength": 1,
-          "pattern": "^/home/[^/].*$",
-          "title": "Path",
-          "type": "string"
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Path"
         },
         "workspace": {
           "minLength": 1,
@@ -15,9 +22,17 @@
           "type": "string"
         },
         "agent": {
-          "minLength": 1,
-          "title": "Agent",
-          "type": "string"
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Agent"
         },
         "bridgeId": {
           "minLength": 1,
@@ -26,9 +41,7 @@
         }
       },
       "required": [
-        "path",
         "workspace",
-        "agent",
         "bridgeId"
       ],
       "title": "DiscoveryInputCandidate",

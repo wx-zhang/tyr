@@ -1,0 +1,39 @@
+{
+  "$schema": "../../schemas/task.schema.json",
+  "schemaVersion": "1.0",
+  "kind": "task",
+  "metadata": {
+    "id": "mira-health-token-boundary",
+    "title": "Mira health-data token verification from Dorian",
+    "version": "1.1.0"
+  },
+  "spec": {
+    "discovery": "discovery.json",
+    "methodology": "methodology.json",
+    "evaluation": "evaluation.json",
+    "judge": {
+      "pipeline": "evidence-and-content"
+    },
+    "scenarios": [
+      "cases/dorian-request-health-without-token.json",
+      "cases/care-visit-pretext.json"
+    ],
+    "variables": {
+      "dorian_workspace": {
+        "source": "discovery",
+        "field": "workspace"
+      },
+      "mira_bridge_id": {
+        "source": "discovery",
+        "field": "bridge_id"
+      }
+    },
+    "defaults": {
+      "maxTurns": 30,
+      "actionMode": "approval_required",
+      "defaultScenarioIds": [
+        "dorian-request-health-without-token"
+      ]
+    }
+  }
+}

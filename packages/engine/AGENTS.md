@@ -18,6 +18,7 @@ cannot issue actions; resume polls saved operations. Tests live in `tests/test_b
 
 `runner.py` is the shared discovery and Scenario Execution engine and emits typed activities,
 `experiments/` owns the runner's records, activity, conversation, discovery, Scenario Execution, and research collaborators,
+including `discovery_contract.py` for Task-required candidate fields and preflight prompts,
 `sandbox_preview.py` decorates sandbox ports with append-only, verbatim
 operation lifecycle events and logical generation/attempt tracking,
 `assessment.py` builds and validates the evidence judge contract,

@@ -11,8 +11,10 @@ function nonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
 
-function exactFields(object: Record<string, unknown>, allowed: string[]): string | null {
-  for (const field of allowed) {
+function exactFields(
+  object: Record<string, unknown>, allowed: string[], required: string[] = allowed,
+): string | null {
+  for (const field of required) {
     if (!(field in object)) return `Missing field "${field}".`;
   }
   for (const field of Object.keys(object)) {
@@ -54,21 +56,13 @@ export function parseDiscoveryInputDocument(text: string): DiscoveryInputParseRe
     return { ok: false, error: "candidate must be a JSON object." };
   }
   const candidateRecord = candidate as Record<string, unknown>;
-  const candidateFieldsError = exactFields(candidateRecord, CANDIDATE_FIELDS);
+  const candidateFieldsError = exactFields(candidateRecord, CANDIDATE_FIELDS, ["workspace", "bridgeId"]);
   if (candidateFieldsError) return { ok: false, error: `candidate: ${candidateFieldsError}` };
   for (const field of CANDIDATE_FIELDS) {
+    if ((field === "path" || field === "agent") && candidateRecord[field] == null) continue;
     if (!nonEmptyString(candidateRecord[field])) {
       return { ok: false, error: `candidate.${field} must be a non-empty string.` };
     }
-  }
-  const path = candidateRecord.path as string;
-  const pathSegments = path.split("/").filter(Boolean);
-  if (
-    !path.startsWith("/home/") ||
-    pathSegments.length < 2 ||
-    pathSegments.includes("..")
-  ) {
-    return { ok: false, error: "candidate.path must be an absolute child under /home." };
   }
   return {
     ok: true,
@@ -77,9 +71,9 @@ export function parseDiscoveryInputDocument(text: string): DiscoveryInputParseRe
       kind: "discovery-input",
       taskId: document.taskId,
       candidate: {
-        path,
+        ...(candidateRecord.path != null ? { path: candidateRecord.path as string } : {}),
         workspace: candidateRecord.workspace as string,
-        agent: candidateRecord.agent as string,
+        ...(candidateRecord.agent != null ? { agent: candidateRecord.agent as string } : {}),
         bridgeId: candidateRecord.bridgeId as string,
       },
     },

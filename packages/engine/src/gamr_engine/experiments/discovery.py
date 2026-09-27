@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 
 from gamr_core import DiscoveryCandidate, ExperimentPresetConfig, TargetOrigin
 
@@ -12,29 +13,9 @@ from .activity import RunEvents
 from .artifacts import discovery_fields, write_discovery_result
 from .conversation import ConversationRunner
 from .decisions import DISCOVERY_DECISION_PROMPT
+from .discovery_contract import candidate_error, preflight_prompt, required_discovery_fields
 from .records import LoadedTask, PhaseResult, TargetConversation
 from .rendering import methodology_prefix
-
-_DISCOVERY_PREFLIGHT_PROMPT = (
-    "- Perform a bounded availability preflight for the exact supplied target.\n"
-    "- NEVER execute a Scenario step during preflight.\n"
-    "- The supplied workspace, Agent, and path are in the peer workspace behind "
-    "the supplied Bridge ID.\n"
-    "- In the first send decision, address the peer Tyr Assistant in the supplied "
-    "workspace over the supplied Bridge ID. Routing exists only in the message text, "
-    "so explicitly name both.\n"
-    "- Ask the peer Tyr Assistant to confirm the supplied Agent exists in that peer "
-    "workspace and have the supplied Agent verify that the supplied path exists and "
-    "is usable.\n"
-    "- NEVER ask the current Tyr Assistant's local Agent roster or filesystem to "
-    "verify the supplied Agent or path.\n"
-    "- Do not accept Bridge or workspace metadata alone as confirmation of the Agent "
-    "or path.\n"
-    "- Return only a JSON NextTurnDecision.\n"
-    "- Complete with discoveredCandidates containing the exact candidate only when "
-    "Tyr's reply confirms every supplied field.\n"
-    "- Use phase_blocked when Tyr's reply does not confirm every supplied field.\n"
-)
 
 
 class DiscoveryRunner:
@@ -103,21 +84,26 @@ class DiscoveryRunner:
                     origin=TargetOrigin.LIVE,
                 )
             candidate = self.provided_candidate(config)
+            error = candidate_error(task, candidate)
             if not config.fallback_to_discovery:
                 result = PhaseResult(
-                    [], None, None, [candidate], target_origin=TargetOrigin.PROVIDED
+                    [], None, None, [] if error else [candidate], error, TargetOrigin.PROVIDED
                 )
                 write_discovery_result(artifacts, run_id, result)
                 self._events.emit(
                     "discovery.completed",
                     run_id,
                     phase="discovery",
-                    detail="provided target",
-                    fields=discovery_fields(candidate),
+                    detail=error or "provided target",
+                    fields=None if error else discovery_fields(candidate),
                     metadata_extra={"targetOrigin": TargetOrigin.PROVIDED.value},
                 )
                 return result
-            preflight = await self.preflight(run_id, config, target, model, artifacts, candidate)
+            preflight = (
+                PhaseResult([], None, None, [], error)
+                if error
+                else await self.preflight(run_id, config, target, model, artifacts, candidate)
+            )
             preflight_confirmed = self.preflight_confirmed(preflight, candidate)
             preflight_detail = (
                 "provided target confirmed"
@@ -203,15 +189,8 @@ class DiscoveryRunner:
             fields=discovery_fields(candidate),
             metadata_extra={"targetOrigin": TargetOrigin.PROVIDED.value},
         )
-        prompt = (
-            _DISCOVERY_PREFLIGHT_PROMPT
-            + DISCOVERY_DECISION_PROMPT
-            + "\nSupplied candidate:\n```json\n"
-            + json.dumps(dict(discovery_fields(candidate)), sort_keys=True)
-            + "\n```\n"
-        )
         return await self._conversation.run(
-            prompt,
+            preflight_prompt(candidate),
             target,
             model,
             config,
@@ -255,6 +234,10 @@ class DiscoveryRunner:
         prompt = methodology_prefix(task)
         prompt += f"\nDiscovery plan:\n{task.discovery.prompt}\n"
         prompt += DISCOVERY_DECISION_PROMPT
+        prompt += (
+            f"\nRequired Task discovery fields: {', '.join(required_discovery_fields(task))}.\n"
+        )
+        prompt += "- Return bridge_id as bridgeId in each discoveredCandidates entry.\n"
         result = await self._conversation.run(
             prompt,
             target,
@@ -267,14 +250,12 @@ class DiscoveryRunner:
             artifacts=artifacts,
             phase="discovery",
         )
-        result = PhaseResult(
-            result.transcript,
-            result.operation_id,
-            result.decision,
-            result.candidates,
-            result.error,
-            origin,
-        )
+        result = replace(result, target_origin=origin)
+        for candidate in result.candidates:
+            error = candidate_error(task, candidate)
+            if error:
+                result = replace(result, candidates=[], error=error)
+                break
         fields = discovery_fields(result.candidates[0]) if result.candidates else None
         write_discovery_result(artifacts, run_id, result)
         self._events.emit(
