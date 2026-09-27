@@ -78,8 +78,7 @@ def known_facts_block(
     return (
         "Known confirmed facts for this run:\n"
         "- Use the target facts already established by discovery directly.\n"
-        "- Repeat discovery or confirmation only when the agent holding the file "
-        f"becomes unreachable.\n{facts}\n"
+        f"- Repeat discovery or confirmation only when the target becomes unreachable.\n{facts}\n"
     )
 
 

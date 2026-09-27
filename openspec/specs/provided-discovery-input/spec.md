@@ -6,23 +6,38 @@ Allow researchers to reuse a complete, operator-supplied discovery target across
 ## Requirements
 
 ### Requirement: Versioned discovery input document
-The system SHALL accept a dedicated discovery-input JSON document with schema version `1.0`, kind `discovery-input`, an informational Task ID, and exactly one candidate containing non-empty `path`, `workspace`, `agent`, and `bridgeId` values. The candidate path SHALL be an absolute child of `/home` without parent traversal. Unsupported versions, incorrect kinds, missing fields, invalid paths, and undeclared fields SHALL be rejected before an Experiment starts.
+The system SHALL accept a dedicated discovery-input JSON document with schema version `1.0`, kind `discovery-input`, an informational Task ID, and exactly one candidate containing non-empty `workspace` and `bridgeId` values. `path` and `agent` MAY be omitted or null; supplied values SHALL be non-empty strings. Path meaning and location constraints SHALL belong to the Task rather than the shared discovery contract. Unsupported versions, incorrect kinds, missing routing fields, empty supplied values, and undeclared fields SHALL be rejected before an Experiment starts.
 
 #### Scenario: Valid complete document
-- **WHEN** a researcher supplies a version `1.0` discovery-input document with all required candidate fields and a confined `/home` path
+- **WHEN** a researcher supplies a version `1.0` discovery-input document with all required routing fields and any Task-required path or Agent
 - **THEN** the system accepts the document as a complete provided discovery target
 
 #### Scenario: Incomplete document
-- **WHEN** a discovery-input document omits any required candidate field
+- **WHEN** a discovery-input document omits workspace or Bridge ID
 - **THEN** the system rejects the configuration before creating or starting an Experiment
 
-#### Scenario: Unsafe candidate path
-- **WHEN** the supplied candidate path is relative, is outside `/home`, or contains parent traversal
-- **THEN** the system rejects the configuration before creating or starting an Experiment
+#### Scenario: Task-defined candidate path
+- **WHEN** the supplied candidate path is a non-empty string outside `/home`
+- **THEN** the shared discovery-input validator accepts it without imposing a filesystem root
+
+#### Scenario: Workspace-only routing target
+- **WHEN** the Task requires only workspace and Bridge ID and the supplied candidate omits path and Agent
+- **THEN** the system accepts the candidate and preserves only the supplied fields in discovery evidence
 
 #### Scenario: Informational Task ID differs
 - **WHEN** the document's Task ID differs from the Task selected for the Experiment
 - **THEN** the system retains and presents the supplied Task ID without rejecting the document or changing the selected Task
+
+### Requirement: Task-required discovery fields
+Before Scenario Execution, the system SHALL require every field declared in the Task's discovery `outputFields` and discovery variable bindings. This check SHALL apply to both live and provided candidates. Missing fields SHALL produce an explicit blocked reason; provided candidates with fallback enabled SHALL proceed to live discovery. Discovery prompts SHALL instruct the model to follow the Task's discovery scope without executing Scenario steps.
+
+#### Scenario: Missing Task-required path
+- **WHEN** a Task requires path but the candidate omits it and fallback is disabled
+- **THEN** the Experiment is blocked with a missing-path reason before Scenario Execution
+
+#### Scenario: Missing Task-required field with fallback
+- **WHEN** a provided candidate lacks a Task-required field and fallback is enabled
+- **THEN** the system starts live discovery without attempting an incomplete target preflight
 
 ### Requirement: CLI discovery input selection
 The CLI SHALL provide an optional discovery-input path for `gamr experiment run`. It SHALL read and validate the document before creating the Experiment and SHALL persist the validated content rather than relying on the external path during execution.
@@ -55,7 +70,7 @@ When an Experiment contains a valid discovery input and fallback is disabled, th
 
 #### Scenario: Deterministic discovery bypass
 - **WHEN** an Experiment has valid discovery input and fallback is disabled
-- **THEN** no live discovery turn occurs and Scenario Execution uses the supplied path, workspace, agent, and Bridge ID
+- **THEN** no live discovery turn occurs and Scenario Execution uses the supplied routing and Task-required fields
 
 #### Scenario: No provided input
 - **WHEN** an Experiment has no discovery input
@@ -66,18 +81,18 @@ When an Experiment contains a valid discovery input and fallback is disabled, th
 - **THEN** the Experiment reports the resulting failure without starting live discovery
 
 ### Requirement: Opt-in discovery fallback
-The system SHALL expose fallback to live discovery as an option that defaults to disabled and is valid only when discovery input is configured. When enabled, the system SHALL perform a minimal read-only target-availability preflight before any Scenario Execution. A successful preflight SHALL retain the supplied candidate; an unavailable target SHALL start the existing live discovery flow. The preflight SHALL NOT execute Scenario steps or request an action approval.
+The system SHALL expose fallback to live discovery as an option that defaults to disabled and is valid only when discovery input is configured. When enabled with all Task-required fields present, the system SHALL perform a bounded target-availability preflight using the selected action mode before any Scenario Execution. A successful preflight SHALL retain the supplied candidate; an unavailable target SHALL start live discovery. Preflight SHALL verify only supplied fields and SHALL NOT execute Scenario steps. Action-enabled requests SHALL remain subject to Tyr-side human approval.
 
 #### Scenario: Fallback remains disabled by default
 - **WHEN** a researcher provides discovery input without enabling fallback
 - **THEN** the system performs no target-availability preflight and does not automatically start live discovery
 
 #### Scenario: Provided target passes preflight
-- **WHEN** fallback is enabled and the read-only preflight confirms the supplied target is available
+- **WHEN** fallback is enabled and the preflight confirms the supplied target is available
 - **THEN** the system executes Scenarios with the supplied candidate without running live discovery
 
 #### Scenario: Provided target fails preflight
-- **WHEN** fallback is enabled and the read-only preflight cannot confirm the supplied target is available
+- **WHEN** fallback is enabled and the preflight cannot confirm the supplied target is available
 - **THEN** the system runs normal discovery before starting any Scenario Execution
 
 #### Scenario: Fallback configuration lacks input

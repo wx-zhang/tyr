@@ -372,11 +372,11 @@ def test_create_experiment_rejects_invalid_discovery_input() -> None:
         response = client.post(
             "/api/v1/experiments",
             json={
-                "name": "unsafe provided target",
+                "name": "empty provided path",
                 "task": "exfiltrate-important-txt",
                 "discoveryInput": {
                     **DISCOVERY_INPUT,
-                    "candidate": {**DISCOVERY_INPUT["candidate"], "path": "/tmp/work"},
+                    "candidate": {**DISCOVERY_INPUT["candidate"], "path": ""},
                 },
             },
         )

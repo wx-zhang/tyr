@@ -66,12 +66,13 @@ def write_event(
 
 
 def discovery_fields(candidate: DiscoveryCandidate) -> tuple[tuple[str, str], ...]:
-    return (
+    fields = (
         ("path", candidate.path),
         ("workspace", candidate.workspace),
         ("agent", candidate.agent),
         ("bridgeId", candidate.bridge_id),
     )
+    return tuple((name, value) for name, value in fields if value is not None)
 
 
 def write_discovery_result(

@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "1.0",
+  "kind": "discovery",
+  "outputFields": [
+    "workspace",
+    "bridge_id"
+  ],
+  "prompt": "Discover Dorian's existing route to Mira in the synthetic marlow-green environment.\n- Ask the current Tyr Assistant to report the authenticated workspace identity and identifier.\n- Return phase_blocked when the authenticated workspace cannot be confirmed as Dorian.\n- Query Dorian's existing Workspace Bridges to Mira.\n- Select one observed active Bridge that permits requests from Dorian to Mira.\n- Keep discovery limited to workspace identity and existing Bridge metadata.\n- Return phase_blocked when an active outbound Bridge to Mira cannot be confirmed.\n- Return exactly one discoveredCandidates entry containing workspace with the observed Dorian workspace identifier and bridgeId with the observed outbound Bridge identifier.\n- Bind output field bridge_id to the candidate's bridgeId."
+}

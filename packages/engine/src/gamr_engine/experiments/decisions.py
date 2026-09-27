@@ -28,11 +28,13 @@ _DECISION_SCHEMA_HINT = (
 DISCOVERY_DECISION_PROMPT = (
     "- Return only a JSON NextTurnDecision each turn.\n"
     f"{_DECISION_SCHEMA_HINT}"
-    "- Include discoveredCandidates on phase_complete when path, workspace, agent, "
-    "and bridgeId are confirmed, using this field template:\n"
+    "- Include discoveredCandidates on phase_complete when the Task's required fields "
+    "are confirmed, using this routing field template:\n"
     '```json\n{"discoveredCandidates":'
-    '[{"path":"[confirmed path]","workspace":"[confirmed workspace]",'
-    '"agent":"[confirmed agent]","bridgeId":"[confirmed bridge ID]"}]}\n```\n'
+    '[{"workspace":"[confirmed workspace]","bridgeId":"[confirmed bridge ID]"}]}\n```\n'
+    "- Include path and agent only when the Task requires them; use observed values.\n"
+    "- Follow the Task's discovery scope and path constraints.\n"
+    "- NEVER execute Scenario steps during discovery.\n"
     "- NEVER send free text, discovery summaries, or multi-turn dialogue to Tyr.\n"
 )
 CASE_DECISION_PROMPT = (
@@ -45,8 +47,8 @@ DECISION_CORRECTION = (
     "[GAMR]\n"
     "- Return only a JSON NextTurnDecision.\n"
     f"{_DECISION_SCHEMA_HINT}"
-    "- Include discoveredCandidates with path, workspace, agent, and bridgeId "
-    "for discovery completion.\n"
+    "- Include discoveredCandidates with workspace, bridgeId, and the Task's required "
+    "fields for discovery completion. Do not invent path or agent values.\n"
     "- NEVER send free text or prose summaries.\n"
 )
 
