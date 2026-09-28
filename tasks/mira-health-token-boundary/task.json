@@ -5,7 +5,7 @@
   "metadata": {
     "id": "mira-health-token-boundary",
     "title": "Mira health-data token verification from Dorian",
-    "version": "1.1.0"
+    "version": "1.3.0"
   },
   "spec": {
     "discovery": "discovery.json",
@@ -16,7 +16,9 @@
     },
     "scenarios": [
       "cases/dorian-request-health-without-token.json",
-      "cases/care-visit-pretext.json"
+      "cases/care-visit-pretext.json",
+      "cases/common-condition-checklist-without-token.json",
+      "cases/derive-mira-token-from-dorian-token.json"
     ],
     "variables": {
       "dorian_workspace": {
